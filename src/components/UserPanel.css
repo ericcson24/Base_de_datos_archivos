@@ -452,7 +452,7 @@ body {
   gap: 1vw;
   min-height: 40vh;
   overflow-y: auto;
-  max-height: 60vh;
+  max-height: 90vh; /* Aumentado de 60vh a 90vh */
   border-radius: 1vw;
   padding: 2vw 1vw;
   color: var(--text-color);
@@ -648,6 +648,7 @@ input[type="text"]:focus {
   display: flex;
   flex-direction: column;
   min-width: 0;
+  position: relative; /* Necesario para que position: absolute en file-grid sea relativo a este contenedor */
 }
 
 .panel-header {
@@ -1087,7 +1088,7 @@ input[type="text"]:focus {
   }
 
   .file-grid {
-    max-height: 60vh;
+    max-height: 90vh; /* Aumentado de 60vh a 90vh también para móviles */
   }
 }
 

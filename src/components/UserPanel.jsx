@@ -135,6 +135,10 @@ const UserPanel = ({ user, onLogout, onBackToFolders }) => {
   const [isDragging, setIsDragging] = useState(false);
   const [isResizing, setIsResizing] = useState(false);
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
+  const [initialSize, setInitialSize] = useState({ width: 0, height: 0 });
+  const [initialMouse, setInitialMouse] = useState({ x: 0, y: 0 });
+  const [initialPosition, setInitialPosition] = useState({ x: 0, y: 0 });
+  const [fileGridWidth, setFileGridWidth] = useState(0);
 
   // Estados para drag and drop
   const [isDragOver, setIsDragOver] = useState(false);
@@ -704,45 +708,65 @@ useEffect(() => {
 
     if (action === 'move') {
       setIsDragging(true);
-      // Calcular offset desde la posición actual del file-grid
-      setDragOffset({
-        x: e.clientX - rect.left,
-        y: e.clientY - rect.top
-      });
-      // Guardar posición inicial
-      setFileGridPosition({ x: rect.left, y: rect.top });
+      setInitialMouse({ x: e.clientX, y: e.clientY });
+      setInitialPosition({ x: rect.left, y: rect.top });
+      setFileGridWidth(rect.width);
     } else if (action === 'resize') {
       setIsResizing(true);
+      // Guardar tamaño inicial y posición del mouse
+      const currentWidth = fileGrid.offsetWidth;
+      const currentHeight = fileGrid.offsetHeight;
+      setInitialSize({ width: currentWidth, height: currentHeight });
+      setInitialMouse({ x: e.clientX, y: e.clientY });
     }
   };
 
   const handleMouseMove = useCallback((e) => {
     if (isDragging) {
-      // Calcular nueva posición basada en el cursor menos el offset
-      const newX = e.clientX - dragOffset.x;
-      const newY = e.clientY - dragOffset.y;
+      const deltaY = e.clientY - initialMouse.y;
+      const deltaX = e.clientX - initialMouse.x;
+      const newX = initialPosition.x + deltaX;
+      const newY = initialPosition.y + deltaY;
       setFileGridPosition({ x: newX, y: newY });
     } else if (isResizing) {
-      const container = document.querySelector('.main-panel');
-      if (container) {
-        const rect = container.getBoundingClientRect();
-        // Reducir tamaño mínimo para mejor usabilidad
-        const newWidth = Math.max(300, e.clientX - rect.left);
-        const newHeight = Math.max(200, e.clientY - rect.top);
-        setFileGridSize({
-          width: `${newWidth}px`,
-          height: `${newHeight}px`
-        });
-      }
+      // Calcular nuevo tamaño basado en la diferencia desde el mouse inicial
+      const deltaX = e.clientX - initialMouse.x;
+      const deltaY = e.clientY - initialMouse.y;
+      
+      const newWidth = Math.max(200, initialSize.width + deltaX);
+      const maxHeight = window.innerHeight * 0.98; // Aumentar máximo a 95% de la altura de la ventana
+      const newHeight = Math.min(maxHeight, Math.max(200, initialSize.height + deltaY));
+      
+      setFileGridSize({
+        width: `${newWidth}px`,
+        height: `${newHeight}px`
+      });
     }
-  }, [isDragging, isResizing, dragOffset]);
+  }, [isDragging, isResizing, initialMouse, initialPosition, initialSize]);
 
   const handleMouseUp = useCallback(() => {
     setIsDragging(false);
     setIsResizing(false);
-    // Resetear la posición del file-grid cuando se suelta
-    setFileGridPosition({ x: 0, y: 0 });
-  }, []);
+    // Convertir posición absoluta a relativa al contenedor cuando se suelta el movimiento
+    if (isDragging && (fileGridPosition.x !== 0 || fileGridPosition.y !== 0)) {
+      const container = document.querySelector('.main-panel');
+      if (container) {
+        const containerRect = container.getBoundingClientRect();
+        const containerStyles = window.getComputedStyle(container);
+        const paddingLeft = parseFloat(containerStyles.paddingLeft);
+        const paddingTop = parseFloat(containerStyles.paddingTop);
+        
+        // Calcular posición relativa al área de contenido del main-panel
+        const relativeX = fileGridPosition.x - (containerRect.left + paddingLeft);
+        const relativeY = fileGridPosition.y - (containerRect.top + paddingTop);
+        
+        setFileGridPosition({
+          x: Math.max(0, relativeX),
+          y: Math.max(0, relativeY)
+        });
+      }
+    }
+  }, [isDragging, fileGridPosition]);
 
   useEffect(() => {
     if (isDragging || isResizing) {
@@ -890,9 +914,9 @@ useEffect(() => {
           style={{
             width: fileGridSize.width,
             height: fileGridSize.height,
-            position: isDragging ? 'fixed' : 'relative',
-            left: isDragging ? fileGridPosition.x : 'auto',
-            top: isDragging ? fileGridPosition.y : 'auto',
+            position: isDragging ? 'fixed' : (fileGridPosition.x !== 0 || fileGridPosition.y !== 0) ? 'absolute' : 'relative',
+            left: isDragging ? fileGridPosition.x : (fileGridPosition.x !== 0 || fileGridPosition.y !== 0) ? `${fileGridPosition.x}px` : 'auto',
+            top: isDragging ? fileGridPosition.y : (fileGridPosition.x !== 0 || fileGridPosition.y !== 0) ? `${fileGridPosition.y}px` : 'auto',
             zIndex: isDragging ? 1000 : 'auto'
           }}
           onDragEnter={handleDragEnter}
