@@ -10,6 +10,30 @@ function App() {
   const [currentView, setCurrentView] = useState('login'); // 'login', 'folders', 'panel'
   const [isLoading, setIsLoading] = useState(true);
 
+  // Estado para el tema global
+  const [isDarkMode, setIsDarkMode] = useState(() => {
+    // Cargar preferencia del localStorage
+    const saved = localStorage.getItem('theme');
+    return saved === 'dark';
+  });
+
+  // Aplicar tema cuando cambia
+  useEffect(() => {
+    const root = document.documentElement;
+    if (isDarkMode) {
+      root.setAttribute('data-theme', 'dark');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      root.setAttribute('data-theme', 'light');
+      localStorage.setItem('theme', 'light');
+    }
+  }, [isDarkMode]);
+
+  // Función para toggle del tema
+  const toggleTheme = () => {
+    setIsDarkMode(!isDarkMode);
+  };
+
   // Verificar si hay token guardado al cargar la app
   useEffect(() => {
     const checkStoredToken = async () => {
@@ -58,6 +82,18 @@ function App() {
           password: credentials.password
         }),
       });
+
+      // Verificar si la respuesta es exitosa antes de parsear JSON
+      if (!response.ok) {
+        // Intentar obtener el mensaje de error del servidor
+        try {
+          const errorData = await response.json();
+          throw new Error(errorData.message || `Error HTTP ${response.status}`);
+        } catch (jsonError) {
+          // Si no hay JSON válido en la respuesta de error, usar el status
+          throw new Error(`Error del servidor: ${response.status} ${response.statusText}`);
+        }
+      }
 
       const data = await response.json();
 
@@ -114,7 +150,7 @@ function App() {
   if (!isLoggedIn) {
     return (
       <div className="App">
-        <Login onLogin={handleLogin} />
+        <Login onLogin={handleLogin} onThemeToggle={toggleTheme} isDarkMode={isDarkMode} />
       </div>
     );
   }
@@ -126,6 +162,8 @@ function App() {
         <FolderSelector
           onSelectFolder={handleSelectFolder}
           onLogout={handleLogout}
+          onThemeToggle={toggleTheme}
+          isDarkMode={isDarkMode}
         />
       </div>
     );
@@ -138,6 +176,8 @@ function App() {
       user={user}
       onLogout={handleLogout}
       onBackToFolders={() => setCurrentView('folders')}
+      onThemeToggle={toggleTheme}
+      isDarkMode={isDarkMode}
     />;
   }
 
@@ -151,7 +191,7 @@ function App() {
         <p>currentView: {currentView}</p>
         <p>user: {user ? JSON.stringify(user) : 'null'}</p>
       </div>
-      <Login onLogin={handleLogin} />
+      <Login onLogin={handleLogin} onThemeToggle={toggleTheme} isDarkMode={isDarkMode} />
     </div>
   );
 }

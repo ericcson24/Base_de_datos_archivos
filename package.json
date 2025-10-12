@@ -17,8 +17,9 @@
   "scripts": {
     "start": "node server/server.js",
     "build": "react-scripts build",
-    "dev": "react-scripts start",
-    "prestart": "npm run build"
+    "client": "react-scripts start",
+    "server": "nodemon server/server.js",
+    "dev": "concurrently \"npm run server\" \"npm run client\""
   },
   "eslintConfig": {
     "extends": [
@@ -37,5 +38,9 @@
       "last 1 safari version"
     ]
   },
-  "proxy": "http://localhost:3000"
+  "proxy": "http://localhost:5000",
+  "devDependencies": {
+    "concurrently": "^9.2.1",
+    "nodemon": "^3.1.10"
+  }
 }

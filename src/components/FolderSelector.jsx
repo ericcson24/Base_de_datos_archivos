@@ -3,7 +3,7 @@ import FrostedContainer from './FrostedContainer';
 import Button from './Button';
 import './FolderSelector.css';
 
-const FolderSelector = ({ onSelectFolder, onLogout }) => {
+const FolderSelector = ({ onSelectFolder, onLogout, onThemeToggle, isDarkMode }) => {
   const handleFolderSelect = (tipo) => {
     // Establecer cookie como hacía el original
     document.cookie = `carpeta=${tipo}; path=/`;
@@ -22,6 +22,15 @@ const FolderSelector = ({ onSelectFolder, onLogout }) => {
     <div className="folder-selector">
       {/* Background */}
       <div className="bg"></div>
+
+      {/* Theme Toggle Button */}
+      <button
+        className="theme-toggle-btn"
+        onClick={onThemeToggle}
+        title={isDarkMode ? 'Cambiar a modo claro' : 'Cambiar a modo oscuro'}
+      >
+        {isDarkMode ? '☀️' : '🌙'}
+      </button>
 
       <div className="selector-container">
         <FrostedContainer variant="card" className="options-container">

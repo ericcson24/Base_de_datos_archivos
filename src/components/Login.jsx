@@ -4,7 +4,7 @@ import Button from './Button';
 import Input from './Input';
 import './Login.css';
 
-const Login = ({ onLogin, onSwitchToRegister }) => {
+const Login = ({ onLogin, onSwitchToRegister, onThemeToggle, isDarkMode }) => {
   const [formData, setFormData] = useState({
     username: '',
     password: ''
@@ -58,67 +58,82 @@ const Login = ({ onLogin, onSwitchToRegister }) => {
   };
 
   return (
-    <FormContainer
-      title="Iniciar Sesión"
-      subtitle="Accede a tu nube personal"
-      maxWidth="400px"
-    >
-      <form onSubmit={handleSubmit} className="login-form">
-        {errors.general && (
-          <div className="error-message general-error">
-            {errors.general}
-          </div>
-        )}
+    <div className="login-container">
+      {/* Theme Toggle Button */}
+      <button 
+        className="theme-toggle-btn"
+        onClick={onThemeToggle}
+        title={isDarkMode ? 'Cambiar a modo claro' : 'Cambiar a modo oscuro'}
+        style={{
+          position: 'absolute',
+          top: '1rem',
+          right: '1rem',
+          zIndex: 1000
+        }}
+      >
+        {isDarkMode ? '☀️' : '🌙'}
+      </button>
 
-        <Input
-          type="text"
-          name="username"
-          placeholder="Nombre de usuario"
-          value={formData.username}
-          onChange={handleChange}
-          error={errors.username}
-          icon="👤"
-          autoComplete="username"
-        />
+      <FormContainer
+        title="Iniciar Sesión"
+        subtitle="Accede a tu nube personal"
+        maxWidth="400px"
+      >
+        <form onSubmit={handleSubmit} className="login-form">
+          {errors.general && (
+            <div className="error-message general-error">
+              {errors.general}
+            </div>
+          )}
 
-        <Input
-          type="password"
-          name="password"
-          placeholder="Contraseña"
-          value={formData.password}
-          onChange={handleChange}
-          error={errors.password}
-          icon="🔒"
-          autoComplete="current-password"
-        />
+          <Input
+            type="text"
+            name="username"
+            placeholder="Nombre de usuario"
+            value={formData.username}
+            onChange={handleChange}
+            error={errors.username}
+            icon=""
+            autoComplete="username"
+          />
 
-        <Button
-          type="submit"
-          variant="primary"
-          size="large"
-          loading={isLoading}
-          fullWidth
-        >
-          {isLoading ? 'Iniciando sesión...' : 'Iniciar Sesión'}
-        </Button>
+          <Input
+            type="password"
+            name="password"
+            placeholder="Contraseña"
+            value={formData.password}
+            onChange={handleChange}
+            error={errors.password}
+            icon=""
+            autoComplete="current-password"
+          />
 
-        {onSwitchToRegister && (
-          <div className="form-footer">
-            <p>
-              ¿No tienes cuenta?{' '}
-              <button
-                type="button"
-                className="link-button"
-                onClick={onSwitchToRegister}
-              >
-                Regístrate aquí
-              </button>
-            </p>
-          </div>
-        )}
-      </form>
-    </FormContainer>
+          <Button
+            type="submit"
+            variant="primary"
+            size="large"
+            loading={isLoading}
+            fullWidth
+          >
+            {isLoading ? 'Iniciando sesión...' : 'Iniciar Sesión'}
+          </Button>
+
+          {onSwitchToRegister && (
+            <div className="form-footer">
+              <p>
+                ¿No tienes cuenta?{' '}
+                <button
+                  type="button"
+                  className="link-button"
+                  onClick={onSwitchToRegister}
+                >
+                  Regístrate aquí
+                </button>
+              </p>
+            </div>
+          )}
+        </form>
+      </FormContainer>
+    </div>
   );
-};
-
-export default Login;
+};export default Login;

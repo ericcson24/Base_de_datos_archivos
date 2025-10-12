@@ -12,6 +12,46 @@ const getAuthenticatedUrl = (url) => {
   return `${url}${separator}token=${encodeURIComponent(token)}`;
 };
 
+// Función para descargar archivos de manera más confiable
+const downloadFile = async (fileId, fileName) => {
+  try {
+    const token = getAuthToken();
+    const downloadUrl = `/api/files/download/${fileId}?download=true&token=${encodeURIComponent(token)}`;
+
+    // Usar fetch para obtener el archivo y crear un blob URL
+    const response = await fetch(downloadUrl, {
+      headers: {
+        'Authorization': `Bearer ${token}`
+      }
+    });
+
+    if (!response.ok) {
+      throw new Error(`Error HTTP: ${response.status}`);
+    }
+
+    const blob = await response.blob();
+
+    // Crear un enlace con blob URL
+    const blobUrl = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = blobUrl;
+    link.download = fileName;
+    link.style.display = 'none';
+
+    // Agregar al DOM, hacer click y remover
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+
+    // Limpiar el blob URL después de un tiempo
+    setTimeout(() => URL.revokeObjectURL(blobUrl), 1000);
+
+  } catch (error) {
+    console.error('Error descargando archivo:', error);
+    alert('Error al descargar el archivo: ' + error.message);
+  }
+};
+
 // Utility function
 const formatFileSize = (bytes) => {
   if (bytes >= 1024 * 1024 * 1024) return (bytes / (1024 * 1024 * 1024)).toFixed(2) + ' GB';
@@ -103,7 +143,7 @@ const getAuthenticatedPreviewUrl = async (fileId, filename) => {
   }
 };
 
-const UserPanel = ({ user, onLogout, onBackToFolders }) => {
+const UserPanel = ({ user, onLogout, onBackToFolders, onThemeToggle, isDarkMode }) => {
   console.log('🎯 UserPanel se está renderizando con user:', user);
 
   const [files, setFiles] = useState([]);
@@ -147,23 +187,6 @@ const UserPanel = ({ user, onLogout, onBackToFolders }) => {
   // Estado para progreso de subida
   const [uploadProgress, setUploadProgress] = useState(null);
 
-  // Estado para el tema
-  const [isDarkMode, setIsDarkMode] = useState(() => {
-    // Cargar preferencia del localStorage
-    const saved = localStorage.getItem('theme');
-    return saved === 'dark';
-  });  // Aplicar tema cuando cambia
-  useEffect(() => {
-    const root = document.documentElement;
-    if (isDarkMode) {
-      root.setAttribute('data-theme', 'dark');
-      localStorage.setItem('theme', 'dark');
-    } else {
-      root.setAttribute('data-theme', 'light');
-      localStorage.setItem('theme', 'light');
-    }
-  }, [isDarkMode]);
-
   // Estados para búsqueda y ordenamiento
   const [searchQuery, setSearchQuery] = useState('');
   const [isSearchExpanded, setIsSearchExpanded] = useState(false);
@@ -172,7 +195,7 @@ const UserPanel = ({ user, onLogout, onBackToFolders }) => {
 
   // Función para toggle del tema
   const toggleTheme = () => {
-    setIsDarkMode(!isDarkMode);
+    onThemeToggle();
   };
 
   // Funciones para búsqueda y ordenamiento
@@ -1195,8 +1218,8 @@ const FileItem = ({ item, onFolderClick, onDelete, onRename, onView, onHover, on
     if (!menuOpen) return;
 
     const handleClickOutside = (event) => {
-      const menuBtn = event.currentTarget.closest('.menu-container')?.querySelector('.menu-trespuntos');
-      const menuPopup = event.currentTarget.closest('.menu-container')?.querySelector('.menu-popup');
+      const menuBtn = document.querySelector('.menu-trespuntos');
+      const menuPopup = document.querySelector('.menu-popup');
       
       if (menuBtn && menuPopup && !menuBtn.contains(event.target) && !menuPopup.contains(event.target)) {
         setMenuOpen(false);
@@ -1217,7 +1240,7 @@ const FileItem = ({ item, onFolderClick, onDelete, onRename, onView, onHover, on
       if (canPreview(item.name)) {
         onView(item);
       } else {
-        window.open(getAuthenticatedUrl(`/api/files/download/${item.id}?download=true`), '_blank');
+        downloadFile(item.id, item.name);
       }
     }
   };
@@ -1343,11 +1366,11 @@ const FileItem = ({ item, onFolderClick, onDelete, onRename, onView, onHover, on
                   👁 Ver completo
                 </button>
               ) : (
-                <button className="mini-menu-item" onClick={() => window.open(getAuthenticatedUrl(`/api/files/download/${item.id}?download=true`), '_blank')}>
+                <button className="mini-menu-item" onClick={() => { setMenuOpen(false); downloadFile(item.id, item.name); }}>
                   👁 Ver
                 </button>
               )}
-              <button className="mini-menu-item" onClick={() => window.open(getAuthenticatedUrl(`/api/files/download/${item.id}?download=true`), '_blank')}>
+              <button className="mini-menu-item" onClick={() => { setMenuOpen(false); downloadFile(item.id, item.name); }}>
                 ⬇️ Descargar
               </button>
               <button className="mini-menu-item" onClick={() => { setMenuOpen(false); onDuplicate(item); }}>
@@ -1485,7 +1508,7 @@ const SidebarPanel = ({ file, onClose, user }) => {
   };
 
   const handleDownload = () => {
-    window.open(getAuthenticatedUrl(`/api/files/download/${file.id}?download=true`), '_blank');
+    downloadFile(file.id, file.name);
   };
 
   const renderPanelContent = () => {
@@ -1667,7 +1690,7 @@ const FileViewerModal = ({ file, onClose, user }) => {
   };
 
   const handleDownload = () => {
-    window.open(getAuthenticatedUrl(`/api/files/download/${file.id}?download=true`), '_blank');
+    downloadFile(file.id, file.name);
   };
 
   const renderFileContent = () => {

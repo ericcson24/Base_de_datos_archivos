@@ -1,5 +1,17 @@
 /* Login.css */
 
+/* Login container - full screen background */
+.login-container {
+  position: relative;
+  width: 100%;
+  height: 100vh;
+  background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
 .login-form {
   display: flex;
   flex-direction: column;
@@ -42,25 +54,65 @@
   color: #764ba2;
 }
 
+/* Theme Toggle Button */
+.theme-toggle-btn {
+  background: rgba(255, 255, 255, 0.9);
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  border-radius: 50%;
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  font-size: 1.2rem;
+  color: #333;
+  transition: all 0.3s ease;
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  z-index: 10;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.theme-toggle-btn:hover {
+  background: rgba(25, 118, 210, 0.1);
+  color: #1976d2;
+  transform: scale(1.1);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+}
+
 /* Dark theme support */
-@media (prefers-color-scheme: dark) {
-  .general-error {
-    background: rgba(255, 107, 107, 0.2);
-    border-color: rgba(255, 107, 107, 0.4);
-    color: #ff7675;
-  }
+[data-theme="dark"] .login-container {
+  background: linear-gradient(135deg, #0a0a0a 0%, #1a1a1a 100%);
+}
 
-  .form-footer {
-    border-top-color: rgba(255, 255, 255, 0.1);
-  }
+[data-theme="dark"] .general-error {
+  background: rgba(255, 107, 107, 0.2);
+  border-color: rgba(255, 107, 107, 0.4);
+  color: #ff7675;
+}
 
-  .link-button {
-    color: #74b9ff;
-  }
+[data-theme="dark"] .form-footer {
+  border-top-color: rgba(255, 255, 255, 0.1);
+}
 
-  .link-button:hover {
-    color: #0984e3;
-  }
+[data-theme="dark"] .link-button {
+  color: #74b9ff;
+}
+
+[data-theme="dark"] .link-button:hover {
+  color: #0984e3;
+}
+
+[data-theme="dark"] .theme-toggle-btn {
+  background: rgba(0, 0, 0, 0.8);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  color: #ffffff;
+}
+
+[data-theme="dark"] .theme-toggle-btn:hover {
+  background: rgba(25, 118, 210, 0.2);
+  color: #1976d2;
 }
 
 /* Responsive adjustments */
