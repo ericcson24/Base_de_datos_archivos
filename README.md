@@ -19,19 +19,20 @@ Inicia el servidor de desarrollo de React en el puerto 3000.
 ## 📁 Estructura del Proyecto
 
 ```
-codigo_servidor/
-├── server/
-│   ├── server.js          # Servidor Express principal
-│   └── routes/
-│       ├── auth.js        # Autenticación
-│       └── files.js       # Gestión de archivos
-├── src/
-│   ├── components/        # Componentes React
-│   ├── App.js            # Aplicación principal
-│   └── index.js          # Punto de entrada
-├── Datos/                # Archivos de usuarios
-├── build/               # Archivos construidos (generado)
-└── package.json
+Servidor_react/
+├── Codigo_Servidor/
+│   ├── server/
+│   │   ├── server.js          # Servidor Express principal
+│   │   └── routes/
+│   │       ├── auth.js        # Autenticación
+│   │       └── files.js       # Gestión de archivos
+│   ├── src/
+│   │   ├── components/        # Componentes React
+│   │   ├── App.js            # Aplicación principal
+│   │   └── index.js          # Punto de entrada
+│   ├── build/               # Archivos construidos (generado)
+│   └── package.json
+└── Datos/                # Archivos de usuarios (fuera del código)
 ```
 
 ## 🔐 Usuarios de Prueba
@@ -63,7 +64,7 @@ codigo_servidor/
 
 ## 🔧 Configuración
 
-La aplicación se ejecuta en el puerto 3000 por defecto. Los archivos de usuario se almacenan en la carpeta `Datos/` con subcarpetas por usuario.
+La aplicación se ejecuta en el puerto 3000 por defecto. Los archivos de usuario se almacenan en la carpeta `Datos/` (ubicada fuera del directorio del código) con subcarpetas por usuario.
 
 ## 📝 Notas de Producción
 

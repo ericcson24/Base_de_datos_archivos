@@ -1,5 +1,0 @@
-eric:laura:Compartida_eric_laura
-
-eric:papa:Compartida_eric_papa
-Trabajador1:eric:Compartida_Trabajador1_eric
-Trabajador1:Trabajador2:Compartida_Trabajador1_Trabajador2

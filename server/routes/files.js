@@ -10,7 +10,7 @@ const storage = multer.diskStorage({
     try {
       const username = req.user.username;
       const uploadPath = req.body.path || '';
-      const fullPath = path.join(__dirname, '../../Datos', username, uploadPath);
+      const fullPath = path.join(__dirname, '../../../Datos', username, uploadPath);
       
       await fs.mkdir(fullPath, { recursive: true });
       cb(null, fullPath);
@@ -172,7 +172,7 @@ router.get('/', authenticate, async (req, res) => {
     const currentPath = req.query.path ? req.query.path.split('/').filter(p => p) : [];
 
     // Ruta base del usuario
-    const userDir = path.join(__dirname, '../../Datos', username);
+    const userDir = path.join(__dirname, '../../../Datos', username);
 
     console.log(`📁 Leyendo archivos para usuario: ${username}, path: ${currentPath.join('/')}`);
     console.log(`📂 Ruta del directorio: ${userDir}`);
@@ -249,14 +249,14 @@ router.get('/preview/:fileId', authenticate, async (req, res) => {
 
     // Decodificar el ID del archivo (que es el path codificado en base64)
     const filePath = Buffer.from(fileId, 'base64').toString();
-    const fullPath = path.join(__dirname, '../../Datos', req.user.username, filePath);
+    const fullPath = path.join(__dirname, '../../../Datos', req.user.username, filePath);
 
     // Verificar que el archivo existe y está dentro del directorio del usuario
     try {
       await fs.access(fullPath);
 
       // Verificar que el archivo está dentro del directorio del usuario (seguridad)
-      const userDir = path.join(__dirname, '../../Datos', req.user.username);
+      const userDir = path.join(__dirname, '../../../Datos', req.user.username);
       const resolvedPath = path.resolve(fullPath);
       const resolvedUserDir = path.resolve(userDir);
 
@@ -355,14 +355,14 @@ router.get('/download/:fileId', authenticate, async (req, res) => {
 
     // Decodificar el ID del archivo (que es el path codificado en base64)
     const filePath = Buffer.from(fileId, 'base64').toString();
-    const fullPath = path.join(__dirname, '../../Datos', req.user.username, filePath);
+    const fullPath = path.join(__dirname, '../../../Datos', req.user.username, filePath);
 
     // Verificar que el archivo existe y está dentro del directorio del usuario
     try {
       await fs.access(fullPath);
       
       // Verificar que el archivo está dentro del directorio del usuario (seguridad)
-      const userDir = path.join(__dirname, '../../Datos', req.user.username);
+      const userDir = path.join(__dirname, '../../../Datos', req.user.username);
       const resolvedPath = path.resolve(fullPath);
       const resolvedUserDir = path.resolve(userDir);
       
@@ -434,7 +434,7 @@ router.post('/upload', authenticate, upload.array('files'), async (req, res) => 
       id: Buffer.from(file.path).toString('base64'),
       name: file.originalname,
       size: file.size,
-      path: path.relative(path.join(__dirname, '../../Datos', req.user.username), file.path)
+      path: path.relative(path.join(__dirname, '../../../Datos', req.user.username), file.path)
     }));
 
     res.json({
@@ -465,7 +465,7 @@ router.post('/upload-folder', authenticate, upload.single('file'), async (req, r
 
     // Obtener el path relativo desde el body
     const relativePath = req.body.relativePath || uploadedFile.originalname;
-    const targetPath = path.join(__dirname, '../../Datos', req.user.username, relativePath);
+    const targetPath = path.join(__dirname, '../../../Datos', req.user.username, relativePath);
     
     // Crear directorios si no existen
     await fs.mkdir(path.dirname(targetPath), { recursive: true });
@@ -505,7 +505,7 @@ router.post('/folder', authenticate, async (req, res) => {
 
     const username = req.user.username;
     const basePath = folderPath || '';
-    const fullPath = path.join(__dirname, '../../Datos', username, basePath, name.trim());
+    const fullPath = path.join(__dirname, '../../../Datos', username, basePath, name.trim());
 
     // Verificar que la carpeta no existe
     try {
@@ -548,14 +548,14 @@ router.delete('/:fileId', authenticate, async (req, res) => {
 
     // Decodificar el ID del archivo (que es el path codificado en base64)
     const filePath = Buffer.from(fileId, 'base64').toString();
-    const fullPath = path.join(__dirname, '../../Datos', req.user.username, filePath);
+    const fullPath = path.join(__dirname, '../../../Datos', req.user.username, filePath);
 
     // Verificar que el archivo/carpeta existe y está dentro del directorio del usuario
     try {
       await fs.access(fullPath);
       
       // Verificar que está dentro del directorio del usuario (seguridad)
-      const userDir = path.join(__dirname, '../../Datos', req.user.username);
+      const userDir = path.join(__dirname, '../../../Datos', req.user.username);
       const resolvedPath = path.resolve(fullPath);
       const resolvedUserDir = path.resolve(userDir);
       
@@ -612,7 +612,7 @@ router.put('/:fileId/rename', authenticate, async (req, res) => {
 
     // Decodificar el ID del archivo
     const filePath = Buffer.from(fileId, 'base64').toString();
-    const fullPath = path.join(__dirname, '../../Datos', req.user.username, filePath);
+    const fullPath = path.join(__dirname, '../../../Datos', req.user.username, filePath);
     const newPath = path.join(path.dirname(fullPath), newName.trim());
 
     // Verificar que el archivo original existe
