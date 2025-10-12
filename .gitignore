@@ -1,0 +1,11 @@
+@"
+# Ignorar dependencias
+node_modules/
+# Ignorar logs
+*.log
+# Ignorar archivos de entorno
+.env
+# Ignorar carpetas de build
+dist/
+build/
+"@ | Out-File -Encoding UTF8 .gitignore
