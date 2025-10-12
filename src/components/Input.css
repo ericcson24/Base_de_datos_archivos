@@ -1,0 +1,168 @@
+/* Input.css */
+
+.input-wrapper {
+  margin-bottom: 16px;
+}
+
+.input-container {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.input-full-width {
+  width: 100%;
+}
+
+.input-field {
+  width: 100%;
+  padding: 12px 16px;
+  border: 2px solid rgba(0, 0, 0, 0.1);
+  border-radius: 8px;
+  font-size: 14px;
+  background: rgba(255, 255, 255, 0.9);
+  backdrop-filter: blur(10px);
+  transition: all 0.2s ease;
+  outline: none;
+}
+
+.input-field:focus {
+  border-color: #667eea;
+  box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+  background: rgba(255, 255, 255, 1);
+}
+
+.input-field::placeholder {
+  color: #999;
+  opacity: 1;
+}
+
+.input-with-icon {
+  padding-left: 44px;
+}
+
+.input-icon {
+  position: absolute;
+  left: 12px;
+  z-index: 1;
+  font-size: 16px;
+  color: #666;
+  pointer-events: none;
+}
+
+.input-error {
+  border-color: #ff6b6b;
+}
+
+.input-error:focus {
+  border-color: #ff6b6b;
+  box-shadow: 0 0 0 3px rgba(255, 107, 107, 0.1);
+}
+
+.input-error-icon {
+  position: absolute;
+  right: 12px;
+  font-size: 14px;
+  color: #ff6b6b;
+  pointer-events: none;
+}
+
+.input-disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.input-error-message {
+  color: #ff6b6b;
+  font-size: 12px;
+  margin-top: 4px;
+  margin-left: 4px;
+}
+
+/* Sizes */
+.input-small .input-field {
+  padding: 8px 12px;
+  font-size: 12px;
+}
+
+.input-small.input-with-icon .input-field {
+  padding-left: 36px;
+}
+
+.input-small .input-icon {
+  left: 10px;
+  font-size: 14px;
+}
+
+.input-large .input-field {
+  padding: 16px 20px;
+  font-size: 16px;
+}
+
+.input-large.input-with-icon .input-field {
+  padding-left: 52px;
+}
+
+.input-large .input-icon {
+  left: 14px;
+  font-size: 18px;
+}
+
+/* Frosted variant */
+.input-frosted-wrapper {
+  padding: 0 !important;
+}
+
+.input-frosted .input-container {
+  background: transparent;
+}
+
+.input-frosted .input-field {
+  background: transparent;
+  border: none;
+  border-radius: 0;
+  box-shadow: none;
+}
+
+.input-frosted .input-field:focus {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+/* Dark theme support */
+@media (prefers-color-scheme: dark) {
+  .input-field {
+    background: rgba(0, 0, 0, 0.1);
+    border-color: rgba(255, 255, 255, 0.1);
+    color: #fff;
+  }
+
+  .input-field:focus {
+    background: rgba(0, 0, 0, 0.2);
+    border-color: #667eea;
+  }
+
+  .input-field::placeholder {
+    color: #ccc;
+  }
+
+  .input-icon {
+    color: #ccc;
+  }
+}
+
+/* Responsive adjustments */
+@media (max-width: 480px) {
+  .input-field {
+    padding: 14px 16px;
+    font-size: 16px; /* Prevent zoom on iOS */
+  }
+
+  .input-with-icon {
+    padding-left: 48px;
+  }
+
+  .input-icon {
+    left: 14px;
+    font-size: 18px;
+  }
+}

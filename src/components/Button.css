@@ -1,0 +1,140 @@
+/* Button.css */
+
+.button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 12px 24px;
+  border: none;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  text-decoration: none;
+  position: relative;
+  overflow: hidden;
+}
+
+.button:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.button-loading {
+  cursor: wait;
+}
+
+/* Variants */
+.button-primary {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+}
+
+.button-primary:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(102, 126, 234, 0.6);
+}
+
+.button-secondary {
+  background: rgba(255, 255, 255, 0.1);
+  color: #333;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  backdrop-filter: blur(10px);
+}
+
+.button-secondary:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.2);
+  transform: translateY(-1px);
+}
+
+.button-danger {
+  background: linear-gradient(135deg, #ff6b6b 0%, #ee5a52 100%);
+  color: white;
+  box-shadow: 0 4px 15px rgba(255, 107, 107, 0.4);
+}
+
+.button-danger:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(255, 107, 107, 0.6);
+}
+
+/* Sizes */
+.button-small {
+  padding: 8px 16px;
+  font-size: 12px;
+}
+
+.button-medium {
+  padding: 12px 24px;
+  font-size: 14px;
+}
+
+.button-large {
+  padding: 16px 32px;
+  font-size: 16px;
+}
+
+/* Full width */
+.button-full-width {
+  width: 100%;
+}
+
+/* Loading state */
+.button-spinner {
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+/* Frosted button content */
+.frosted-button-content {
+  background: none;
+  border: none;
+  padding: 0;
+  margin: 0;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  color: inherit;
+  font: inherit;
+  cursor: inherit;
+}
+
+/* Dark theme support */
+@media (prefers-color-scheme: dark) {
+  .button-secondary {
+    color: #fff;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+  }
+
+  .button-secondary:hover:not(:disabled) {
+    background: rgba(255, 255, 255, 0.1);
+  }
+}
+
+/* Responsive adjustments */
+@media (max-width: 480px) {
+  .button {
+    padding: 14px 20px;
+    font-size: 16px; /* Prevent zoom on iOS */
+  }
+
+  .button-small {
+    padding: 10px 16px;
+    font-size: 14px;
+  }
+
+  .button-large {
+    padding: 18px 24px;
+    font-size: 16px;
+  }
+}

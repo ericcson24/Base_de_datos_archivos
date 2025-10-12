@@ -1,0 +1,119 @@
+/* FolderSelector.css */
+.folder-selector {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  background-color: #f6f6f6;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100vh;
+  margin: 0;
+  width: 100vw;
+  position: relative;
+  overflow: hidden;
+}
+
+.folder-selector .bg {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  background: linear-gradient(#ffffff 80%, #9c9a9a 100%);
+}
+
+.selector-container {
+  width: 40%;
+  max-width: 80vw;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1vw;
+  min-height: 40vh;
+  overflow-y: auto;
+  max-height: 60vh;
+  border-radius: 1vw;
+  padding: 2vw 1vw;
+  color: #000000;
+  margin-bottom: 1vw;
+  background: rgb(255 255 255 / 8%);
+  border-radius: 0.5rem;
+  border: 2px solid transparent;
+  box-shadow: 0 0 0 2px rgb(195 195 195 / 60%), 0 16px 32px rgba(0, 0, 0, 0.12);
+  border: 0.4vw dashed transparent;
+  position: relative;
+  margin: 0 auto;
+}
+
+.options-container {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+  padding: 2rem;
+}
+
+.options-container h2 {
+  font-size: 1.4rem;
+  color: #333;
+  margin-bottom: 1rem;
+  text-align: center;
+}
+
+.option-btn {
+  border: none;
+  border-radius: 1em;
+  padding: 0.6em 0.8em;
+  font-size: 1em;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.2s, color 0.2s;
+  width: 100%;
+  text-align: left;
+  display: flex;
+  align-items: center;
+  gap: 0.7em;
+  background: none;
+  color: #333;
+  margin-bottom: 0.4em;
+  min-height: 2.2em;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.option-btn:hover {
+  background-color: #ffffff;
+}
+
+.logout-btn {
+  background: linear-gradient(90deg, #ff3b30 60%, #ff7b6b 100%);
+  color: #fff;
+  margin-top: 1rem;
+}
+
+.logout-btn:hover {
+  background: linear-gradient(90deg, #d32f2f 60%, #ff3b30 100%);
+  color: #fff;
+  box-shadow: 0 4px 16px rgba(255,59,48,0.18);
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .selector-container {
+    width: 90%;
+    padding: 1rem;
+  }
+
+  .options-container {
+    padding: 1.5rem;
+  }
+
+  .options-container h2 {
+    font-size: 1.2rem;
+  }
+
+  .option-btn {
+    font-size: 0.9rem;
+    padding: 0.8rem;
+  }
+}

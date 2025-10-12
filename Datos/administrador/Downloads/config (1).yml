@@ -1,0 +1,7 @@
+tunnel: tunelnube
+credentials-file: C:\Users\eric2\.cloudflared\tunelnube.json
+
+ingress:
+  - hostname: nube.proyectonube.xyz
+    service: http://localhost:55888
+  - service: http_status:404
