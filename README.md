@@ -66,8 +66,41 @@ Servidor_react/
 
 La aplicación se ejecuta en el puerto 3000 por defecto. Los archivos de usuario se almacenan en la carpeta `Datos/` (ubicada fuera del directorio del código) con subcarpetas por usuario.
 
-## 📝 Notas de Producción
+## � Configuración de Microsoft Azure AD (para Calendario)
 
-- El comando `npm start` automáticamente ejecuta `npm run build` antes de iniciar el servidor
-- Los archivos estáticos de React se sirven desde la carpeta `build/`
-- El servidor Express maneja tanto la API como los archivos estáticos
+### Registro de Aplicación
+1. Ve a [Azure Portal](https://portal.azure.com)
+2. Busca "Azure Active Directory" > "Registros de aplicaciones"
+3. Crea una nueva aplicación o selecciona una existente
+
+### Configuración de Autenticación
+1. En tu aplicación, ve a "Autenticación"
+2. En "URI de redirección", agrega:
+   - **Desarrollo**: `http://localhost:4000/auth/callback`
+   - **Producción**: Tu dominio de producción + `/auth/callback`
+
+### Permisos de API
+1. Ve a "Permisos de API"
+2. Agrega estos permisos delegados:
+   - `Calendars.ReadWrite`
+   - `User.Read`
+   - `offline_access`
+
+### Variables de Entorno
+Crea un archivo `.env` en la raíz del proyecto:
+```env
+MICROSOFT_CLIENT_ID=tu_client_id_de_azure
+MICROSOFT_CLIENT_SECRET=tu_client_secret_de_azure
+SESSION_SECRET=una_clave_secreta_segura_para_sesiones
+```
+
+### ⚠️ Errores Comunes
+
+**"unauthorized_client: The client does not exist or is not enabled for consumers"**
+- Solución: Asegúrate de seleccionar **"Cuentas en cualquier directorio organizativo y cuentas personales de Microsoft"** al registrar la app
+
+**"invalid_client"**
+- Solución: Verifica que el CLIENT_ID y CLIENT_SECRET sean correctos en el archivo .env
+
+**Redirección a URL externa**
+- Solución: Asegúrate de que la URI de redirección en Azure AD sea `http://localhost:4000/auth/callback`

@@ -143,7 +143,7 @@ const getAuthenticatedPreviewUrl = async (fileId, filename) => {
   }
 };
 
-const UserPanel = ({ user, onLogout, onBackToFolders, onThemeToggle, isDarkMode }) => {
+const UserPanel = ({ user, onLogout, onBackToFolders, onThemeToggle, isDarkMode, onGoToCalendar }) => {
   console.log('🎯 UserPanel se está renderizando con user:', user);
 
   const [files, setFiles] = useState([]);
@@ -905,7 +905,7 @@ useEffect(() => {
           <button className="acciones-btn" onClick={onBackToFolders}>
             ⬅️ Volver
           </button>
-          <button className="acciones-btn" onClick={() => window.open('/calendar', '_blank')}>
+          <button className="acciones-btn" onClick={() => window.location.href = 'http://localhost:4000/calendar'}>
             📅 Abrir calendario
           </button>
           <button className="acciones-btn" onClick={onLogout}>

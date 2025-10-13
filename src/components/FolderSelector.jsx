@@ -15,7 +15,7 @@ const FolderSelector = ({ onSelectFolder, onLogout, onThemeToggle, isDarkMode })
   };
 
   const handleCalendar = () => {
-    window.location.href = 'https://calendario.proyectonube.xyz/';
+    window.location.href = 'http://localhost:4000/calendar';
   };
 
   return (

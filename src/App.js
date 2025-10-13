@@ -2,12 +2,13 @@ import React, { useState, useEffect } from 'react';
 import Login from './components/Login';
 import UserPanel from './components/UserPanel';
 import FolderSelector from './components/FolderSelector';
+import Calendar from './components/Calendar';
 import './App.css';
 
 function App() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [user, setUser] = useState(null);
-  const [currentView, setCurrentView] = useState('login'); // 'login', 'folders', 'panel'
+  const [currentView, setCurrentView] = useState('login'); // 'login', 'folders', 'panel', 'calendar'
   const [isLoading, setIsLoading] = useState(true);
 
   // Estado para el tema global
@@ -64,6 +65,23 @@ function App() {
           localStorage.removeItem('auth_token');
         }
       }
+
+      // Verificar si hay parámetro redirect=calendar en la URL
+      const urlParams = new URLSearchParams(window.location.search);
+      const redirect = urlParams.get('redirect');
+
+      if (redirect === 'calendar') {
+        // Si viene del calendario y no está autenticado, ir directamente a login
+        if (!storedToken) {
+          setCurrentView('login');
+        } else {
+          // Si está autenticado, iniciar automáticamente login de Outlook
+          console.log('Usuario autenticado, iniciando login de Outlook para calendario...');
+          window.location.href = '/api/auth/login';
+          return; // No continuar con el flujo normal
+        }
+      }
+
       setIsLoading(false);
     };
 
@@ -176,6 +194,18 @@ function App() {
       user={user}
       onLogout={handleLogout}
       onBackToFolders={() => setCurrentView('folders')}
+      onThemeToggle={toggleTheme}
+      isDarkMode={isDarkMode}
+      onGoToCalendar={() => setCurrentView('calendar')}
+    />;
+  }
+
+  // Si está logueado y en vista de calendario
+  if (currentView === 'calendar' && user) {
+    return <Calendar
+      user={user}
+      onLogout={handleLogout}
+      onBackToPanel={() => setCurrentView('panel')}
       onThemeToggle={toggleTheme}
       isDarkMode={isDarkMode}
     />;

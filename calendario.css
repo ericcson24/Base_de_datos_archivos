@@ -1,0 +1,1636 @@
+/* =========================================
+   CALENDARIO DE OUTLOOK - ESTILO PANEL
+   ========================================= */
+
+/* Variables CSS idénticas a panel.css */
+:root {
+  --sidebar-width: clamp(36px, 10vw, 120px);
+  --sidebar-height-mobile: 12vw;
+  --main-padding: clamp(12rem, 2vw, 2rem);
+  --thumbnail-size: clamp(32px, 8vw, 48px);
+  --font-main: clamp(0.95rem, 1.8vw, 1.08rem);
+}
+
+/* Reset idéntico a panel.css */
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+/* Fondo idéntico a panel.css */
+.bg {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  background: linear-gradient(#ffffff 80%, #9c9a9a 100%);
+}
+
+/* Body idéntico a panel.css */
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  color: #222;
+  font-size: var(--font-main);
+  min-height: 100vh;
+  width: 100vw;
+  transition: background 0.4s ease-in-out;
+  display: flex;
+  flex-direction: column;
+  overflow-x: hidden;
+  height: 100%;
+  -webkit-text-size-adjust: 100%;
+  -webkit-tap-highlight-color: transparent;
+  overscroll-behavior-y: contain;
+}
+
+/* Utilidades */
+.hidden {
+  display: none !important;
+}
+
+/* =========================================
+   CONTENEDOR DEL CALENDARIO
+   ========================================= */
+
+.main-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  padding: 0 2vw;
+  min-height: calc(100vh - 140px);
+}
+
+.calendar-wrapper {
+  width: 100%;
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 20px 0;
+  transition: all 0.3s ease;
+}
+
+.calendar-container {
+  width: 100%;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+#calendar {
+  width: 95%;
+  min-height: 70vh;
+  max-height: 80vh;
+  overflow-y: auto;
+  border-radius: 0.8em;
+  padding: 24px;
+  color: #000000;
+  background: rgba(255, 255, 255, 0.08);
+  border: 2px solid transparent;
+  box-shadow: 0 0 0 2px rgba(195, 195, 195, 0.60), 0 16px 32px rgba(0, 0, 0, 0.12);
+  backdrop-filter: url(#frosted);
+  -webkit-backdrop-filter: url(#frosted);
+  transition: all 0.2s ease;
+}
+
+#calendar:hover {
+  background: rgba(255, 255, 255, 0.12);
+  box-shadow: 0 0 0 2px rgba(195, 195, 195, 0.80), 0 20px 40px rgba(0, 0, 0, 0.15);
+}
+
+/* Scroll bonito para el calendario */
+#calendar::-webkit-scrollbar {
+  width: 0.6em;
+}
+
+#calendar::-webkit-scrollbar-thumb {
+  background: rgba(100, 100, 100, 0.2);
+  border-radius: 1em;
+  border: 3px solid transparent;
+  background-clip: content-box;
+}
+
+#calendar::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+/* Responsivo para panel flotante */
+@media (max-width: 768px) {
+  .main-content {
+    padding: 0 1vw;
+  }
+  
+  .calendar-wrapper {
+    padding: 10px 0;
+  }
+  
+  #calendar {
+    width: 100%;
+    padding: 16px;
+    min-height: 60vh;
+  }
+  
+  /* En móvil, ajustar el panel y botón */
+  .categories-panel {
+    width: 280px;
+    left: -280px;
+    padding: 16px;
+    border-radius: 0 0.6em 0.6em 0;
+  }
+  
+  .categories-toggle {
+    width: 45px;
+    height: 45px;
+    left: 15px;
+    font-size: 18px;
+  }
+  
+  .categories-toggle.panel-open {
+    left: 295px; /* Ancho del panel + margen en móvil */
+  }
+  
+  /* Ajustar header en móvil */
+  .categories-header h3 {
+    font-size: 1.1rem;
+  }
+  
+  .category-action-btn {
+    font-size: 0.8rem;
+    padding: 6px 10px;
+  }
+}
+
+
+
+
+/* =========================================
+   POPUP DE CATEGORÍAS
+   ========================================= */
+
+/* Contenedor del popup de categorías */
+.category-popup {
+  position: absolute;
+  background: rgba(172, 172, 172, 0.08);
+  border: 2px solid transparent;
+  border-radius: 0.8em;
+  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.6), 0 16px 32px rgba(0, 0, 0, 0.15);
+  backdrop-filter: url(#frosted);
+  -webkit-backdrop-filter: url(#frosted);
+  padding: 16px 20px;
+  z-index: 1000;
+  max-width: 320px;
+  min-width: 220px;
+  font-size: 0.9rem;
+  display: none;
+  pointer-events: auto;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  transition: opacity 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275), transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  transform: translateY(-10px) scale(0.95);
+  opacity: 0;
+}
+
+.category-popup::before {
+  content: '';
+  position: absolute;
+  top: -8px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 0;
+  height: 0;
+  border-left: 8px solid transparent;
+  border-right: 8px solid transparent;
+  border-bottom: 8px solid rgba(255, 255, 255, 0.9);
+  filter: drop-shadow(0 -2px 4px rgba(0, 0, 0, 0.1));
+}
+
+.category-popup::after {
+  content: '';
+  position: absolute;
+  top: -10px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 0;
+  height: 0;
+  border-left: 10px solid transparent;
+  border-right: 10px solid transparent;
+  border-bottom: 10px solid rgba(172, 172, 172, 0.3);
+  z-index: -1;
+}
+
+.category-popup.show {
+  display: block;
+  opacity: 1;
+  transform: translateY(0) scale(1);
+}
+
+.category-popup-header {
+  font-weight: 700;
+  color: #252525;
+  margin-bottom: 12px;
+  font-size: 0.85rem;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+  padding-bottom: 8px;
+}
+
+.category-popup-content {
+  color: #555;
+}
+
+.category-popup-categories {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 0;
+}
+
+.category-popup-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(255, 255, 255, 0.7);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-radius: 12px;
+  padding: 6px 12px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: #333;
+  transition: all 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+}
+
+.category-popup-tag:hover {
+  background: rgba(255, 255, 255, 0.9);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+}
+
+.category-popup-tag-color {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  border: 1px solid rgba(255, 255, 255, 0.5);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2), inset 0 1px 2px rgba(255, 255, 255, 0.3);
+}
+
+/* Indicador de categoría en eventos */
+.event-category-indicator {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  font-size: 12px;
+  opacity: 0.9;
+  cursor: pointer;
+  z-index: 2;
+  background: rgba(255, 255, 255, 0.9);
+  border-radius: 50%;
+  width: 18px;
+  height: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+  border: 1px solid rgba(0, 0, 0, 0.1);
+}
+
+.event-category-indicator:hover {
+  opacity: 1;
+  background: rgba(255, 255, 255, 1);
+  transform: scale(1.1);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.15);
+}
+
+/* Mejorar la apariencia de eventos con categorías */
+.fc-event:has(.event-category-indicator) {
+  padding-right: 24px !important;
+}
+
+/* Responsivo para dispositivos móviles */
+@media (max-width: 768px) {
+  .category-popup {
+    max-width: calc(100vw - 40px);
+    font-size: 0.8rem;
+    padding: 10px 12px;
+  }
+  
+  .category-popup-tag {
+    font-size: 0.7rem;
+    padding: 3px 8px;
+  }
+  
+  .event-category-indicator {
+    font-size: 10px;
+    width: 16px;
+    height: 16px;
+  }
+}
+
+/* =========================================
+   HEADER DE NAVEGACIÓN - ESTILO PANEL
+   ========================================= */
+.header {
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  padding: 16px 24px;
+  background: rgba(172, 172, 172, 0.08);
+  border-radius: 0.5em;
+  border: 2px solid transparent;
+  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.6), 0 16px 32px rgba(0, 0, 0, 0.12);
+  backdrop-filter: url(#frosted);
+  -webkit-backdrop-filter: url(#frosted);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin: 1vh 2vw;
+  transition: box-shadow 0.2s, background 0.2s;
+}
+
+.header-left {
+  display: flex;
+  align-items: center;
+}
+
+.logo {
+  font-weight: 700;
+  font-size: clamp(1.1rem, 2.2vw, 1.3rem);
+  color: #252525;
+  display: flex;
+  align-items: center;
+  gap: 1vw;
+  text-decoration: none;
+  transition: color 0.2s;
+}
+
+.logo:hover {
+  color: #1967d2;
+}
+
+.logo-img {
+  width: 2.2em;
+  height: 2.2em;
+  min-width: 2em;
+  min-height: 2em;
+  max-width: 3em;
+  max-height: 3em;
+  margin-right: 0.5em;
+  object-fit: contain;
+  border-radius: 0.5em;
+}
+
+.nav-buttons {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+
+.nav-btn {
+  border: none;
+  border-radius: 0.7em;
+  padding: 0.7em 1.3em;
+  font-size: 1em;
+  font-weight: 600;
+  box-shadow: 0 2px 8px rgba(66,133,244,0.10);
+  cursor: pointer;
+  transition: background 0.18s, color 0.18s, box-shadow 0.18s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.7em;
+  text-decoration: none;
+  background: rgba(172, 172, 172, 0.13);
+  color: #222;
+  backdrop-filter: url(#frosted);
+  -webkit-backdrop-filter: url(#frosted);
+}
+
+.nav-btn:hover {
+  background: #e8f0fe;
+  color: #1967d2;
+  box-shadow: 0 4px 16px rgba(66,133,244,0.18);
+  transform: translateY(-1px);
+}
+
+.nav-btn.secondary {
+  background: rgba(188, 162, 162, 0.08);
+  color: #222;
+  backdrop-filter: url(#frosted);
+  -webkit-backdrop-filter: url(#frosted);
+}
+
+.nav-btn.secondary:hover {
+  background: #e8f0fe;
+  color: #1967d2;
+}
+
+/* =========================================
+   ESTADO DE AUTENTICACIÓN - ESTILO PANEL
+   ========================================= */
+.auth-card {
+  text-align: center;
+  padding: 48px 40px;
+  background: rgba(172, 172, 172, 0.08);
+  border-radius: 0.5em;
+  border: 2px solid transparent;
+  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.6), 0 16px 32px rgba(0, 0, 0, 0.12);
+  backdrop-filter: url(#frosted);
+  -webkit-backdrop-filter: url(#frosted);
+  margin: 60px auto;
+  max-width: 500px;
+  position: relative;
+  transition: box-shadow 0.2s, background 0.2s;
+}
+
+.auth-card:hover {
+  background: rgba(172, 172, 172, 0.12);
+  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.8), 0 16px 32px rgba(0, 0, 0, 0.18);
+}
+
+.auth-card h2 {
+  margin: 0 0 16px 0;
+  color: #252525;
+  font-size: 1.8rem;
+  font-weight: 700;
+}
+
+.auth-card p {
+  margin: 0 0 32px 0;
+  color: #666;
+  font-size: 1.1rem;
+  line-height: 1.6;
+}
+
+/* =========================================
+   MODAL DE EVENTOS - ESTILO PANEL
+   ========================================= */
+.modal-backdrop {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.637); /* Reducir opacidad para ser más sutil */
+  backdrop-filter: blur(12px); /* Aumentar el blur */
+  -webkit-backdrop-filter: blur(12px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2147483647;
+  animation: modalBackdropFadeIn 0.4s ease;
+}
+
+@keyframes modalBackdropFadeIn {
+  from { 
+    opacity: 0; 
+    backdrop-filter: blur(0px); 
+    -webkit-backdrop-filter: blur(0px);
+  }
+  to { 
+    opacity: 1; 
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+  }
+}
+
+.event-modal {
+  background: rgb(255, 255, 255); /* Aumentar un poco más la opacidad */
+  border-radius: 0.5em;
+  border: 2px solid rgba(255, 255, 255, 0.3); /* Borde más sutil */
+  box-shadow: 
+    0 0 0 1px rgba(255, 255, 255, 0.6), 
+    0 20px 40px rgba(0, 0, 0, 0.15),
+    0 8px 16px rgba(0, 0, 0, 0.1); /* Sombras más elaboradas */
+  backdrop-filter: url(#frosted);
+  -webkit-backdrop-filter: url(#frosted);
+  max-width: 600px;
+  width: 90%;
+  max-height: 85vh;
+  overflow-y: auto;
+  animation: modalSlideIn 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94); /* Animación más suave */
+  position: relative;
+}
+
+@keyframes modalSlideIn {
+  from { 
+    opacity: 0; 
+    transform: translateY(-30px) scale(0.9);
+    filter: blur(4px);
+  }
+  to { 
+    opacity: 1; 
+    transform: translateY(0) scale(1);
+    filter: blur(0px);
+  }
+}
+
+.modal-header {
+  padding: 24px 24px 20px 24px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.2); /* Cambiar a blanco transparente */
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: rgba(255, 255, 255, 0.08); /* Más sutil */
+  backdrop-filter: url(#frosted);
+  -webkit-backdrop-filter: url(#frosted);
+  border-radius: 0.5em 0.5em 0 0;
+  position: relative;
+}
+
+.modal-title {
+  margin: 0;
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: #252525;
+}
+
+.close-modal {
+  background: rgba(255, 255, 255, 0.1);
+  border: 2px solid rgba(255, 255, 255, 0.2);
+  font-size: 20px;
+  cursor: pointer;
+  color: #666;
+  padding: 8px;
+  border-radius: 50%;
+  backdrop-filter: url(#frosted);
+  -webkit-backdrop-filter: url(#frosted);
+  transition: all 0.2s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  font-weight: 600;
+}
+
+.close-modal:hover {
+  background: rgba(255, 59, 48, 0.15);
+  border-color: rgba(255, 59, 48, 0.3);
+  color: #ff3b30;
+  transform: scale(1.1) rotate(90deg);
+  box-shadow: 0 4px 12px rgba(255, 59, 48, 0.2);
+}
+
+.modal-body {
+  padding: 24px;
+  background: rgba(255, 255, 255, 0.05); /* Cambiar de sólido a transparente */
+  backdrop-filter: url(#frosted);
+  -webkit-backdrop-filter: url(#frosted);
+  border-radius: 0 0 0.5em 0.5em; /* Bordes redondeados en la parte inferior */
+}
+
+/* También mejorar el scroll del modal para que coincida */
+.event-modal::-webkit-scrollbar {
+  width: 0.6em;
+}
+
+.event-modal::-webkit-scrollbar-thumb {
+  background: rgba(100, 100, 100, 0.3);
+  border-radius: 1em;
+  border: 2px solid transparent;
+  background-clip: content-box;
+}
+
+.event-modal::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+/* Mejorar la transición del modal para que sea más suave */
+.event-modal {
+  background: rgb(255, 255, 255); /* Aumentar un poco más la opacidad */
+  border-radius: 0.5em;
+  border: 2px solid rgba(255, 255, 255, 0.3); /* Borde más sutil */
+  box-shadow: 
+    0 0 0 1px rgba(255, 255, 255, 0.6), 
+    0 20px 40px rgba(0, 0, 0, 0.15),
+    0 8px 16px rgba(0, 0, 0, 0.1); /* Sombras más elaboradas */
+  backdrop-filter: url(#frosted);
+  -webkit-backdrop-filter: url(#frosted);
+  max-width: 600px;
+  width: 90%;
+  max-height: 85vh;
+  overflow-y: auto;
+  animation: modalSlideIn 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94); /* Animación más suave */
+  position: relative;
+}
+
+/* Agregar un efecto sutil de brillo en el borde superior */
+.event-modal::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: linear-gradient(90deg, 
+    transparent 0%, 
+    rgba(25, 103, 210, 0.5) 25%, 
+    rgba(52, 168, 83, 0.5) 75%, 
+    transparent 100%);
+  border-radius: 0.5em 0.5em 0 0;
+  z-index: 1;
+}
+
+/* Mejorar el backdrop para que sea más coherente */
+.modal-backdrop {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.2); /* Reducir opacidad para ser más sutil */
+  backdrop-filter: blur(12px); /* Aumentar el blur */
+  -webkit-backdrop-filter: blur(12px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2147483647;
+  animation: modalBackdropFadeIn 0.4s ease;
+}
+
+@keyframes modalBackdropFadeIn {
+  from { 
+    opacity: 0; 
+    backdrop-filter: blur(0px); 
+    -webkit-backdrop-filter: blur(0px);
+  }
+  to { 
+    opacity: 1; 
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+  }
+}
+
+/* Animación mejorada del modal */
+@keyframes modalSlideIn {
+  from { 
+    opacity: 0; 
+    transform: translateY(-30px) scale(0.9);
+    filter: blur(4px);
+  }
+  to { 
+    opacity: 1; 
+    transform: translateY(0) scale(1);
+    filter: blur(0px);
+  }
+}
+
+/* Mejorar el header del modal */
+.modal-header {
+  padding: 24px 24px 20px 24px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.2); /* Cambiar a blanco transparente */
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: rgba(255, 255, 255, 0.08); /* Más sutil */
+  backdrop-filter: url(#frosted);
+  -webkit-backdrop-filter: url(#frosted);
+  border-radius: 0.5em 0.5em 0 0;
+  position: relative;
+}
+
+/* Efecto hover mejorado para el botón cerrar */
+.close-modal {
+  background: rgba(255, 255, 255, 0.1);
+  border: 2px solid rgba(255, 255, 255, 0.2);
+  font-size: 20px;
+  cursor: pointer;
+  color: #666;
+  padding: 8px;
+  border-radius: 50%;
+  backdrop-filter: url(#frosted);
+  -webkit-backdrop-filter: url(#frosted);
+  transition: all 0.2s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  font-weight: 600;
+}
+
+.close-modal:hover {
+  background: rgba(255, 59, 48, 0.15);
+  border-color: rgba(255, 59, 48, 0.3);
+  color: #ff3b30;
+  transform: scale(1.1) rotate(90deg);
+  box-shadow: 0 4px 12px rgba(255, 59, 48, 0.2);
+}
+
+/* =========================================
+   ESTILOS ESPECÍFICOS DE FULLCALENDAR - ESTILO PANEL
+   ========================================= */
+.fc {
+  font-family: inherit;
+  color: #222;
+}
+
+.fc-header-toolbar {
+  padding: 20px 24px;
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 0.5rem;
+  margin-bottom: 1rem;
+  backdrop-filter: url(#frosted);
+  -webkit-backdrop-filter: url(#frosted);
+  border: 2px solid transparent;
+  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.6), 0 8px 16px rgba(0, 0, 0, 0.08);
+}
+
+.fc-button {
+  background: rgba(188, 162, 162, 0.08) !important;
+  border: 2px solid transparent !important;
+  color: #222 !important;
+  padding: 0.7em 1.3em !important;
+  border-radius: 0.7em !important;
+  font-weight: 600 !important;
+  font-size: 1em !important;
+  box-shadow: 0 2px 8px rgba(66,133,244,0.10) !important;
+  backdrop-filter: url(#frosted) !important;
+  -webkit-backdrop-filter: url(#frosted) !important;
+  transition: background 0.18s, color 0.18s, box-shadow 0.18s !important;
+  cursor: pointer !important;
+}
+
+.fc-button:hover {
+  background: #e8f0fe !important;
+  color: #1967d2 !important;
+  box-shadow: 0 4px 16px rgba(66,133,244,0.18) !important;
+  transform: translateY(-1px);
+}
+
+.fc-button-active {
+  background: #1967d2 !important;
+  color: white !important;
+  box-shadow: 0 4px 16px rgba(66,133,244,0.25) !important;
+}
+
+.fc-daygrid-day {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(0, 0, 0, 0.05);
+  transition: background 0.18s, box-shadow 0.18s;
+}
+
+.fc-daygrid-day:hover {
+  background: rgba(66, 133, 244, 0.05);
+  box-shadow: inset 0 0 0 1px rgba(66, 133, 244, 0.2);
+}
+
+.fc-day-today {
+  background: rgba(27, 55, 99, 0.08) !important;
+  border: 1px solid rgba(66, 133, 244, 0.2) !important;
+}
+
+/* Fix for event colors to properly display category colors */
+.fc-event {
+  border-radius: 0.5em !important;
+  padding: 4px 8px !important;
+  font-size: 0.9rem !important;
+  font-weight: 500 !important;
+  color: white !important;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2) !important;
+  transition: transform 0.18s, box-shadow 0.18s !important;
+  cursor: pointer !important;
+  opacity: 1 !important;
+}
+
+/* Style for events with no categories/tags */
+.fc-event:not([data-categories]), 
+.fc-event[data-categories=""] {
+  background-color: rgba(160, 160, 160, 0.85) !important;
+  border-color: rgba(140, 140, 140, 0.9) !important;
+  color: white !important;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15) !important;
+}
+
+/* Fix for multiple category events */
+.fc-event[data-categories*=","] {
+  background-image: linear-gradient(45deg, transparent 47%, rgba(255,255,255,0.2) 47%, rgba(255,255,255,0.2) 53%, transparent 53%) !important;
+}
+
+/* Add category color mapping (based on the preset color system) */
+.fc-event[data-color="preset0"] { background-color: #ff0000 !important; }
+.fc-event[data-color="preset1"] { background-color: #ff8000 !important; }
+.fc-event[data-color="preset2"] { background-color: #8b4513 !important; }
+.fc-event[data-color="preset3"] { background-color: #ffff00 !important; }
+.fc-event[data-color="preset4"] { background-color: #00ff00 !important; }
+.fc-event[data-color="preset5"] { background-color: #40e0d0 !important; }
+.fc-event[data-color="preset6"] { background-color: #326acb !important; } 
+.fc-event[data-color="preset7"] { background-color: #3b47e7 !important; } 
+.fc-event[data-color="preset8"] { background-color: #8100a8 !important; } 
+.fc-event[data-color="preset9"] { background-color: #404040 !important; }
+.fc-event[data-color="preset10"] { background-color: #dc143c !important; }
+.fc-event[data-color="preset11"] { background-color: #ff69b4 !important; }
+.fc-event[data-color="preset12"] { background-color: #4169e1 !important; }
+.fc-event[data-color="preset13"] { background-color: #228b22 !important; }
+
+/* =========================================
+   PANEL LATERAL DE CATEGORÍAS - SLIDE FROM LEFT
+   ========================================= */
+
+.categories-panel {
+  position: fixed;
+  top: 50%;
+  left: -320px; /* Oculto por defecto */
+  transform: translateY(-50%);
+  width: 320px;
+  max-height: 80vh;
+  background: rgba(255, 255, 255, 0.4);
+  border-radius: 0 0.8em 0.8em 0;
+  border: 2px solid transparent;
+  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.6), 0 16px 32px rgba(0, 0, 0, 0.12);
+  backdrop-filter: url(#frosted);
+  -webkit-backdrop-filter: url(#frosted);
+  padding: 24px;
+  transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  z-index: 1000;
+  overflow: hidden;
+}
+
+/* Botón flotante para abrir/cerrar el panel */
+.categories-toggle {
+  position: fixed;
+  top: 50%;
+  left: 20px;
+  transform: translateY(-50%);
+  background: rgba(172, 172, 172, 0.15);
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  border-radius: 50%;
+  width: 50px;
+  height: 50px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  font-size: 20px;
+  font-weight: bold;
+  color: #252525;
+  transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  z-index: 1001;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+}
+
+.categories-toggle::before {
+  content: "🏷️";
+  font-size: 20px;
+}
+
+.categories-toggle:hover {
+  background: rgba(172, 172, 172, 0.25);
+  border-color: rgba(255, 255, 255, 0.5);
+  transform: translateY(-50%) scale(1.1);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
+}
+
+/* Estado abierto del panel */
+.categories-panel.open {
+  left: 0;
+  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.8), 0 20px 40px rgba(0, 0, 0, 0.15);
+}
+
+/* Cuando el panel está abierto, mover el botón */
+.categories-toggle.panel-open {
+  left: 340px; /* Ancho del panel + margen */
+  background: rgba(255, 59, 48, 0.15);
+  border-color: rgba(255, 59, 48, 0.3);
+  color: #ff3b30;
+}
+
+.categories-toggle.panel-open::before {
+  content: "✕";
+  font-size: 16px;
+}
+
+.categories-toggle.panel-open:hover {
+  background: rgba(255, 59, 48, 0.25);
+  border-color: rgba(255, 59, 48, 0.5);
+  transform: translateY(-50%) scale(1.1) rotate(180deg);
+}
+
+/* Overlay cuando el panel está abierto */
+.categories-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.3);
+  backdrop-filter: blur(2px);
+  -webkit-backdrop-filter: blur(2px);
+  z-index: 999;
+  opacity: 0;
+  visibility: hidden;
+  transition: all 0.3s ease;
+}
+
+.categories-overlay.show {
+  opacity: 1;
+  visibility: visible;
+}
+
+/* Header del panel */
+.categories-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.categories-header h3 {
+  margin: 0;
+  font-size: 1.2rem;
+  font-weight: 700;
+  color: #252525;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  transition: all 0.3s ease;
+}
+
+/* Botón de cerrar en el header (ya no necesario porque tenemos el botón flotante) */
+.categories-header .categories-toggle {
+  display: none;
+}
+
+/* Botones de acción */
+.categories-actions {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 20px;
+  flex-wrap: wrap;
+  transition: all 0.3s ease;
+}
+.category-action-btn {
+  border: none;
+  border-radius: 0.7em;
+  padding: 8px 12px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  flex: 1;
+  min-width: 70px;
+  background: rgba(172, 172, 172, 0.13);
+  color: #222;
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  box-shadow: 0 2px 8px rgba(66, 133, 244, 0.10);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.category-action-btn:hover {
+  background: #e8f0fe;
+  color: #1967d2;
+  box-shadow: 0 4px 16px rgba(66, 133, 244, 0.18);
+  transform: translateY(-1px) scale(1.02);
+  border-color: rgba(25, 103, 210, 0.3);
+}
+
+/* Lista de categorías */
+.categories-list {
+  max-height: 400px;
+  overflow-y: auto;
+  padding-right: 8px;
+  transition: all 0.3s ease;
+}
+
+.categories-list::-webkit-scrollbar {
+  width: 6px;
+}
+
+.categories-list::-webkit-scrollbar-thumb {
+  background: rgba(100, 100, 100, 0.3);
+  border-radius: 10px;
+  border: 1px solid transparent;
+  background-clip: content-box;
+}
+
+.categories-list::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.categories-list::-webkit-scrollbar-thumb:hover {
+  background: rgba(100, 100, 100, 0.5);
+}
+
+/* Elementos de categoría */
+.category-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  margin-bottom: 8px;
+  border-radius: 0.7em;
+  border-left: 4px solid transparent;
+  background: rgba(255, 255, 255, 0.04);
+  transition: all 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  cursor: pointer;
+  position: relative;
+  overflow: hidden;
+}
+
+.category-item::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(45deg, transparent 30%, rgba(255, 255, 255, 0.05) 50%, transparent 70%);
+  transform: translateX(-100%);
+  transition: transform 0.6s ease;
+}
+
+.category-item:hover::before {
+  transform: translateX(100%);
+}
+
+.category-item:hover {
+  background: rgba(255, 255, 255, 0.1);
+  border-left-color: #1967d2;
+  transform: translateX(4px);
+  box-shadow: 0 4px 12px rgba(25, 103, 210, 0.1);
+}
+
+.category-item.selected {
+  background: rgba(25, 103, 210, 0.08);
+  border-left-color: #2196f3;
+  box-shadow: 0 2px 8px rgba(33, 150, 243, 0.2);
+}
+
+.category-item.selected::after {
+  content: '✓';
+  position: absolute;
+  right: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: #2196f3;
+  font-weight: bold;
+  font-size: 0.9rem;
+}
+
+/* Checkbox personalizado */
+.category-item input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  appearance: none;
+  -webkit-appearance: none;
+  background: rgba(255, 255, 255, 0.2);
+  border: 2px solid rgba(255, 255, 255, 0.4);
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  position: relative;
+  flex-shrink: 0;
+}
+
+.category-item input[type="checkbox"]:checked {
+  background: #2196f3;
+  border-color: #2196f3;
+}
+
+.category-item input[type="checkbox"]:checked::before {
+  content: '✓';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  color: white;
+  font-size: 12px;
+  font-weight: bold;
+}
+
+/* Color de categoría */
+.category-color {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  border: 2px solid rgba(255, 255, 255, 0.5);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1), inset 0 1px 2px rgba(255, 255, 255, 0.3);
+  transition: all 0.2s ease;
+}
+
+.category-item:hover .category-color {
+  transform: scale(1.2);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15), inset 0 1px 2px rgba(255, 255, 255, 0.5);
+}
+
+/* Label de categoría */
+.category-label {
+  flex: 1;
+  font-size: 0.9rem;
+  font-weight: 500;
+  color: #333;
+  cursor: pointer;
+  user-select: none;
+  transition: color 0.2s ease;
+}
+
+.category-item:hover .category-label {
+  color: #1967d2;
+  font-weight: 600;
+}
+
+.category-item.selected .category-label {
+  color: #2196f3;
+  font-weight: 600;
+}
+
+/* Vista previa de categoría */
+.category-preview {
+  font-size: 0.75rem;
+  padding: 3px 8px;
+  border-radius: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  opacity: 0;
+  transform: scale(0.8);
+  transition: all 0.2s ease;
+  white-space: nowrap;
+  margin-left: auto;
+}
+
+.category-item:hover .category-preview {
+  opacity: 1;
+  transform: scale(1);
+}
+
+/* Estados especiales */
+.loading-categories {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 32px 16px;
+  color: #666;
+  font-size: 0.9rem;
+}
+
+.spinner-small {
+  width: 20px;
+  height: 20px;
+  border: 2px solid rgba(25, 103, 210, 0.2);
+  border-top: 2px solid #1967d2;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+.no-categories {
+  text-align: center;
+  padding: 32px 16px;
+  color: #666;
+  font-size: 0.9rem;
+  font-style: italic;
+}
+
+.error-message {
+  text-align: center;
+  padding: 32px 16px;
+  color: #ff3b30;
+  font-size: 0.9rem;
+  background: rgba(255, 59, 48, 0.05);
+  border-radius: 0.5em;
+  border: 1px solid rgba(255, 59, 48, 0.2);
+}
+
+
+/* Estilos para eventos con categorías */
+.fc-event {
+  border-radius: 6px !important;
+  border-width: 2px !important;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1) !important;
+  transition: all 0.2s ease !important;
+}
+
+.fc-event:hover {
+  transform: translateY(-1px) !important;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15) !important;
+}
+
+.fc-event[data-categories*="Importante"] {
+  border-style: solid !important;
+  border-width: 3px !important;
+  font-weight: bold !important;
+}
+
+.fc-event[data-categories*="Personal"] {
+  border-style: dashed !important;
+}
+
+.fc-event[data-categories*="Trabajo"] {
+  border-style: solid !important;
+  font-weight: 600 !important;
+}
+
+/* =========================================
+   MODALES Y FORMULARIOS DE EVENTOS
+   ========================================= */
+
+/* Modal backdrop */
+.modal-backdrop {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.4);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  z-index: 2000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  opacity: 0;
+  visibility: hidden;
+  transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+.modal-backdrop.show {
+  opacity: 1;
+  visibility: visible;
+}
+
+/* Modal container */
+.modal-container {
+  background: rgba(255, 255, 255, 0.95);
+  border-radius: 1em;
+  border: 2px solid transparent;
+  box-shadow: 0 0 0 2px rgba(195, 195, 195, 0.60), 0 20px 40px rgba(0, 0, 0, 0.15);
+  backdrop-filter: url(#frosted);
+  -webkit-backdrop-filter: url(#frosted);
+  max-width: 500px;
+  width: 100%;
+  max-height: 90vh;
+  overflow-y: auto;
+  transform: translateY(-20px) scale(0.95);
+  transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+.modal-backdrop.show .modal-container {
+  transform: translateY(0) scale(1);
+}
+
+/* Modal header */
+.modal-header {
+  padding: 24px 24px 16px;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.modal-title {
+  font-size: 1.4rem;
+  font-weight: 700;
+  color: #222;
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.modal-close {
+  background: none;
+  border: none;
+  font-size: 1.5rem;
+  color: #666;
+  cursor: pointer;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+}
+
+.modal-close:hover {
+  background: rgba(255, 59, 48, 0.1);
+  color: #ff3b30;
+  transform: rotate(90deg);
+}
+
+/* Modal body */
+.modal-body {
+  padding: 24px;
+}
+
+/* Form styles */
+.form-group {
+  margin-bottom: 20px;
+}
+
+.form-label {
+  display: block;
+  font-weight: 600;
+  color: #333;
+  margin-bottom: 8px;
+  font-size: 0.9rem;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.form-input, .form-textarea, .form-select {
+  width: 100%;
+  padding: 12px 16px;
+  border: 2px solid rgba(0, 0, 0, 0.1);
+  border-radius: 0.8em;
+  background: rgba(255, 255, 255, 0.8);
+  font-size: 1rem;
+  color: #333;
+  transition: all 0.2s ease;
+  font-family: inherit;
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+
+.form-input:focus, .form-textarea:focus, .form-select:focus {
+  outline: none;
+  border-color: #2196f3;
+  background: rgba(255, 255, 255, 0.95);
+  box-shadow: 0 0 0 3px rgba(33, 150, 243, 0.1);
+  transform: translateY(-1px);
+}
+
+.form-textarea {
+  min-height: 80px;
+  resize: vertical;
+}
+
+/* Checkbox y switch styles */
+.form-checkbox-group {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 0;
+}
+
+.form-checkbox {
+  width: 20px;
+  height: 20px;
+  appearance: none;
+  -webkit-appearance: none;
+  background: rgba(255, 255, 255, 0.8);
+  border: 2px solid rgba(0, 0, 0, 0.2);
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  position: relative;
+}
+
+.form-checkbox:checked {
+  background: #2196f3;
+  border-color: #2196f3;
+}
+
+.form-checkbox:checked::before {
+  content: '✓';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  color: white;
+  font-size: 14px;
+  font-weight: bold;
+}
+
+.form-checkbox-label {
+  font-weight: 500;
+  color: #333;
+  cursor: pointer;
+  user-select: none;
+}
+
+/* Time inputs group */
+.time-inputs {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+/* Select múltiple para categorías */
+.form-select[multiple] {
+  min-height: 120px;
+  padding: 8px;
+}
+
+.form-select[multiple] option {
+  padding: 8px 12px;
+  border-radius: 4px;
+  margin: 2px 0;
+  background: rgba(255, 255, 255, 0.9);
+  color: #333;
+}
+
+.form-select[multiple] option:checked {
+  background: #2196f3;
+  color: white;
+}
+
+/* Modal footer */
+.modal-footer {
+  padding: 16px 24px 24px;
+  border-top: 1px solid rgba(0, 0, 0, 0.1);
+  display: flex;
+  gap: 12px;
+  justify-content: flex-end;
+}
+
+/* Button styles */
+.btn {
+  padding: 12px 24px;
+  border: none;
+  border-radius: 0.8em;
+  font-size: 0.95rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-width: 100px;
+  text-decoration: none;
+  text-align: center;
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+
+.btn-primary {
+  background: #2196f3;
+  color: white;
+  box-shadow: 0 4px 12px rgba(33, 150, 243, 0.3);
+}
+
+.btn-primary:hover {
+  background: #1976d2;
+  transform: translateY(-2px);
+  box-shadow: 0 8px 20px rgba(33, 150, 243, 0.4);
+}
+
+.btn-secondary {
+  background: rgba(172, 172, 172, 0.15);
+  color: #666;
+  border: 1px solid rgba(0, 0, 0, 0.1);
+}
+
+.btn-secondary:hover {
+  background: rgba(172, 172, 172, 0.25);
+  color: #333;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.btn-danger {
+  background: #ff3b30;
+  color: white;
+  box-shadow: 0 4px 12px rgba(255, 59, 48, 0.3);
+}
+
+.btn-danger:hover {
+  background: #e5342a;
+  transform: translateY(-2px);
+  box-shadow: 0 8px 20px rgba(255, 59, 48, 0.4);
+}
+
+/* Responsive modal */
+@media (max-width: 768px) {
+  .modal-container {
+    max-width: 95%;
+    margin: 10px;
+  }
+  
+  .modal-header, .modal-body, .modal-footer {
+    padding-left: 16px;
+    padding-right: 16px;
+  }
+  
+  .time-inputs {
+    grid-template-columns: 1fr;
+  }
+  
+  .modal-footer {
+    flex-direction: column;
+  }
+  
+  .btn {
+    width: 100%;
+  }
+}
+
+/* Loading states */
+.btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none !important;
+}
+
+.btn.loading {
+  position: relative;
+  color: transparent;
+}
+
+.btn.loading::after {
+  content: '';
+  position: absolute;
+  width: 16px;
+  height: 16px;
+  border: 2px solid transparent;
+  border-top: 2px solid currentColor;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  color: white;
+}
+
+/* Success/Error messages */
+.message {
+  padding: 12px 16px;
+  border-radius: 0.6em;
+  margin-bottom: 16px;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.message.success {
+  background: rgba(76, 175, 80, 0.1);
+  color: #2e7d32;
+  border: 1px solid rgba(76, 175, 80, 0.2);
+}
+
+.message.error {
+  background: rgba(255, 59, 48, 0.1);
+  color: #d32f2f;
+  border: 1px solid rgba(255, 59, 48, 0.2);
+}
+
+/* Required field indicator */
+.form-label.required::after {
+  content: '*';
+  color: #ff3b30;
+  margin-left: 4px;
+}
+
+/* Additional form improvements */
+.hidden {
+  display: none !important;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+/* Toast messages */
+.message-toast {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  padding: 12px 20px;
+  border-radius: 8px;
+  color: white;
+  font-weight: 500;
+  z-index: 10000;
+  max-width: 300px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  transition: all 0.3s ease;
+  opacity: 1;
+  transform: translateX(0);
+}
+
+.message-toast.success {
+  background: #28a745;
+}
+
+.message-toast.error {
+  background: #dc3545;
+}
+
+.message-toast.info {
+  background: #007bff;
+}
+
+.message-toast.fade-out {
+  opacity: 0;
+  transform: translateX(100%);
+}

@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const { spawn } = require('child_process');
 const path = require('path');
+const { msalClient, scopes } = require('../microsoft-auth');
 
 // Función para validar credenciales usando el sistema Python
 function validateCredentials(username, password) {
@@ -256,6 +257,168 @@ router.get('/verify', (req, res) => {
       success: false,
       message: 'Sesión inválida'
     });
+  }
+});
+
+// Configurar cache para MSAL
+// Cache is now configured in microsoft-auth.js constructor
+// msalClient.getTokenCache().addBeforeCacheAccess(beforeCacheAccess);
+// msalClient.getTokenCache().addAfterCacheAccess(afterCacheAccess);
+
+// Middleware para inicializar sesión si no existe
+router.use((req, res, next) => {
+  if (!req.session) {
+    req.session = {};
+  }
+  next();
+});
+
+// Microsoft Auth routes
+
+// Login con Microsoft
+router.get('/login', async (req, res) => {
+  try {
+    console.log('🚀 Iniciando login con Microsoft...');
+
+    // Forzar localhost para mantener todo en local
+    const redirectUri = 'http://localhost:4000/api/auth/callback';
+
+    const authUrl = await msalClient.getAuthCodeUrl({
+      scopes: scopes,
+      redirectUri: redirectUri,
+      responseMode: 'query'
+    });
+
+    console.log('🔗 URL de autenticación generada con redirectUri:', redirectUri);
+    res.redirect(authUrl);
+  } catch (error) {
+    console.error('❌ Error generando URL de login:', error);
+    res.status(500).json({ error: 'Error interno del servidor' });
+  }
+});
+
+// Callback de Microsoft
+router.get('/callback', async (req, res) => {
+  try {
+    const { code, error, error_description } = req.query;
+
+    console.log('🔍 Callback recibido. Query params:', req.query);
+
+    if (error) {
+      console.error('❌ Error en callback de Microsoft:', error, error_description);
+      return res.redirect(`http://localhost:4000/?error=${error}&description=${encodeURIComponent(error_description || '')}`);
+    }
+
+    if (!code) {
+      console.log('❌ No se recibió código de autorización');
+      return res.redirect('http://localhost:4000/?error=no_code');
+    }
+
+    console.log('📨 Recibido código de autorización de Microsoft');
+
+    // Usar la misma URL fija de localhost
+    const redirectUri = 'http://localhost:4000/api/auth/callback';
+
+    console.log('🔄 Intercambiando código por tokens...');
+
+    const tokenResponse = await msalClient.acquireTokenByCode({
+      code: code,
+      scopes: scopes,
+      redirectUri: redirectUri
+    });
+
+    console.log('✅ Tokens adquiridos exitosamente');
+    console.log('📊 Token response keys:', Object.keys(tokenResponse));
+
+    // Guardar tokens en sesión
+    req.session.accessToken = tokenResponse.accessToken;
+    req.session.refreshToken = tokenResponse.refreshToken;
+    req.session.tokenExpires = tokenResponse.expiresOn.getTime();
+    req.session.account = tokenResponse.account;
+
+    console.log('💾 Sesión de Outlook guardada');
+    console.log('👤 Cuenta guardada:', {
+      name: req.session.account?.name,
+      username: req.session.account?.username
+    });
+
+    // Redirigir al calendario en localhost
+    console.log('🔀 Redirigiendo a calendario...');
+    res.redirect('http://localhost:4000/calendar');
+  } catch (error) {
+    console.error('❌ Error en callback de Microsoft:', error);
+    console.error('❌ Stack trace:', error.stack);
+    res.redirect(`http://localhost:4000/?error=auth_failed&message=${encodeURIComponent(error.message)}`);
+  }
+});
+
+// Verificar estado de autenticación
+router.get('/status', (req, res) => {
+  try {
+    const authenticated = !!(req.session.accessToken && req.session.account);
+
+    console.log('📊 Estado de autenticación:', {
+      authenticated,
+      hasAccessToken: !!req.session.accessToken,
+      hasAccount: !!req.session.account,
+      accountName: req.session.account?.name || 'N/A'
+    });
+
+    res.json({
+      authenticated,
+      account: req.session.account ? {
+        name: req.session.account.name,
+        username: req.session.account.username
+      } : null
+    });
+  } catch (error) {
+    console.error('❌ Error verificando estado:', error);
+    res.status(500).json({ error: 'Error interno del servidor' });
+  }
+});
+
+// Renovar token
+router.post('/refresh', async (req, res) => {
+  try {
+    if (!req.session.account) {
+      return res.status(401).json({ error: 'No hay cuenta activa' });
+    }
+
+    console.log('🔄 Intentando renovar token...');
+
+    const tokenResponse = await msalClient.acquireTokenSilent({
+      account: req.session.account,
+      scopes: scopes
+    });
+
+    // Actualizar sesión
+    req.session.accessToken = tokenResponse.accessToken;
+    req.session.refreshToken = tokenResponse.refreshToken;
+    req.session.tokenExpires = tokenResponse.expiresOn.getTime();
+
+    console.log('✅ Token renovado exitosamente');
+    res.json({ success: true });
+  } catch (error) {
+    console.error('❌ Error renovando token:', error);
+    res.status(401).json({ error: 'No se pudo renovar el token' });
+  }
+});
+
+// Logout de Microsoft
+router.post('/logout', (req, res) => {
+  try {
+    console.log('👋 Cerrando sesión de Microsoft');
+
+    // Limpiar sesión
+    req.session.accessToken = null;
+    req.session.refreshToken = null;
+    req.session.tokenExpires = null;
+    req.session.account = null;
+
+    res.json({ success: true });
+  } catch (error) {
+    console.error('❌ Error en logout:', error);
+    res.status(500).json({ error: 'Error interno del servidor' });
   }
 });
 
