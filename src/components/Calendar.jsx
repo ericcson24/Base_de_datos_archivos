@@ -71,17 +71,17 @@ const Calendar = ({ user, onLogout, onBackToPanel, onThemeToggle, isDarkMode }) 
         } else {
           // Si no está autenticado con Outlook, redirigir automáticamente al login
           console.log('No autenticado con Outlook, redirigiendo al login...');
-          window.location.href = '/api/auth/login';
+          window.location.href = 'http://localhost:5000/api/auth/login';
         }
       } else {
         // Si hay error en la petición, también redirigir al login
         console.log('Error verificando autenticación, redirigiendo al login...');
-        window.location.href = '/api/auth/login';
+        window.location.href = 'http://localhost:5000/api/auth/login';
       }
     } catch (error) {
       console.error('Error checking authentication:', error);
       // En caso de error, redirigir al login
-      window.location.href = '/api/auth/login';
+      window.location.href = 'http://localhost:5000/api/auth/login';
     }
   }, [loadCategories, loadEvents]);
 

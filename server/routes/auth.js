@@ -280,8 +280,9 @@ router.get('/login', async (req, res) => {
   try {
     console.log('🚀 Iniciando login con Microsoft...');
 
-    // Forzar localhost para mantener todo en local
-    const redirectUri = 'http://localhost:3000/api/auth/callback';
+    // Usar el puerto del backend para el redirectUri
+    const PORT = process.env.PORT || 5000;
+    const redirectUri = `http://localhost:${PORT}/api/auth/callback`;
 
     const authUrl = await msalClient.getAuthCodeUrl({
       scopes: scopes,
@@ -316,8 +317,9 @@ router.get('/callback', async (req, res) => {
 
     console.log('📨 Recibido código de autorización de Microsoft');
 
-    // Usar la misma URL fija de localhost
-    const redirectUri = 'http://localhost:3000/api/auth/callback';
+    // Usar el mismo puerto del backend
+    const PORT = process.env.PORT || 5000;
+    const redirectUri = `http://localhost:${PORT}/api/auth/callback`;
 
     console.log('🔄 Intercambiando código por tokens...');
 
