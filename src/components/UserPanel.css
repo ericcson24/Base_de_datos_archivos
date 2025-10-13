@@ -642,6 +642,19 @@ body {
   padding-right: 1rem;
 }
 
+.files-container.grid-view {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: 1rem;
+  padding: 1rem;
+  align-content: start;
+}
+
+.files-container.list-view {
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
 .files-container::-webkit-scrollbar {
   width: 6px;
 }
@@ -1232,6 +1245,128 @@ input[type="text"]:focus {
   opacity: 0.9;
 }
 
+/* GLASSMORPHISM EFFECTS */
+.glassmorphism {
+  background: rgba(255, 255, 255, 0.9);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.glassmorphism-strong {
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(15px);
+  -webkit-backdrop-filter: blur(15px);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+}
+
+.glassmorphism-light {
+  background: rgba(255, 255, 255, 0.7);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+}
+
+.glassmorphism-modal {
+  background: rgba(255, 255, 255, 0.9);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.25);
+}
+
+.glassmorphism-input {
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+}
+
+.glassmorphism-button {
+  background: rgba(255, 255, 255, 0.8);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.glassmorphism-panel {
+  background: rgba(255, 255, 255, 0.9);
+  backdrop-filter: blur(15px);
+  -webkit-backdrop-filter: blur(15px);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.glassmorphism-preview {
+  background: rgba(255, 255, 255, 0.9);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.25);
+}
+
+.glassmorphism-textarea {
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+}
+
+.glassmorphism-thumbnail {
+  background: rgba(255, 255, 255, 0.8);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+/* Dark mode glassmorphism variants */
+[data-theme="dark"] .glassmorphism {
+  background: rgba(30, 30, 30, 0.9);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+[data-theme="dark"] .glassmorphism-strong {
+  background: rgba(30, 30, 30, 0.95);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+}
+
+[data-theme="dark"] .glassmorphism-light {
+  background: rgba(30, 30, 30, 0.7);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+[data-theme="dark"] .glassmorphism-modal {
+  background: rgba(20, 20, 20, 0.9);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+[data-theme="dark"] .glassmorphism-input {
+  background: rgba(40, 40, 40, 0.95);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+}
+
+[data-theme="dark"] .glassmorphism-button {
+  background: rgba(50, 50, 50, 0.8);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+[data-theme="dark"] .glassmorphism-panel {
+  background: rgba(30, 30, 30, 0.9);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+[data-theme="dark"] .glassmorphism-preview {
+  background: rgba(20, 20, 20, 0.9);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+[data-theme="dark"] .glassmorphism-textarea {
+  background: rgba(40, 40, 40, 0.95);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+}
+
+[data-theme="dark"] .glassmorphism-thumbnail {
+  background: rgba(50, 50, 50, 0.8);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
 /* RESPONSIVE */
 @media (max-width: 768px) {
   .sidebar {
@@ -1736,141 +1871,5 @@ input[type="text"]:focus {
   color: var(--hover-preview-secondary-text);
 }
 
-/* SEARCH AND SORT CONTROLS */
-.search-sort-container {
-  position: absolute;
-  top: 8px;
-  left: 50px;
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  z-index: 15;
-}
-
-.search-container {
-  position: relative;
-  display: flex;
-  align-items: center;
-}
-
-.search-btn {
-  background: var(--menu-bg);
-  border: 1px solid var(--menu-border);
-  border-radius: 50%;
-  width: 36px;
-  height: 36px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  font-size: 1.1rem;
-  color: var(--menu-text);
-  transition: all 0.3s ease;
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
-}
-
-.search-btn:hover {
-  background: var(--menu-hover-bg);
-  color: var(--menu-hover-text);
-  transform: scale(1.1);
-}
-
-.search-btn.active {
-  background: var(--button-primary-bg);
-  color: var(--button-primary-text);
-}
-
-.search-btn.has-query {
-  position: relative;
-}
-
-.search-btn.has-query::after {
-  content: '';
-  position: absolute;
-  top: 4px;
-  right: 4px;
-  width: 8px;
-  height: 8px;
-  background: var(--button-primary-bg);
-  border-radius: 50%;
-  border: 2px solid var(--menu-bg);
-}
-
-.search-input {
-  position: absolute;
-  left: 45px;
-  top: 50%;
-  transform: translateY(-50%);
-  width: 0;
-  height: 36px;
-  padding: 0 1rem;
-  border: 1px solid var(--input-border);
-  border-radius: 18px;
-  background: var(--panel-bg);
-  color: var(--text-color);
-  font-size: 0.9rem;
-  transition: all 0.3s ease;
-  opacity: 0;
-  pointer-events: none;
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
-}
-
-.search-input:focus {
-  outline: none;
-  border-color: var(--input-focus-border);
-}
-
-.search-input.expanded {
-  width: 250px;
-  opacity: 1;
-  pointer-events: auto;
-}
-
-.search-input::placeholder {
-  color: var(--panel-secondary-text);
-}
-
-.sort-buttons {
-  display: flex;
-  align-items: center;
-  gap: 0.25rem;
-}
-
-.sort-btn {
-  background: var(--button-secondary-bg);
-  border: 1px solid var(--panel-border);
-  border-radius: 6px;
-  padding: 0.25rem 0.5rem;
-  font-size: 0.75rem;
-  color: var(--button-secondary-text);
-  cursor: pointer;
-  transition: all 0.2s ease;
-  display: flex;
-  align-items: center;
-  gap: 0.25rem;
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
-}
-
-.sort-btn:hover {
-  background: var(--panel-bg);
-  border-color: var(--input-focus-border);
-}
-
-.sort-btn.active {
-  background: var(--button-primary-bg);
-  color: var(--button-primary-text);
-  border-color: var(--button-primary-bg);
-}
-
-.sort-btn.asc::after {
-  content: "↑";
-  font-size: 0.8rem;
-}
-
-.sort-btn.desc::after {
-  content: "↓";
-  font-size: 0.8rem;
-}
+/* SEARCH AND SORT CONTROLS - UPDATED MODERN DESIGN */
+/* Old styles removed - now using Tailwind classes in JSX */

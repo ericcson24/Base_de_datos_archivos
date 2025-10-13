@@ -63,8 +63,6 @@ const formatFileSize = (bytes) => {
 // File type detection and preview utilities
 const getFileType = (filename) => {
   const ext = filename.toLowerCase().split('.').pop();
-  const name = filename.toLowerCase();
-
   if (['jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp', 'svg'].includes(ext)) return 'image';
   if (['mp4', 'avi', 'mov', 'wmv', 'flv', 'webm', 'mkv'].includes(ext)) return 'video';
   if (['mp3', 'wav', 'flac', 'aac', 'ogg'].includes(ext)) return 'audio';
@@ -97,14 +95,6 @@ const getFileIcon = (filename) => {
 const canPreview = (filename) => {
   const type = getFileType(filename);
   return ['image', 'video', 'pdf', 'text'].includes(type);
-};
-
-const getPreviewUrl = (fileId, filename) => {
-  const type = getFileType(filename);
-  if (type === 'image') return `/api/files/preview/${fileId}`;
-  if (type === 'video') return `/api/files/preview/${fileId}`;
-  if (type === 'pdf') return `/api/files/preview/${fileId}`;
-  return null;
 };
 
 // Función para obtener preview con autenticación
@@ -174,15 +164,12 @@ const UserPanel = ({ user, onLogout, onBackToFolders, onThemeToggle, isDarkMode,
   const [fileGridPosition, setFileGridPosition] = useState({ x: 0, y: 0 });
   const [isDragging, setIsDragging] = useState(false);
   const [isResizing, setIsResizing] = useState(false);
-  const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
   const [initialSize, setInitialSize] = useState({ width: 0, height: 0 });
   const [initialMouse, setInitialMouse] = useState({ x: 0, y: 0 });
   const [initialPosition, setInitialPosition] = useState({ x: 0, y: 0 });
-  const [fileGridWidth, setFileGridWidth] = useState(0);
 
   // Estados para drag and drop
   const [isDragOver, setIsDragOver] = useState(false);
-  const [dragCounter, setDragCounter] = useState(0);
   
   // Estado para progreso de subida
   const [uploadProgress, setUploadProgress] = useState(null);
@@ -190,8 +177,9 @@ const UserPanel = ({ user, onLogout, onBackToFolders, onThemeToggle, isDarkMode,
   // Estados para búsqueda y ordenamiento
   const [searchQuery, setSearchQuery] = useState('');
   const [isSearchExpanded, setIsSearchExpanded] = useState(false);
-  const [sortBy, setSortBy] = useState('name'); // 'name', 'type', 'date'
-  const [sortOrder, setSortOrder] = useState('asc'); // 'asc', 'desc'
+  const [sortBy, setSortBy] = useState('type'); // 'name', 'type', 'date' - Default: type
+  const [sortOrder, setSortOrder] = useState('asc'); // 'asc', 'desc' - Default: asc
+  const [viewMode, setViewMode] = useState('list'); // 'list', 'grid'
 
   // Función para toggle del tema
   const toggleTheme = () => {
@@ -238,6 +226,10 @@ const UserPanel = ({ user, onLogout, onBackToFolders, onThemeToggle, isDarkMode,
     const filtered = filteredFiles();
 
     return filtered.sort((a, b) => {
+      // Folders always come first, regardless of sort type
+      if (a.type === 'folder' && b.type !== 'folder') return -1;
+      if (a.type !== 'folder' && b.type === 'folder') return 1;
+
       let aValue, bValue;
 
       switch (sortBy) {
@@ -246,9 +238,7 @@ const UserPanel = ({ user, onLogout, onBackToFolders, onThemeToggle, isDarkMode,
           bValue = b.name.toLowerCase();
           break;
         case 'type':
-          // Carpetas primero, luego por tipo de archivo
-          if (a.type === 'folder' && b.type !== 'folder') return -1;
-          if (a.type !== 'folder' && b.type === 'folder') return 1;
+          // Within same type group, sort by file type
           aValue = getFileType(a.name);
           bValue = getFileType(b.name);
           break;
@@ -287,12 +277,6 @@ const UserPanel = ({ user, onLogout, onBackToFolders, onThemeToggle, isDarkMode,
     }
 
     return invalidFiles;
-  };
-
-  // Función para cerrar todos los menús
-  const closeAllMenus = () => {
-    setUploadMenuOpen(false);
-    setSharedDropdownOpen(false);
   };
 
   // useEffect para manejar clicks fuera de los menús
@@ -370,7 +354,7 @@ useEffect(() => {
   loadSharedFolders();
 }, [currentView, currentPath, loadFiles, loadSharedFolders]);
 
-  const handleFileUpload = async (files) => {
+  const handleFileUpload = useCallback(async (files) => {
     if (!files || files.length === 0) return;
 
     // Validar archivos
@@ -424,9 +408,9 @@ useEffect(() => {
       // Limpiar mensaje de error después de 5 segundos
       setTimeout(() => setUploadProgress(null), 5000);
     }
-  };
+  }, [currentPath, loadFiles]);
 
-  const handleFolderUpload = async (files) => {
+  const handleFolderUpload = useCallback(async (files) => {
     if (!files || files.length === 0) return;
 
     // Validar archivos
@@ -506,7 +490,7 @@ useEffect(() => {
       // Limpiar mensaje de error después de 5 segundos
       setTimeout(() => setUploadProgress(null), 5000);
     }
-  };
+  }, [currentPath, loadFiles]);
 
   const handleCreateFolder = async () => {
     if (!newFolderName.trim()) {
@@ -681,22 +665,13 @@ useEffect(() => {
   const handleDragEnter = useCallback((e) => {
     e.preventDefault();
     e.stopPropagation();
-    setDragCounter(prev => prev + 1);
-    if (e.dataTransfer.items && e.dataTransfer.items.length > 0) {
-      setIsDragOver(true);
-    }
+    setIsDragOver(true);
   }, []);
 
   const handleDragLeave = useCallback((e) => {
     e.preventDefault();
     e.stopPropagation();
-    setDragCounter(prev => {
-      const newCounter = prev - 1;
-      if (newCounter === 0) {
-        setIsDragOver(false);
-      }
-      return newCounter;
-    });
+    setIsDragOver(false);
   }, []);
 
   const handleDragOver = useCallback((e) => {
@@ -708,7 +683,6 @@ useEffect(() => {
     e.preventDefault();
     e.stopPropagation();
     setIsDragOver(false);
-    setDragCounter(0);
 
     const files = Array.from(e.dataTransfer.files);
     if (files.length > 0) {
@@ -721,7 +695,7 @@ useEffect(() => {
         await handleFileUpload(files);
       }
     }
-  }, []);
+  }, [handleFileUpload, handleFolderUpload]);
 
   // Funciones para redimensionamiento y movimiento del file-grid
   const handleMouseDown = (e, action) => {
@@ -733,7 +707,6 @@ useEffect(() => {
       setIsDragging(true);
       setInitialMouse({ x: e.clientX, y: e.clientY });
       setInitialPosition({ x: rect.left, y: rect.top });
-      setFileGridWidth(rect.width);
     } else if (action === 'resize') {
       setIsResizing(true);
       // Guardar tamaño inicial y posición del mouse
@@ -932,6 +905,164 @@ useEffect(() => {
           </button>
         </div>
 
+        {/* Modern Search and Controls Bar - Moved outside file-grid */}
+        <div className="relative z-10 mb-6 w-full px-6">
+          <div className="search-container flex items-center justify-between glassmorphism rounded-2xl p-4 shadow-lg border-gray-200/50 transition-all duration-300 hover:shadow-xl">
+            {/* Search Section */}
+            <div className="flex items-center space-x-3 flex-1 max-w-md">
+              <div className="relative group">
+                {/* Search Button - positioned absolutely */}
+                <button
+                  className={`absolute inset-0 p-3 rounded-xl transition-all duration-300 transform hover:scale-105 z-10 ${
+                    isSearchExpanded
+                      ? 'opacity-0 pointer-events-none'
+                      : 'opacity-100 bg-gray-100 text-gray-600 hover:bg-gray-200'
+                  }`}
+                  onClick={toggleSearch}
+                  title={searchQuery ? `Búsqueda activa: "${searchQuery}"` : "Buscar archivos"}
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                  </svg>
+                </button>
+
+                {/* Search Input - positioned absolutely in same location */}
+                <div className={`absolute inset-0 transition-all duration-300 ease-out transform ${
+                  isSearchExpanded ? 'opacity-100 scale-100' : 'opacity-0 scale-95 pointer-events-none'
+                }`}>
+                  <div className="relative">
+                    <input
+                      type="text"
+                      className="w-full pl-12 pr-10 py-3 glassmorphism-input border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-300 shadow-md hover:shadow-lg text-gray-900 placeholder-gray-500"
+                      placeholder="Buscar archivos..."
+                      value={searchQuery}
+                      onChange={handleSearch}
+                      onKeyPress={(e) => e.key === 'Enter' && e.target.blur()}
+                      autoFocus={isSearchExpanded}
+                    />
+                    <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                      <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                      </svg>
+                    </div>
+                    {searchQuery && (
+                      <button
+                        onClick={() => setSearchQuery('')}
+                        className="absolute inset-y-0 right-0 pr-4 flex items-center text-gray-400 hover:text-gray-600 transition-colors duration-200"
+                        title="Limpiar búsqueda"
+                      >
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* Search Results Counter */}
+              {searchQuery && (
+                <div className="animate-fade-in bg-blue-50 text-blue-700 px-3 py-1 rounded-lg text-sm font-medium border border-blue-200">
+                  {filteredFiles().length} resultado{filteredFiles().length !== 1 ? 's' : ''}
+                </div>
+              )}
+            </div>
+
+            {/* Controls Section */}
+            <div className="flex items-center space-x-2">
+              {/* Sort Controls */}
+              <div className="flex items-center space-x-1 bg-gray-50 rounded-xl p-1">
+                <button
+                  className={`p-2 rounded-lg transition-all duration-200 transform hover:scale-105 ${
+                    sortBy === 'name'
+                      ? 'bg-blue-500 text-white shadow-md'
+                      : 'text-gray-600 hover:bg-gray-200'
+                  }`}
+                  onClick={() => handleSort('name')}
+                  title="Ordenar por nombre"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 12h.01M7 17h.01M12 7h.01M12 12h.01M12 17h.01M17 7h.01M17 12h.01M17 17h.01" />
+                  </svg>
+                </button>
+                <button
+                  className={`p-2 rounded-lg transition-all duration-200 transform hover:scale-105 ${
+                    sortBy === 'type'
+                      ? 'bg-blue-500 text-white shadow-md'
+                      : 'text-gray-600 hover:bg-gray-200'
+                  }`}
+                  onClick={() => handleSort('type')}
+                  title="Ordenar por tipo"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2H5a2 2 0 00-2-2z" />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 5a2 2 0 012-2h4a2 2 0 012 2v2H8V5z" />
+                  </svg>
+                </button>
+                <button
+                  className={`p-2 rounded-lg transition-all duration-200 transform hover:scale-105 ${
+                    sortBy === 'date'
+                      ? 'bg-blue-500 text-white shadow-md'
+                      : 'text-gray-600 hover:bg-gray-200'
+                  }`}
+                  onClick={() => handleSort('date')}
+                  title="Ordenar por fecha"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                  </svg>
+                </button>
+              </div>
+
+              {/* Sort Direction */}
+              <button
+                className="p-2 bg-gray-50 rounded-xl hover:bg-gray-200 transition-all duration-200 transform hover:scale-105"
+                onClick={() => setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')}
+                title={`Orden ${sortOrder === 'asc' ? 'ascendente' : 'descendente'}`}
+              >
+                <svg
+                  className={`w-4 h-4 text-gray-600 transition-transform duration-200 ${sortOrder === 'desc' ? 'rotate-180' : ''}`}
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4" />
+                </svg>
+              </button>
+
+              {/* View Mode Toggle */}
+              <div className="flex items-center space-x-1 bg-gray-50 rounded-xl p-1">
+                <button
+                  className={`p-2 rounded-lg transition-all duration-200 transform hover:scale-105 ${
+                    viewMode === 'list'
+                      ? 'bg-blue-500 text-white shadow-md'
+                      : 'text-gray-600 hover:bg-gray-200'
+                  }`}
+                  onClick={() => setViewMode('list')}
+                  title="Vista de lista"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 10h16M4 14h16M4 18h16" />
+                  </svg>
+                </button>
+                <button
+                  className={`p-2 rounded-lg transition-all duration-200 transform hover:scale-105 ${
+                    viewMode === 'grid'
+                      ? 'bg-blue-500 text-white shadow-md'
+                      : 'text-gray-600 hover:bg-gray-200'
+                  }`}
+                  onClick={() => setViewMode('grid')}
+                  title="Vista de cuadrícula"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
+                  </svg>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
         <div 
           className={`file-grid ${isDragOver ? 'drag-over' : ''}`}
           style={{
@@ -967,96 +1098,8 @@ useEffect(() => {
             onMouseDown={(e) => handleMouseDown(e, 'move')}
           ></div>
 
-          {/* Search and Sort Controls */}
-          <div className="search-sort-container">
-            <div className="search-container">
-              <button
-                className={`search-btn ${isSearchExpanded ? 'active' : ''} ${searchQuery ? 'has-query' : ''}`}
-                onClick={toggleSearch}
-                title={searchQuery ? `Búsqueda activa: "${searchQuery}"` : "Buscar archivos"}
-              >
-                🔍
-              </button>
-              <input
-                type="text"
-                className={`search-input ${isSearchExpanded ? 'expanded' : ''}`}
-                placeholder="Buscar archivos..."
-                value={searchQuery}
-                onChange={handleSearch}
-                onKeyPress={(e) => e.key === 'Enter' && e.target.blur()}
-              />
-            </div>
-
-            <div className="sort-buttons">
-              <button
-                className={`sort-btn ${sortBy === 'name' ? 'active' : ''} ${sortBy === 'name' ? sortOrder : ''}`}
-                onClick={() => handleSort('name')}
-                title="Ordenar por nombre"
-              >
-                📝
-              </button>
-              <button
-                className={`sort-btn ${sortBy === 'type' ? 'active' : ''} ${sortBy === 'type' ? sortOrder : ''}`}
-                onClick={() => handleSort('type')}
-                title="Ordenar por tipo"
-              >
-                📁
-              </button>
-              <button
-                className={`sort-btn ${sortBy === 'date' ? 'active' : ''} ${sortBy === 'date' ? sortOrder : ''}`}
-                onClick={() => handleSort('date')}
-                title="Ordenar por fecha"
-              >
-                📅
-              </button>
-            </div>
-          </div>
-
-          {/* Search Results Indicator */}
-          {searchQuery && (
-            <div style={{
-              position: 'absolute',
-              top: '50px',
-              left: '10px',
-              background: 'var(--panel-bg)',
-              border: '1px solid var(--panel-border)',
-              borderRadius: '6px',
-              padding: '0.25rem 0.5rem',
-              fontSize: '0.8rem',
-              color: 'var(--panel-text)',
-              backdropFilter: 'blur(10px)',
-              zIndex: 15,
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0.5rem'
-            }}>
-              <span>🔍 {filteredFiles().length} resultado{filteredFiles().length !== 1 ? 's' : ''} para "{searchQuery}"</span>
-              <button
-                onClick={() => setSearchQuery('')}
-                style={{
-                  background: 'none',
-                  border: 'none',
-                  color: 'var(--panel-secondary-text)',
-                  cursor: 'pointer',
-                  fontSize: '0.9rem',
-                  padding: '0',
-                  lineHeight: 1
-                }}
-                title="Limpiar búsqueda"
-              >
-                ✕
-              </button>
-            </div>
-          )}
-
-          {/* Resize Handle */}
-          <div 
-            className="resize-handle"
-            onMouseDown={(e) => handleMouseDown(e, 'resize')}
-          ></div>
-
           {/* Files and folders */}
-          <div className="files-container">
+          <div className={`files-container ${viewMode === 'grid' ? 'grid-view' : 'list-view'}`}>
             {loading ? (
               <div className="loading">Cargando archivos...</div>
             ) : (
@@ -1082,6 +1125,7 @@ useEffect(() => {
                     onOpenSidebar={openSidebarPanel}
                     onDuplicate={handleDuplicateItem}
                     isHovered={hoveredFile?.id === item.id}
+                    viewMode={viewMode}
                   />
                 ))}
 
@@ -1109,6 +1153,12 @@ useEffect(() => {
               user={user}
             />
           )}
+
+          {/* Resize Handle */}
+          <div 
+            className="resize-handle"
+            onMouseDown={(e) => handleMouseDown(e, 'resize')}
+          ></div>
         </div>
       </div>
 
@@ -1148,20 +1198,31 @@ useEffect(() => {
 
       {/* Create Folder Modal */}
       {showCreateFolderModal && (
-        <div className="modal-overlay" onClick={() => setShowCreateFolderModal(false)}>
-          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
-            <h3>Nueva Carpeta</h3>
+        <div className="fixed inset-0 bg-black/50 dark:bg-black/70 flex items-center justify-center z-50" onClick={() => setShowCreateFolderModal(false)}>
+          <div className="glassmorphism-modal dark:bg-slate-800 rounded-lg shadow-xl border-gray-200 dark:border-slate-600 p-6 w-full max-w-md mx-4" onClick={(e) => e.stopPropagation()}>
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-slate-100 mb-4">Nueva Carpeta</h3>
             <input
               type="text"
               placeholder="Nombre de la carpeta"
               value={newFolderName}
               onChange={(e) => setNewFolderName(e.target.value)}
               onKeyPress={(e) => e.key === 'Enter' && handleCreateFolder()}
+              className="w-full px-3 py-2 glassmorphism-input dark:bg-slate-700 text-gray-900 dark:text-slate-100 placeholder-gray-500 dark:placeholder-slate-400 mb-4"
               autoFocus
             />
-            <div className="modal-buttons">
-              <button onClick={() => setShowCreateFolderModal(false)}>Cancelar</button>
-              <button onClick={handleCreateFolder}>Crear</button>
+            <div className="flex justify-end space-x-3">
+              <button 
+                onClick={() => setShowCreateFolderModal(false)}
+                className="px-4 py-2 text-gray-600 dark:text-slate-300 hover:bg-gray-100 dark:hover:bg-slate-700 rounded-lg transition-colors duration-200"
+              >
+                Cancelar
+              </button>
+              <button 
+                onClick={handleCreateFolder}
+                className="px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg transition-colors duration-200"
+              >
+                Crear
+              </button>
             </div>
           </div>
         </div>
@@ -1169,20 +1230,31 @@ useEffect(() => {
 
       {/* Rename Modal */}
       {showRenameModal && (
-        <div className="modal-overlay" onClick={() => setShowRenameModal(false)}>
-          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
-            <h3>Renombrar {renameItem?.type === 'folder' ? 'Carpeta' : 'Archivo'}</h3>
+        <div className="fixed inset-0 bg-black/50 dark:bg-black/70 flex items-center justify-center z-50" onClick={() => setShowRenameModal(false)}>
+          <div className="glassmorphism-modal dark:bg-slate-800 rounded-lg shadow-xl border-gray-200 dark:border-slate-600 p-6 w-full max-w-md mx-4" onClick={(e) => e.stopPropagation()}>
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-slate-100 mb-4">Renombrar {renameItem?.type === 'folder' ? 'Carpeta' : 'Archivo'}</h3>
             <input
               type="text"
               placeholder="Nuevo nombre"
               value={renameValue}
               onChange={(e) => setRenameValue(e.target.value)}
               onKeyPress={(e) => e.key === 'Enter' && handleRenameItem()}
+              className="w-full px-3 py-2 glassmorphism-input dark:bg-slate-700 text-gray-900 dark:text-slate-100 placeholder-gray-500 dark:placeholder-slate-400 mb-4"
               autoFocus
             />
-            <div className="modal-buttons">
-              <button onClick={() => setShowRenameModal(false)}>Cancelar</button>
-              <button onClick={handleRenameItem}>Renombrar</button>
+            <div className="flex justify-end space-x-3">
+              <button 
+                onClick={() => setShowRenameModal(false)}
+                className="px-4 py-2 text-gray-600 dark:text-slate-300 hover:bg-gray-100 dark:hover:bg-slate-700 rounded-lg transition-colors duration-200"
+              >
+                Cancelar
+              </button>
+              <button 
+                onClick={handleRenameItem}
+                className="px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg transition-colors duration-200"
+              >
+                Renombrar
+              </button>
             </div>
           </div>
         </div>
@@ -1208,7 +1280,7 @@ useEffect(() => {
 };
 
 // File Item Component
-const FileItem = ({ item, onFolderClick, onDelete, onRename, onView, onHover, onLeave, isHovered, onOpenSidebar, onDuplicate }) => {
+const FileItem = ({ item, onFolderClick, onDelete, onRename, onView, onHover, onLeave, isHovered, onOpenSidebar, onDuplicate, viewMode = 'list' }) => {
   const [menuOpen, setMenuOpen] = useState(false);
   const [previewUrl, setPreviewUrl] = useState(null);
   const [previewLoading, setPreviewLoading] = useState(false);
@@ -1262,7 +1334,7 @@ const FileItem = ({ item, onFolderClick, onDelete, onRename, onView, onHover, on
     onLeave();
   };
 
-  const loadPreview = async () => {
+  const loadPreview = useCallback(async () => {
     setPreviewLoading(true);
     try {
       const url = await getAuthenticatedPreviewUrl(item.id, item.name);
@@ -1272,79 +1344,358 @@ const FileItem = ({ item, onFolderClick, onDelete, onRename, onView, onHover, on
     } finally {
       setPreviewLoading(false);
     }
-  };
+  }, [item.id, item.name]);
 
   useEffect(() => {
     // Cargar preview automáticamente para archivos que se pueden previsualizar
     if (item.type === 'file' && canPreview(item.name) && !previewUrl && !previewLoading) {
       loadPreview();
     }
-  }, [item.id, item.name]);
+  }, [item.id, item.name, item.type, loadPreview, previewLoading, previewUrl]);
 
   if (item.type === 'file') {
     const fileType = getFileType(item.name);
     const canShowPreview = canPreview(item.name);
 
-    return (
+    if (viewMode === 'grid') {
+      // Grid View
+      return (
+        <div
+          className={`group relative glassmorphism dark:bg-slate-800 rounded-xl shadow-md hover:shadow-xl transition-all duration-300 transform hover:scale-105 cursor-pointer border-gray-200 dark:border-slate-600 overflow-hidden ${isHovered ? 'ring-2 ring-blue-500' : ''}`}
+          onClick={handleClick}
+          onMouseEnter={handleMouseEnter}
+          onMouseLeave={handleMouseLeave}
+        >
+          {/* Thumbnail */}
+          <div className="aspect-square p-4 flex items-center justify-center bg-gray-50 dark:bg-black">
+            {canShowPreview && previewUrl ? (
+              <>
+                {fileType === 'image' && (
+                  <img
+                    src={previewUrl}
+                    alt={item.name}
+                    className="w-full h-full object-cover rounded-lg"
+                    onError={(e) => {
+                      e.target.style.display = 'none';
+                      e.target.nextSibling.style.display = 'flex';
+                    }}
+                  />
+                )}
+                {fileType === 'video' && (
+                  <video
+                    muted
+                    className="w-full h-full object-cover rounded-lg"
+                    onMouseEnter={(e) => e.target.play()}
+                    onMouseLeave={(e) => e.target.pause()}
+                    onError={(e) => {
+                      e.target.style.display = 'none';
+                      e.target.nextSibling.style.display = 'flex';
+                    }}
+                  >
+                    <source src={previewUrl} />
+                  </video>
+                )}
+                {fileType === 'pdf' && (
+                  <iframe
+                    src={previewUrl}
+                    className="w-full h-full border-none rounded-lg"
+                    onError={(e) => {
+                      e.target.style.display = 'none';
+                      e.target.nextSibling.style.display = 'flex';
+                    }}
+                    title={item.name}
+                  />
+                )}
+                <div className="file-icon absolute inset-0 flex items-center justify-center bg-gray-100 rounded-lg" style={{ display: 'none' }}>
+                  {getFileIcon(item.name)}
+                </div>
+              </>
+            ) : previewLoading ? (
+              <div className="file-icon animate-pulse">⟳</div>
+            ) : (
+              <div className="file-icon text-4xl">{getFileIcon(item.name)}</div>
+            )}
+          </div>
+
+          {/* File Info */}
+          <div className="p-3">
+            <h3 className="text-sm font-medium text-gray-900 dark:text-slate-100 truncate" title={item.name}>
+              {item.name}
+            </h3>
+            <p className="text-xs text-gray-700 dark:text-slate-400 mt-1">
+              {item.size ? formatFileSize(item.size) : ''}
+            </p>
+          </div>
+
+          {/* Menu Button */}
+          <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+            <button
+              className="p-1.5 glassmorphism-button rounded-full shadow-md hover:shadow-lg transition-all duration-200 transform hover:scale-110"
+              onClick={handleMenuClick}
+            >
+              <svg className="w-4 h-4 text-gray-600" fill="currentColor" viewBox="0 0 20 20">
+                <path d="M10 6a2 2 0 110-4 2 2 0 010 4zM10 12a2 2 0 110-4 2 2 0 010 4zM10 18a2 2 0 110-4 2 2 0 010 4z" />
+              </svg>
+            </button>
+          </div>
+
+          {/* Menu Popup */}
+          {menuOpen && (
+            <div className="absolute top-12 right-2 z-50 glassmorphism-strong rounded-lg shadow-xl border-gray-200 py-2 min-w-48 animate-fade-in">
+              <button className="w-full text-left px-4 py-2 text-sm hover:bg-gray-100 transition-colors duration-150 flex items-center space-x-2" onClick={() => { setMenuOpen(false); onOpenSidebar(item, 'view'); }}>
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                </svg>
+                <span>Abrir en panel</span>
+              </button>
+              <button className="w-full text-left px-4 py-2 text-sm hover:bg-gray-100 dark:hover:bg-slate-700 transition-colors duration-150 flex items-center space-x-2" onClick={() => { setMenuOpen(false); onOpenSidebar(item, 'edit'); }}>
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                </svg>
+                <span>Editar en panel</span>
+              </button>
+              <button className="w-full text-left px-4 py-2 text-sm hover:bg-gray-100 dark:hover:bg-slate-700 transition-colors duration-150 flex items-center space-x-2" onClick={() => { setMenuOpen(false); onOpenSidebar(item, 'info'); }}>
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                <span>Información</span>
+              </button>
+              {canShowPreview ? (
+                <button className="w-full text-left px-4 py-2 text-sm hover:bg-gray-100 dark:hover:bg-slate-700 transition-colors duration-150 flex items-center space-x-2" onClick={() => { setMenuOpen(false); onView(item); }}>
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                  </svg>
+                  <span>Ver completo</span>
+                </button>
+              ) : (
+                <button className="w-full text-left px-4 py-2 text-sm hover:bg-gray-100 dark:hover:bg-slate-700 transition-colors duration-150 flex items-center space-x-2" onClick={() => { setMenuOpen(false); downloadFile(item.id, item.name); }}>
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                  </svg>
+                  <span>Ver</span>
+                </button>
+              )}
+              <button className="w-full text-left px-4 py-2 text-sm hover:bg-gray-100 dark:hover:bg-slate-700 transition-colors duration-150 flex items-center space-x-2" onClick={() => { setMenuOpen(false); downloadFile(item.id, item.name); }}>
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                </svg>
+                <span>Descargar</span>
+              </button>
+              <button className="w-full text-left px-4 py-2 text-sm hover:bg-gray-100 dark:hover:bg-slate-700 transition-colors duration-150 flex items-center space-x-2" onClick={() => { setMenuOpen(false); onDuplicate(item); }}>
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                </svg>
+                <span>Duplicar</span>
+              </button>
+              <div className="border-t border-gray-200 dark:border-slate-600 my-1"></div>
+              <button className="w-full text-left px-4 py-2 text-sm hover:bg-gray-100 dark:hover:bg-slate-700 transition-colors duration-150 flex items-center space-x-2" onClick={() => { setMenuOpen(false); onRename(item); }}>
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                </svg>
+                <span>Renombrar</span>
+              </button>
+              <button className="w-full text-left px-4 py-2 text-sm hover:bg-red-50 dark:hover:bg-red-900/20 text-red-600 dark:text-red-400 transition-colors duration-150 flex items-center space-x-2" onClick={() => { setMenuOpen(false); onDelete(item); }}>
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                </svg>
+                <span>Eliminar</span>
+              </button>
+            </div>
+          )}
+        </div>
+      );
+    } else {
+      // List View (existing code)
+      return (
+        <div
+          className={`drive-file-row ${isHovered ? 'hovered' : ''}`}
+          onClick={handleClick}
+          onMouseEnter={handleMouseEnter}
+          onMouseLeave={handleMouseLeave}
+        >
+          <div className="thumbnail">
+            {canShowPreview && previewUrl ? (
+              <>
+                {fileType === 'image' && (
+                  <img
+                    src={previewUrl}
+                    alt={item.name}
+                    onError={(e) => {
+                      e.target.style.display = 'none';
+                      e.target.nextSibling.style.display = 'flex';
+                    }}
+                  />
+                )}
+                {fileType === 'video' && (
+                  <video
+                    muted
+                    onMouseEnter={(e) => e.target.play()}
+                    onMouseLeave={(e) => e.target.pause()}
+                    onError={(e) => {
+                      e.target.style.display = 'none';
+                      e.target.nextSibling.style.display = 'flex';
+                    }}
+                  >
+                    <source src={previewUrl} />
+                  </video>
+                )}
+                {fileType === 'pdf' && (
+                  <iframe
+                    src={previewUrl}
+                    onError={(e) => {
+                      e.target.style.display = 'none';
+                      e.target.nextSibling.style.display = 'flex';
+                    }}
+                    title={item.name}
+                  />
+                )}
+                <div className="file-icon" style={{ display: 'none' }}>
+                  {getFileIcon(item.name)}
+                </div>
+              </>
+            ) : previewLoading ? (
+              <div className="file-icon loading">⟳</div>
+            ) : (
+              <div className="file-icon">
+                {getFileIcon(item.name)}
+              </div>
+            )}
+          </div>
+          <div className="file-name" title={item.name}>
+            {item.name}
+          </div>
+          <span className="file-size">
+            {item.size ? formatFileSize(item.size) : ''}
+          </span>
+          <div className="menu-container">
+            <button className="menu-trespuntos" onClick={handleMenuClick}>
+              ⋮
+            </button>
+            {menuOpen && (
+              <div className={`mini-menu-frosted ${menuOpen ? 'show' : ''}`}>
+                <button className="mini-menu-item" onClick={() => { setMenuOpen(false); onOpenSidebar(item, 'view'); }}>
+                  👁 Abrir en panel
+                </button>
+                <button className="mini-menu-item" onClick={() => { setMenuOpen(false); onOpenSidebar(item, 'edit'); }}>
+                  ✏️ Editar en panel
+                </button>
+                <button className="mini-menu-item" onClick={() => { setMenuOpen(false); onOpenSidebar(item, 'info'); }}>
+                  ℹ️ Información
+                </button>
+                {canShowPreview ? (
+                  <button className="mini-menu-item" onClick={() => { setMenuOpen(false); onView(item); }}>
+                    👁 Ver completo
+                  </button>
+                ) : (
+                  <button className="mini-menu-item" onClick={() => { setMenuOpen(false); downloadFile(item.id, item.name); }}>
+                    👁 Ver
+                  </button>
+                )}
+                <button className="mini-menu-item" onClick={() => { setMenuOpen(false); downloadFile(item.id, item.name); }}>
+                  ⬇️ Descargar
+                </button>
+                <button className="mini-menu-item" onClick={() => { setMenuOpen(false); onDuplicate(item); }}>
+                  📋 Duplicar
+                </button>
+                <button className="mini-menu-item">📁 Mover</button>
+                <button className="mini-menu-item" onClick={() => { setMenuOpen(false); onRename(item); }}>
+                  ✏️ Renombrar
+                </button>
+                <button className="mini-menu-item danger" onClick={() => { setMenuOpen(false); onDelete(item); }}>
+                  🗑️ Eliminar
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      );
+    }
+  }
+
+  return (
+    viewMode === 'grid' ? (
+      // Grid View for Folders
       <div
-        className={`drive-file-row ${isHovered ? 'hovered' : ''}`}
+        className="group relative glassmorphism-light backdrop-blur-md rounded-xl shadow-md hover:shadow-xl transition-all duration-300 transform hover:scale-105 cursor-pointer border-gray-200/50 overflow-hidden"
         onClick={handleClick}
         onMouseEnter={handleMouseEnter}
         onMouseLeave={handleMouseLeave}
       >
-        <div className="thumbnail">
-          {canShowPreview && previewUrl ? (
-            <>
-              {fileType === 'image' && (
-                <img
-                  src={previewUrl}
-                  alt={item.name}
-                  onError={(e) => {
-                    e.target.style.display = 'none';
-                    e.target.nextSibling.style.display = 'flex';
-                  }}
-                />
-              )}
-              {fileType === 'video' && (
-                <video
-                  muted
-                  onMouseEnter={(e) => e.target.play()}
-                  onMouseLeave={(e) => e.target.pause()}
-                  onError={(e) => {
-                    e.target.style.display = 'none';
-                    e.target.nextSibling.style.display = 'flex';
-                  }}
-                >
-                  <source src={previewUrl} />
-                </video>
-              )}
-              {fileType === 'pdf' && (
-                <iframe
-                  src={previewUrl}
-                  onError={(e) => {
-                    e.target.style.display = 'none';
-                    e.target.nextSibling.style.display = 'flex';
-                  }}
-                  title={item.name}
-                />
-              )}
-              <div className="file-icon" style={{ display: 'none' }}>
-                {getFileIcon(item.name)}
-              </div>
-            </>
-          ) : previewLoading ? (
-            <div className="file-icon loading">⟳</div>
-          ) : (
-            <div className="file-icon">
-              {getFileIcon(item.name)}
-            </div>
+        {/* Folder Icon */}
+        <div className="aspect-square p-6 flex items-center justify-center glassmorphism-thumbnail">
+          <div className="text-6xl">📁</div>
+        </div>
+
+        {/* Folder Info */}
+        <div className="p-3 glassmorphism">
+          <h3 className="text-sm font-medium text-gray-900 dark:text-slate-100 truncate" title={item.name}>
+            {item.name}
+          </h3>
+          {item.shared && (
+            <span className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300 mt-1">
+              <span className="mr-1">🤝</span>
+              Compartida
+            </span>
           )}
         </div>
-        <div className="file-name" title={item.name}>
-          {item.name}
+
+        {/* Menu Button */}
+        <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+          <button
+            className="p-1.5 glassmorphism-button dark:bg-slate-700 rounded-full shadow-md hover:shadow-lg transition-all duration-200 transform hover:scale-110"
+            onClick={handleMenuClick}
+          >
+            <svg className="w-4 h-4 text-gray-600 dark:text-slate-300" fill="currentColor" viewBox="0 0 20 20">
+              <path d="M10 6a2 2 0 110-4 2 2 0 010 4zM10 12a2 2 0 110-4 2 2 0 010 4zM10 18a2 2 0 110-4 2 2 0 010 4z" />
+            </svg>
+          </button>
         </div>
-        <span className="file-size">
-          {item.size ? formatFileSize(item.size) : ''}
+
+        {/* Menu Popup */}
+        {menuOpen && (
+          <div className="absolute top-12 right-2 z-50 glassmorphism-strong dark:bg-slate-800 rounded-lg shadow-xl border-gray-200 dark:border-slate-600 py-2 min-w-48 animate-fade-in">
+            <button className="w-full text-left px-4 py-2 text-sm hover:bg-gray-100 dark:hover:bg-slate-700 transition-colors duration-150 flex items-center space-x-2" onClick={() => onFolderClick(item.name)}>
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2H5a2 2 0 00-2-2z" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 5a2 2 0 012-2h4a2 2 0 012 2v2H8V5z" />
+              </svg>
+              <span>Abrir</span>
+            </button>
+            <button className="w-full text-left px-4 py-2 text-sm hover:bg-gray-100 dark:hover:bg-slate-700 transition-colors duration-150 flex items-center space-x-2" onClick={() => { setMenuOpen(false); onDuplicate(item); }}>
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+              </svg>
+              <span>Duplicar</span>
+            </button>
+            <div className="border-t border-gray-200 dark:border-slate-600 my-1"></div>
+            <button className="w-full text-left px-4 py-2 text-sm hover:bg-gray-100 dark:hover:bg-slate-700 transition-colors duration-150 flex items-center space-x-2" onClick={() => { setMenuOpen(false); onRename(item); }}>
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+              </svg>
+              <span>Renombrar</span>
+            </button>
+            <button className="w-full text-left px-4 py-2 text-sm hover:bg-red-50 dark:hover:bg-red-900/20 text-red-600 dark:text-red-400 transition-colors duration-150 flex items-center space-x-2" onClick={() => { setMenuOpen(false); onDelete(item); }}>
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+              </svg>
+              <span>Eliminar</span>
+            </button>
+          </div>
+        )}
+      </div>
+    ) : (
+      // List View for Folders (existing code)
+      <div
+        className="folder-chip"
+        onClick={handleClick}
+        onMouseEnter={handleMouseEnter}
+        onMouseLeave={handleMouseLeave}
+      >
+        <span className="folder-icon">📁</span>
+        <span className="folder-name" title={item.name}>
+          {item.name}
+          {item.shared && <span className="shared-label">🤝 Compartida</span>}
         </span>
         <div className="menu-container">
           <button className="menu-trespuntos" onClick={handleMenuClick}>
@@ -1352,26 +1703,8 @@ const FileItem = ({ item, onFolderClick, onDelete, onRename, onView, onHover, on
           </button>
           {menuOpen && (
             <div className={`mini-menu-frosted ${menuOpen ? 'show' : ''}`}>
-              <button className="mini-menu-item" onClick={() => { setMenuOpen(false); onOpenSidebar(item, 'view'); }}>
-                👁 Abrir en panel
-              </button>
-              <button className="mini-menu-item" onClick={() => { setMenuOpen(false); onOpenSidebar(item, 'edit'); }}>
-                ✏️ Editar en panel
-              </button>
-              <button className="mini-menu-item" onClick={() => { setMenuOpen(false); onOpenSidebar(item, 'info'); }}>
-                ℹ️ Información
-              </button>
-              {canShowPreview ? (
-                <button className="mini-menu-item" onClick={() => { setMenuOpen(false); onView(item); }}>
-                  👁 Ver completo
-                </button>
-              ) : (
-                <button className="mini-menu-item" onClick={() => { setMenuOpen(false); downloadFile(item.id, item.name); }}>
-                  👁 Ver
-                </button>
-              )}
-              <button className="mini-menu-item" onClick={() => { setMenuOpen(false); downloadFile(item.id, item.name); }}>
-                ⬇️ Descargar
+              <button className="mini-menu-item" onClick={() => onFolderClick(item.name)}>
+                📁 Abrir
               </button>
               <button className="mini-menu-item" onClick={() => { setMenuOpen(false); onDuplicate(item); }}>
                 📋 Duplicar
@@ -1387,44 +1720,7 @@ const FileItem = ({ item, onFolderClick, onDelete, onRename, onView, onHover, on
           )}
         </div>
       </div>
-    );
-  }
-
-  return (
-    <div
-      className="folder-chip"
-      onClick={handleClick}
-      onMouseEnter={handleMouseEnter}
-      onMouseLeave={handleMouseLeave}
-    >
-      <span className="folder-icon">📁</span>
-      <span className="folder-name" title={item.name}>
-        {item.name}
-        {item.shared && <span className="shared-label">🤝 Compartida</span>}
-      </span>
-      <div className="menu-container">
-        <button className="menu-trespuntos" onClick={handleMenuClick}>
-          ⋮
-        </button>
-        {menuOpen && (
-          <div className={`mini-menu-frosted ${menuOpen ? 'show' : ''}`}>
-            <button className="mini-menu-item" onClick={() => onFolderClick(item.name)}>
-              📁 Abrir
-            </button>
-            <button className="mini-menu-item" onClick={() => { setMenuOpen(false); onDuplicate(item); }}>
-              📋 Duplicar
-            </button>
-            <button className="mini-menu-item">📁 Mover</button>
-            <button className="mini-menu-item" onClick={() => { setMenuOpen(false); onRename(item); }}>
-              ✏️ Renombrar
-            </button>
-            <button className="mini-menu-item danger" onClick={() => { setMenuOpen(false); onDelete(item); }}>
-              🗑️ Eliminar
-            </button>
-          </div>
-        )}
-      </div>
-    </div>
+    )
   );
 };
 
@@ -1434,20 +1730,13 @@ export default UserPanel;
 const SidebarPanel = ({ file, onClose, user }) => {
   const [loading, setLoading] = useState(false);
   const [content, setContent] = useState('');
-  const [editMode, setEditMode] = useState(false);
+  const [editMode, setEditMode] = useState(false); // eslint-disable-line no-unused-vars
   const [authenticatedUrl, setAuthenticatedUrl] = useState(null);
 
   const fileType = getFileType(file.name);
   const canEdit = ['text', 'json', 'xml', 'html', 'css', 'js', 'py', 'java', 'cpp', 'c', 'php'].includes(fileType);
 
-  useEffect(() => {
-    if (file.action === 'view' || file.action === 'edit') {
-      loadFileContent();
-      loadAuthenticatedPreview();
-    }
-  }, [file]);
-
-  const loadFileContent = async () => {
+  const loadFileContent = useCallback(async () => {
     if (!canPreview(file.name)) return;
 
     setLoading(true);
@@ -1469,9 +1758,9 @@ const SidebarPanel = ({ file, onClose, user }) => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [file.id, file.name, user?.token]);
 
-  const loadAuthenticatedPreview = async () => {
+  const loadAuthenticatedPreview = useCallback(async () => {
     if (!canPreview(file.name)) return;
 
     try {
@@ -1480,7 +1769,14 @@ const SidebarPanel = ({ file, onClose, user }) => {
     } catch (error) {
       console.error('Error cargando preview autenticada:', error);
     }
-  };
+  }, [file.id, file.name]);
+
+  useEffect(() => {
+    if (file.action === 'view' || file.action === 'edit') {
+      loadFileContent();
+      loadAuthenticatedPreview();
+    }
+  }, [file.action, file, loadFileContent, loadAuthenticatedPreview]);
 
   const handleSave = async () => {
     try {
@@ -1500,7 +1796,6 @@ const SidebarPanel = ({ file, onClose, user }) => {
       if (!response.ok) throw new Error('Error al guardar');
 
       alert('Archivo guardado correctamente');
-      setEditMode(false);
     } catch (error) {
       console.error('Error saving file:', error);
       alert('Error al guardar el archivo');
@@ -1514,76 +1809,133 @@ const SidebarPanel = ({ file, onClose, user }) => {
   const renderPanelContent = () => {
     switch (file.action) {
       case 'view':
-        return (
-          <div className="panel-file-preview">
-            {fileType === 'image' && authenticatedUrl && (
-              <img
-                src={authenticatedUrl}
-                alt={file.name}
-                style={{ maxWidth: '100%', maxHeight: '300px', objectFit: 'contain' }}
-              />
-            )}
-            {fileType === 'video' && authenticatedUrl && (
-              <video
-                controls
-                style={{ maxWidth: '100%', maxHeight: '300px' }}
-              >
-                <source src={authenticatedUrl} />
-              </video>
-            )}
-            {fileType === 'pdf' && authenticatedUrl && (
-              <iframe
-                src={authenticatedUrl}
-                style={{ width: '100%', height: '400px', border: 'none' }}
-                title={file.name}
-              />
-            )}
-            {(fileType === 'text' || canEdit) && (
-              <div className="text-viewer">
-                <pre className="text-content" style={{ maxHeight: '400px', overflow: 'auto' }}>
-                  {loading ? 'Cargando...' : content}
-                </pre>
-              </div>
-            )}
-            {!canPreview(file.name) && (
-              <div className="unsupported-content">
-                <span className="file-icon-large">{getFileIcon(file.name)}</span>
-                <p>Este archivo no se puede previsualizar en el panel</p>
-              </div>
-            )}
-          </div>
-        );
+        if (editMode) {
+          // Edit mode for view action
+          return (
+            <div className="space-y-4">
+              {canEdit ? (
+                <div className="space-y-4">
+                  <textarea
+                    value={content}
+                    onChange={(e) => setContent(e.target.value)}
+                    className="w-full h-64 p-3 glassmorphism-textarea dark:bg-slate-700 text-gray-900 dark:text-slate-100 font-mono text-sm resize-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  />
+                  <div className="flex space-x-3">
+                    <button onClick={handleSave} className="flex-1 flex items-center justify-center space-x-2 px-4 py-2 bg-green-500 hover:bg-green-600 text-white rounded-lg transition-colors duration-200">
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                      </svg>
+                      <span>Guardar</span>
+                    </button>
+                    <button onClick={() => setEditMode(false)} className="flex-1 flex items-center justify-center space-x-2 px-4 py-2 bg-gray-500 hover:bg-gray-600 text-white rounded-lg transition-colors duration-200">
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                      </svg>
+                      <span>Cancelar</span>
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div className="text-center py-8 text-gray-700 dark:text-gray-400">
+                  <svg className="w-12 h-12 mx-auto mb-4 text-gray-300 dark:text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                  </svg>
+                  <p>Este tipo de archivo no se puede editar</p>
+                </div>
+              )}
+            </div>
+          );
+        } else {
+          // Normal view mode
+          return (
+            <div className="space-y-4">
+              {fileType === 'image' && authenticatedUrl && (
+                <div className="flex justify-center">
+                  <img
+                    src={authenticatedUrl}
+                    alt={file.name}
+                    className="max-w-full max-h-64 object-contain rounded-lg shadow-md"
+                  />
+                </div>
+              )}
+              {fileType === 'video' && authenticatedUrl && (
+                <div className="flex justify-center">
+                  <video
+                    controls
+                    className="max-w-full max-h-64 rounded-lg shadow-md"
+                  >
+                    <source src={authenticatedUrl} />
+                  </video>
+                </div>
+              )}
+              {fileType === 'pdf' && authenticatedUrl && (
+                <div className="flex justify-center">
+                  <iframe
+                    src={authenticatedUrl}
+                    className="w-full h-64 border border-gray-300 dark:border-gray-600 rounded-lg"
+                    title={file.name}
+                  />
+                </div>
+              )}
+              {(fileType === 'text' || canEdit) && (
+                <div className="space-y-4">
+                  <div className="bg-gray-50 dark:bg-slate-700 rounded-lg p-4 max-h-64 overflow-y-auto">
+                    <pre className="text-sm text-gray-900 dark:text-slate-100 whitespace-pre-wrap font-mono">
+                      {loading ? 'Cargando...' : content}
+                    </pre>
+                  </div>
+                  {canEdit && (
+                    <div className="text-center">
+                      <button onClick={() => setEditMode(true)} className="inline-flex items-center space-x-2 px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg transition-colors duration-200">
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                        </svg>
+                        <span>Editar</span>
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
+              {!canPreview(file.name) && (
+                <div className="text-center py-8">
+                  <div className="text-6xl mb-4">{getFileIcon(file.name)}</div>
+                  <p className="text-gray-700 dark:text-gray-400">Este archivo no se puede previsualizar en el panel</p>
+                </div>
+              )}
+            </div>
+          );
+        }
 
       case 'edit':
         return (
-          <div className="panel-file-preview">
+          <div className="space-y-4">
             {canEdit ? (
-              <div>
+              <div className="space-y-4">
                 <textarea
                   value={content}
                   onChange={(e) => setContent(e.target.value)}
-                  style={{
-                    width: '100%',
-                    height: '400px',
-                    fontFamily: 'monospace',
-                    fontSize: '14px',
-                    padding: '1rem',
-                    border: '1px solid #ddd',
-                    borderRadius: '8px',
-                    resize: 'vertical'
-                  }}
+                  className="w-full h-64 p-3 glassmorphism-textarea dark:bg-slate-700 text-gray-900 dark:text-slate-100 font-mono text-sm resize-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 />
-                <div style={{ marginTop: '1rem', display: 'flex', gap: '0.5rem' }}>
-                  <button onClick={handleSave} style={{ background: '#4caf50', color: 'white', border: 'none', padding: '0.5rem 1rem', borderRadius: '4px' }}>
-                    💾 Guardar
+                <div className="flex space-x-3">
+                  <button onClick={handleSave} className="flex-1 flex items-center justify-center space-x-2 px-4 py-2 bg-green-500 hover:bg-green-600 text-white rounded-lg transition-colors duration-200">
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                    </svg>
+                    <span>Guardar</span>
                   </button>
-                  <button onClick={() => setEditMode(false)} style={{ background: '#f44336', color: 'white', border: 'none', padding: '0.5rem 1rem', borderRadius: '4px' }}>
-                    ❌ Cancelar
+                  <button onClick={() => setEditMode(false)} className="flex-1 flex items-center justify-center space-x-2 px-4 py-2 bg-gray-500 hover:bg-gray-600 text-white rounded-lg transition-colors duration-200">
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                    <span>Cancelar</span>
                   </button>
                 </div>
               </div>
             ) : (
-              <div className="unsupported-content">
+              <div className="text-center py-8 text-gray-700 dark:text-gray-400">
+                <svg className="w-12 h-12 mx-auto mb-4 text-gray-300 dark:text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                </svg>
                 <p>Este tipo de archivo no se puede editar</p>
               </div>
             )}
@@ -1593,13 +1945,26 @@ const SidebarPanel = ({ file, onClose, user }) => {
       case 'info':
       default:
         return (
-          <div className="panel-file-info">
-            <h4>Información del archivo</h4>
-            <p><strong>Nombre:</strong> {file.name}</p>
-            <p><strong>Tamaño:</strong> {formatFileSize(file.size)}</p>
-            <p><strong>Tipo:</strong> {fileType.toUpperCase()}</p>
-            <p><strong>Fecha:</strong> {file.createdAt ? new Date(file.createdAt).toLocaleDateString() : 'Desconocida'}</p>
-            <p><strong>ID:</strong> {file.id}</p>
+          <div className="space-y-3">
+            <h4 className="text-lg font-semibold text-gray-900 dark:text-slate-100 mb-4">Información del archivo</h4>
+            <div className="space-y-3">
+              <div className="flex justify-between items-center py-2 border-b border-gray-200 dark:border-slate-600">
+                <span className="text-gray-600 dark:text-slate-400 font-medium">Nombre:</span>
+                <span className="text-gray-900 dark:text-slate-100 text-right">{file.name}</span>
+              </div>
+              <div className="flex justify-between items-center py-2 border-b border-gray-200 dark:border-slate-600">
+                <span className="text-gray-600 dark:text-slate-400 font-medium">Tamaño:</span>
+                <span className="text-gray-900 dark:text-slate-100 text-right">{formatFileSize(file.size)}</span>
+              </div>
+              <div className="flex justify-between items-center py-2 border-b border-gray-200 dark:border-slate-600">
+                <span className="text-gray-600 dark:text-slate-400 font-medium">Tipo:</span>
+                <span className="text-gray-900 dark:text-slate-100 text-right">{fileType.toUpperCase()}</span>
+              </div>
+              <div className="flex justify-between items-center py-2">
+                <span className="text-gray-600 dark:text-slate-400 font-medium">Fecha:</span>
+                <span className="text-gray-900 dark:text-slate-100 text-right">{file.createdAt ? new Date(file.createdAt).toLocaleDateString() : 'Desconocida'}</span>
+              </div>
+            </div>
           </div>
         );
     }
@@ -1607,50 +1972,53 @@ const SidebarPanel = ({ file, onClose, user }) => {
 
   return (
     <>
-      <div className="sidebar-panel-overlay show" onClick={onClose}></div>
-      <div className="sidebar-panel open">
-        <div className="sidebar-panel-header">
-          <h3>{file.name}</h3>
-          <div className="sidebar-panel-actions">
-            {file.action === 'view' && canEdit && (
-              <button
-                className="sidebar-close-btn"
-                onClick={() => setEditMode(true)}
-                style={{ background: 'rgba(33, 150, 243, 0.1)', color: '#2196f3' }}
-                title="Editar"
-              >
-                ✏️
-              </button>
-            )}
+      <div className="fixed inset-0 bg-black/50 dark:bg-black/70 z-40" onClick={onClose}></div>
+      <div className="fixed right-0 top-0 h-full w-96 glassmorphism-panel dark:bg-slate-800 shadow-xl border-l border-gray-200 dark:border-slate-600 z-50 transform transition-transform duration-300 ease-in-out">
+        <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-slate-600">
+          <h3 className="text-lg font-semibold text-gray-900 dark:text-slate-100 truncate">{file.name}</h3>
+          <div className="flex items-center space-x-2">
             <button
-              className="sidebar-close-btn"
+              className="p-2 text-gray-700 dark:text-slate-400 hover:text-gray-900 dark:hover:text-slate-200 hover:bg-gray-100 dark:hover:bg-slate-700 rounded-lg transition-colors duration-200"
               onClick={handleDownload}
               title="Descargar"
             >
-              ⬇️
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+              </svg>
             </button>
             <button
-              className="sidebar-close-btn"
+              className="p-2 text-gray-700 dark:text-slate-400 hover:text-gray-900 dark:hover:text-slate-200 hover:bg-gray-100 dark:hover:bg-slate-700 rounded-lg transition-colors duration-200"
               onClick={onClose}
               title="Cerrar"
             >
-              ✕
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
             </button>
           </div>
         </div>
 
-        <div className="sidebar-panel-content">
+        <div className="flex-1 overflow-y-auto p-4">
           {renderPanelContent()}
 
-          <div className="panel-file-actions">
-            <button className="panel-action-btn" onClick={handleDownload}>
-              ⬇️ Descargar archivo
+          <div className="mt-6 space-y-3">
+            <button className="w-full flex items-center justify-center space-x-2 px-4 py-3 bg-blue-500 hover:bg-blue-600 text-white rounded-lg transition-colors duration-200" onClick={handleDownload}>
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+              </svg>
+              <span>Descargar archivo</span>
             </button>
-            <button className="panel-action-btn" onClick={() => window.open(getAuthenticatedUrl(`/api/files/preview/${file.id}`), '_blank')}>
-              🔗 Abrir en nueva ventana
+            <button className="w-full flex items-center justify-center space-x-2 px-4 py-3 bg-gray-100 dark:bg-slate-700 hover:bg-gray-200 dark:hover:bg-slate-600 text-gray-700 dark:text-slate-300 rounded-lg transition-colors duration-200" onClick={() => window.open(getAuthenticatedUrl(`/api/files/preview/${file.id}`), '_blank')}>
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+              </svg>
+              <span>Abrir en nueva ventana</span>
             </button>
-            <button className="panel-action-btn danger" onClick={onClose}>
-              ❌ Cerrar panel
+            <button className="w-full flex items-center justify-center space-x-2 px-4 py-3 bg-red-50 dark:bg-red-900/20 hover:bg-red-100 dark:hover:bg-red-900/30 text-red-600 dark:text-red-400 rounded-lg transition-colors duration-200" onClick={onClose}>
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+              <span>Cerrar panel</span>
             </button>
           </div>
         </div>
@@ -1666,13 +2034,7 @@ const FileViewerModal = ({ file, onClose, user }) => {
   const [authenticatedUrl, setAuthenticatedUrl] = useState(null);
   const fileType = getFileType(file.name);
 
-  useEffect(() => {
-    setLoading(true);
-    setError(null);
-    loadAuthenticatedPreview();
-  }, [file]);
-
-  const loadAuthenticatedPreview = async () => {
+  const loadAuthenticatedPreview = useCallback(async () => {
     if (!canPreview(file.name)) {
       setLoading(false);
       return;
@@ -1687,7 +2049,13 @@ const FileViewerModal = ({ file, onClose, user }) => {
       setError('Error al cargar el archivo');
       setLoading(false);
     }
-  };
+  }, [file.id, file.name]);
+
+  useEffect(() => {
+    setLoading(true);
+    setError(null);
+    loadAuthenticatedPreview();
+  }, [file, loadAuthenticatedPreview]);
 
   const handleDownload = () => {
     downloadFile(file.id, file.name);
@@ -1782,32 +2150,41 @@ const FileViewerModal = ({ file, onClose, user }) => {
   };
 
   return (
-    <div className="modal-overlay file-viewer-overlay" onClick={onClose}>
-      <div className="file-viewer-modal" onClick={(e) => e.stopPropagation()}>
-        <div className="viewer-header">
-          <h3>{file.name}</h3>
-          <div className="viewer-actions">
-            <button onClick={handleDownload} className="download-btn">
-              ⬇️ Descargar
+    <div className="fixed inset-0 bg-black/50 dark:bg-black/70 flex items-center justify-center z-50" onClick={onClose}>
+      <div className="glassmorphism-modal dark:bg-slate-800 rounded-lg shadow-2xl border-gray-200 dark:border-slate-600 w-full max-w-4xl mx-4 max-h-[90vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-slate-600">
+          <h3 className="text-lg font-semibold text-gray-900 dark:text-slate-100 truncate">{file.name}</h3>
+          <div className="flex items-center space-x-2">
+            <button onClick={handleDownload} className="p-2 text-gray-700 dark:text-slate-400 hover:text-gray-900 dark:hover:text-slate-200 hover:bg-gray-100 dark:hover:bg-slate-700 rounded-lg transition-colors duration-200" title="Descargar">
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+              </svg>
             </button>
-            <button onClick={onClose} className="close-btn">
-              ✕
+            <button onClick={onClose} className="p-2 text-gray-700 dark:text-slate-400 hover:text-gray-900 dark:hover:text-slate-200 hover:bg-gray-100 dark:hover:bg-slate-700 rounded-lg transition-colors duration-200" title="Cerrar">
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
             </button>
           </div>
         </div>
 
-        <div className="viewer-body">
+        <div className="flex-1 overflow-y-auto p-4">
           {loading && (
-            <div className="viewer-loading">
-              <div className="loading-spinner"></div>
-              <p>Cargando archivo...</p>
+            <div className="flex flex-col items-center justify-center py-16">
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mb-4"></div>
+              <p className="text-gray-600 dark:text-slate-400">Cargando archivo...</p>
             </div>
           )}
 
           {error && (
-            <div className="viewer-error">
-              <p>❌ {error}</p>
-              <button onClick={handleDownload}>Descargar archivo</button>
+            <div className="flex flex-col items-center justify-center py-16">
+              <svg className="w-16 h-16 text-red-500 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              <p className="text-red-600 dark:text-red-400 mb-4">{error}</p>
+              <button onClick={handleDownload} className="px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg transition-colors duration-200">
+                Descargar archivo
+              </button>
             </div>
           )}
 
@@ -1846,8 +2223,8 @@ const TextFileViewer = ({ fileId, fileName, onLoad, onError }) => {
   }, [fileId, onLoad, onError]);
 
   return (
-    <div className="viewer-content text-viewer">
-      <pre className="text-content">{content}</pre>
+    <div className="glassmorphism-textarea dark:bg-slate-700 rounded-lg p-4 max-h-96 overflow-y-auto">
+      <pre className="text-sm text-gray-900 dark:text-slate-100 whitespace-pre-wrap font-mono leading-relaxed">{content}</pre>
     </div>
   );
 };
@@ -1856,6 +2233,17 @@ const TextFileViewer = ({ fileId, fileName, onLoad, onError }) => {
 const HoverPreview = ({ file, preview }) => {
   const [position, setPosition] = useState({ x: 0, y: 0 });
   const [authenticatedUrl, setAuthenticatedUrl] = useState(null);
+
+  const loadAuthenticatedPreview = useCallback(async () => {
+    if (file && canPreview(file.name)) {
+      try {
+        const url = await getAuthenticatedPreviewUrl(file.id, file.name);
+        setAuthenticatedUrl(url);
+      } catch (error) {
+        console.error('Error cargando preview autenticada:', error);
+      }
+    }
+  }, [file]);
 
   useEffect(() => {
     const handleMouseMove = (e) => {
@@ -1867,28 +2255,16 @@ const HoverPreview = ({ file, preview }) => {
   }, []);
 
   useEffect(() => {
-    const loadAuthenticatedPreview = async () => {
-      if (file && canPreview(file.name)) {
-        try {
-          const url = await getAuthenticatedPreviewUrl(file.id, file.name);
-          setAuthenticatedUrl(url);
-        } catch (error) {
-          console.error('Error cargando preview autenticada:', error);
-        }
-      }
-    };
-
     loadAuthenticatedPreview();
-  }, [file?.id, file?.name]);
+  }, [file, loadAuthenticatedPreview]);
 
   const renderPreview = () => {
     if (!file) return null;
 
     if (!authenticatedUrl) {
       return (
-        <div className="file-preview">
-          <span>{getFileIcon(file.name)}</span>
-          <p>{file.name}</p>
+        <div className="flex items-center justify-center w-16 h-16 bg-gray-100 dark:bg-slate-700 rounded-lg">
+          <span className="text-2xl">{getFileIcon(file.name)}</span>
         </div>
       );
     }
@@ -1901,10 +2277,10 @@ const HoverPreview = ({ file, preview }) => {
           <img
             src={authenticatedUrl}
             alt={file.name}
-            style={{ maxWidth: '200px', maxHeight: '200px', objectFit: 'contain' }}
+            className="w-16 h-16 object-cover rounded-lg shadow-sm"
             onError={(e) => {
               e.target.style.display = 'none';
-              e.target.nextSibling.style.display = 'block';
+              e.target.nextSibling.style.display = 'flex';
             }}
           />
         );
@@ -1912,7 +2288,7 @@ const HoverPreview = ({ file, preview }) => {
       case 'video':
         return (
           <video
-            style={{ maxWidth: '200px', maxHeight: '200px' }}
+            className="w-16 h-16 object-cover rounded-lg shadow-sm"
             muted
             onMouseEnter={(e) => e.target.play()}
             onMouseLeave={(e) => e.target.pause()}
@@ -1923,17 +2299,15 @@ const HoverPreview = ({ file, preview }) => {
 
       case 'pdf':
         return (
-          <div className="pdf-preview">
-            <span>📄</span>
-            <p>PDF Preview</p>
+          <div className="flex items-center justify-center w-16 h-16 bg-red-50 dark:bg-red-900/20 rounded-lg">
+            <span className="text-xl">📄</span>
           </div>
         );
 
       default:
         return (
-          <div className="file-preview">
-            <span>{getFileIcon(file.name)}</span>
-            <p>{file.name}</p>
+          <div className="flex items-center justify-center w-16 h-16 bg-gray-100 dark:bg-slate-700 rounded-lg">
+            <span className="text-2xl">{getFileIcon(file.name)}</span>
           </div>
         );
     }
@@ -1943,17 +2317,16 @@ const HoverPreview = ({ file, preview }) => {
 
   return (
     <div
-      className="hover-preview"
+      className="fixed z-50 pointer-events-none glassmorphism-preview dark:bg-slate-800 rounded-lg shadow-xl border-gray-200 dark:border-slate-600 p-3 max-w-xs"
       style={{
         left: position.x + 10,
         top: position.y + 10,
-        pointerEvents: 'none'
       }}
     >
       {renderPreview()}
-      <div className="preview-info">
-        <p className="preview-filename">{file.name}</p>
-        <p className="preview-size">{formatFileSize(file.size)}</p>
+      <div className="mt-2 pt-2 border-t border-gray-200 dark:border-slate-600">
+        <p className="text-sm font-medium text-gray-900 dark:text-slate-100 truncate">{file.name}</p>
+        <p className="text-xs text-gray-700 dark:text-slate-400">{formatFileSize(file.size)}</p>
       </div>
     </div>
   );
