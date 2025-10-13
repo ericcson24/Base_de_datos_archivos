@@ -8,7 +8,7 @@ const path = require('path');
 const { spawn } = require('child_process');
 
 const app = express();
-const PORT = process.env.PORT || 4000;
+const PORT = process.env.PORT || 5000;
 
 // Middleware
 app.use(cors({
@@ -36,6 +36,28 @@ app.use(express.static(path.join(__dirname, '../build')));
 app.use('/api/auth', require('./routes/auth'));
 app.use('/api/files', require('./routes/files'));
 app.use('/api/events', require('./routes/events'));
+
+// Temporary simple login endpoint for testing
+app.post('/api/auth/login', (req, res) => {
+  const { username, password } = req.body;
+  
+  console.log('Login attempt:', { username, password });
+  
+  // Simple test credentials
+  if (username === 'test' && password === 'test') {
+    res.json({
+      success: true,
+      message: 'Login exitoso',
+      user: { id: 1, username: 'test', role: 'user' },
+      token: 'dGVzdDp0ZXN0' // base64 encoded "test:test"
+    });
+  } else {
+    res.status(401).json({
+      success: false,
+      message: 'Credenciales incorrectas'
+    });
+  }
+});
 
 // Calendar route - serve calendar page if authenticated
 app.get('/calendar', (req, res) => {

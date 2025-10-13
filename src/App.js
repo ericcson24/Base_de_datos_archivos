@@ -5,16 +5,34 @@ import FolderSelector from './components/FolderSelector';
 import Calendar from './components/Calendar';
 import './App.css';
 
+// Utility functions for cookie management
+const setCookie = (name, value, days = 365) => {
+  const expires = new Date();
+  expires.setTime(expires.getTime() + days * 24 * 60 * 60 * 1000);
+  document.cookie = `${name}=${value};expires=${expires.toUTCString()};path=/;SameSite=Lax`;
+};
+
+const getCookie = (name) => {
+  const value = `; ${document.cookie}`;
+  const parts = value.split(`; ${name}=`);
+  if (parts.length === 2) return parts.pop().split(';').shift();
+  return null;
+};
+
+const deleteCookie = (name) => {
+  document.cookie = `${name}=;expires=Thu, 01 Jan 1970 00:00:00 GMT;path=/;SameSite=Lax`;
+};
+
 function App() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [user, setUser] = useState(null);
   const [currentView, setCurrentView] = useState('login'); // 'login', 'folders', 'panel', 'calendar'
   const [isLoading, setIsLoading] = useState(true);
 
-  // Estado para el tema global
+  // Estado para el tema global - ahora usa cookies
   const [isDarkMode, setIsDarkMode] = useState(() => {
-    // Cargar preferencia del localStorage
-    const saved = localStorage.getItem('theme');
+    // Cargar preferencia de las cookies
+    const saved = getCookie('theme');
     return saved === 'dark';
   });
 
@@ -23,10 +41,10 @@ function App() {
     const root = document.documentElement;
     if (isDarkMode) {
       root.setAttribute('data-theme', 'dark');
-      localStorage.setItem('theme', 'dark');
+      setCookie('theme', 'dark');
     } else {
       root.setAttribute('data-theme', 'light');
-      localStorage.setItem('theme', 'light');
+      setCookie('theme', 'light');
     }
   }, [isDarkMode]);
 
@@ -66,7 +84,7 @@ function App() {
         }
       }
 
-      // Verificar si hay parámetro redirect=calendar en la URL
+  // Verificar si hay parámetro redirect=calendar en la URL
       const urlParams = new URLSearchParams(window.location.search);
       const redirect = urlParams.get('redirect');
 
@@ -82,11 +100,52 @@ function App() {
         }
       }
 
+      // Detectar ruta actual y cambiar currentView
+      const currentPath = window.location.pathname;
+      if (currentPath === '/calendar' && storedToken) {
+        setCurrentView('calendar');
+      } else if (currentPath === '/panel' && storedToken) {
+        setCurrentView('panel');
+      } else if (currentPath === '/folders' && storedToken) {
+        setCurrentView('folders');
+      } else if (!storedToken) {
+        setCurrentView('login');
+      } else {
+        // Por defecto ir a folders si está autenticado
+        setCurrentView('folders');
+      }
+
       setIsLoading(false);
     };
 
     checkStoredToken();
   }, []);
+
+  // Detectar cambios en la ruta del navegador
+  useEffect(() => {
+    const handleLocationChange = () => {
+      const currentPath = window.location.pathname;
+      if (isLoggedIn && user) {
+        if (currentPath === '/calendar') {
+          setCurrentView('calendar');
+        } else if (currentPath === '/panel') {
+          setCurrentView('panel');
+        } else if (currentPath === '/folders') {
+          setCurrentView('folders');
+        }
+      }
+    };
+
+    // Escuchar cambios en el historial
+    window.addEventListener('popstate', handleLocationChange);
+    
+    // También verificar la ruta inicial
+    handleLocationChange();
+
+    return () => {
+      window.removeEventListener('popstate', handleLocationChange);
+    };
+  }, [isLoggedIn, user]);
 
   const handleLogin = async (credentials) => {
     try {
@@ -123,6 +182,7 @@ function App() {
         setUser(userWithToken);
         setIsLoggedIn(true);
         setCurrentView('folders'); // VOLVER A LA NAVEGACIÓN NORMAL: login → folders → panel
+        window.history.pushState(null, '', '/folders');
         console.log('Login exitoso:', data);
 
         // Guardar token en localStorage para persistencia
@@ -140,6 +200,7 @@ function App() {
     // Aquí puedes manejar la selección de carpeta
     // Por ahora, simplemente vamos al panel
     setCurrentView('panel');
+    window.history.pushState(null, '', '/panel');
   };
 
   const handleLogout = async () => {
@@ -150,6 +211,7 @@ function App() {
       setIsLoggedIn(false);
       setUser(null);
       setCurrentView('login');
+      window.history.pushState(null, '', '/login');
     } catch (error) {
       console.error('Error en logout:', error);
     }
@@ -193,10 +255,16 @@ function App() {
     return <UserPanel
       user={user}
       onLogout={handleLogout}
-      onBackToFolders={() => setCurrentView('folders')}
+      onBackToFolders={() => {
+        setCurrentView('folders');
+        window.history.pushState(null, '', '/folders');
+      }}
       onThemeToggle={toggleTheme}
       isDarkMode={isDarkMode}
-      onGoToCalendar={() => setCurrentView('calendar')}
+      onGoToCalendar={() => {
+        setCurrentView('calendar');
+        window.history.pushState(null, '', '/calendar');
+      }}
     />;
   }
 
@@ -205,7 +273,10 @@ function App() {
     return <Calendar
       user={user}
       onLogout={handleLogout}
-      onBackToPanel={() => setCurrentView('panel')}
+      onBackToPanel={() => {
+        setCurrentView('panel');
+        window.history.pushState(null, '', '/panel');
+      }}
       onThemeToggle={toggleTheme}
       isDarkMode={isDarkMode}
     />;

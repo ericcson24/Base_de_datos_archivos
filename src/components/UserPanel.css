@@ -1,5 +1,5 @@
 :root {
-  --sidebar-width: 280px;
+  --sidebar-width: 10%;
   --sidebar-height-mobile: 60px;
   --main-padding: 2rem;
   --thumbnail-size: 48px;
@@ -131,6 +131,10 @@
   --upload-progress-warning-text: white;
 }
 
+[data-theme="dark"] .main-panel {
+  background: var(--bg-gradient);
+}
+
 * {
   box-sizing: border-box;
   margin: 0;
@@ -241,12 +245,12 @@ body {
   border-radius: var(--border-radius);
   border: 1px solid var(--sidebar-border);
   box-shadow: var(--shadow);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
+  backdrop-filter: url(#frosted);
+  -webkit-backdrop-filter: url(#frosted);
   display: flex;
   flex-direction: column;
-  padding: 1.5rem;
-  gap: 1rem;
+  padding: 1.25rem;
+  gap: 0.75rem;
   z-index: 100;
 }
 
@@ -324,8 +328,8 @@ body {
   min-width: 180px;
   z-index: 5000;
   background: rgba(255, 255, 255, 0.95);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
+  backdrop-filter: url(#frosted);
+  -webkit-backdrop-filter: url(#frosted);
   border-radius: 8px;
   box-shadow: var(--shadow);
   border: 1px solid rgba(0, 0, 0, 0.1);
@@ -674,8 +678,8 @@ input[type="text"]:focus {
   padding: 1rem 2rem;
   border-radius: 12px;
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
+  backdrop-filter: url(#frosted);
+  -webkit-backdrop-filter: url(#frosted);
   border: 1px solid rgba(0, 0, 0, 0.1);
   animation: slideDown 0.3s ease;
 }
@@ -1002,8 +1006,8 @@ input[type="text"]:focus {
 
 .modal-content {
   background: var(--modal-bg);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
+  backdrop-filter: url(#frosted);
+  -webkit-backdrop-filter: url(#frosted);
   padding: 2rem;
   border-radius: var(--border-radius);
   box-shadow: var(--shadow-hover);
@@ -1183,8 +1187,8 @@ input[type="text"]:focus {
   width: 400px;
   height: 100%;
   background: var(--panel-bg);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
+  backdrop-filter: url(#frosted);
+  -webkit-backdrop-filter: url(#frosted);
   border-left: 1px solid var(--panel-border);
   box-shadow: -4px 0 20px rgba(0, 0, 0, 0.1);
   transition: right 0.3s ease;
@@ -1352,8 +1356,8 @@ input[type="text"]:focus {
 
 .file-viewer-modal {
   background: var(--viewer-bg);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
+  backdrop-filter: url(#frosted);
+  -webkit-backdrop-filter: url(#frosted);
   border-radius: var(--border-radius);
   box-shadow: var(--shadow-hover);
   border: 1px solid var(--viewer-border);
@@ -1514,8 +1518,8 @@ input[type="text"]:focus {
 .hover-preview {
   position: fixed;
   background: var(--hover-preview-bg);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
+  backdrop-filter: url(#frosted);
+  -webkit-backdrop-filter: url(#frosted);
   border-radius: 8px;
   box-shadow: var(--shadow-hover);
   border: 1px solid var(--hover-preview-border);

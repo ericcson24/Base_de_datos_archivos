@@ -4,11 +4,136 @@
 
 /* Variables CSS idénticas a panel.css */
 :root {
-  --sidebar-width: clamp(36px, 10vw, 120px);
+  
   --sidebar-height-mobile: 12vw;
   --main-padding: clamp(12rem, 2vw, 2rem);
   --thumbnail-size: clamp(32px, 8vw, 48px);
   --font-main: clamp(0.95rem, 1.8vw, 1.08rem);
+  --border-radius: 12px;
+  --shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+  --shadow-hover: 0 8px 32px rgba(0, 0, 0, 0.12);
+
+  /* Light theme colors */
+  --bg-gradient: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+  --text-color: #333;
+  --sidebar-bg: rgba(255, 255, 255, 0.95);
+  --sidebar-border: rgba(0, 0, 0, 0.1);
+  --sidebar-text: #333;
+  --sidebar-btn-bg: rgba(0, 0, 0, 0.05);
+  --sidebar-btn-hover: #e3f2fd;
+  --sidebar-btn-text: #333;
+  --file-grid-bg: rgba(255, 255, 255, 0.08);
+  --file-row-bg: rgba(188, 162, 162, 0.08);
+  --file-row-hover: #d2e3fc;
+  --file-name-color: #333;
+  --modal-bg: rgba(255, 255, 255, 0.95);
+  --modal-border: rgba(0, 0, 0, 0.1);
+  --storage-text-bg: rgba(255, 255, 255, 0.9);
+  --input-border: #e0e0e0;
+  --input-focus-border: #4285f4;
+  --button-secondary-bg: #f8f9fa;
+  --button-secondary-text: #666;
+  --button-primary-bg: #4285f4;
+  --button-primary-text: white;
+  --file-size-bg: linear-gradient(135deg, #e3f2fd, #f3e5f5);
+  --file-size-text: #555;
+  --file-size-border: rgba(0, 0, 0, 0.1);
+  --folder-bg: linear-gradient(135deg, rgba(255, 193, 7, 0.1), rgba(255, 235, 59, 0.1));
+  --folder-border: rgba(255, 193, 7, 0.2);
+  --folder-icon: #f57c00;
+  --menu-bg: rgba(255, 255, 255, 0.9);
+  --menu-border: rgba(0, 0, 0, 0.1);
+  --menu-text: #666;
+  --menu-hover-bg: rgba(0, 0, 0, 0.1);
+  --menu-hover-text: #333;
+  --back-btn-bg: rgba(255, 255, 255, 0.9);
+  --back-btn-border: rgba(0, 0, 0, 0.1);
+  --back-btn-text: #333;
+  --back-btn-hover-bg: #f8f9fa;
+  --empty-text: #666;
+  --panel-bg: rgba(255, 255, 255, 0.9);
+  --panel-border: rgba(0, 0, 0, 0.1);
+  --panel-text: #333;
+  --panel-secondary-text: #666;
+  --viewer-bg: rgba(255, 255, 255, 0.95);
+  --viewer-border: rgba(0, 0, 0, 0.1);
+  --viewer-header-border: #e0e0e0;
+  --text-viewer-bg: #f8f9fa;
+  --text-viewer-text: #333;
+  --hover-preview-bg: rgba(255, 255, 255, 0.95);
+  --hover-preview-border: rgba(0, 0, 0, 0.1);
+  --hover-preview-text: #333;
+  --hover-preview-secondary-text: #666;
+  --upload-progress-uploading-bg: rgba(255, 193, 7, 0.9);
+  --upload-progress-uploading-text: #333;
+  --upload-progress-success-bg: rgba(76, 175, 80, 0.9);
+  --upload-progress-success-text: white;
+  --upload-progress-error-bg: rgba(211, 47, 47, 0.9);
+  --upload-progress-error-text: white;
+  --upload-progress-warning-bg: rgba(255, 152, 0, 0.9);
+  --upload-progress-warning-text: white;
+}
+
+/* Dark theme */
+[data-theme="dark"] {
+  --bg-gradient: linear-gradient(135deg, #0a0a0a 0%, #1a1a1a 100%);
+  --text-color: #ffffff;
+  --sidebar-bg: rgba(15, 15, 15, 0.95);
+  --sidebar-border: rgba(255, 255, 255, 0.1);
+  --sidebar-text: #ffffff;
+  --sidebar-btn-bg: rgba(255, 255, 255, 0.05);
+  --sidebar-btn-hover: rgba(66, 133, 244, 0.2);
+  --sidebar-btn-text: #ffffff;
+  --file-grid-bg: rgba(255, 255, 255, 0.03);
+  --file-row-bg: rgba(50, 50, 50, 0.3);
+  --file-row-hover: rgba(66, 133, 244, 0.15);
+  --file-name-color: #ffffff;
+  --modal-bg: rgba(20, 20, 20, 0.95);
+  --modal-border: rgba(255, 255, 255, 0.1);
+  --storage-text-bg: rgba(20, 20, 20, 0.9);
+  --input-border: #404040;
+  --input-focus-border: #4285f4;
+  --button-secondary-bg: #404040;
+  --button-secondary-text: #cccccc;
+  --button-primary-bg: #4285f4;
+  --button-primary-text: white;
+  --file-size-bg: linear-gradient(135deg, #2a2a2a, #3a3a3a);
+  --file-size-text: #cccccc;
+  --file-size-border: rgba(255, 255, 255, 0.1);
+  --folder-bg: linear-gradient(135deg, rgba(255, 193, 7, 0.1), rgba(255, 152, 0, 0.1));
+  --folder-border: rgba(255, 193, 7, 0.2);
+  --folder-icon: #ffb74d;
+  --menu-bg: rgba(30, 30, 30, 0.9);
+  --menu-border: rgba(255, 255, 255, 0.1);
+  --menu-text: #cccccc;
+  --menu-hover-bg: rgba(255, 255, 255, 0.1);
+  --menu-hover-text: #ffffff;
+  --back-btn-bg: rgba(30, 30, 30, 0.9);
+  --back-btn-border: rgba(255, 255, 255, 0.1);
+  --back-btn-text: #ffffff;
+  --back-btn-hover-bg: #404040;
+  --empty-text: #cccccc;
+  --panel-bg: rgba(30, 30, 30, 0.9);
+  --panel-border: rgba(255, 255, 255, 0.1);
+  --panel-text: #ffffff;
+  --panel-secondary-text: #cccccc;
+  --viewer-bg: rgba(20, 20, 20, 0.95);
+  --viewer-border: rgba(255, 255, 255, 0.1);
+  --viewer-header-border: #404040;
+  --text-viewer-bg: #2a2a2a;
+  --text-viewer-text: #ffffff;
+  --hover-preview-bg: rgba(20, 20, 20, 0.95);
+  --hover-preview-border: rgba(255, 255, 255, 0.1);
+  --hover-preview-text: #ffffff;
+  --hover-preview-secondary-text: #cccccc;
+  --upload-progress-uploading-bg: rgba(255, 193, 7, 0.9);
+  --upload-progress-uploading-text: #000000;
+  --upload-progress-success-bg: rgba(76, 175, 80, 0.9);
+  --upload-progress-success-text: white;
+  --upload-progress-error-bg: rgba(211, 47, 47, 0.9);
+  --upload-progress-error-text: white;
+  --upload-progress-warning-bg: rgba(255, 152, 0, 0.9);
+  --upload-progress-warning-text: white;
 }
 
 /* Reset idéntico a panel.css */
@@ -23,13 +148,13 @@
   position: fixed;
   inset: 0;
   z-index: -1;
-  background: linear-gradient(#ffffff 80%, #9c9a9a 100%);
+  background: var(--bg-gradient);
 }
 
 /* Body idéntico a panel.css */
 body {
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-  color: #222;
+  color: var(--text-color);
   font-size: var(--font-main);
   min-height: 100vh;
   width: 100vw;
@@ -83,8 +208,8 @@ body {
   overflow-y: auto;
   border-radius: 0.8em;
   padding: 24px;
-  color: #000000;
-  background: rgba(255, 255, 255, 0.08);
+  color: var(--text-color);
+  background: var(--file-grid-bg);
   border: 2px solid transparent;
   box-shadow: 0 0 0 2px rgba(195, 195, 195, 0.60), 0 16px 32px rgba(0, 0, 0, 0.12);
   backdrop-filter: url(#frosted);
@@ -93,7 +218,7 @@ body {
 }
 
 #calendar:hover {
-  background: rgba(255, 255, 255, 0.12);
+  background: var(--file-row-hover);
   box-shadow: 0 0 0 2px rgba(195, 195, 195, 0.80), 0 20px 40px rgba(0, 0, 0, 0.15);
 }
 
@@ -152,7 +277,7 @@ body {
 /* Contenedor del popup de categorías */
 .category-popup {
   position: absolute;
-  background: rgba(172, 172, 172, 0.08);
+  background: var(--panel-bg);
   border: 2px solid transparent;
   border-radius: 0.8em;
   box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.6), 0 16px 32px rgba(0, 0, 0, 0.15);
@@ -181,7 +306,7 @@ body {
   height: 0;
   border-left: 8px solid transparent;
   border-right: 8px solid transparent;
-  border-bottom: 8px solid rgba(255, 255, 255, 0.9);
+  border-bottom: 8px solid var(--panel-bg);
   filter: drop-shadow(0 -2px 4px rgba(0, 0, 0, 0.1));
 }
 
@@ -195,7 +320,7 @@ body {
   height: 0;
   border-left: 10px solid transparent;
   border-right: 10px solid transparent;
-  border-bottom: 10px solid rgba(172, 172, 172, 0.3);
+  border-bottom: 10px solid var(--panel-border);
   z-index: -1;
 }
 
@@ -207,7 +332,7 @@ body {
 
 .category-popup-header {
   font-weight: 700;
-  color: #252525;
+  color: var(--text-color);
   margin-bottom: 12px;
   font-size: 0.85rem;
   text-transform: uppercase;
@@ -215,12 +340,12 @@ body {
   display: flex;
   align-items: center;
   gap: 6px;
-  border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+  border-bottom: 1px solid var(--panel-border);
   padding-bottom: 8px;
 }
 
 .category-popup-content {
-  color: #555;
+  color: var(--panel-secondary-text);
 }
 
 .category-popup-categories {
@@ -234,13 +359,13 @@ body {
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  background: rgba(255, 255, 255, 0.7);
-  border: 1px solid rgba(255, 255, 255, 0.3);
+  background: var(--panel-bg);
+  border: 1px solid var(--panel-border);
   border-radius: 12px;
   padding: 6px 12px;
   font-size: 0.8rem;
   font-weight: 600;
-  color: #333;
+  color: var(--panel-text);
   transition: all 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
@@ -248,7 +373,7 @@ body {
 }
 
 .category-popup-tag:hover {
-  background: rgba(255, 255, 255, 0.9);
+  background: var(--sidebar-btn-hover);
   transform: translateY(-1px);
   box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
 }
@@ -322,7 +447,7 @@ body {
   top: 0;
   z-index: 100;
   padding: 16px 24px;
-  background: rgba(172, 172, 172, 0.08);
+  background: var(--panel-bg);
   border-radius: 0.5em;
   border: 2px solid transparent;
   box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.6), 0 16px 32px rgba(0, 0, 0, 0.12);
@@ -343,7 +468,7 @@ body {
 .logo {
   font-weight: 700;
   font-size: clamp(1.1rem, 2.2vw, 1.3rem);
-  color: #252525;
+  color: var(--text-color);
   display: flex;
   align-items: center;
   gap: 1vw;
@@ -387,28 +512,28 @@ body {
   justify-content: center;
   gap: 0.7em;
   text-decoration: none;
-  background: rgba(172, 172, 172, 0.13);
-  color: #222;
+  background: var(--sidebar-btn-bg);
+  color: var(--sidebar-btn-text);
   backdrop-filter: url(#frosted);
   -webkit-backdrop-filter: url(#frosted);
 }
 
 .nav-btn:hover {
-  background: #e8f0fe;
+  background: var(--sidebar-btn-hover);
   color: #1967d2;
   box-shadow: 0 4px 16px rgba(66,133,244,0.18);
   transform: translateY(-1px);
 }
 
 .nav-btn.secondary {
-  background: rgba(188, 162, 162, 0.08);
-  color: #222;
+  background: var(--button-secondary-bg);
+  color: var(--button-secondary-text);
   backdrop-filter: url(#frosted);
   -webkit-backdrop-filter: url(#frosted);
 }
 
 .nav-btn.secondary:hover {
-  background: #e8f0fe;
+  background: var(--sidebar-btn-hover);
   color: #1967d2;
 }
 
@@ -418,7 +543,7 @@ body {
 .auth-card {
   text-align: center;
   padding: 48px 40px;
-  background: rgba(172, 172, 172, 0.08);
+  background: var(--panel-bg);
   border-radius: 0.5em;
   border: 2px solid transparent;
   box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.6), 0 16px 32px rgba(0, 0, 0, 0.12);
@@ -431,20 +556,20 @@ body {
 }
 
 .auth-card:hover {
-  background: rgba(172, 172, 172, 0.12);
+  background: var(--file-row-hover);
   box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.8), 0 16px 32px rgba(0, 0, 0, 0.18);
 }
 
 .auth-card h2 {
   margin: 0 0 16px 0;
-  color: #252525;
+  color: var(--text-color);
   font-size: 1.8rem;
   font-weight: 700;
 }
 
 .auth-card p {
   margin: 0 0 32px 0;
-  color: #666;
+  color: var(--panel-secondary-text);
   font-size: 1.1rem;
   line-height: 1.6;
 }
@@ -482,7 +607,7 @@ body {
 }
 
 .event-modal {
-  background: rgb(255, 255, 255); /* Aumentar un poco más la opacidad */
+  background: var(--modal-bg);
   border-radius: 0.5em;
   border: 2px solid rgba(255, 255, 255, 0.3); /* Borde más sutil */
   box-shadow: 
@@ -518,7 +643,7 @@ body {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  background: rgba(255, 255, 255, 0.08); /* Más sutil */
+  background: var(--modal-bg);
   backdrop-filter: url(#frosted);
   -webkit-backdrop-filter: url(#frosted);
   border-radius: 0.5em 0.5em 0 0;
@@ -529,7 +654,7 @@ body {
   margin: 0;
   font-size: 1.5rem;
   font-weight: 700;
-  color: #252525;
+  color: var(--text-color);
 }
 
 .close-modal {
@@ -561,7 +686,7 @@ body {
 
 .modal-body {
   padding: 24px;
-  background: rgba(255, 255, 255, 0.05); /* Cambiar de sólido a transparente */
+  background: var(--modal-bg);
   backdrop-filter: url(#frosted);
   -webkit-backdrop-filter: url(#frosted);
   border-radius: 0 0 0.5em 0.5em; /* Bordes redondeados en la parte inferior */
@@ -584,23 +709,6 @@ body {
 }
 
 /* Mejorar la transición del modal para que sea más suave */
-.event-modal {
-  background: rgb(255, 255, 255); /* Aumentar un poco más la opacidad */
-  border-radius: 0.5em;
-  border: 2px solid rgba(255, 255, 255, 0.3); /* Borde más sutil */
-  box-shadow: 
-    0 0 0 1px rgba(255, 255, 255, 0.6), 
-    0 20px 40px rgba(0, 0, 0, 0.15),
-    0 8px 16px rgba(0, 0, 0, 0.1); /* Sombras más elaboradas */
-  backdrop-filter: url(#frosted);
-  -webkit-backdrop-filter: url(#frosted);
-  max-width: 600px;
-  width: 90%;
-  max-height: 85vh;
-  overflow-y: auto;
-  animation: modalSlideIn 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94); /* Animación más suave */
-  position: relative;
-}
 
 /* Agregar un efecto sutil de brillo en el borde superior */
 .event-modal::before {
@@ -710,12 +818,12 @@ body {
    ========================================= */
 .fc {
   font-family: inherit;
-  color: #222;
+  color: var(--text-color);
 }
 
 .fc-header-toolbar {
   padding: 20px 24px;
-  background: rgba(255, 255, 255, 0.08);
+  background: var(--panel-bg);
   border-radius: 0.5rem;
   margin-bottom: 1rem;
   backdrop-filter: url(#frosted);
@@ -725,9 +833,9 @@ body {
 }
 
 .fc-button {
-  background: rgba(188, 162, 162, 0.08) !important;
+  background: var(--sidebar-btn-bg) !important;
   border: 2px solid transparent !important;
-  color: #222 !important;
+  color: var(--sidebar-btn-text) !important;
   padding: 0.7em 1.3em !important;
   border-radius: 0.7em !important;
   font-weight: 600 !important;
@@ -740,7 +848,7 @@ body {
 }
 
 .fc-button:hover {
-  background: #e8f0fe !important;
+  background: var(--sidebar-btn-hover) !important;
   color: #1967d2 !important;
   box-shadow: 0 4px 16px rgba(66,133,244,0.18) !important;
   transform: translateY(-1px);
@@ -753,13 +861,13 @@ body {
 }
 
 .fc-daygrid-day {
-  background: rgba(255, 255, 255, 0.05);
+  background: var(--file-row-bg);
   border: 1px solid rgba(0, 0, 0, 0.05);
   transition: background 0.18s, box-shadow 0.18s;
 }
 
 .fc-daygrid-day:hover {
-  background: rgba(66, 133, 244, 0.05);
+  background: var(--file-row-hover);
   box-shadow: inset 0 0 0 1px rgba(66, 133, 244, 0.2);
 }
 
@@ -822,7 +930,7 @@ body {
   transform: translateY(-50%);
   width: 320px;
   max-height: 80vh;
-  background: rgba(255, 255, 255, 0.4);
+  background: var(--panel-bg);
   border-radius: 0 0.8em 0.8em 0;
   border: 2px solid transparent;
   box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.6), 0 16px 32px rgba(0, 0, 0, 0.12);
@@ -840,7 +948,7 @@ body {
   top: 50%;
   left: 20px;
   transform: translateY(-50%);
-  background: rgba(172, 172, 172, 0.15);
+  background: var(--panel-bg);
   border: 2px solid rgba(255, 255, 255, 0.3);
   border-radius: 50%;
   width: 50px;
@@ -851,7 +959,7 @@ body {
   cursor: pointer;
   font-size: 20px;
   font-weight: bold;
-  color: #252525;
+  color: var(--text-color);
   transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
@@ -865,7 +973,7 @@ body {
 }
 
 .categories-toggle:hover {
-  background: rgba(172, 172, 172, 0.25);
+  background: var(--sidebar-btn-hover);
   border-color: rgba(255, 255, 255, 0.5);
   transform: translateY(-50%) scale(1.1);
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
@@ -931,7 +1039,7 @@ body {
   margin: 0;
   font-size: 1.2rem;
   font-weight: 700;
-  color: #252525;
+  color: var(--text-color);
   display: flex;
   align-items: center;
   gap: 8px;
@@ -961,8 +1069,8 @@ body {
   transition: all 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
   flex: 1;
   min-width: 70px;
-  background: rgba(172, 172, 172, 0.13);
-  color: #222;
+  background: var(--sidebar-btn-bg);
+  color: var(--sidebar-btn-text);
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
   box-shadow: 0 2px 8px rgba(66, 133, 244, 0.10);
@@ -970,7 +1078,7 @@ body {
 }
 
 .category-action-btn:hover {
-  background: #e8f0fe;
+  background: var(--sidebar-btn-hover);
   color: #1967d2;
   box-shadow: 0 4px 16px rgba(66, 133, 244, 0.18);
   transform: translateY(-1px) scale(1.02);
@@ -1013,7 +1121,7 @@ body {
   margin-bottom: 8px;
   border-radius: 0.7em;
   border-left: 4px solid transparent;
-  background: rgba(255, 255, 255, 0.04);
+  background: var(--file-row-bg);
   transition: all 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
   cursor: pointer;
   position: relative;
@@ -1037,14 +1145,14 @@ body {
 }
 
 .category-item:hover {
-  background: rgba(255, 255, 255, 0.1);
+  background: var(--file-row-hover);
   border-left-color: #1967d2;
   transform: translateX(4px);
   box-shadow: 0 4px 12px rgba(25, 103, 210, 0.1);
 }
 
 .category-item.selected {
-  background: rgba(25, 103, 210, 0.08);
+  background: var(--sidebar-btn-hover);
   border-left-color: #2196f3;
   box-shadow: 0 2px 8px rgba(33, 150, 243, 0.2);
 }
@@ -1112,7 +1220,7 @@ body {
   flex: 1;
   font-size: 0.9rem;
   font-weight: 500;
-  color: #333;
+  color: var(--panel-text);
   cursor: pointer;
   user-select: none;
   transition: color 0.2s ease;

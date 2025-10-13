@@ -68,10 +68,20 @@ const Calendar = ({ user, onLogout, onBackToPanel, onThemeToggle, isDarkMode }) 
         if (statusData.authenticated) {
           loadCategories();
           loadEvents();
+        } else {
+          // Si no está autenticado con Outlook, redirigir automáticamente al login
+          console.log('No autenticado con Outlook, redirigiendo al login...');
+          window.location.href = '/api/auth/login';
         }
+      } else {
+        // Si hay error en la petición, también redirigir al login
+        console.log('Error verificando autenticación, redirigiendo al login...');
+        window.location.href = '/api/auth/login';
       }
     } catch (error) {
       console.error('Error checking authentication:', error);
+      // En caso de error, redirigir al login
+      window.location.href = '/api/auth/login';
     }
   }, [loadCategories, loadEvents]);
 
@@ -124,11 +134,6 @@ const Calendar = ({ user, onLogout, onBackToPanel, onThemeToggle, isDarkMode }) 
     }
   };
 
-  const handleLogin = () => {
-    // Redirigir al servidor principal para iniciar sesión con Outlook
-    window.location.href = `http://localhost:3000/?redirect=calendar`;
-  };
-
   const toggleCategory = (categoryName) => {
     const newSelected = new Set(selectedCategories);
     if (newSelected.has(categoryName)) {
@@ -174,11 +179,19 @@ const Calendar = ({ user, onLogout, onBackToPanel, onThemeToggle, isDarkMode }) 
     return (
       <div className="main-content">
         <div className="auth-card">
-          <h2>🔐 Conecta tu cuenta de Outlook</h2>
-          <p>Para acceder al calendario de Outlook, necesitas conectar tu cuenta de Microsoft.</p>
-          <button className="nav-btn" onClick={handleLogin}>
-            🚀 Conectar con Microsoft Outlook
-          </button>
+          <h2>🔐 Conectando con Outlook...</h2>
+          <p>Redirigiendo a Microsoft para autenticación automática...</p>
+          <div style={{ textAlign: 'center', marginTop: '20px' }}>
+            <div style={{ 
+              width: '40px', 
+              height: '40px', 
+              border: '4px solid #f3f3f3', 
+              borderTop: '4px solid #3498db', 
+              borderRadius: '50%', 
+              animation: 'spin 1s linear infinite',
+              margin: '0 auto'
+            }}></div>
+          </div>
         </div>
       </div>
     );
@@ -196,6 +209,13 @@ const Calendar = ({ user, onLogout, onBackToPanel, onThemeToggle, isDarkMode }) 
         <div className="nav-buttons">
           <button className="nav-btn secondary" onClick={onBackToPanel}>
             ⬅️ Volver al Panel
+          </button>
+          <button 
+            className="theme-toggle-btn"
+            onClick={onThemeToggle}
+            title={isDarkMode ? 'Cambiar a modo claro' : 'Cambiar a modo oscuro'}
+          >
+            {isDarkMode ? '☀️' : '🌙'}
           </button>
           <button className="nav-btn" onClick={onLogout}>
             🚪 Cerrar sesión

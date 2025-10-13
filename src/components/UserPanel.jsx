@@ -905,7 +905,7 @@ useEffect(() => {
           <button className="acciones-btn" onClick={onBackToFolders}>
             ⬅️ Volver
           </button>
-          <button className="acciones-btn" onClick={() => window.location.href = 'http://localhost:4000/calendar'}>
+          <button className="acciones-btn" onClick={() => window.location.href = 'http://localhost:3000/calendar'}>
             📅 Abrir calendario
           </button>
           <button className="acciones-btn" onClick={onLogout}>

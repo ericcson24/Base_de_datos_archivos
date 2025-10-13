@@ -76,7 +76,7 @@ La aplicación se ejecuta en el puerto 3000 por defecto. Los archivos de usuario
 ### Configuración de Autenticación
 1. En tu aplicación, ve a "Autenticación"
 2. En "URI de redirección", agrega:
-   - **Desarrollo**: `http://localhost:4000/auth/callback`
+   - **Desarrollo**: `http://localhost:3000/auth/callback`
    - **Producción**: Tu dominio de producción + `/auth/callback`
 
 ### Permisos de API
@@ -103,4 +103,4 @@ SESSION_SECRET=una_clave_secreta_segura_para_sesiones
 - Solución: Verifica que el CLIENT_ID y CLIENT_SECRET sean correctos en el archivo .env
 
 **Redirección a URL externa**
-- Solución: Asegúrate de que la URI de redirección en Azure AD sea `http://localhost:4000/auth/callback`
+- Solución: Asegúrate de que la URI de redirección en Azure AD sea `http://localhost:3000/auth/callback`

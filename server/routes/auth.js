@@ -281,7 +281,7 @@ router.get('/login', async (req, res) => {
     console.log('🚀 Iniciando login con Microsoft...');
 
     // Forzar localhost para mantener todo en local
-    const redirectUri = 'http://localhost:4000/api/auth/callback';
+    const redirectUri = 'http://localhost:3000/api/auth/callback';
 
     const authUrl = await msalClient.getAuthCodeUrl({
       scopes: scopes,
@@ -306,18 +306,18 @@ router.get('/callback', async (req, res) => {
 
     if (error) {
       console.error('❌ Error en callback de Microsoft:', error, error_description);
-      return res.redirect(`http://localhost:4000/?error=${error}&description=${encodeURIComponent(error_description || '')}`);
+      return res.redirect(`http://localhost:3000/?error=${error}&description=${encodeURIComponent(error_description || '')}`);
     }
 
     if (!code) {
       console.log('❌ No se recibió código de autorización');
-      return res.redirect('http://localhost:4000/?error=no_code');
+      return res.redirect('http://localhost:3000/?error=no_code');
     }
 
     console.log('📨 Recibido código de autorización de Microsoft');
 
     // Usar la misma URL fija de localhost
-    const redirectUri = 'http://localhost:4000/api/auth/callback';
+    const redirectUri = 'http://localhost:3000/api/auth/callback';
 
     console.log('🔄 Intercambiando código por tokens...');
 
@@ -344,11 +344,11 @@ router.get('/callback', async (req, res) => {
 
     // Redirigir al calendario en localhost
     console.log('🔀 Redirigiendo a calendario...');
-    res.redirect('http://localhost:4000/calendar');
+    res.redirect('http://localhost:3000/calendar');
   } catch (error) {
     console.error('❌ Error en callback de Microsoft:', error);
     console.error('❌ Stack trace:', error.stack);
-    res.redirect(`http://localhost:4000/?error=auth_failed&message=${encodeURIComponent(error.message)}`);
+    res.redirect(`http://localhost:3000/?error=auth_failed&message=${encodeURIComponent(error.message)}`);
   }
 });
 
