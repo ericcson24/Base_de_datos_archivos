@@ -296,12 +296,8 @@ const Calendar = ({ user, onLogout, onBackToPanel, onThemeToggle, isDarkMode }) 
           <button className="nav-btn secondary" onClick={onBackToPanel}>
             ⬅️ Volver al Panel
           </button>
-          <button 
-            className="theme-toggle-btn"
-            onClick={onThemeToggle}
-            title={isDarkMode ? 'Cambiar a modo claro' : 'Cambiar a modo oscuro'}
-          >
-            {isDarkMode ? '☀️' : '🌙'}
+          <button className="nav-btn" onClick={onThemeToggle} title={isDarkMode ? 'Cambiar a modo claro' : 'Cambiar a modo oscuro'}>
+            {isDarkMode ? '☀️ Claro' : '🌙 Oscuro'}
           </button>
           <button className="nav-btn" onClick={onLogout}>
             🚪 Cerrar sesión

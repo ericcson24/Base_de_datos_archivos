@@ -170,7 +170,7 @@ const UserPanel = ({ user, onLogout, onBackToFolders, onThemeToggle, isDarkMode,
   // Nuevos estados para redimensionamiento y panel lateral
   const [sidebarPanelOpen, setSidebarPanelOpen] = useState(false);
   const [sidebarPanelFile, setSidebarPanelFile] = useState(null);
-  const [fileGridSize, setFileGridSize] = useState({ width: '70%', height: '70vh' });
+  const [fileGridSize, setFileGridSize] = useState({ width: '100%', height: '70vh' });
   const [fileGridPosition, setFileGridPosition] = useState({ x: 0, y: 0 });
   const [isDragging, setIsDragging] = useState(false);
   const [isResizing, setIsResizing] = useState(false);
@@ -826,16 +826,16 @@ useEffect(() => {
           <span>Nube Personal</span>
         </div>
 
-        {/* Upload Button */}
-        <div className="upload-btn-wrapper">
+        {/* Upload Button - Arriba de navegación */}
+        <div className="upload-btn-container">
           <button
-            className="upload-btn"
+            className="upload-btn-separado"
             onClick={() => setUploadMenuOpen(!uploadMenuOpen)}
           >
             <span>⬆️</span> Subir
           </button>
           {uploadMenuOpen && (
-            <div className="mini-menu-frosted">
+            <div className={`mini-menu-frosted show`}>
               <button
                 className="mini-menu-item"
                 onClick={() => document.getElementById('fileInput').click()}
@@ -846,7 +846,7 @@ useEffect(() => {
                 className="mini-menu-item"
                 onClick={() => document.getElementById('folderInput').click()}
               >
-                📁 Subir carpeta
+                � Subir carpeta
               </button>
               <button
                 className="mini-menu-item"
@@ -858,8 +858,8 @@ useEffect(() => {
           )}
         </div>
 
-        {/* Navigation */}
-        <div className="sidebar-nav">
+        {/* Navigation - En contenedor superior */}
+        <div className="sidebar-navigation">
           <button
             className={`sidebar-btn ${currentView === 'privada' ? 'active' : ''}`}
             onClick={() => changeView('privada')}
