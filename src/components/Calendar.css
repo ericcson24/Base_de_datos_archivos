@@ -217,9 +217,22 @@ body {
   transition: all 0.2s ease;
 }
 
+/* Modo oscuro específico para el calendario */
+[data-theme="dark"] #calendar {
+  background: rgba(30, 30, 30, 0.95);
+  border: 2px solid rgba(255, 255, 255, 0.1);
+  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.1), 0 16px 32px rgba(0, 0, 0, 0.3);
+}
+
 #calendar:hover {
   background: var(--file-row-hover);
   box-shadow: 0 0 0 2px rgba(195, 195, 195, 0.80), 0 20px 40px rgba(0, 0, 0, 0.15);
+}
+
+/* Hover en modo oscuro */
+[data-theme="dark"] #calendar:hover {
+  background: rgba(40, 40, 40, 0.95);
+  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.2), 0 20px 40px rgba(0, 0, 0, 0.4);
 }
 
 /* Scroll bonito para el calendario */
@@ -874,6 +887,33 @@ body {
 .fc-day-today {
   background: rgba(27, 55, 99, 0.08) !important;
   border: 1px solid rgba(66, 133, 244, 0.2) !important;
+}
+
+/* Día de hoy en modo oscuro */
+[data-theme="dark"] .fc-day-today {
+  background: rgba(66, 133, 244, 0.2) !important;
+  border: 1px solid rgba(66, 133, 244, 0.4) !important;
+}
+
+/* Cabecera de días de la semana */
+.fc-col-header {
+  background: var(--panel-bg) !important;
+  color: var(--text-color) !important;
+  border-bottom: 1px solid var(--panel-border) !important;
+}
+
+.fc-col-header-cell {
+  background: var(--panel-bg) !important;
+  color: var(--text-color) !important;
+  border: 1px solid var(--panel-border) !important;
+}
+
+/* Cabecera en modo oscuro */
+[data-theme="dark"] .fc-col-header,
+[data-theme="dark"] .fc-col-header-cell {
+  background: rgba(40, 40, 40, 0.95) !important;
+  color: #ffffff !important;
+  border-color: rgba(255, 255, 255, 0.1) !important;
 }
 
 /* Fix for event colors to properly display category colors */

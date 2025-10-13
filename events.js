@@ -40,6 +40,26 @@ function convertToSpainTime(dateStr, isAllDay = false) {
   return `${year}-${month}-${day}T${hours}:${minutes}:${seconds}+02:00`;
 }
 
+// Función para convertir fechas UTC (con Z) a zona española
+function convertUTCToSpainTime(dateStr, isAllDay = false) {
+  if (!dateStr) return null;
+  if (isAllDay) return dateStr.includes('T') ? dateStr.split('T')[0] : dateStr;
+
+  // Crear fecha desde UTC y convertir a España (sumar 2 horas)
+  const utcDate = new Date(dateStr);
+  const spainDate = new Date(utcDate.getTime() + (2 * 60 * 60 * 1000)); // +2 horas
+
+  // Formatear como ISO sin Z (hora local española)
+  const year = spainDate.getFullYear();
+  const month = String(spainDate.getMonth() + 1).padStart(2, '0');
+  const day = String(spainDate.getDate()).padStart(2, '0');
+  const hours = String(spainDate.getHours()).padStart(2, '0');
+  const minutes = String(spainDate.getMinutes()).padStart(2, '0');
+  const seconds = String(spainDate.getSeconds()).padStart(2, '0');
+
+  return `${year}-${month}-${day}T${hours}:${minutes}:${seconds}`;
+}
+
 // Función CORREGIDA para convertir desde España a UTC para envío
 function convertFromSpainTime(dateStr, timeStr = null, isAllDay = false) {
   if (isAllDay) {
@@ -324,13 +344,36 @@ router.get('/', async (req, res) => {
             
             // Filtrar manualmente por fechas si se obtuvieron todos los eventos
             if (start && end && calendarEvents.length > 0) {
-              const startDate = new Date(start);
-              const endDate = new Date(end);
-              
               const originalCount = calendarEvents.length;
+              
+              // Convertir las fechas del rango (que vienen en UTC del frontend) a zona española
+              const startDateSpain = convertUTCToSpainTime(start, false);
+              const endDateSpain = convertUTCToSpainTime(end, false);
+              
+              console.log(`🔍 Filtrado manual en "${calendar.name}":`);
+              console.log(`  • Rango solicitado (UTC): ${start} a ${end}`);
+              console.log(`  • Rango convertido (España): ${startDateSpain} a ${endDateSpain}`);
+              
               calendarEvents = calendarEvents.filter(event => {
-                const eventDate = new Date(event.start.dateTime || event.start.date);
-                return eventDate >= startDate && eventDate <= endDate;
+                // Convertir la fecha del evento (de Graph, en UTC sin offset) a zona española
+                const eventStartSpain = convertToSpainTime(event.start.dateTime || event.start.date, event.isAllDay);
+                const eventDate = new Date(eventStartSpain);
+                const startRange = new Date(startDateSpain);
+                const endRange = new Date(endDateSpain);
+                
+                let isInRange;
+                if (event.isAllDay) {
+                  // Para eventos de todo el día, comparar solo fechas (ignorar horas)
+                  const eventDateOnly = new Date(eventDate.getFullYear(), eventDate.getMonth(), eventDate.getDate());
+                  const startDateOnly = new Date(startRange.getFullYear(), startRange.getMonth(), startRange.getDate());
+                  const endDateOnly = new Date(endRange.getFullYear(), endRange.getMonth(), endRange.getDate());
+                  isInRange = eventDateOnly >= startDateOnly && eventDateOnly <= endDateOnly;
+                } else {
+                  // Para eventos con hora, comparar fecha y hora completas
+                  isInRange = eventDate >= startRange && eventDate <= endRange;
+                }
+                
+                return isInRange;
               });
               
               console.log(`🔍 Filtrado manual en "${calendar.name}": ${originalCount} → ${calendarEvents.length} eventos`);
@@ -465,35 +508,14 @@ router.get('/', async (req, res) => {
         console.log(`📅 TODO EL DÍA "${event.subject}": ${startDate} - ${endDate}`);
       } else {
         // CRÍTICO: Procesar ambas fechas de la misma manera
-        console.log(`📅 ANTES de convertir "${event.subject}":`);
-        console.log(`  • Start original: ${event.start.dateTime}`);
-        console.log(`  • End original: ${event.end.dateTime}`);
+        console.log(`📅 Convirtiendo "${event.subject}": ${event.start.dateTime} → ${convertToSpainTime(event.start.dateTime, false)}`);
         
         startDate = convertToSpainTime(event.start.dateTime, false);
         endDate = convertToSpainTime(event.end.dateTime, false);
         
-        console.log(`📅 DESPUÉS de convertir "${event.subject}":`);
-        console.log(`  • Start convertido: ${startDate}`);
-        console.log(`  • End convertido: ${endDate}`);
-        
         // VERIFICACIÓN: Comprobar que las fechas son válidas
         if (!startDate || !endDate) {
           console.error(`❌ ERROR: Fechas inválidas para "${event.subject}"`);
-          console.error(`  • Start: ${startDate}`);
-          console.error(`  • End: ${endDate}`);
-          console.error(`  • Start original: ${event.start.dateTime}`);
-          console.error(`  • End original: ${event.end.dateTime}`);
-        }
-        
-        // VERIFICACIÓN: Comprobar que end > start
-        if (startDate && endDate) {
-          const startMs = new Date(startDate).getTime();
-          const endMs = new Date(endDate).getTime();
-          if (endMs <= startMs) {
-            console.warn(`⚠️ ADVERTENCIA: Hora fin <= hora inicio para "${event.subject}"`);
-            console.warn(`  • Start: ${startDate} (${startMs})`);
-            console.warn(`  • End: ${endDate} (${endMs})`);
-          }
         }
       }
 
@@ -559,15 +581,7 @@ router.get('/', async (req, res) => {
       }
 
       // ====== PASO 4: VERIFICACIÓN FINAL ======
-      console.log(`✅ EVENTO FINAL "${baseEvent.title}":`, {
-        start: baseEvent.start,
-        end: baseEvent.end,
-        allDay: baseEvent.allDay,
-        categories: baseEvent.extendedProps.categories,
-        color: baseEvent.backgroundColor,
-        startType: typeof baseEvent.start,
-        endType: typeof baseEvent.end
-      });
+      console.log(`✅ EVENTO "${baseEvent.title}": ${baseEvent.start} (${baseEvent.extendedProps.categories.length > 0 ? baseEvent.extendedProps.categories[0] : 'Sin categoría'})`);
 
       return baseEvent;
     });

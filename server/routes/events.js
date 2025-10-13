@@ -327,10 +327,40 @@ router.get('/', async (req, res) => {
               const startDate = new Date(start);
               const endDate = new Date(end);
 
+              console.log(`🔍 FILTRANDO ${calendarEvents.length} eventos entre ${startDate.toISOString()} y ${endDate.toISOString()}`);
+
               const originalCount = calendarEvents.length;
               calendarEvents = calendarEvents.filter(event => {
-                const eventDate = new Date(event.start.dateTime || event.start.date);
-                return eventDate >= startDate && eventDate <= endDate;
+                // Convertir fecha del evento a UTC para comparación correcta
+                let eventDate;
+                let eventDateStr;
+
+                if (event.start.dateTime) {
+                  eventDateStr = event.start.dateTime;
+                  eventDate = new Date(event.start.dateTime);
+                  // Si no tiene zona horaria, asumir que está en zona local del servidor
+                  if (!event.start.dateTime.includes('Z') && !event.start.dateTime.includes('+')) {
+                    // La fecha está en zona local, convertir a UTC
+                    eventDate = new Date(event.start.dateTime + 'Z');
+                  }
+                } else if (event.start.date) {
+                  eventDateStr = event.start.date;
+                  // Evento de todo el día
+                  eventDate = new Date(event.start.date + 'T00:00:00Z');
+                } else {
+                  console.log(`❌ Evento "${event.subject}" sin fecha válida`);
+                  return false; // Evento sin fecha válida
+                }
+
+                const isInRange = eventDate >= startDate && eventDate <= endDate;
+
+                if (!isInRange) {
+                  console.log(`❌ FUERA DE RANGO: "${event.subject}" - Fecha evento: ${eventDate.toISOString()} (${eventDateStr}) vs Rango: ${startDate.toISOString()} - ${endDate.toISOString()}`);
+                } else {
+                  console.log(`✅ DENTRO DE RANGO: "${event.subject}" - Fecha: ${eventDate.toISOString()}`);
+                }
+
+                return isInRange;
               });
 
               console.log(`🔍 Filtrado manual en "${calendar.name}": ${originalCount} → ${calendarEvents.length} eventos`);
