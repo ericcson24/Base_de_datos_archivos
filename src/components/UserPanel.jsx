@@ -1038,7 +1038,31 @@ useEffect(() => {
           <button className="acciones-btn" onClick={onBackToFolders}>
             ⬅️ Volver
           </button>
-          <button className="acciones-btn" onClick={() => window.location.href = 'http://localhost:3000/calendar'}>
+          <button className="acciones-btn" onClick={async () => {
+            // Verificar si tiene sesión de Microsoft
+            try {
+              const response = await fetch('http://localhost:5000/api/auth/verify-microsoft', {
+                credentials: 'include'
+              });
+              const data = await response.json();
+              
+              if (data.hasMicrosoftAuth) {
+                // Tiene sesión de Microsoft, ir al calendario
+                window.location.href = 'http://localhost:3000/calendar';
+              } else {
+                // No tiene sesión, redirigir a login de Microsoft
+                if (window.confirm('Para acceder al calendario necesitas iniciar sesión con tu cuenta de Microsoft Outlook. ¿Deseas continuar?')) {
+                  window.location.href = 'http://localhost:5000/api/auth/login';
+                }
+              }
+            } catch (error) {
+              console.error('Error verificando sesión de Microsoft:', error);
+              // En caso de error, intentar login de Microsoft
+              if (window.confirm('Para acceder al calendario necesitas iniciar sesión con tu cuenta de Microsoft Outlook. ¿Deseas continuar?')) {
+                window.location.href = 'http://localhost:5000/api/auth/login';
+              }
+            }
+          }}>
             📅 Abrir calendario
           </button>
           <button className="acciones-btn" onClick={onLogout}>

@@ -172,13 +172,36 @@ function getOutlookCategoryColor(outlookColor) {
 // GET - Obtener eventos de Outlook (TODOS los calendarios)
 router.get('/', async (req, res) => {
   try {
-    if (!req.session.accessToken) {
-      return res.status(401).json({ error: 'REAUTH' });
+    // Verificar que existe la sesión y el accessToken
+    if (!req.session || !req.session.accessToken) {
+      console.log('❌ No hay accessToken en la sesión');
+      console.log('📋 Sesión actual:', {
+        existe: !!req.session,
+        tieneAccessToken: !!req.session?.accessToken,
+        tieneAccount: !!req.session?.account
+      });
+      return res.status(401).json({ 
+        error: 'REAUTH',
+        message: 'No has iniciado sesión con Microsoft. Por favor, inicia sesión con tu cuenta de Outlook primero.',
+        needsMicrosoftAuth: true
+      });
+    }
+
+    // Los tokens de Microsoft Access Token no son JWT estándar (no tienen formato header.payload.signature)
+    // Microsoft usa un formato propietario que comienza con "EwA" - solo verificamos que sea string no vacío
+    const token = req.session.accessToken;
+    if (typeof token !== 'string' || token.trim().length === 0) {
+      console.log('❌ Token inválido - token vacío o no es string');
+      return res.status(401).json({ 
+        error: 'REAUTH',
+        message: 'Token de Microsoft inválido. Por favor, vuelve a iniciar sesión.',
+        needsMicrosoftAuth: true
+      });
     }
 
     const { start, end } = req.query;
-    console.log('Obteniendo eventos de TODOS los calendarios para:', req.session.account.username);
-    console.log('Rango de fechas solicitado:', start, 'a', end);
+    console.log('✅ Obteniendo eventos de TODOS los calendarios para:', req.session.account?.username || 'usuario desconocido');
+    console.log('📅 Rango de fechas solicitado:', start, 'a', end);
 
     const client = getAuthenticatedClient(req.session.accessToken);
 

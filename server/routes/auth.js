@@ -406,6 +406,31 @@ router.post('/refresh', async (req, res) => {
   }
 });
 
+// Verificar si tiene sesión de Microsoft
+router.get('/verify-microsoft', (req, res) => {
+  try {
+    const hasMicrosoftAuth = !!(req.session && req.session.accessToken && req.session.account);
+    
+    console.log('🔍 Verificando sesión de Microsoft:', {
+      tieneSession: !!req.session,
+      tieneAccessToken: !!req.session?.accessToken,
+      tieneAccount: !!req.session?.account,
+      resultado: hasMicrosoftAuth
+    });
+
+    res.json({
+      hasMicrosoftAuth,
+      account: hasMicrosoftAuth ? {
+        name: req.session.account.name,
+        email: req.session.account.username
+      } : null
+    });
+  } catch (error) {
+    console.error('❌ Error verificando sesión de Microsoft:', error);
+    res.json({ hasMicrosoftAuth: false, account: null });
+  }
+});
+
 // Logout de Microsoft
 router.post('/logout', (req, res) => {
   try {
