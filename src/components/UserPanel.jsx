@@ -177,6 +177,9 @@ const UserPanel = ({ user, onLogout, onBackToFolders, onThemeToggle, isDarkMode,
   // Estado para mostrar límites de arrastre
   const [showDragBounds, setShowDragBounds] = useState(false);
   const [dragBounds, setDragBounds] = useState({ top: 0, left: 0, right: 0, bottom: 0 });
+  
+  // Z-index para file-grid (inicia en 1, paneles en 10+)
+  const [fileGridZIndex, setFileGridZIndex] = useState(1);
 
   // Estados para drag and drop
   const [isDragOver, setIsDragOver] = useState(false);
@@ -1197,7 +1200,13 @@ useEffect(() => {
             position: (isDragging || fileGridPosition.x !== 0 || fileGridPosition.y !== 0) ? 'absolute' : 'relative',
             left: (isDragging || fileGridPosition.x !== 0 || fileGridPosition.y !== 0) ? `${fileGridPosition.x}px` : 'auto',
             top: (isDragging || fileGridPosition.x !== 0 || fileGridPosition.y !== 0) ? `${fileGridPosition.y}px` : 'auto',
-            zIndex: isDragging ? 1000 : 'auto'
+            zIndex: isDragging ? 1000 : fileGridZIndex
+          }}
+          onClick={() => {
+            // Traer file-grid al frente al hacer click
+            const newZIndex = highestZIndex + 1;
+            setFileGridZIndex(newZIndex);
+            setHighestZIndex(newZIndex);
           }}
           onDragEnter={handleDragEnter}
           onDragLeave={handleDragLeave}

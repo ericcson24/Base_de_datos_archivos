@@ -79,33 +79,60 @@ const FileEditorPanel = ({ file, onClose, position, zIndex, onBringToFront, pane
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [file.id, fileType]);
 
-  // Dragging handlers
+  // Dragging handlers - Usando la misma lógica que file-grid
   const handleMouseDown = useCallback((e) => {
     if (e.target.closest('.resize-handle')) return;
     if (e.target.closest('.panel-controls')) return;
     if (e.target.closest('.editor-content')) return;
 
+    e.preventDefault();
     onBringToFront();
+    
+    const panel = panelRef.current;
+    const mainPanel = document.querySelector('.main-panel');
+    
+    if (!mainPanel || !panel) return;
+
+    // Capturar dimensiones actuales en píxeles
+    const currentWidth = panel.offsetWidth;
+    const currentHeight = panel.offsetHeight;
+    setSize({ width: currentWidth, height: currentHeight });
+    
+    // Calcular offset del mouse respecto al panel
+    const panelRect = panel.getBoundingClientRect();
+    const offsetX = e.clientX - panelRect.left;
+    const offsetY = e.clientY - panelRect.top;
+    
+    setDragOffset({ x: offsetX, y: offsetY });
     setIsDragging(true);
-    const rect = panelRef.current.getBoundingClientRect();
-    setDragOffset({
-      x: e.clientX - rect.left,
-      y: e.clientY - rect.top
-    });
   }, [onBringToFront]);
 
   const handleMouseMove = useCallback((e) => {
     if (isDragging) {
-      const newX = e.clientX - dragOffset.x;
-      const newY = e.clientY - dragOffset.y;
+      const mainPanel = document.querySelector('.main-panel');
+      const panel = panelRef.current;
+      if (!mainPanel || !panel) return;
+      
+      const mainPanelRect = mainPanel.getBoundingClientRect();
+      
+      // Posición donde DEBE estar la esquina superior izquierda
+      let newX = e.clientX - mainPanelRect.left - dragOffset.x;
+      let newY = e.clientY - mainPanelRect.top - dragOffset.y;
 
-      // Boundaries
-      const maxX = window.innerWidth - 100;
-      const maxY = window.innerHeight - 50;
+      // Boundaries - igual que file-grid
+      const storageBar = document.querySelector('.storage-bar');
+      const storageBarHeight = storageBar ? storageBar.offsetHeight : 0;
+      const panelHeaderMain = document.querySelector('.panel-header-main');
+      const headerHeight = panelHeaderMain ? panelHeaderMain.offsetHeight : 0;
+      
+      const maxX = mainPanel.offsetWidth - panel.offsetWidth - 40;
+      const maxY = mainPanel.offsetHeight - panel.offsetHeight - storageBarHeight - 40;
+      const minX = 40;
+      const minY = headerHeight + 60;
 
       setPos({
-        x: Math.max(0, Math.min(newX, maxX)),
-        y: Math.max(0, Math.min(newY, maxY))
+        x: Math.max(minX, Math.min(newX, maxX)),
+        y: Math.max(minY, Math.min(newY, maxY))
       });
     }
   }, [isDragging, dragOffset]);
