@@ -67,6 +67,22 @@
   --upload-progress-error-text: white;
   --upload-progress-warning-bg: rgba(255, 152, 0, 0.9);
   --upload-progress-warning-text: white;
+  
+  /* Controls (search, sort, filter) */
+  --control-bg: rgba(255, 255, 255, 0.9);
+  --control-border: rgba(0, 0, 0, 0.1);
+  --control-text: #333;
+  --control-placeholder: #999;
+  --control-btn-bg: #f8f9fa;
+  --control-btn-hover-bg: #e9ecef;
+  --control-btn-text: #666;
+  --control-btn-active-bg: #4285f4;
+  --control-btn-active-text: white;
+  --search-result-bg: rgba(66, 133, 244, 0.08);
+  --search-result-text: #1976d2;
+  --search-result-border: rgba(66, 133, 244, 0.2);
+  --clear-btn-text: #999;
+  --clear-btn-hover-text: #666;
 }
 
 /* Dark theme */
@@ -129,6 +145,22 @@
   --upload-progress-error-text: white;
   --upload-progress-warning-bg: rgba(255, 152, 0, 0.9);
   --upload-progress-warning-text: white;
+  
+  /* Controls (search, sort, filter) - Dark Mode */
+  --control-bg: rgba(40, 40, 40, 0.9);
+  --control-border: rgba(255, 255, 255, 0.1);
+  --control-text: #ffffff;
+  --control-placeholder: #999;
+  --control-btn-bg: #505050;
+  --control-btn-hover-bg: #606060;
+  --control-btn-text: #cccccc;
+  --control-btn-active-bg: #4285f4;
+  --control-btn-active-text: white;
+  --search-result-bg: rgba(66, 133, 244, 0.15);
+  --search-result-text: #64b5f6;
+  --search-result-border: rgba(66, 133, 244, 0.3);
+  --clear-btn-text: #888;
+  --clear-btn-hover-text: #bbb;
 }
 
 [data-theme="dark"] .main-panel {
@@ -1392,6 +1424,55 @@ input[type="text"]:focus {
   .file-grid {
     max-height: 90vh; /* Aumentado de 60vh a 90vh también para móviles */
   }
+}
+
+/* SEARCH AND SORT CONTROLS */
+.search-container {
+  background: var(--control-bg);
+  border: 1px solid var(--control-border);
+  color: var(--control-text);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+
+.search-input {
+  background: transparent;
+  color: var(--control-text);
+}
+
+.search-input::placeholder {
+  color: var(--control-placeholder);
+}
+
+.search-clear-btn {
+  color: var(--clear-btn-text);
+}
+
+.search-clear-btn:hover {
+  color: var(--clear-btn-hover-text);
+}
+
+.search-result-counter {
+  background: var(--search-result-bg);
+  color: var(--search-result-text);
+  border-color: var(--search-result-border);
+}
+
+.control-group {
+  background: var(--control-btn-bg);
+}
+
+.control-btn {
+  color: var(--control-btn-text);
+}
+
+.control-btn:hover {
+  background: var(--control-btn-hover-bg);
+}
+
+.control-btn.active {
+  background: var(--control-btn-active-bg);
+  color: var(--control-btn-active-text);
 }
 
 /* UTILITIES */

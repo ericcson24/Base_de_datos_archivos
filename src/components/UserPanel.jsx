@@ -1132,18 +1132,14 @@ useEffect(() => {
               <div
   role="search"
   onClick={() => setIsSearchExpanded(true)}
-  className={`relative flex items-center overflow-hidden transition-all duration-300 ease-in-out border cursor-text ${
-    isDarkMode
-      ? 'bg-slate-800 border-slate-700 hover:bg-slate-700'
-      : 'bg-white border-gray-300 hover:bg-gray-100'
-  } ${isSearchExpanded
+  className={`search-container relative flex items-center overflow-hidden transition-all duration-300 ease-in-out border cursor-text ${isSearchExpanded
     ? 'w-72 h-9 rounded-lg shadow-md pl-3 pr-8 justify-start'
     : 'w-12 h-12 rounded-full justify-center'
   }`}
 >
   {/* 🔍 Icono */}
   <svg
-    className={`text-gray-500 transition-all duration-300 ease-in-out ${
+    className={`search-clear-btn transition-all duration-300 ease-in-out ${
       isSearchExpanded
         ? 'w-4 h-4 mr-2 opacity-70 translate-x-0'
         : 'w-5 h-5 opacity-100'
@@ -1169,14 +1165,10 @@ useEffect(() => {
     onKeyPress={(e) => e.key === 'Enter' && e.target.blur()}
     onBlur={() => setIsSearchExpanded(false)}
     autoFocus={isSearchExpanded}
-    className={`absolute left-0 w-full h-full bg-transparent border-none outline-none text-[14px] flex items-center px-8 transition-all duration-300 ease-in-out ${
+    className={`search-input absolute left-0 w-full h-full bg-transparent border-none outline-none text-[14px] flex items-center px-8 transition-all duration-300 ease-in-out ${
       isSearchExpanded
         ? 'opacity-100 translate-x-0 cursor-text'
         : 'opacity-0 -translate-x-5 pointer-events-none'
-    } ${
-      isDarkMode
-        ? 'text-slate-100 placeholder-slate-400'
-        : 'text-gray-900 placeholder-gray-500'
     }`}
     style={{ outline: 'none', boxShadow: 'none' }}
   />
@@ -1188,11 +1180,7 @@ useEffect(() => {
         e.stopPropagation(); // 👈 evita cerrar el buscador
         setSearchQuery('');
       }}
-      className={`absolute right-3 flex items-center justify-center w-5 h-5 rounded-full transition-colors duration-200 ${
-        isDarkMode
-          ? 'text-slate-500 hover:text-slate-300'
-          : 'text-gray-400 hover:text-gray-600'
-      }`}
+      className="search-clear-btn absolute right-3 flex items-center justify-center w-5 h-5 rounded-full transition-colors duration-200"
       title="Limpiar búsqueda"
     >
       <svg
