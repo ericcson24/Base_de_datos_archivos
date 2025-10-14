@@ -587,7 +587,7 @@ body {
 
 .main-panel {
   flex: 1;
-  margin-left: calc(var(--sidebar-width) + 2rem);
+  margin-left: calc(var(--sidebar-width) + 1rem); /* Reducido de 2rem a 1rem */
   padding: var(--main-padding);
   display: flex;
   flex-direction: column;
@@ -640,8 +640,8 @@ body {
 
 
 .file-grid {
-  width: 100%;
-  max-width: 100%;
+  /* width se establece dinámicamente via JavaScript */
+  /* max-width: none para permitir redimensionamiento */
   min-width: 20%; /* Mínimo 20% del ancho del contenedor */
   display: flex;
   flex-direction: column;
@@ -851,7 +851,7 @@ input[type="text"]:focus {
 /* MAIN PANEL */
 .main-panel {
   flex: 1;
-  margin-left: calc(var(--sidebar-width) + 2rem);
+  margin-left: calc(var(--sidebar-width) + 1rem); /* Reducido de 2rem a 1rem */
   padding: var(--main-padding);
   padding-top: 2rem;
   display: flex;
@@ -1124,7 +1124,7 @@ input[type="text"]:focus {
 .storage-bar {
   position: fixed;
   bottom: 1rem;
-  left: calc(var(--sidebar-width) + 2rem);
+  left: calc(var(--sidebar-width) + 1rem); /* Ajustado para coincidir con main-panel */
   right: 2rem;
   height: 4px;
   background: #e0e0e0;
@@ -2113,9 +2113,9 @@ input[type="text"]:focus {
 }
 
 .file-grid {
-  flex: 1;
+  /* El ancho se controla dinámicamente desde JavaScript */
   min-width: 400px;
-  max-width: 60%;
+  /* No max-width para permitir redimensionamiento libre */
 }
 
 .editor-panels-container {

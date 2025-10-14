@@ -206,6 +206,41 @@ const UserPanel = ({ user, onLogout, onBackToFolders, onThemeToggle, isDarkMode,
     onThemeToggle();
   };
 
+  // Inicializar file-grid con ancho al 100% en píxeles
+  useEffect(() => {
+    const initializeFileGridWidth = () => {
+      const mainContent = document.querySelector('.main-content-container');
+      if (mainContent) {
+        // Obtener el ancho completo del contenedor disponible
+        const availableWidth = mainContent.offsetWidth;
+        
+        // Restar paddings del contenedor
+        const mainContentStyles = window.getComputedStyle(mainContent);
+        const paddingLeft = parseFloat(mainContentStyles.paddingLeft) || 0;
+        const paddingRight = parseFloat(mainContentStyles.paddingRight) || 0;
+        
+        // Ancho inicial del file-grid (100% del espacio disponible)
+        const initialWidth = availableWidth - paddingLeft - paddingRight;
+        
+        setFileGridSize({ 
+          width: `${initialWidth}px`, 
+          height: '70vh' 
+        });
+      }
+    };
+
+    // Ejecutar después de que el DOM esté listo
+    const timer = setTimeout(initializeFileGridWidth, 100);
+    
+    // También ejecutar cuando cambie el tamaño de la ventana
+    window.addEventListener('resize', initializeFileGridWidth);
+    
+    return () => {
+      clearTimeout(timer);
+      window.removeEventListener('resize', initializeFileGridWidth);
+    };
+  }, []);
+
   // Funciones para búsqueda y ordenamiento
   const handleSearch = (e) => {
     setSearchQuery(e.target.value);
