@@ -136,6 +136,11 @@ const getAuthenticatedPreviewUrl = async (fileId, filename) => {
 const UserPanel = ({ user, onLogout, onBackToFolders, onThemeToggle, isDarkMode, onGoToCalendar }) => {
   console.log('🎯 UserPanel se está renderizando con user:', user);
 
+  // Grid snapping constants
+  const GRID_SIZE = 40; // Tamaño del grid en píxeles (aumentado de 20 a 40)
+  const MIN_WIDTH = 200;
+  const MIN_HEIGHT = 200;
+
   const [files, setFiles] = useState([]);
   const [currentView, setCurrentView] = useState('privada');
   const [currentPath, setCurrentPath] = useState([]);
@@ -166,7 +171,12 @@ const UserPanel = ({ user, onLogout, onBackToFolders, onThemeToggle, isDarkMode,
   const [isResizing, setIsResizing] = useState(false);
   const [initialSize, setInitialSize] = useState({ width: 0, height: 0 });
   const [initialMouse, setInitialMouse] = useState({ x: 0, y: 0 });
-  const [initialPosition, setInitialPosition] = useState({ x: 0, y: 0 });
+  const [initialPosition] = useState({ x: 0, y: 0 });
+  const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
+
+  // Estado para mostrar límites de arrastre
+  const [showDragBounds, setShowDragBounds] = useState(false);
+  const [dragBounds, setDragBounds] = useState({ top: 0, left: 0, right: 0, bottom: 0 });
 
   // Estados para drag and drop
   const [isDragOver, setIsDragOver] = useState(false);
@@ -694,15 +704,58 @@ useEffect(() => {
   const handleMouseDown = (e, action) => {
     e.preventDefault();
     const fileGrid = e.currentTarget.closest('.file-grid');
-    const rect = fileGrid.getBoundingClientRect();
+    const mainPanel = document.querySelector('.main-panel');
+    const panelHeader = document.querySelector('.panel-header');
+    
+    if (!mainPanel || !panelHeader) return;
 
     if (action === 'move') {
-      setIsDragging(true);
+      // Capturar dimensiones actuales
+      const currentWidth = fileGrid.offsetWidth;
+      const currentHeight = fileGrid.offsetHeight;
+      
+      // Fijar dimensiones en píxeles
+      setFileGridSize({ 
+        width: `${currentWidth}px`, 
+        height: `${currentHeight}px` 
+      });
+      
+      // Calcular área CONSTANTE donde puede estar el grid (independiente del tamaño del grid)
+      const storageBar = document.querySelector('.storage-bar');
+      const storageBarHeight = storageBar ? storageBar.offsetHeight : 0;
+      
+      const topMargin = 20;
+      const bottomMargin = 20;
+      
+      const panelHeaderHeight = panelHeader.offsetHeight;
+      const availableTop = panelHeaderHeight + topMargin;
+      const totalAvailableHeight = mainPanel.offsetHeight - panelHeaderHeight - storageBarHeight - topMargin - bottomMargin;
+      
+      // Límites CONSTANTES - el área completa disponible
+      const bounds = {
+        top: availableTop,
+        left: 0,
+        right: mainPanel.offsetWidth,
+        bottom: availableTop + totalAvailableHeight
+      };
+      
+      setDragBounds(bounds);
+      
+      // Obtener posición actual del file-grid
+      const fileGridRect = fileGrid.getBoundingClientRect();
+      const mainPanelRect = mainPanel.getBoundingClientRect();
+      
+      // Offset entre el click y la esquina del grid - esto es CRÍTICO para mantener el ratón en su lugar
+      const offsetX = e.clientX - fileGridRect.left;
+      const offsetY = e.clientY - fileGridRect.top;
+      setDragOffset({ x: offsetX, y: offsetY });
+      
       setInitialMouse({ x: e.clientX, y: e.clientY });
-      setInitialPosition({ x: rect.left, y: rect.top });
+      
+      setIsDragging(true);
+      setShowDragBounds(true);
     } else if (action === 'resize') {
       setIsResizing(true);
-      // Guardar tamaño inicial y posición del mouse
       const currentWidth = fileGrid.offsetWidth;
       const currentHeight = fileGrid.offsetHeight;
       setInitialSize({ width: currentWidth, height: currentHeight });
@@ -712,58 +765,121 @@ useEffect(() => {
 
   const handleMouseMove = useCallback((e) => {
     if (isDragging) {
-      const deltaY = e.clientY - initialMouse.y;
-      const deltaX = e.clientX - initialMouse.x;
-      const newX = initialPosition.x + deltaX;
-      const newY = initialPosition.y + deltaY;
+      const mainPanel = document.querySelector('.main-panel');
+      const fileGrid = document.querySelector('.file-grid');
+      if (!mainPanel || !fileGrid) return;
+      
+      const mainPanelRect = mainPanel.getBoundingClientRect();
+      
+      // Posición donde DEBE estar la esquina superior izquierda del grid
+      // para que el ratón se mantenga en el move-handle
+      let topLeftX = e.clientX - mainPanelRect.left - dragOffset.x;
+      let topLeftY = e.clientY - mainPanelRect.top - dragOffset.y;
+      
+      // Dimensiones actuales
+      let currentWidth = fileGrid.offsetWidth;
+      let currentHeight = fileGrid.offsetHeight;
+      
+      // Tamaño mínimo en píxeles (20% del ancho del panel)
+      const minWidthPx = Math.max(MIN_WIDTH, mainPanel.offsetWidth * 0.20);
+      const minHeightPx = MIN_HEIGHT;
+      
+      let newX = topLeftX;
+      let newY = topLeftY;
+      let newWidth = currentWidth;
+      let newHeight = currentHeight;
+      
+      // AJUSTE HORIZONTAL
+      if (topLeftX < dragBounds.left) {
+        // Se sale por la izquierda
+        newX = dragBounds.left;
+        // Calcular nuevo ancho: desde el límite izquierdo hasta donde terminaría el grid
+        const potentialWidth = currentWidth - (dragBounds.left - topLeftX);
+        newWidth = Math.max(minWidthPx, potentialWidth);
+      } else if (topLeftX + currentWidth > dragBounds.right) {
+        // Se sale por la derecha
+        newX = topLeftX;
+        // Calcular nuevo ancho disponible desde la posición actual hasta el límite derecho
+        const availableWidth = dragBounds.right - topLeftX;
+        newWidth = Math.max(minWidthPx, availableWidth);
+      } else {
+        // Dentro de límites horizontales
+        newX = topLeftX;
+        newWidth = currentWidth;
+      }
+      
+      // AJUSTE VERTICAL
+      if (topLeftY < dragBounds.top) {
+        // Se sale por arriba
+        newY = dragBounds.top;
+        // Calcular nueva altura: desde el límite superior hasta donde terminaría el grid
+        const potentialHeight = currentHeight - (dragBounds.top - topLeftY);
+        newHeight = Math.max(minHeightPx, potentialHeight);
+      } else if (topLeftY + currentHeight > dragBounds.bottom) {
+        // Se sale por abajo
+        newY = topLeftY;
+        // Calcular nueva altura disponible desde la posición actual hasta el límite inferior
+        const availableHeight = dragBounds.bottom - topLeftY;
+        newHeight = Math.max(minHeightPx, availableHeight);
+      } else {
+        // Dentro de límites verticales
+        newY = topLeftY;
+        newHeight = currentHeight;
+      }
+      
+      // Actualizar estado
       setFileGridPosition({ x: newX, y: newY });
+      if (newWidth !== currentWidth || newHeight !== currentHeight) {
+        setFileGridSize({ width: `${newWidth}px`, height: `${newHeight}px` });
+      }
     } else if (isResizing) {
-      // Calcular nuevo tamaño basado en la diferencia desde el mouse inicial
+      // ...existing code...
       const deltaX = e.clientX - initialMouse.x;
       const deltaY = e.clientY - initialMouse.y;
-      
-      const newWidth = Math.max(200, initialSize.width + deltaX);
-      const maxHeight = window.innerHeight * 0.98; // Aumentar máximo a 95% de la altura de la ventana
-      const newHeight = Math.min(maxHeight, Math.max(200, initialSize.height + deltaY));
-      
+
+      let newWidth = Math.max(MIN_WIDTH, initialSize.width + deltaX);
+      let newHeight = Math.max(MIN_HEIGHT, initialSize.height + deltaY);
+
+      // Snap to grid durante resize (esto sí funciona bien)
+      newWidth = Math.round(newWidth / GRID_SIZE) * GRID_SIZE;
+      newHeight = Math.round(newHeight / GRID_SIZE) * GRID_SIZE;
+
+      // Get main-panel boundaries for size constraints
+      const mainPanel = document.querySelector('.main-panel');
+      if (mainPanel) {
+        const maxWidth = mainPanel.offsetWidth;
+        const maxHeight = mainPanel.offsetHeight * 0.8; // Max 80% of main-panel height
+
+        // Limit to main-panel dimensions
+        newWidth = Math.min(newWidth, maxWidth);
+        newHeight = Math.min(newHeight, maxHeight);
+      }
+
       setFileGridSize({
         width: `${newWidth}px`,
         height: `${newHeight}px`
       });
     }
-  }, [isDragging, isResizing, initialMouse, initialPosition, initialSize]);
+  }, [isDragging, isResizing, initialMouse, initialSize, GRID_SIZE, MIN_WIDTH, MIN_HEIGHT, dragOffset.x, dragOffset.y, dragBounds.left, dragBounds.right, dragBounds.top, dragBounds.bottom]);
 
-  const handleMouseUp = useCallback(() => {
+  const handleMouseUp = useCallback((e) => {
     setIsDragging(false);
     setIsResizing(false);
-    // Convertir posición absoluta a relativa al contenedor cuando se suelta el movimiento
-    if (isDragging && (fileGridPosition.x !== 0 || fileGridPosition.y !== 0)) {
-      const container = document.querySelector('.main-panel');
-      if (container) {
-        const containerRect = container.getBoundingClientRect();
-        const containerStyles = window.getComputedStyle(container);
-        const paddingLeft = parseFloat(containerStyles.paddingLeft);
-        const paddingTop = parseFloat(containerStyles.paddingTop);
-        
-        // Calcular posición relativa al área de contenido del main-panel
-        const relativeX = fileGridPosition.x - (containerRect.left + paddingLeft);
-        const relativeY = fileGridPosition.y - (containerRect.top + paddingTop);
-        
-        setFileGridPosition({
-          x: Math.max(0, relativeX),
-          y: Math.max(0, relativeY)
-        });
-      }
-    }
-  }, [isDragging, fileGridPosition]);
+    setShowDragBounds(false);
+    
+    // La posición y el tamaño ya están establecidos por handleMouseMove
+    // No necesitamos hacer nada más aquí
+  }, []);
 
   useEffect(() => {
     if (isDragging || isResizing) {
       document.addEventListener('mousemove', handleMouseMove);
-      document.addEventListener('mouseup', handleMouseUp);
+      // Crear un wrapper para pasar el evento a handleMouseUp
+      const mouseUpHandler = (e) => handleMouseUp(e);
+      document.addEventListener('mouseup', mouseUpHandler);
       return () => {
         document.removeEventListener('mousemove', handleMouseMove);
-        document.removeEventListener('mouseup', handleMouseUp);
+        document.removeEventListener('mouseup', mouseUpHandler);
       };
     }
   }, [isDragging, isResizing, handleMouseMove, handleMouseUp]);
@@ -898,15 +1014,35 @@ useEffect(() => {
           </button>
         </div>
 
+        {/* Overlay de límites de arrastre - ÁREA CONSTANTE */}
+        {showDragBounds && (
+          <div 
+            className="drag-bounds-overlay"
+            style={{
+              position: 'absolute',
+              top: `${dragBounds.top}px`,
+              left: `${dragBounds.left}px`,
+              width: `${dragBounds.right - dragBounds.left}px`,
+              height: `${dragBounds.bottom - dragBounds.top}px`,
+              border: '2px dashed rgba(59, 130, 246, 0.6)',
+              backgroundColor: 'rgba(59, 130, 246, 0.08)',
+              borderRadius: '8px',
+              pointerEvents: 'none',
+              zIndex: 999,
+              transition: 'opacity 0.2s ease-in-out'
+            }}
+          />
+        )}
+
         <div 
           className={`file-grid ${isDragOver ? 'drag-over' : ''}`}
           
           style={{
             width: fileGridSize.width,
             height: fileGridSize.height,
-            position: isDragging ? 'fixed' : (fileGridPosition.x !== 0 || fileGridPosition.y !== 0) ? 'absolute' : 'relative',
-            left: isDragging ? fileGridPosition.x : (fileGridPosition.x !== 0 || fileGridPosition.y !== 0) ? `${fileGridPosition.x}px` : 'auto',
-            top: isDragging ? fileGridPosition.y : (fileGridPosition.x !== 0 || fileGridPosition.y !== 0) ? `${fileGridPosition.y}px` : 'auto',
+            position: (isDragging || fileGridPosition.x !== 0 || fileGridPosition.y !== 0) ? 'absolute' : 'relative',
+            left: (isDragging || fileGridPosition.x !== 0 || fileGridPosition.y !== 0) ? `${fileGridPosition.x}px` : 'auto',
+            top: (isDragging || fileGridPosition.x !== 0 || fileGridPosition.y !== 0) ? `${fileGridPosition.y}px` : 'auto',
             zIndex: isDragging ? 1000 : 'auto'
           }}
           onDragEnter={handleDragEnter}

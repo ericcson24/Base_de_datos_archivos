@@ -610,10 +610,9 @@ body {
 .file-grid {
   width: 100%;
   max-width: 100%;
+  min-width: 20%; /* Mínimo 20% del ancho del contenedor */
   display: flex;
   flex-direction: column;
-              /* o el valor que se adapte mejor */
-  display: flex;
   align-items: stretch;
   gap: 1vw;
   min-height: 40vh;
@@ -623,11 +622,9 @@ body {
   padding: 2vw 1vw;
   color: var(--text-color);
   margin-bottom: 1vw;
-    background: var(--file-grid-bg);
+  background: var(--file-grid-bg);
   border-radius: 0.5rem;
-  
   box-shadow: var(--shadow);
-  
   border: 0.4vw dashed transparent;
   position: relative;
   margin: 0 auto;
@@ -1472,6 +1469,10 @@ input[type="text"]:focus {
 .move-handle:hover {
   background: rgba(25, 118, 210, 0.1);
   color: #1976d2;
+}
+
+.move-handle:active {
+  cursor: grabbing !important;
 }
 
 .move-handle::before {
