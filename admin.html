@@ -1,0 +1,1172 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Panel de Administración - Nube Distribuible</title>
+    <style>
+        /* Variables globales */
+        :root {
+            --primary-color: #1a73e8;
+            --secondary-color: #5f6368;
+            --success-color: #34a853;
+            --error-color: #ea4335;
+            --warning-color: #fbbc04;
+            --bg-color: #f8f9fa;
+            --card-bg: rgba(255, 255, 255, 0.9);
+            --text-color: #202124;
+            --border-radius: 8px;
+            --shadow: 0 1px 3px rgba(0,0,0,0.12), 0 1px 2px rgba(0,0,0,0.24);
+            --shadow-hover: 0 3px 6px rgba(0,0,0,0.15), 0 2px 4px rgba(0,0,0,0.12);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            color: var(--text-color);
+            line-height: 1.6;
+        }
+
+        /* Header */
+        .header {
+            background: var(--card-bg);
+            backdrop-filter: blur(10px);
+            padding: 1rem 2rem;
+            box-shadow: var(--shadow);
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+
+        .header-content {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            font-size: 1.5rem;
+            font-weight: 600;
+            color: var(--primary-color);
+        }
+
+        .header-actions {
+            display: flex;
+            gap: 12px;
+            align-items: center;
+        }
+
+        /* Contenedor principal */
+        .container {
+            max-width: 1200px;
+            margin: 2rem auto;
+            padding: 0 2rem;
+        }
+
+        /* Cards */
+        .card {
+            background: var(--card-bg);
+            backdrop-filter: blur(10px);
+            border-radius: var(--border-radius);
+            box-shadow: var(--shadow);
+            margin-bottom: 2rem;
+            overflow: hidden;
+            transition: box-shadow 0.3s ease;
+        }
+
+        .card:hover {
+            box-shadow: var(--shadow-hover);
+        }
+
+        .card-header {
+            padding: 1.5rem 2rem;
+            border-bottom: 1px solid rgba(0,0,0,0.1);
+            display: flex;
+            justify-content: between;
+            align-items: center;
+        }
+
+        .card-title {
+            font-size: 1.25rem;
+            font-weight: 600;
+            margin: 0;
+        }
+
+        .card-content {
+            padding: 2rem;
+        }
+
+        /* Grid de estadísticas */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 1.5rem;
+            margin-bottom: 2rem;
+        }
+
+        .stat-card {
+            background: var(--card-bg);
+            padding: 1.5rem;
+            border-radius: var(--border-radius);
+            box-shadow: var(--shadow);
+            text-align: center;
+            transition: transform 0.3s ease;
+        }
+
+        .stat-card:hover {
+            transform: translateY(-4px);
+        }
+
+        .stat-number {
+            font-size: 2.5rem;
+            font-weight: 700;
+            color: var(--primary-color);
+            display: block;
+        }
+
+        .stat-label {
+            color: var(--secondary-color);
+            font-size: 0.9rem;
+            margin-top: 0.5rem;
+        }
+
+        /* Botones */
+        .btn {
+            padding: 0.75rem 1.5rem;
+            border: none;
+            border-radius: var(--border-radius);
+            font-size: 1rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-decoration: none;
+            display: inline-block;
+            text-align: center;
+        }
+
+        .btn-primary {
+            background: var(--primary-color);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: #1557b0;
+            transform: translateY(-2px);
+        }
+
+        .btn-success {
+            background: var(--success-color);
+            color: white;
+        }
+
+        .btn-danger {
+            background: var(--error-color);
+            color: white;
+        }
+
+        .btn-secondary {
+            background: var(--secondary-color);
+            color: white;
+        }
+
+        .btn-group {
+            display: flex;
+            gap: 12px;
+            flex-wrap: wrap;
+        }
+
+        /* Tabla de usuarios */
+        .users-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 1rem;
+        }
+
+        .users-table th,
+        .users-table td {
+            padding: 1rem;
+            text-align: left;
+            border-bottom: 1px solid rgba(0,0,0,0.1);
+        }
+
+        .users-table th {
+            background: rgba(0,0,0,0.05);
+            font-weight: 600;
+        }
+
+        .user-status {
+            padding: 0.25rem 0.75rem;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            font-weight: 500;
+        }
+
+        .status-active {
+            background: rgba(52, 168, 83, 0.1);
+            color: var(--success-color);
+        }
+
+        .status-locked {
+            background: rgba(234, 67, 53, 0.1);
+            color: var(--error-color);
+        }
+
+        /* Modal */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.5);
+            z-index: 1000;
+        }
+
+        .modal-content {
+            background: white;
+            max-width: 500px;
+            margin: 5% auto;
+            border-radius: var(--border-radius);
+            overflow: hidden;
+            box-shadow: var(--shadow-hover);
+        }
+
+        .modal-header {
+            padding: 1.5rem 2rem;
+            background: var(--primary-color);
+            color: white;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .modal-close {
+            background: none;
+            border: none;
+            color: white;
+            font-size: 1.5rem;
+            cursor: pointer;
+        }
+
+        .modal-body {
+            padding: 2rem;
+        }
+
+        /* Formularios */
+        .form-group {
+            margin-bottom: 1.5rem;
+        }
+
+        .form-label {
+            display: block;
+            margin-bottom: 0.5rem;
+            font-weight: 500;
+        }
+
+        .form-control {
+            width: 100%;
+            padding: 0.75rem;
+            border: 2px solid #e8eaed;
+            border-radius: var(--border-radius);
+            font-size: 1rem;
+            transition: border-color 0.3s ease;
+        }
+
+        .form-control:focus {
+            outline: none;
+            border-color: var(--primary-color);
+        }
+
+        /* Mensajes */
+        .alert {
+            padding: 1rem 1.5rem;
+            border-radius: var(--border-radius);
+            margin-bottom: 1rem;
+            display: none;
+        }
+
+        .alert-success {
+            background: rgba(52, 168, 83, 0.1);
+            color: var(--success-color);
+            border: 1px solid rgba(52, 168, 83, 0.3);
+        }
+
+        .alert-error {
+            background: rgba(234, 67, 53, 0.1);
+            color: var(--error-color);
+            border: 1px solid rgba(234, 67, 53, 0.3);
+        }
+
+        /* Loading */
+        .loading {
+            display: none;
+            text-align: center;
+            padding: 2rem;
+        }
+
+        .spinner {
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid var(--primary-color);
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 1rem;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .container {
+                padding: 0 1rem;
+            }
+
+            .header-content {
+                flex-direction: column;
+                gap: 1rem;
+            }
+
+            .stats-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .btn-group {
+                flex-direction: column;
+            }
+
+            .users-table {
+                font-size: 0.9rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Header -->
+    <header class="header">
+        <div class="header-content">
+            <div class="logo">
+                <span>🛠️</span>
+                <span>Panel de Administración</span>
+            </div>
+            <div class="header-actions">
+                <button class="btn btn-secondary" onclick="refreshData()">🔄 Actualizar</button>
+                <a href="/carpetas" class="btn btn-primary">← Volver</a>
+            </div>
+        </div>
+    </header>
+
+    <!-- Contenido principal -->
+    <div class="container">
+        <!-- Estadísticas del sistema -->
+        <div class="card">
+            <div class="card-header">
+                <h2 class="card-title">📊 Estado del Sistema</h2>
+            </div>
+            <div class="card-content">
+                <div class="stats-grid" id="statsGrid">
+                    <div class="stat-card">
+                        <span class="stat-number" id="totalUsers">-</span>
+                        <div class="stat-label">Usuarios Totales</div>
+                    </div>
+                    <div class="stat-card">
+                        <span class="stat-number" id="activeUsers">-</span>
+                        <div class="stat-label">Usuarios Activos</div>
+                    </div>
+                    <div class="stat-card">
+                        <span class="stat-number" id="lockedUsers">-</span>
+                        <div class="stat-label">Usuarios Bloqueados</div>
+                    </div>
+                    <div class="stat-card">
+                        <span class="stat-number" id="systemStatus">🟢</span>
+                        <div class="stat-label">Estado del Sistema</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Gestión de usuarios -->
+        <div class="card">
+            <div class="card-header">
+                <h2 class="card-title">👥 Gestión de Usuarios</h2>
+                <div class="btn-group">
+                    <button class="btn btn-primary" onclick="showAddUserModal()">➕ Añadir Usuario</button>
+                    <button class="btn btn-success" onclick="unlockAllUsers()">🔓 Desbloquear Todos</button>
+                </div>
+            </div>
+            <div class="card-content">
+                <div id="usersLoading" class="loading">
+                    <div class="spinner"></div>
+                    <p>Cargando usuarios...</p>
+                </div>
+                <table class="users-table" id="usersTable" style="display: none;">
+                    <thead>
+                        <tr>
+                            <th>Usuario</th>
+                            <th>Rol</th>
+                            <th>Estado</th>
+                            <th>Último Acceso</th>
+                            <th>Intentos Fallidos</th>
+                            <th>Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody id="usersTableBody">
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Logs del sistema -->
+        <div class="card">
+            <div class="card-header">
+                <h2 class="card-title">📝 Logs del Sistema</h2>
+                <button class="btn btn-secondary" onclick="loadLogs()">🔄 Recargar Logs</button>
+            </div>
+            <div class="card-content">
+                <div id="logsContainer">
+                    <div class="loading">
+                        <div class="spinner"></div>
+                        <p>Cargando logs...</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Diagnósticos -->
+        <div class="card">
+            <div class="card-header">
+                <h2 class="card-title">🔍 Diagnósticos del Sistema</h2>
+                <button class="btn btn-primary" onclick="runDiagnostics()">🧪 Ejecutar Diagnósticos</button>
+            </div>
+            <div class="card-content">
+                <div id="diagnosticsContainer">
+                    <p>Haz clic en "Ejecutar Diagnósticos" para verificar el estado del sistema.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal para añadir usuario -->
+    <div id="addUserModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>➕ Añadir Nuevo Usuario</h3>
+                <button class="modal-close" onclick="closeModal('addUserModal')">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div id="modalAlert" class="alert"></div>
+                <form id="addUserForm">
+                    <div class="form-group">
+                        <label class="form-label" for="newUsername">Nombre de Usuario:</label>
+                        <input type="text" id="newUsername" class="form-control" required>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label" for="newPassword">Contraseña:</label>
+                        <input type="password" id="newPassword" class="form-control" required>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label" for="newRole">Rol:</label>
+                        <select id="newRole" class="form-control">
+                            <option value="user">Usuario</option>
+                            <option value="admin">Administrador</option>
+                        </select>
+                    </div>
+                    <div class="btn-group">
+                        <button type="submit" class="btn btn-primary">✅ Crear Usuario</button>
+                        <button type="button" class="btn btn-secondary" onclick="closeModal('addUserModal')">❌ Cancelar</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal para cambiar contraseña -->
+    <div id="changePasswordModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>🔑 Cambiar Contraseña de Usuario</h3>
+                <button class="modal-close" onclick="closeModal('changePasswordModal')">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div id="changePasswordAlert" class="alert"></div>
+                <form id="changePasswordForm">
+                    <div class="form-group">
+                        <label class="form-label" for="targetUsername">Usuario:</label>
+                        <input type="text" id="targetUsername" class="form-control" readonly>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label" for="newUserPassword">Nueva Contraseña:</label>
+                        <input type="password" id="newUserPassword" class="form-control" required>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label" for="confirmPassword">Confirmar Nueva Contraseña:</label>
+                        <input type="password" id="confirmPassword" class="form-control" required>
+                    </div>
+                    <div class="btn-group">
+                        <button type="submit" class="btn btn-primary">✅ Cambiar Contraseña</button>
+                        <button type="button" class="btn btn-secondary" onclick="closeModal('changePasswordModal')">❌ Cancelar</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal para ver logs de usuario -->
+    <div id="userLogsModal" class="modal">
+        <div class="modal-content" style="max-width: 80%; max-height: 80%;">
+            <div class="modal-header">
+                <h3>📋 Logs de Usuario</h3>
+                <button class="modal-close" onclick="closeModal('userLogsModal')">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div id="userLogsContainer">
+                    <p>Cargando logs...</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal para ver información de contraseña -->
+    <div id="passwordInfoModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>👁️ Información de Contraseña</h3>
+                <button class="modal-close" onclick="closeModal('passwordInfoModal')">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div id="passwordInfoContainer">
+                    <p>Cargando información...</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Variables globales
+        let systemData = {};
+
+        // Cargar datos iniciales
+        document.addEventListener('DOMContentLoaded', function() {
+            refreshData();
+        });
+
+        // Función principal para refrescar todos los datos
+        async function refreshData() {
+            await Promise.all([
+                loadSystemStatus(),
+                loadUsers(),
+                loadLogs()
+            ]);
+        }
+
+        // Cargar estado del sistema
+        async function loadSystemStatus() {
+            try {
+                const response = await fetch('/admin/api/status');
+                const data = await response.json();
+                
+                if (data.success) {
+                    systemData = data;
+                    updateStats(data);
+                } else {
+                    showAlert('error', 'Error cargando estado del sistema');
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                showAlert('error', 'Error de conexión al cargar estado');
+            }
+        }
+
+        // Actualizar estadísticas
+        function updateStats(data) {
+            document.getElementById('totalUsers').textContent = data.total_users || 0;
+            document.getElementById('activeUsers').textContent = data.active_users || 0;
+            document.getElementById('lockedUsers').textContent = data.locked_users || 0;
+            document.getElementById('systemStatus').textContent = data.status === 'online' ? '🟢' : '🔴';
+            
+            // Agregar estadísticas adicionales del servidor si están disponibles
+            if (data.server_stats) {
+                // Agregar cards de estadísticas del servidor si no existen
+                addServerStatsCards(data.server_stats);
+            }
+        }
+        
+        // Función para agregar cards de estadísticas del servidor
+        function addServerStatsCards(stats) {
+            const statsGrid = document.getElementById('statsGrid');
+            
+            // Verificar si ya existen las cards adicionales
+            if (!document.getElementById('serverCpuCard')) {
+                const additionalCards = `
+                    <div class="stat-card" id="serverCpuCard">
+                        <span class="stat-number" id="serverCpu">${stats.cpu_usage}</span>
+                        <div class="stat-label">Uso de CPU</div>
+                    </div>
+                    <div class="stat-card" id="serverMemoryCard">
+                        <span class="stat-number" id="serverMemory">${stats.memory_usage}</span>
+                        <div class="stat-label">Memoria (${stats.memory_used_gb}GB/${stats.memory_total_gb}GB)</div>
+                    </div>
+                    <div class="stat-card" id="serverDiskCard">
+                        <span class="stat-number" id="serverDisk">${stats.disk_usage}</span>
+                        <div class="stat-label">Disco (${stats.disk_free_gb}GB libres)</div>
+                    </div>
+                    <div class="stat-card" id="serverNetworkCard">
+                        <span class="stat-number" id="serverNetwork">↑${stats.bytes_sent_mb}MB ↓${stats.bytes_recv_mb}MB</span>
+                        <div class="stat-label">Red (Subida/Bajada)</div>
+                    </div>
+                    <div class="stat-card" id="serverSpeedCard">
+                        <span class="stat-number" id="serverSpeed">${stats.connection_speed}</span>
+                        <div class="stat-label">Velocidad de Conexión</div>
+                    </div>
+                    <div class="stat-card" id="serverUptimeCard">
+                        <span class="stat-number" id="serverUptime">${stats.uptime_hours}h</span>
+                        <div class="stat-label">Tiempo Activo</div>
+                    </div>
+                    <div class="stat-card" id="serverFilesCard">
+                        <span class="stat-number" id="serverFiles">${stats.total_files}</span>
+                        <div class="stat-label">Archivos (${stats.total_size_mb}MB)</div>
+                    </div>
+                    <div class="stat-card" id="serverPingCard">
+                        <span class="stat-number" id="serverPing">${getPingDisplay(stats.ping_results)}</span>
+                        <div class="stat-label">Conectividad</div>
+                    </div>
+                `;
+                statsGrid.insertAdjacentHTML('beforeend', additionalCards);
+            } else {
+                // Actualizar valores existentes
+                document.getElementById('serverCpu').textContent = stats.cpu_usage;
+                document.getElementById('serverMemory').textContent = stats.memory_usage;
+                document.getElementById('serverMemory').parentElement.querySelector('.stat-label').textContent = 
+                    `Memoria (${stats.memory_used_gb}GB/${stats.memory_total_gb}GB)`;
+                document.getElementById('serverDisk').textContent = stats.disk_usage;
+                document.getElementById('serverDisk').parentElement.querySelector('.stat-label').textContent = 
+                    `Disco (${stats.disk_free_gb}GB libres)`;
+                document.getElementById('serverNetwork').textContent = `↑${stats.bytes_sent_mb}MB ↓${stats.bytes_recv_mb}MB`;
+                document.getElementById('serverSpeed').textContent = stats.connection_speed;
+                document.getElementById('serverUptime').textContent = `${stats.uptime_hours}h`;
+                document.getElementById('serverFiles').textContent = stats.total_files;
+                document.getElementById('serverFiles').parentElement.querySelector('.stat-label').textContent = 
+                    `Archivos (${stats.total_size_mb}MB)`;
+                document.getElementById('serverPing').textContent = getPingDisplay(stats.ping_results);
+            }
+        }
+        
+        // Función auxiliar para mostrar información de ping
+        function getPingDisplay(pingResults) {
+            if (!pingResults) return "N/A";
+            const results = Object.entries(pingResults);
+            if (results.length === 0) return "N/A";
+            
+            // Mostrar el mejor resultado
+            const validResults = results.filter(([name, ping]) => ping !== "Error" && ping !== "Fallo");
+            if (validResults.length > 0) {
+                return validResults[0][1]; // Primer resultado válido
+            }
+            return "Error";
+        }
+
+        // Cargar usuarios
+        async function loadUsers() {
+            const loading = document.getElementById('usersLoading');
+            const table = document.getElementById('usersTable');
+            
+            loading.style.display = 'block';
+            table.style.display = 'none';
+
+            try {
+                const response = await fetch('/admin/api/users');
+                const data = await response.json();
+                
+                if (data.success) {
+                    displayUsers(data.users);
+                } else {
+                    showAlert('error', 'Error cargando usuarios');
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                showAlert('error', 'Error de conexión al cargar usuarios');
+            } finally {
+                loading.style.display = 'none';
+                table.style.display = 'table';
+            }
+        }
+
+        // Mostrar usuarios en la tabla
+        function displayUsers(users) {
+            const tbody = document.getElementById('usersTableBody');
+            tbody.innerHTML = '';
+
+            users.forEach(user => {
+                const row = document.createElement('tr');
+                
+                const statusClass = user.is_locked ? 'status-locked' : 'status-active';
+                const statusText = user.is_locked ? `🔒 Bloqueado (${user.time_remaining})` : '🔓 Activo';
+                
+                row.innerHTML = `
+                    <td><strong>${user.username}</strong></td>
+                    <td>${user.role === 'admin' ? '👑 Admin' : '👤 Usuario'}</td>
+                    <td><span class="user-status ${statusClass}">${statusText}</span></td>
+                    <td>${user.last_login ? new Date(user.last_login).toLocaleString() : 'Nunca'}</td>
+                    <td>${user.failed_attempts}</td>
+                    <td>
+                        <div class="btn-group">
+                            ${user.is_locked ? 
+                                `<button class="btn btn-success" onclick="unlockUser('${user.username}')">🔓 Desbloquear</button>` : 
+                                ''
+                            }
+                            <button class="btn btn-primary" onclick="showChangePasswordModal('${user.username}')">🔑 Cambiar Contraseña</button>
+                            <button class="btn btn-info" onclick="showUserLogs('${user.username}')">📋 Ver Logs</button>
+                            <button class="btn btn-warning" onclick="showUserPassword('${user.username}')">👁️ Ver Info Contraseña</button>
+                            ${user.username !== 'administrador' ? 
+                                `<button class="btn btn-danger" onclick="deleteUser('${user.username}')">🗑️ Eliminar</button>` : 
+                                ''
+                            }
+                        </div>
+                    </td>
+                `;
+                
+                tbody.appendChild(row);
+            });
+        }
+
+        // Mostrar modal para añadir usuario
+        function showAddUserModal() {
+            document.getElementById('addUserModal').style.display = 'block';
+            document.getElementById('addUserForm').reset();
+            hideModalAlert();
+        }
+
+        // Cerrar modal
+        function closeModal(modalId) {
+            document.getElementById(modalId).style.display = 'none';
+        }
+
+        // Manejar formulario de añadir usuario
+        document.getElementById('addUserForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const username = document.getElementById('newUsername').value.trim();
+            const password = document.getElementById('newPassword').value;
+            const role = document.getElementById('newRole').value;
+
+            if (!username || !password) {
+                showModalAlert('error', 'Todos los campos son obligatorios');
+                return;
+            }
+
+            try {
+                const response = await fetch('/admin/api/users/add', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ username, password, role })
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    showModalAlert('success', data.message);
+                    setTimeout(() => {
+                        closeModal('addUserModal');
+                        loadUsers();
+                    }, 1500);
+                } else {
+                    showModalAlert('error', data.message);
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                showModalAlert('error', 'Error de conexión');
+            }
+        });
+
+        // Mostrar modal para cambiar contraseña
+        function showChangePasswordModal(username) {
+            document.getElementById('targetUsername').value = username;
+            document.getElementById('changePasswordModal').style.display = 'block';
+            document.getElementById('changePasswordForm').reset();
+            document.getElementById('targetUsername').value = username; // Resetear después del reset
+            hideChangePasswordAlert();
+        }
+
+        // Manejar formulario de cambiar contraseña
+        document.getElementById('changePasswordForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const username = document.getElementById('targetUsername').value;
+            const newPassword = document.getElementById('newUserPassword').value;
+            const confirmPassword = document.getElementById('confirmPassword').value;
+
+            if (!newPassword || !confirmPassword) {
+                showChangePasswordAlert('error', 'Todos los campos son obligatorios');
+                return;
+            }
+
+            if (newPassword !== confirmPassword) {
+                showChangePasswordAlert('error', 'Las contraseñas no coinciden');
+                return;
+            }
+
+            if (newPassword.length < 6) {
+                showChangePasswordAlert('error', 'La contraseña debe tener al menos 6 caracteres');
+                return;
+            }
+
+            try {
+                const response = await fetch('/admin/api/users/change-password', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ username, new_password: newPassword })
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    showChangePasswordAlert('success', data.message);
+                    setTimeout(() => {
+                        closeModal('changePasswordModal');
+                        loadUsers();
+                    }, 1500);
+                } else {
+                    showChangePasswordAlert('error', data.message);
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                showChangePasswordAlert('error', 'Error de conexión');
+            }
+        });
+
+        // Mostrar logs de usuario específico
+        async function showUserLogs(username) {
+            document.getElementById('userLogsModal').style.display = 'block';
+            const container = document.getElementById('userLogsContainer');
+            container.innerHTML = '<div class="loading"><div class="spinner"></div><p>Cargando logs del usuario...</p></div>';
+
+            try {
+                const response = await fetch(`/admin/api/users/${username}/logs`);
+                const data = await response.json();
+
+                if (data.success) {
+                    displayUserLogs(data.logs, username);
+                } else {
+                    container.innerHTML = `<p>Error cargando logs: ${data.message}</p>`;
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                container.innerHTML = '<p>Error de conexión al cargar logs</p>';
+            }
+        }
+
+        // Mostrar logs de usuario
+        function displayUserLogs(logs, username) {
+            const container = document.getElementById('userLogsContainer');
+            
+            if (!logs || logs.length === 0) {
+                container.innerHTML = `<p>No hay logs disponibles para el usuario "${username}"</p>`;
+                return;
+            }
+
+            const logsHtml = `
+                <h4>Logs para usuario: ${username}</h4>
+                <div style="max-height: 400px; overflow-y: auto; border: 1px solid #ddd; border-radius: 4px; margin-top: 1rem;">
+                    ${logs.map(log => 
+                        `<div style="padding: 0.5rem; border-bottom: 1px solid #eee; font-family: monospace; font-size: 0.9rem;">
+                            <span style="color: #666; font-size: 0.8rem;">[${log.timestamp || 'N/A'}]</span> 
+                            ${log.message || log.raw || log}
+                        </div>`
+                    ).join('')}
+                </div>
+            `;
+
+            container.innerHTML = logsHtml;
+        }
+
+        // Mostrar información de contraseña
+        async function showUserPassword(username) {
+            document.getElementById('passwordInfoModal').style.display = 'block';
+            const container = document.getElementById('passwordInfoContainer');
+            container.innerHTML = '<div class="loading"><div class="spinner"></div><p>Cargando información de contraseña...</p></div>';
+
+            try {
+                const response = await fetch(`/admin/api/users/${username}/password-info`);
+                const data = await response.json();
+
+                if (data.success) {
+                    displayPasswordInfo(data.password_info, username);
+                } else {
+                    container.innerHTML = `<p>Error cargando información: ${data.message}</p>`;
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                container.innerHTML = '<p>Error de conexión al cargar información</p>';
+            }
+        }
+
+        // Mostrar información de contraseña
+        function displayPasswordInfo(info, username) {
+            const container = document.getElementById('passwordInfoContainer');
+            
+            const infoHtml = `
+                <h4>Información de contraseña para: ${username}</h4>
+                <div style="margin-top: 1rem;">
+                    <div style="padding: 1rem; border: 1px solid #ddd; border-radius: 4px; margin-bottom: 1rem;">
+                        <h5>📊 Detalles de la cuenta:</h5>
+                        <p><strong>Usuario:</strong> ${info.username}</p>
+                        <p><strong>Tiene contraseña:</strong> ${info.has_password ? '✅ Sí' : '❌ No'}</p>
+                        <p><strong>Método de contraseña:</strong> ${info.password_method}</p>
+                        <p><strong>Cuenta creada:</strong> ${info.created}</p>
+                        <p><strong>Último acceso:</strong> ${info.last_login}</p>
+                    </div>
+                    <div style="padding: 1rem; background: #f8f9fa; border-radius: 4px;">
+                        <p><small><strong>Nota:</strong> ${info.password_hint}</small></p>
+                    </div>
+                </div>
+            `;
+
+            container.innerHTML = infoHtml;
+        }
+
+        // Desbloquear usuario específico
+        async function unlockUser(username) {
+            if (!confirm(`¿Estás seguro de que quieres desbloquear al usuario "${username}"?`)) {
+                return;
+            }
+
+            try {
+                const response = await fetch('/admin/api/users/unlock', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ username })
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    showAlert('success', data.message);
+                    loadUsers();
+                } else {
+                    showAlert('error', data.message);
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                showAlert('error', 'Error de conexión');
+            }
+        }
+
+        // Desbloquear todos los usuarios
+        async function unlockAllUsers() {
+            if (!confirm('¿Estás seguro de que quieres desbloquear TODOS los usuarios?')) {
+                return;
+            }
+
+            try {
+                const response = await fetch('/admin/api/users/unlock-all', {
+                    method: 'POST'
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    showAlert('success', data.message);
+                    loadUsers();
+                } else {
+                    showAlert('error', data.message);
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                showAlert('error', 'Error de conexión');
+            }
+        }
+
+        // Eliminar usuario
+        async function deleteUser(username) {
+            if (!confirm(`¿Estás seguro de que quieres ELIMINAR al usuario "${username}"? Esta acción no se puede deshacer.`)) {
+                return;
+            }
+
+            try {
+                const response = await fetch('/admin/api/users/delete', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ username })
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    showAlert('success', data.message);
+                    loadUsers();
+                } else {
+                    showAlert('error', data.message);
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                showAlert('error', 'Error de conexión');
+            }
+        }
+
+        // Cargar logs
+        async function loadLogs() {
+            const container = document.getElementById('logsContainer');
+            container.innerHTML = '<div class="loading"><div class="spinner"></div><p>Cargando logs...</p></div>';
+
+            try {
+                const response = await fetch('/admin/api/logs');
+                const data = await response.json();
+
+                if (data.success) {
+                    displayLogs(data.logs);
+                } else {
+                    container.innerHTML = '<p>Error cargando logs</p>';
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                container.innerHTML = '<p>Error de conexión al cargar logs</p>';
+            }
+        }
+
+        // Mostrar logs
+        function displayLogs(logs) {
+            const container = document.getElementById('logsContainer');
+            
+            if (!logs || logs.length === 0) {
+                container.innerHTML = '<p>No hay logs disponibles</p>';
+                return;
+            }
+
+            const logsHtml = logs.slice(0, 100).map(log => 
+                `<div style="padding: 0.5rem; border-bottom: 1px solid #eee; font-family: monospace; font-size: 0.9rem;">
+                    <span style="color: #666; font-size: 0.8rem;">[${log.timestamp || 'N/A'}]</span> 
+                    <span style="color: ${log.level === 'error' ? '#dc3545' : log.level === 'warning' ? '#ffc107' : '#28a745'};">
+                        ${log.message || log.raw || log}
+                    </span>
+                </div>`
+            ).join('');
+
+            container.innerHTML = `
+                <div style="max-height: 500px; overflow-y: auto; border: 1px solid #ddd; border-radius: 4px; background: #f8f9fa;">
+                    ${logsHtml}
+                </div>
+                <div style="margin-top: 1rem; padding: 0.5rem; background: #e9ecef; border-radius: 4px; font-size: 0.9rem;">
+                    <strong>Total de logs:</strong> ${logs.length} | 
+                    <button class="btn btn-secondary" onclick="loadLogs()" style="margin-left: 1rem;">🔄 Recargar</button>
+                </div>
+            `;
+        }
+
+        // Ejecutar diagnósticos
+        async function runDiagnostics() {
+            const container = document.getElementById('diagnosticsContainer');
+            container.innerHTML = '<div class="loading"><div class="spinner"></div><p>Ejecutando diagnósticos...</p></div>';
+
+            try {
+                const response = await fetch('/admin/api/diagnostics/run', {
+                    method: 'POST'
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    displayDiagnostics(data.results);
+                } else {
+                    container.innerHTML = '<p>Error ejecutando diagnósticos</p>';
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                container.innerHTML = '<p>Error de conexión al ejecutar diagnósticos</p>';
+            }
+        }
+
+        // Mostrar resultados de diagnósticos
+        function displayDiagnostics(results) {
+            const container = document.getElementById('diagnosticsContainer');
+            
+            const diagnosticsHtml = results.map(result => 
+                `<div style="padding: 1rem; margin-bottom: 1rem; border: 1px solid #ddd; border-radius: 4px;">
+                    <h4>${result.success ? '✅' : '❌'} ${result.test}</h4>
+                    <p>${result.message}</p>
+                    ${result.details ? `<pre style="background: #f5f5f5; padding: 0.5rem; margin-top: 0.5rem; border-radius: 4px; font-size: 0.8rem;">${result.details}</pre>` : ''}
+                </div>`
+            ).join('');
+
+            container.innerHTML = diagnosticsHtml;
+        }
+
+        // Utilidades para mostrar alertas
+        function showAlert(type, message) {
+            // Crear alerta temporal en la parte superior
+            const alert = document.createElement('div');
+            alert.className = `alert alert-${type}`;
+            alert.style.display = 'block';
+            alert.style.position = 'fixed';
+            alert.style.top = '20px';
+            alert.style.right = '20px';
+            alert.style.zIndex = '9999';
+            alert.style.maxWidth = '400px';
+            alert.textContent = message;
+            
+            document.body.appendChild(alert);
+            
+            setTimeout(() => {
+                alert.remove();
+            }, 5000);
+        }
+
+        function showModalAlert(type, message) {
+            const alert = document.getElementById('modalAlert');
+            alert.className = `alert alert-${type}`;
+            alert.style.display = 'block';
+            alert.textContent = message;
+        }
+
+        function hideModalAlert() {
+            const alert = document.getElementById('modalAlert');
+            alert.style.display = 'none';
+        }
+
+        function showChangePasswordAlert(type, message) {
+            const alert = document.getElementById('changePasswordAlert');
+            alert.className = `alert alert-${type}`;
+            alert.style.display = 'block';
+            alert.textContent = message;
+        }
+
+        function hideChangePasswordAlert() {
+            const alert = document.getElementById('changePasswordAlert');
+            alert.style.display = 'none';
+        }
+
+        // Cerrar modales al hacer clic fuera
+        window.addEventListener('click', function(event) {
+            const modals = document.querySelectorAll('.modal');
+            modals.forEach(modal => {
+                if (event.target === modal) {
+                    modal.style.display = 'none';
+                }
+            });
+        });
+    </script>
+</body>
+</html>

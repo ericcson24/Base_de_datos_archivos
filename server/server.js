@@ -36,6 +36,7 @@ app.use(express.static(path.join(__dirname, '../build')));
 app.use('/api/auth', require('./routes/auth'));
 app.use('/api/files', require('./routes/files'));
 app.use('/api/events', require('./routes/events'));
+app.use('/admin', require('./routes/admin'));
 
 // Temporary simple login endpoint for testing
 app.post('/api/auth/login', (req, res) => {

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import Login from './components/Login';
 import UserPanel from './components/UserPanel';
+import AdminPanel from './components/AdminPanel';
 import FolderSelector from './components/FolderSelector';
 import Calendar from './components/Calendar';
 import './App.css';
@@ -26,7 +27,7 @@ const deleteCookie = (name) => {
 function App() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [user, setUser] = useState(null);
-  const [currentView, setCurrentView] = useState('login'); // 'login', 'folders', 'panel', 'calendar'
+  const [currentView, setCurrentView] = useState('login'); // 'login', 'folders', 'panel', 'calendar', 'admin'
   const [isLoading, setIsLoading] = useState(true);
 
   // Estado para el tema global - ahora usa cookies
@@ -68,12 +69,35 @@ function App() {
 
           if (response.ok) {
             const data = await response.json();
-            setUser({
+            const userWithToken = {
               ...data.user,
               token: storedToken
-            });
+            };
+            setUser(userWithToken);
             setIsLoggedIn(true);
-            setCurrentView('folders'); // Ir directamente a folders si el token es válido
+            
+            // Detectar ruta actual y cambiar currentView
+            const currentPath = window.location.pathname;
+            if (currentPath === '/calendar' && storedToken) {
+              setCurrentView('calendar');
+            } else if (currentPath === '/panel' && storedToken) {
+              setCurrentView('panel');
+            } else if (currentPath === '/admin' && storedToken) {
+              setCurrentView('admin');
+            } else if (currentPath === '/folders' && storedToken) {
+              setCurrentView('folders');
+            } else if (!storedToken) {
+              setCurrentView('login');
+            } else {
+              // Redirigir según el rol del usuario si está autenticado
+              if (userWithToken.role === 'admin') {
+                setCurrentView('admin');
+                window.history.pushState(null, '', '/admin');
+              } else {
+                setCurrentView('folders');
+                window.history.pushState(null, '', '/folders');
+              }
+            }
           } else {
             // Token inválido, limpiarlo
             localStorage.removeItem('auth_token');
@@ -106,13 +130,12 @@ function App() {
         setCurrentView('calendar');
       } else if (currentPath === '/panel' && storedToken) {
         setCurrentView('panel');
+      } else if (currentPath === '/admin' && storedToken) {
+        setCurrentView('admin');
       } else if (currentPath === '/folders' && storedToken) {
         setCurrentView('folders');
       } else if (!storedToken) {
         setCurrentView('login');
-      } else {
-        // Por defecto ir a folders si está autenticado
-        setCurrentView('folders');
       }
 
       setIsLoading(false);
@@ -130,6 +153,8 @@ function App() {
           setCurrentView('calendar');
         } else if (currentPath === '/panel') {
           setCurrentView('panel');
+        } else if (currentPath === '/admin' && user.role === 'admin') {
+          setCurrentView('admin');
         } else if (currentPath === '/folders') {
           setCurrentView('folders');
         }
@@ -181,9 +206,17 @@ function App() {
         };
         setUser(userWithToken);
         setIsLoggedIn(true);
-        setCurrentView('folders'); // VOLVER A LA NAVEGACIÓN NORMAL: login → folders → panel
-        window.history.pushState(null, '', '/folders');
-        console.log('Login exitoso:', data);
+        
+        // Verificar si es administrador y redirigir apropiadamente
+        if (userWithToken.role === 'admin') {
+          setCurrentView('admin');
+          window.history.pushState(null, '', '/admin');
+          console.log('Login exitoso como administrador:', data);
+        } else {
+          setCurrentView('folders');
+          window.history.pushState(null, '', '/folders');
+          console.log('Login exitoso como usuario:', data);
+        }
 
         // Guardar token en localStorage para persistencia
         localStorage.setItem('auth_token', data.token);
@@ -201,6 +234,13 @@ function App() {
     // Por ahora, simplemente vamos al panel
     setCurrentView('panel');
     window.history.pushState(null, '', '/panel');
+  };
+
+  const handleGoToAdmin = () => {
+    if (user && user.role === 'admin') {
+      setCurrentView('admin');
+      window.history.pushState(null, '', '/admin');
+    }
   };
 
   const handleLogout = async () => {
@@ -240,8 +280,28 @@ function App() {
     return (
       <div className="App">
         <FolderSelector
+          user={user}
           onSelectFolder={handleSelectFolder}
           onLogout={handleLogout}
+          onThemeToggle={toggleTheme}
+          isDarkMode={isDarkMode}
+          onGoToAdmin={user && user.role === 'admin' ? handleGoToAdmin : null}
+        />
+      </div>
+    );
+  }
+
+  // Si está logueado y es administrador en vista admin
+  if (currentView === 'admin' && user && user.role === 'admin') {
+    return (
+      <div className="App">
+        <AdminPanel
+          user={user}
+          onLogout={handleLogout}
+          onBackToFolders={() => {
+            setCurrentView('folders');
+            window.history.pushState(null, '', '/folders');
+          }}
           onThemeToggle={toggleTheme}
           isDarkMode={isDarkMode}
         />
