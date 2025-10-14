@@ -1,0 +1,14 @@
+.pdf-editor {
+  background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+}
+
+[data-theme="dark"] .pdf-editor {
+  background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+}
+
+.pdf-viewer-container {
+  position: relative;
+  background: #525252;
+  border-radius: 8px;
+  overflow: hidden;
+}

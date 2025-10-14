@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import FileEditorPanel from './FileEditorPanel';
 import './UserPanel.css';
 
 // Utility functions
@@ -171,7 +172,6 @@ const UserPanel = ({ user, onLogout, onBackToFolders, onThemeToggle, isDarkMode,
   const [isResizing, setIsResizing] = useState(false);
   const [initialSize, setInitialSize] = useState({ width: 0, height: 0 });
   const [initialMouse, setInitialMouse] = useState({ x: 0, y: 0 });
-  const [initialPosition] = useState({ x: 0, y: 0 });
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
 
   // Estado para mostrar límites de arrastre
@@ -190,6 +190,13 @@ const UserPanel = ({ user, onLogout, onBackToFolders, onThemeToggle, isDarkMode,
   const [sortBy, setSortBy] = useState('type'); // 'name', 'type', 'date' - Default: type
   const [sortOrder, setSortOrder] = useState('asc'); // 'asc', 'desc' - Default: asc
   const [viewMode, setViewMode] = useState('list'); // 'list', 'grid'
+
+  // Estados para múltiples paneles de edición
+  const [editorPanels, setEditorPanels] = useState([]);
+  const [nextPanelId, setNextPanelId] = useState(1);
+  const [highestZIndex, setHighestZIndex] = useState(1000);
+  const [showDropZone, setShowDropZone] = useState(false);
+  const [fileDragging, setFileDragging] = useState(null);
 
   // Función para toggle del tema
   const toggleTheme = () => {
@@ -946,6 +953,75 @@ useEffect(() => {
     setSidebarPanelFile(null);
   };
 
+  // Funciones para múltiples paneles de edición
+  const openEditorPanel = (file) => {
+    // Verificar si el archivo ya está abierto
+    const existingPanel = editorPanels.find(panel => panel.file.id === file.id);
+    if (existingPanel) {
+      // Traer al frente el panel existente
+      bringPanelToFront(existingPanel.id);
+      return;
+    }
+
+    // Crear nuevo panel
+    const newZIndex = highestZIndex + 1;
+    const newPanel = {
+      id: nextPanelId,
+      file: file,
+      position: {
+        x: 100 + (nextPanelId * 30), // Offset para que no se superpongan exactamente
+        y: 100 + (nextPanelId * 30)
+      },
+      zIndex: newZIndex
+    };
+
+    setEditorPanels([...editorPanels, newPanel]);
+    setNextPanelId(nextPanelId + 1);
+    setHighestZIndex(newZIndex);
+  };
+
+  const closeEditorPanel = (panelId) => {
+    setEditorPanels(editorPanels.filter(panel => panel.id !== panelId));
+  };
+
+  const bringPanelToFront = (panelId) => {
+    const newZIndex = highestZIndex + 1;
+    setEditorPanels(editorPanels.map(panel => 
+      panel.id === panelId 
+        ? { ...panel, zIndex: newZIndex }
+        : panel
+    ));
+    setHighestZIndex(newZIndex);
+  };
+
+  // Drag and Drop para abrir archivos en paneles
+  const handleFileDragStart = useCallback((file, e) => {
+    setFileDragging(file);
+    setShowDropZone(true);
+    e.dataTransfer.effectAllowed = 'copy';
+  }, []);
+
+  const handleFileDragEnd = useCallback(() => {
+    setFileDragging(null);
+    setShowDropZone(false);
+  }, []);
+
+  const handleDropZoneDragOver = useCallback((e) => {
+    e.preventDefault();
+    e.stopPropagation();
+  }, []);
+
+  const handleDropZoneDrop = useCallback((e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (fileDragging) {
+      openEditorPanel(fileDragging);
+    }
+    setFileDragging(null);
+    setShowDropZone(false);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fileDragging]);
+
   return (
     <div className="user-panel">
       {/* Background */}
@@ -1089,6 +1165,9 @@ useEffect(() => {
           </button>
         </div>
 
+        {/* Contenedor flexible para file-grid y paneles */}
+        <div className="main-content-container">
+        
         {/* Overlay de límites de arrastre - ÁREA CONSTANTE */}
         {showDragBounds && (
           <div 
@@ -1350,6 +1429,8 @@ useEffect(() => {
                     onLeave={handleFileLeave}
                     onOpenSidebar={openSidebarPanel}
                     onDuplicate={handleDuplicateItem}
+                    onDragStart={handleFileDragStart}
+                    onDragEnd={handleFileDragEnd}
                     isHovered={hoveredFile?.id === item.id}
                     viewMode={viewMode}
                   />
@@ -1386,7 +1467,28 @@ useEffect(() => {
             onMouseDown={(e) => handleMouseDown(e, 'resize')}
           ></div>
         </div>
-      </div>
+
+        {/* Editor Panels Container - Al lado del file-grid */}
+        {editorPanels.length > 0 && (
+          <div className="editor-panels-container flex-1 flex flex-col gap-4 overflow-y-auto p-4">
+            {editorPanels.map(panel => (
+              <div key={panel.id} className="editor-panel-inline glassmorphism rounded-2xl shadow-xl overflow-hidden border border-gray-200 dark:border-gray-700">
+                <FileEditorPanel
+                  file={panel.file}
+                  position={{x:0,y:0}}
+                  zIndex={panel.zIndex}
+                  panelId={panel.id}
+                  onClose={() => closeEditorPanel(panel.id)}
+                  onBringToFront={() => bringPanelToFront(panel.id)}
+                  isInline={true}
+                />
+              </div>
+            ))}
+          </div>
+        )}
+        
+        </div> {/* Cierre main-content-container */}
+      </div> {/* Cierre main-panel */}
 
       {/* Storage Bar */}
       <div className="storage-bar">
@@ -1501,15 +1603,46 @@ useEffect(() => {
           file={hoveredFile}
         />
       )}
+
+      {/* Drop Zone for Editor Panels - Inline */}
+      {showDropZone && fileDragging && (
+        <div 
+          className="editor-drop-zone-inline"
+          onDragOver={handleDropZoneDragOver}
+          onDrop={handleDropZoneDrop}
+          onDragLeave={() => setShowDropZone(false)}
+        >
+          <div className="drop-zone-content">
+            <svg className="w-12 h-12 mb-3 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 15l-2 5L9 9l11 4-5 2zm0 0l5 5M7.188 2.239l.777 2.897M5.136 7.965l-2.898-.777M13.95 4.05l-2.122 2.122m-5.657 5.656l-2.12 2.122" />
+            </svg>
+            <p className="text-base font-semibold">Suelta para ver/editar</p>
+            <p className="text-xs opacity-75">{fileDragging?.name}</p>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
 
 // File Item Component
-const FileItem = ({ item, onFolderClick, onDelete, onRename, onView, onHover, onLeave, isHovered, onOpenSidebar, onDuplicate, viewMode = 'list' }) => {
+const FileItem = ({ item, onFolderClick, onDelete, onRename, onView, onHover, onLeave, isHovered, onOpenSidebar, onDuplicate, onDragStart, onDragEnd, viewMode = 'list' }) => {
   const [menuOpen, setMenuOpen] = useState(false);
   const [previewUrl, setPreviewUrl] = useState(null);
   const [previewLoading, setPreviewLoading] = useState(false);
+
+  // Handlers para drag and drop
+  const handleDragStart = (e) => {
+    if (item.type === 'file') {
+      onDragStart(item, e);
+    }
+  };
+
+  const handleDragEnd = (e) => {
+    if (item.type === 'file') {
+      onDragEnd(e);
+    }
+  };
 
   // useEffect para manejar clicks fuera del menú
   useEffect(() => {
@@ -1592,8 +1725,13 @@ const FileItem = ({ item, onFolderClick, onDelete, onRename, onView, onHover, on
           onMouseEnter={handleMouseEnter}
           onMouseLeave={handleMouseLeave}
         >
-          {/* Thumbnail */}
-          <div className="aspect-square p-4 flex items-center justify-center bg-gray-50 dark:bg-black">
+          {/* Thumbnail - DRAGGABLE */}
+          <div 
+            className="aspect-square p-4 flex items-center justify-center bg-gray-50 dark:bg-black cursor-grab active:cursor-grabbing"
+            draggable={item.type === 'file'}
+            onDragStart={handleDragStart}
+            onDragEnd={handleDragEnd}
+          >
             {canShowPreview && previewUrl ? (
               <>
                 {fileType === 'image' && (
@@ -1740,7 +1878,12 @@ const FileItem = ({ item, onFolderClick, onDelete, onRename, onView, onHover, on
           onMouseEnter={handleMouseEnter}
           onMouseLeave={handleMouseLeave}
         >
-          <div className="thumbnail">
+          <div 
+            className="thumbnail cursor-grab active:cursor-grabbing"
+            draggable={item.type === 'file'}
+            onDragStart={handleDragStart}
+            onDragEnd={handleDragEnd}
+          >
             {canShowPreview && previewUrl ? (
               <>
                 {fileType === 'image' && (
