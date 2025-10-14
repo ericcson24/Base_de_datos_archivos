@@ -726,16 +726,20 @@ useEffect(() => {
       
       const topMargin = 20;
       const bottomMargin = 20;
+      const leftPadding = 40;   // Padding izquierdo
+      const topPadding = 40;    // Padding superior adicional
+      const rightPadding = 40;  // Padding derecho
+      const bottomPadding = 40; // Padding inferior adicional
       
       const panelHeaderHeight = panelHeader.offsetHeight;
-      const availableTop = panelHeaderHeight + topMargin;
-      const totalAvailableHeight = mainPanel.offsetHeight - panelHeaderHeight - storageBarHeight - topMargin - bottomMargin;
+      const availableTop = panelHeaderHeight + topMargin + topPadding;
+      const totalAvailableHeight = mainPanel.offsetHeight - panelHeaderHeight - storageBarHeight - topMargin - bottomMargin - bottomPadding - topPadding;
       
-      // Límites CONSTANTES - el área completa disponible
+      // Límites CONSTANTES - el área completa disponible con padding en todos los lados
       const bounds = {
         top: availableTop,
-        left: 0,
-        right: mainPanel.offsetWidth,
+        left: leftPadding,
+        right: mainPanel.offsetWidth - rightPadding,
         bottom: availableTop + totalAvailableHeight
       };
       
@@ -743,7 +747,6 @@ useEffect(() => {
       
       // Obtener posición actual del file-grid
       const fileGridRect = fileGrid.getBoundingClientRect();
-      const mainPanelRect = mainPanel.getBoundingClientRect();
       
       // Offset entre el click y la esquina del grid - esto es CRÍTICO para mantener el ratón en su lugar
       const offsetX = e.clientX - fileGridRect.left;
@@ -784,6 +787,9 @@ useEffect(() => {
       const minWidthPx = Math.max(MIN_WIDTH, mainPanel.offsetWidth * 0.20);
       const minHeightPx = MIN_HEIGHT;
       
+      // Factor de reducción de sensibilidad (cuanto más alto, más lento se redimensiona)
+      const resizeSensitivity = 0.3; // Solo aplica 30% del cambio
+      
       let newX = topLeftX;
       let newY = topLeftY;
       let newWidth = currentWidth;
@@ -792,16 +798,30 @@ useEffect(() => {
       // AJUSTE HORIZONTAL
       if (topLeftX < dragBounds.left) {
         // Se sale por la izquierda
+        const overflow = dragBounds.left - topLeftX;
         newX = dragBounds.left;
-        // Calcular nuevo ancho: desde el límite izquierdo hasta donde terminaría el grid
-        const potentialWidth = currentWidth - (dragBounds.left - topLeftX);
-        newWidth = Math.max(minWidthPx, potentialWidth);
+        // Reducir solo una fracción del overflow
+        const widthReduction = overflow * resizeSensitivity;
+        newWidth = Math.max(minWidthPx, currentWidth - widthReduction);
       } else if (topLeftX + currentWidth > dragBounds.right) {
-        // Se sale por la derecha
-        newX = topLeftX;
-        // Calcular nuevo ancho disponible desde la posición actual hasta el límite derecho
-        const availableWidth = dragBounds.right - topLeftX;
-        newWidth = Math.max(minWidthPx, availableWidth);
+        // La parte derecha del grid se sale
+        const overflow = (topLeftX + currentWidth) - dragBounds.right;
+        
+        // Verificar si el grid ya está en su tamaño mínimo
+        const isAtMinWidth = currentWidth <= minWidthPx;
+        
+        if (isAtMinWidth) {
+          // Grid YA está en tamaño mínimo: NO permitir que se salga
+          // Limitar la posición para que la parte derecha no exceda dragBounds.right
+          newX = Math.min(topLeftX, dragBounds.right - currentWidth);
+          newWidth = minWidthPx;
+        } else {
+          // Aún puede reducirse
+          const widthReduction = overflow * resizeSensitivity;
+          const potentialWidth = currentWidth - widthReduction;
+          newX = topLeftX;
+          newWidth = Math.max(minWidthPx, potentialWidth);
+        }
       } else {
         // Dentro de límites horizontales
         newX = topLeftX;
@@ -811,20 +831,51 @@ useEffect(() => {
       // AJUSTE VERTICAL
       if (topLeftY < dragBounds.top) {
         // Se sale por arriba
+        const overflow = dragBounds.top - topLeftY;
         newY = dragBounds.top;
-        // Calcular nueva altura: desde el límite superior hasta donde terminaría el grid
-        const potentialHeight = currentHeight - (dragBounds.top - topLeftY);
-        newHeight = Math.max(minHeightPx, potentialHeight);
+        // Reducir solo una fracción del overflow
+        const heightReduction = overflow * resizeSensitivity;
+        const potentialHeight = currentHeight - heightReduction;
+        
+        // Si ya está en el mínimo, no puede seguir moviéndose hacia arriba
+        if (potentialHeight <= minHeightPx && currentHeight <= minHeightPx) {
+          newY = dragBounds.top;
+          newHeight = minHeightPx;
+        } else {
+          newHeight = Math.max(minHeightPx, potentialHeight);
+        }
       } else if (topLeftY + currentHeight > dragBounds.bottom) {
-        // Se sale por abajo
-        newY = topLeftY;
-        // Calcular nueva altura disponible desde la posición actual hasta el límite inferior
-        const availableHeight = dragBounds.bottom - topLeftY;
-        newHeight = Math.max(minHeightPx, availableHeight);
+        // La parte inferior del grid se sale
+        const overflow = (topLeftY + currentHeight) - dragBounds.bottom;
+        
+        // Verificar si el grid ya está en su tamaño mínimo
+        const isAtMinHeight = currentHeight <= minHeightPx;
+        
+        if (isAtMinHeight) {
+          // Grid YA está en tamaño mínimo: NO permitir que se salga
+          // Limitar la posición para que la parte inferior no exceda dragBounds.bottom
+          newY = Math.min(topLeftY, dragBounds.bottom - currentHeight);
+          newHeight = minHeightPx;
+        } else {
+          // Aún puede reducirse
+          const heightReduction = overflow * resizeSensitivity;
+          const potentialHeight = currentHeight - heightReduction;
+          newY = topLeftY;
+          newHeight = Math.max(minHeightPx, potentialHeight);
+        }
       } else {
         // Dentro de límites verticales
         newY = topLeftY;
         newHeight = currentHeight;
+      }
+      
+      // VERIFICACIÓN FINAL: Doble seguridad para evitar que se salga
+      if (newY + newHeight > dragBounds.bottom) {
+        newY = dragBounds.bottom - newHeight;
+      }
+      
+      if (newX + newWidth > dragBounds.right) {
+        newX = dragBounds.right - newWidth;
       }
       
       // Actualizar estado
