@@ -187,13 +187,6 @@ const UserPanel = ({ user, onLogout, onBackToFolders, onThemeToggle, isDarkMode,
   };
 
   // Funciones para búsqueda y ordenamiento
-  const toggleSearch = () => {
-    setIsSearchExpanded(!isSearchExpanded);
-    if (isSearchExpanded) {
-      setSearchQuery('');
-    }
-  };
-
   const handleSearch = (e) => {
     setSearchQuery(e.target.value);
   };
@@ -905,64 +898,114 @@ useEffect(() => {
           </button>
         </div>
 
-        {/* Modern Search and Controls Bar - Moved outside file-grid */}
-        <div className="relative z-10 mb-6 w-full px-6">
+        <div 
+          className={`file-grid ${isDragOver ? 'drag-over' : ''}`}
+          
+          style={{
+            width: fileGridSize.width,
+            height: fileGridSize.height,
+            position: isDragging ? 'fixed' : (fileGridPosition.x !== 0 || fileGridPosition.y !== 0) ? 'absolute' : 'relative',
+            left: isDragging ? fileGridPosition.x : (fileGridPosition.x !== 0 || fileGridPosition.y !== 0) ? `${fileGridPosition.x}px` : 'auto',
+            top: isDragging ? fileGridPosition.y : (fileGridPosition.x !== 0 || fileGridPosition.y !== 0) ? `${fileGridPosition.y}px` : 'auto',
+            zIndex: isDragging ? 1000 : 'auto'
+          }}
+          onDragEnter={handleDragEnter}
+          onDragLeave={handleDragLeave}
+          onDragOver={handleDragOver}
+          onDrop={handleDrop}
+        >{/* Modern Search and Controls Bar - Moved outside file-grid */}
+        <div className="relative z-10 mb-6 w-full px-6 min-h-[5%]">
           <div className="search-container flex items-center justify-between glassmorphism rounded-2xl p-4 shadow-lg border-gray-200/50 transition-all duration-300 hover:shadow-xl">
             {/* Search Section */}
             <div className="flex items-center space-x-3 flex-1 max-w-md">
-              <div className="relative group">
-                {/* Search Button - positioned absolutely */}
-                <button
-                  className={`absolute inset-0 p-3 rounded-xl transition-all duration-300 transform hover:scale-105 z-10 ${
-                    isSearchExpanded
-                      ? 'opacity-0 pointer-events-none'
-                      : 'opacity-100 bg-gray-100 text-gray-600 hover:bg-gray-200'
-                  }`}
-                  onClick={toggleSearch}
-                  title={searchQuery ? `Búsqueda activa: "${searchQuery}"` : "Buscar archivos"}
-                >
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                  </svg>
-                </button>
+              <div
+  role="search"
+  onClick={() => setIsSearchExpanded(true)}
+  className={`relative flex items-center overflow-hidden transition-all duration-300 ease-in-out border cursor-text ${
+    isDarkMode
+      ? 'bg-slate-800 border-slate-700 hover:bg-slate-700'
+      : 'bg-white border-gray-300 hover:bg-gray-100'
+  } ${isSearchExpanded
+    ? 'w-72 h-9 rounded-lg shadow-md pl-3 pr-8 justify-start'
+    : 'w-12 h-12 rounded-full justify-center'
+  }`}
+>
+  {/* 🔍 Icono */}
+  <svg
+    className={`text-gray-500 transition-all duration-300 ease-in-out ${
+      isSearchExpanded
+        ? 'w-4 h-4 mr-2 opacity-70 translate-x-0'
+        : 'w-5 h-5 opacity-100'
+    }`}
+    fill="none"
+    stroke="currentColor"
+    viewBox="0 0 24 24"
+  >
+    <path
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      strokeWidth={2}
+      d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+    />
+  </svg>
 
-                {/* Search Input - positioned absolutely in same location */}
-                <div className={`absolute inset-0 transition-all duration-300 ease-out transform ${
-                  isSearchExpanded ? 'opacity-100 scale-100' : 'opacity-0 scale-95 pointer-events-none'
-                }`}>
-                  <div className="relative">
-                    <input
-                      type="text"
-                      className="w-full pl-12 pr-10 py-3 glassmorphism-input border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-300 shadow-md hover:shadow-lg text-gray-900 placeholder-gray-500"
-                      placeholder="Buscar archivos..."
-                      value={searchQuery}
-                      onChange={handleSearch}
-                      onKeyPress={(e) => e.key === 'Enter' && e.target.blur()}
-                      autoFocus={isSearchExpanded}
-                    />
-                    <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                      <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                      </svg>
-                    </div>
-                    {searchQuery && (
-                      <button
-                        onClick={() => setSearchQuery('')}
-                        className="absolute inset-y-0 right-0 pr-4 flex items-center text-gray-400 hover:text-gray-600 transition-colors duration-200"
-                        title="Limpiar búsqueda"
-                      >
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                        </svg>
-                      </button>
-                    )}
-                  </div>
-                </div>
-              </div>
+  {/* 🔤 Input */}
+  <input
+    type="text"
+    placeholder="Buscar archivos..."
+    value={searchQuery}
+    onChange={handleSearch}
+    onKeyPress={(e) => e.key === 'Enter' && e.target.blur()}
+    onBlur={() => setIsSearchExpanded(false)}
+    autoFocus={isSearchExpanded}
+    className={`absolute left-0 w-full h-full bg-transparent border-none outline-none text-[14px] flex items-center px-8 transition-all duration-300 ease-in-out ${
+      isSearchExpanded
+        ? 'opacity-100 translate-x-0 cursor-text'
+        : 'opacity-0 -translate-x-5 pointer-events-none'
+    } ${
+      isDarkMode
+        ? 'text-slate-100 placeholder-slate-400'
+        : 'text-gray-900 placeholder-gray-500'
+    }`}
+    style={{ outline: 'none', boxShadow: 'none' }}
+  />
+
+  {/* ❌ Botón limpiar */}
+  {isSearchExpanded && searchQuery && (
+    <button
+      onClick={(e) => {
+        e.stopPropagation(); // 👈 evita cerrar el buscador
+        setSearchQuery('');
+      }}
+      className={`absolute right-3 flex items-center justify-center w-5 h-5 rounded-full transition-colors duration-200 ${
+        isDarkMode
+          ? 'text-slate-500 hover:text-slate-300'
+          : 'text-gray-400 hover:text-gray-600'
+      }`}
+      title="Limpiar búsqueda"
+    >
+      <svg
+        className="w-3.5 h-3.5"
+        fill="none"
+        stroke="currentColor"
+        viewBox="0 0 24 24"
+      >
+        <path
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          strokeWidth={2}
+          d="M6 18L18 6M6 6l12 12"
+        />
+      </svg>
+    </button>
+  )}
+</div>
+
+
 
               {/* Search Results Counter */}
               {searchQuery && (
-                <div className="animate-fade-in bg-blue-50 text-blue-700 px-3 py-1 rounded-lg text-sm font-medium border border-blue-200">
+                <div className={`animate-fade-in ${isDarkMode ? 'bg-blue-900/20 text-blue-300 border-blue-800' : 'bg-blue-50 text-blue-700 border-blue-200'} px-3 py-1 rounded-lg text-sm font-medium border`}>
                   {filteredFiles().length} resultado{filteredFiles().length !== 1 ? 's' : ''}
                 </div>
               )}
@@ -971,12 +1014,12 @@ useEffect(() => {
             {/* Controls Section */}
             <div className="flex items-center space-x-2">
               {/* Sort Controls */}
-              <div className="flex items-center space-x-1 bg-gray-50 rounded-xl p-1">
+              <div className={`flex items-center space-x-1 ${isDarkMode ? 'bg-slate-700' : 'bg-gray-50'} rounded-xl p-1`}>
                 <button
                   className={`p-2 rounded-lg transition-all duration-200 transform hover:scale-105 ${
                     sortBy === 'name'
                       ? 'bg-blue-500 text-white shadow-md'
-                      : 'text-gray-600 hover:bg-gray-200'
+                      : `text-gray-600 ${isDarkMode ? 'text-slate-300 hover:bg-slate-600' : 'hover:bg-gray-200'}`
                   }`}
                   onClick={() => handleSort('name')}
                   title="Ordenar por nombre"
@@ -989,7 +1032,7 @@ useEffect(() => {
                   className={`p-2 rounded-lg transition-all duration-200 transform hover:scale-105 ${
                     sortBy === 'type'
                       ? 'bg-blue-500 text-white shadow-md'
-                      : 'text-gray-600 hover:bg-gray-200'
+                      : `text-gray-600 ${isDarkMode ? 'text-slate-300 hover:bg-slate-600' : 'hover:bg-gray-200'}`
                   }`}
                   onClick={() => handleSort('type')}
                   title="Ordenar por tipo"
@@ -1003,7 +1046,7 @@ useEffect(() => {
                   className={`p-2 rounded-lg transition-all duration-200 transform hover:scale-105 ${
                     sortBy === 'date'
                       ? 'bg-blue-500 text-white shadow-md'
-                      : 'text-gray-600 hover:bg-gray-200'
+                      : `text-gray-600 ${isDarkMode ? 'text-slate-300 hover:bg-slate-600' : 'hover:bg-gray-200'}`
                   }`}
                   onClick={() => handleSort('date')}
                   title="Ordenar por fecha"
@@ -1016,12 +1059,12 @@ useEffect(() => {
 
               {/* Sort Direction */}
               <button
-                className="p-2 bg-gray-50 rounded-xl hover:bg-gray-200 transition-all duration-200 transform hover:scale-105"
+                className={`p-2 ${isDarkMode ? 'bg-slate-700 hover:bg-slate-600' : 'bg-gray-50 hover:bg-gray-200'} rounded-xl transition-all duration-200 transform hover:scale-105`}
                 onClick={() => setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')}
                 title={`Orden ${sortOrder === 'asc' ? 'ascendente' : 'descendente'}`}
               >
                 <svg
-                  className={`w-4 h-4 text-gray-600 transition-transform duration-200 ${sortOrder === 'desc' ? 'rotate-180' : ''}`}
+                  className={`w-4 h-4 ${isDarkMode ? 'text-slate-300' : 'text-gray-600'} transition-transform duration-200 ${sortOrder === 'desc' ? 'rotate-180' : ''}`}
                   fill="none"
                   stroke="currentColor"
                   viewBox="0 0 24 24"
@@ -1031,12 +1074,12 @@ useEffect(() => {
               </button>
 
               {/* View Mode Toggle */}
-              <div className="flex items-center space-x-1 bg-gray-50 rounded-xl p-1">
+              <div className={`flex items-center space-x-1 ${isDarkMode ? 'bg-slate-700' : 'bg-gray-50'} rounded-xl p-1`}>
                 <button
                   className={`p-2 rounded-lg transition-all duration-200 transform hover:scale-105 ${
                     viewMode === 'list'
                       ? 'bg-blue-500 text-white shadow-md'
-                      : 'text-gray-600 hover:bg-gray-200'
+                      : `text-gray-600 ${isDarkMode ? 'text-slate-300 hover:bg-slate-600' : 'hover:bg-gray-200'}`
                   }`}
                   onClick={() => setViewMode('list')}
                   title="Vista de lista"
@@ -1049,7 +1092,7 @@ useEffect(() => {
                   className={`p-2 rounded-lg transition-all duration-200 transform hover:scale-105 ${
                     viewMode === 'grid'
                       ? 'bg-blue-500 text-white shadow-md'
-                      : 'text-gray-600 hover:bg-gray-200'
+                      : `text-gray-600 ${isDarkMode ? 'text-slate-300 hover:bg-slate-600' : 'hover:bg-gray-200'}`
                   }`}
                   onClick={() => setViewMode('grid')}
                   title="Vista de cuadrícula"
@@ -1062,22 +1105,6 @@ useEffect(() => {
             </div>
           </div>
         </div>
-
-        <div 
-          className={`file-grid ${isDragOver ? 'drag-over' : ''}`}
-          style={{
-            width: fileGridSize.width,
-            height: fileGridSize.height,
-            position: isDragging ? 'fixed' : (fileGridPosition.x !== 0 || fileGridPosition.y !== 0) ? 'absolute' : 'relative',
-            left: isDragging ? fileGridPosition.x : (fileGridPosition.x !== 0 || fileGridPosition.y !== 0) ? `${fileGridPosition.x}px` : 'auto',
-            top: isDragging ? fileGridPosition.y : (fileGridPosition.x !== 0 || fileGridPosition.y !== 0) ? `${fileGridPosition.y}px` : 'auto',
-            zIndex: isDragging ? 1000 : 'auto'
-          }}
-          onDragEnter={handleDragEnter}
-          onDragLeave={handleDragLeave}
-          onDragOver={handleDragOver}
-          onDrop={handleDrop}
-        >
           {/* Upload Progress */}
           {uploadProgress && (
             <div className={`upload-progress ${uploadProgress.status}`}>
