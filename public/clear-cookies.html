@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Limpiar Cookies - Resolver Error 431</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            max-width: 600px;
+            margin: 50px auto;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            text-align: center;
+        }
+        .container {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 30px;
+            border-radius: 15px;
+            backdrop-filter: blur(10px);
+            box-shadow: 0 8px 32px rgba(31, 38, 135, 0.37);
+        }
+        h1 {
+            margin-bottom: 20px;
+            font-size: 2em;
+        }
+        .error-info {
+            background: rgba(255, 255, 255, 0.2);
+            padding: 15px;
+            border-radius: 10px;
+            margin: 20px 0;
+        }
+        button {
+            background: #ff6b6b;
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            font-size: 16px;
+            border-radius: 8px;
+            cursor: pointer;
+            margin: 10px;
+            transition: all 0.3s ease;
+        }
+        button:hover {
+            background: #ff5252;
+            transform: translateY(-2px);
+        }
+        .success {
+            background: rgba(76, 175, 80, 0.3);
+            padding: 15px;
+            border-radius: 10px;
+            margin: 20px 0;
+            display: none;
+        }
+        .loading {
+            display: none;
+            margin: 20px 0;
+        }
+        .spinner {
+            border: 4px solid rgba(255, 255, 255, 0.3);
+            border-radius: 50%;
+            border-top: 4px solid white;
+            width: 40px;
+            height: 40px;
+            animation: spin 2s linear infinite;
+            margin: 0 auto;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🧹 Solucionador Error 431</h1>
+        
+        <div class="error-info">
+            <h3>Error: 431 Request Header Fields Too Large</h3>
+            <p>Este error ocurre cuando las cookies del navegador son demasiado grandes.</p>
+            <p><strong>¡NUEVO!</strong> El sistema ahora funciona 100% sin cookies usando JWT tokens.</p>
+        </div>
+
+        <button onclick="clearAllCookies()">
+            🗑️ Activar Modo Sin Cookies
+        </button>
+
+        <button onclick="clearBrowserCookies()">
+            🌐 Limpiar Navegador Completo
+        </button>
+
+        <div class="loading" id="loading">
+            <div class="spinner"></div>
+            <p>Limpiando cookies...</p>
+        </div>
+
+        <div class="success" id="success">
+            <h3>✅ ¡Sistema Sin Cookies Activado!</h3>
+            <p>El servidor ahora funciona 100% sin cookies usando JWT tokens.</p>
+            <p>Esto elimina completamente el error 431.</p>
+            <button onclick="window.location.href='/'">Ir a Inicio</button>
+        </div>
+    </div>
+
+    <script>
+        async function clearAllCookies() {
+            document.getElementById('loading').style.display = 'block';
+            
+            try {
+                // Llamar al endpoint del servidor para limpiar
+                const response = await fetch('/api/auth/clear-all-cookies', {
+                    method: 'POST',
+                    credentials: 'include'
+                });
+
+                const result = await response.json();
+                console.log('Server cleanup result:', result);
+
+                // También limpiar cookies del lado del cliente
+                clearBrowserCookies();
+
+                document.getElementById('loading').style.display = 'none';
+                document.getElementById('success').style.display = 'block';
+                
+            } catch (error) {
+                console.error('Error clearing cookies:', error);
+                // Intentar limpiar solo del lado del cliente
+                clearBrowserCookies();
+                document.getElementById('loading').style.display = 'none';
+                alert('Limpieza parcial completada. Recarga la página.');
+            }
+        }
+
+        function clearBrowserCookies() {
+            // Limpiar todas las cookies del navegador
+            document.cookie.split(";").forEach(function(c) { 
+                document.cookie = c.replace(/^ +/, "").replace(/=.*/, "=;expires=" + new Date().toUTCString() + ";path=/"); 
+            });
+
+            // También intentar limpiar con diferentes paths
+            const cookies = document.cookie.split(';');
+            cookies.forEach(cookie => {
+                const eqPos = cookie.indexOf('=');
+                const name = eqPos > -1 ? cookie.substr(0, eqPos).trim() : cookie.trim();
+                
+                // Limpiar con diferentes configuraciones
+                document.cookie = name + '=;expires=Thu, 01 Jan 1970 00:00:00 GMT;path=/';
+                document.cookie = name + '=;expires=Thu, 01 Jan 1970 00:00:00 GMT;path=/;domain=localhost';
+                document.cookie = name + '=;expires=Thu, 01 Jan 1970 00:00:00 GMT;path=/;domain=.localhost';
+            });
+
+            // Limpiar localStorage y sessionStorage también
+            localStorage.clear();
+            sessionStorage.clear();
+
+            console.log('Browser cookies cleared');
+        }
+
+        // Mostrar cookies actuales
+        console.log('Current cookies:', document.cookie);
+    </script>
+</body>
+</html>

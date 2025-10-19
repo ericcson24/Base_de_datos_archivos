@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import FileEditorPanel from './FileEditorPanel';
+import AIProductivityPanel from './AIProductivityPanel';
 import './UserPanel.css';
 
 // Utility functions
@@ -315,6 +316,10 @@ const UserPanel = ({ user, onLogout, onBackToFolders, onThemeToggle, isDarkMode,
   const [isAIExpanded, setIsAIExpanded] = useState(false);
   const [aiQuery, setAIQuery] = useState('');
   const [showRecentSection, setShowRecentSection] = useState(true);
+  
+  // Estados para panel de IA de productividad
+  const [showAIPanel, setShowAIPanel] = useState(false);
+  const [microsoftToken, setMicrosoftToken] = useState(null);
 
   // Funciones para persistencia de archivos recientes
   const getStorageKey = useCallback(() => `recentFiles_${user?.username || 'default'}`, [user?.username]);
@@ -1469,6 +1474,34 @@ useEffect(() => {
           }}>
             📅 Abrir calendario
           </button>
+          
+          <button className="acciones-btn" onClick={async () => {
+            // Verificar si tiene sesión de Microsoft para IA
+            try {
+              const response = await fetch('http://localhost:5000/api/auth/verify-microsoft', {
+                credentials: 'include'
+              });
+              const data = await response.json();
+              
+              if (data.hasMicrosoftAuth && data.accessToken) {
+                // Tiene sesión de Microsoft, abrir panel de IA
+                setMicrosoftToken(data.accessToken);
+                setShowAIPanel(true);
+              } else {
+                // No tiene sesión, mostrar mensaje informativo
+                if (window.confirm('La IA de productividad requiere acceso a tu calendario de Microsoft Outlook para sugerir archivos relevantes. ¿Deseas iniciar sesión?')) {
+                  window.location.href = 'http://localhost:5000/api/auth/login';
+                }
+              }
+            } catch (error) {
+              console.error('Error verificando sesión de Microsoft para IA:', error);
+              if (window.confirm('Para usar la IA necesitas iniciar sesión con Microsoft Outlook. ¿Deseas continuar?')) {
+                window.location.href = 'http://localhost:5000/api/auth/login';
+              }
+            }
+          }}>
+            🤖 Asistente IA
+          </button>
           <button className="acciones-btn" onClick={onLogout}>
             🚪 Cerrar sesión
           </button>
@@ -2095,6 +2128,16 @@ useEffect(() => {
             <p className="text-xs opacity-75">{fileDragging?.name}</p>
           </div>
         </div>
+      )}
+
+      {/* AI Productivity Panel Modal */}
+      {showAIPanel && microsoftToken && (
+        <AIProductivityPanel
+          isOpen={showAIPanel}
+          onClose={() => setShowAIPanel(false)}
+          accessToken={microsoftToken}
+          user={user}
+        />
       )}
     </div>
   );

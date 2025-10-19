@@ -4,6 +4,7 @@ import UserPanel from './components/UserPanel';
 import AdminPanel from './components/AdminPanel';
 import FolderSelector from './components/FolderSelector';
 import Calendar from './components/Calendar';
+import SyncButton from './components/SyncButton';
 import './App.css';
 
 // Utility functions for cookie management
@@ -287,6 +288,12 @@ function App() {
           isDarkMode={isDarkMode}
           onGoToAdmin={user && user.role === 'admin' ? handleGoToAdmin : null}
         />
+        
+        {/* Botón de sincronización */}
+        <SyncButton 
+          userId={user.id || user.username} 
+          isVisible={true}
+        />
       </div>
     );
   }
@@ -305,6 +312,12 @@ function App() {
           onThemeToggle={toggleTheme}
           isDarkMode={isDarkMode}
         />
+        
+        {/* Botón de sincronización */}
+        <SyncButton 
+          userId={user.id || user.username} 
+          isVisible={true}
+        />
       </div>
     );
   }
@@ -312,34 +325,54 @@ function App() {
   // Si está logueado y en vista de panel
   if (currentView === 'panel' && user) {
     console.log('Renderizando UserPanel con user:', user, 'currentView:', currentView);
-    return <UserPanel
-      user={user}
-      onLogout={handleLogout}
-      onBackToFolders={() => {
-        setCurrentView('folders');
-        window.history.pushState(null, '', '/folders');
-      }}
-      onThemeToggle={toggleTheme}
-      isDarkMode={isDarkMode}
-      onGoToCalendar={() => {
-        setCurrentView('calendar');
-        window.history.pushState(null, '', '/calendar');
-      }}
-    />;
+    return (
+      <div className="App">
+        <UserPanel
+          user={user}
+          onLogout={handleLogout}
+          onBackToFolders={() => {
+            setCurrentView('folders');
+            window.history.pushState(null, '', '/folders');
+          }}
+          onThemeToggle={toggleTheme}
+          isDarkMode={isDarkMode}
+          onGoToCalendar={() => {
+            setCurrentView('calendar');
+            window.history.pushState(null, '', '/calendar');
+          }}
+        />
+        
+        {/* Botón de sincronización */}
+        <SyncButton 
+          userId={user.id || user.username} 
+          isVisible={true}
+        />
+      </div>
+    );
   }
 
   // Si está logueado y en vista de calendario
   if (currentView === 'calendar' && user) {
-    return <Calendar
-      user={user}
-      onLogout={handleLogout}
-      onBackToPanel={() => {
-        setCurrentView('panel');
-        window.history.pushState(null, '', '/panel');
-      }}
-      onThemeToggle={toggleTheme}
-      isDarkMode={isDarkMode}
-    />;
+    return (
+      <div className="App">
+        <Calendar
+          user={user}
+          onLogout={handleLogout}
+          onBackToPanel={() => {
+            setCurrentView('panel');
+            window.history.pushState(null, '', '/panel');
+          }}
+          onThemeToggle={toggleTheme}
+          isDarkMode={isDarkMode}
+        />
+        
+        {/* Botón de sincronización */}
+        <SyncButton 
+          userId={user.id || user.username} 
+          isVisible={true}
+        />
+      </div>
+    );
   }
 
   // Fallback - agregar debug
@@ -353,6 +386,14 @@ function App() {
         <p>user: {user ? JSON.stringify(user) : 'null'}</p>
       </div>
       <Login onLogin={handleLogin} onThemeToggle={toggleTheme} isDarkMode={isDarkMode} />
+      
+      {/* Botón de sincronización - mostrar solo si está logueado */}
+      {isLoggedIn && user && (
+        <SyncButton 
+          userId={user.id || user.username} 
+          isVisible={currentView !== 'login'}
+        />
+      )}
     </div>
   );
 }
