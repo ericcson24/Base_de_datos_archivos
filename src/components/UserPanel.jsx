@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import FileEditorPanel from './FileEditorPanel';
 import './UserPanel.css';
 
@@ -134,6 +135,115 @@ const getAuthenticatedPreviewUrl = async (fileId, filename) => {
   }
 };
 
+// Componente RecentFileItem - Estilo Google Drive con previews reales
+const RecentFileItem = ({ file, isDarkMode, onFileClick }) => {
+  const [previewUrl, setPreviewUrl] = useState(null);
+  const [isLoading, setIsLoading] = useState(false);
+
+  // Cargar preview del archivo
+  useEffect(() => {
+    const loadPreview = async () => {
+      if (file.type === 'folder' || !canPreview(file.name)) return;
+      
+      setIsLoading(true);
+      try {
+        const url = await getAuthenticatedPreviewUrl(file.id, file.name);
+        setPreviewUrl(url);
+      } catch (error) {
+        console.error('Error loading preview:', error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    loadPreview();
+  }, [file.id, file.name, file.type]);
+
+  const fileType = getFileType(file.name);
+  
+  return (
+    <div 
+      className="recent-file-item"
+      onClick={() => onFileClick(file)}
+      title={file.name}
+    >
+      <div className="recent-file-preview">
+        {file.type === 'folder' ? (
+          <div className="folder-icon">📁</div>
+        ) : isLoading ? (
+          <div className="loading-preview">⟳</div>
+        ) : previewUrl && canPreview(file.name) ? (
+          <div className="file-preview-container">
+            {fileType === 'image' && (
+              <img 
+                src={previewUrl} 
+                alt={file.name}
+                className="file-preview-image"
+                onError={(e) => {
+                  e.target.style.display = 'none';
+                  e.target.nextSibling.style.display = 'flex';
+                }}
+              />
+            )}
+            {fileType === 'pdf' && (
+              <iframe 
+                src={previewUrl}
+                className="file-preview-pdf"
+                onError={(e) => {
+                  e.target.style.display = 'none';
+                  e.target.nextSibling.style.display = 'flex';
+                }}
+                title={file.name}
+              />
+            )}
+            {fileType === 'video' && (
+              <video 
+                className="file-preview-video"
+                muted
+                onError={(e) => {
+                  e.target.style.display = 'none';
+                  e.target.nextSibling.style.display = 'flex';
+                }}
+              >
+                <source src={previewUrl} />
+              </video>
+            )}
+            {/* Fallback icon */}
+            <div className="file-fallback-icon" style={{ display: 'none' }}>
+              {getFileIcon(file.name)}
+            </div>
+          </div>
+        ) : (
+          <div className="file-icon-large">
+            {getFileIcon(file.name)}
+          </div>
+        )}
+        
+        {/* File type indicator */}
+        <div className="file-type-indicator">
+          {file.name.split('.').pop()?.toUpperCase()}
+        </div>
+      </div>
+      
+      <div className="recent-file-info">
+        <p className="recent-file-name">
+          {file.name.length > 20 ? `${file.name.substring(0, 17)}...` : file.name}
+        </p>
+        <p className="recent-file-date">
+          {file.modifiedAt ? 
+            new Date(file.modifiedAt).toLocaleDateString('es-ES', { 
+              month: 'short', 
+              day: 'numeric',
+              year: new Date(file.modifiedAt).getFullYear() !== new Date().getFullYear() ? 'numeric' : undefined
+            }) : 
+            'Reciente'
+          }
+        </p>
+      </div>
+    </div>
+  );
+};
+
 const UserPanel = ({ user, onLogout, onBackToFolders, onThemeToggle, isDarkMode, onGoToCalendar }) => {
   console.log('🎯 UserPanel se está renderizando con user:', user);
 
@@ -179,8 +289,7 @@ const UserPanel = ({ user, onLogout, onBackToFolders, onThemeToggle, isDarkMode,
   const [dragBounds, setDragBounds] = useState({ top: 0, left: 0, right: 0, bottom: 0 });
   
   // Z-index para file-grid (inicia en 1, paneles en 10+)
-  const [fileGridZIndex, setFileGridZIndex] = useState(1);
-
+  
   // Estados para drag and drop
   const [isDragOver, setIsDragOver] = useState(false);
   
@@ -200,6 +309,45 @@ const UserPanel = ({ user, onLogout, onBackToFolders, onThemeToggle, isDarkMode,
   const [highestZIndex, setHighestZIndex] = useState(1000);
   const [showDropZone, setShowDropZone] = useState(false);
   const [fileDragging, setFileDragging] = useState(null);
+
+  // Estados para archivos recientes y IA
+  const [recentFiles, setRecentFiles] = useState([]);
+  const [isAIExpanded, setIsAIExpanded] = useState(false);
+  const [aiQuery, setAIQuery] = useState('');
+  const [showRecentSection, setShowRecentSection] = useState(true);
+
+  // Funciones para persistencia de archivos recientes
+  const getStorageKey = useCallback(() => `recentFiles_${user?.username || 'default'}`, [user?.username]);
+
+  const loadRecentFilesFromStorage = useCallback(() => {
+    try {
+      const stored = localStorage.getItem(getStorageKey());
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        // Filtrar archivos más antiguos de 30 días
+        const thirtyDaysAgo = new Date();
+        thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+        
+        const filtered = parsed.filter(file => {
+          const fileDate = new Date(file.modifiedAt || file.accessedAt);
+          return fileDate > thirtyDaysAgo;
+        });
+        
+        return filtered.slice(0, 10); // Solo los 10 más recientes
+      }
+    } catch (error) {
+      console.error('Error loading recent files from storage:', error);
+    }
+    return [];
+  }, [getStorageKey]);
+
+  const saveRecentFilesToStorage = useCallback((recentFiles) => {
+    try {
+      localStorage.setItem(getStorageKey(), JSON.stringify(recentFiles));
+    } catch (error) {
+      console.error('Error saving recent files to storage:', error);
+    }
+  }, [getStorageKey]);
 
   // Función para toggle del tema
   const toggleTheme = () => {
@@ -241,6 +389,36 @@ const UserPanel = ({ user, onLogout, onBackToFolders, onThemeToggle, isDarkMode,
     };
   }, []);
 
+  // Cargar archivos recientes desde localStorage al inicializar
+  useEffect(() => {
+    const storedRecent = loadRecentFilesFromStorage();
+    if (storedRecent.length > 0) {
+      setRecentFiles(storedRecent);
+    } else {
+      // Solo usar datos de prueba si no hay nada guardado
+      const sampleData = [
+        { id: 'recent1', name: 'Proyecto_Final.docx', type: 'file', modifiedAt: new Date().toISOString() },
+        { id: 'recent2', name: 'Presentacion.pptx', type: 'file', modifiedAt: new Date(Date.now() - 86400000).toISOString() },
+        { id: 'recent3', name: 'Documentos', type: 'folder', modifiedAt: new Date(Date.now() - 172800000).toISOString() },
+        { id: 'recent4', name: 'imagen_perfil.jpg', type: 'file', modifiedAt: new Date(Date.now() - 259200000).toISOString() }
+      ];
+      setRecentFiles(sampleData);
+      saveRecentFilesToStorage(sampleData);
+    }
+  }, [loadRecentFilesFromStorage, saveRecentFilesToStorage]); // Recargar cuando cambie el usuario
+
+  // Limpiar archivos recientes antiguos periódicamente
+  useEffect(() => {
+    const cleanupInterval = setInterval(() => {
+      const cleaned = loadRecentFilesFromStorage();
+      if (cleaned.length !== recentFiles.length) {
+        setRecentFiles(cleaned);
+      }
+    }, 60000 * 60); // Cada hora
+
+    return () => clearInterval(cleanupInterval);
+  }, [loadRecentFilesFromStorage, recentFiles.length]);
+
   // Funciones para búsqueda y ordenamiento
   const handleSearch = (e) => {
     setSearchQuery(e.target.value);
@@ -256,6 +434,44 @@ const UserPanel = ({ user, onLogout, onBackToFolders, onThemeToggle, isDarkMode,
       setSortOrder('asc');
     }
   };
+
+  // Funciones para la IA
+  const handleAISearch = (e) => {
+    setAIQuery(e.target.value);
+  };
+
+  const submitAIQuery = async () => {
+    if (!aiQuery.trim()) return;
+    
+    // TODO: Implementar llamada al chatbot de IA
+    console.log('Consulta IA:', aiQuery);
+    // Placeholder para futura implementación
+    alert(`Funcionalidad de IA próximamente disponible!\nConsulta: "${aiQuery}"`);
+    
+    setAIQuery('');
+    setIsAIExpanded(false);
+  };
+
+  // Función para añadir archivo a recientes (actualizada)
+  const addToRecentFiles = useCallback((file) => {
+    setRecentFiles(prevRecent => {
+      // Filtrar el archivo si ya existe para evitar duplicados
+      const filtered = prevRecent.filter(f => f.id !== file.id);
+      // Añadir al principio con timestamp actualizado
+      const updated = [{
+        ...file,
+        modifiedAt: new Date().toISOString(),
+        accessedAt: new Date().toISOString()
+      }, ...filtered];
+      // Mantener solo los 10 más recientes
+      const final = updated.slice(0, 10);
+      
+      // Guardar en localStorage
+      saveRecentFilesToStorage(final);
+      
+      return final;
+    });
+  }, [saveRecentFilesToStorage]);
 
   // Función para filtrar archivos según búsqueda
   const filteredFiles = () => {
@@ -356,13 +572,22 @@ const UserPanel = ({ user, onLogout, onBackToFolders, onThemeToggle, isDarkMode,
           setSearchQuery('');
         }
       }
+
+      // Cerrar IA si se hace click fuera
+      if (isAIExpanded) {
+        const aiContainer = document.querySelector('.ai-container');
+        if (aiContainer && !aiContainer.contains(event.target)) {
+          setIsAIExpanded(false);
+          setAIQuery('');
+        }
+      }
     };
 
     document.addEventListener('mousedown', handleClickOutside);
     return () => {
       document.removeEventListener('mousedown', handleClickOutside);
     };
-  }, [uploadMenuOpen, sharedDropdownOpen, isSearchExpanded]);
+  }, [uploadMenuOpen, sharedDropdownOpen, isSearchExpanded, isAIExpanded]);
 
 const loadFiles = useCallback(async () => {
   try {
@@ -383,6 +608,48 @@ const loadFiles = useCallback(async () => {
   }
 }, [currentPath]);
 
+// Función para cargar archivos recientes
+const loadRecentFiles = useCallback(async () => {
+  try {
+    const response = await fetch('/api/files/recent', {
+      headers: {
+        'Authorization': `Bearer ${getAuthToken()}`
+      }
+    });
+    if (response.ok) {
+      const data = await response.json();
+      // Ordenar por fecha de modificación más reciente
+      const sortedRecent = (data.files || [])
+        .sort((a, b) => new Date(b.modifiedAt || b.createdAt) - new Date(a.modifiedAt || a.createdAt))
+        .slice(0, 10); // Solo los 10 más recientes
+      
+      // Combinar con archivos de localStorage
+      const storedRecent = loadRecentFilesFromStorage();
+      const combined = [...sortedRecent];
+      
+      // Añadir archivos de localStorage que no estén en la respuesta del servidor
+      storedRecent.forEach(stored => {
+        if (!combined.find(c => c.id === stored.id)) {
+          combined.push(stored);
+        }
+      });
+      
+      const final = combined.slice(0, 10);
+      setRecentFiles(final);
+      saveRecentFilesToStorage(final);
+    } else {
+      // Si no hay endpoint de archivos recientes, usar solo localStorage
+      const storedRecent = loadRecentFilesFromStorage();
+      setRecentFiles(storedRecent);
+    }
+  } catch (error) {
+    console.error('Error loading recent files:', error);
+    // En caso de error, usar archivos de localStorage
+    const storedRecent = loadRecentFilesFromStorage();
+    setRecentFiles(storedRecent);
+  }
+}, [loadRecentFilesFromStorage, saveRecentFilesToStorage]);
+
 const loadSharedFolders = useCallback(async () => {
   try {
     const response = await fetch('/api/files/shared-folders', {
@@ -400,7 +667,8 @@ const loadSharedFolders = useCallback(async () => {
 useEffect(() => {
   loadFiles();
   loadSharedFolders();
-}, [currentView, currentPath, loadFiles, loadSharedFolders]);
+  loadRecentFiles();
+}, [currentView, currentPath, loadFiles, loadSharedFolders, loadRecentFiles]);
 
   const handleFileUpload = useCallback(async (files) => {
     if (!files || files.length === 0) return;
@@ -443,6 +711,11 @@ useEffect(() => {
       
       setUploadProgress({ status: 'success', message: `✅ ${files.length} archivo(s) subido(s) exitosamente` });
       
+      // Añadir archivos subidos a recientes
+      if (result.files) {
+        result.files.forEach(file => addToRecentFiles(file));
+      }
+      
       // Recargar archivos después de subir
       loadFiles();
       
@@ -456,7 +729,7 @@ useEffect(() => {
       // Limpiar mensaje de error después de 5 segundos
       setTimeout(() => setUploadProgress(null), 5000);
     }
-  }, [currentPath, loadFiles]);
+  }, [currentPath, loadFiles, addToRecentFiles]);
 
   const handleFolderUpload = useCallback(async (files) => {
     if (!files || files.length === 0) return;
@@ -564,6 +837,12 @@ useEffect(() => {
       if (result.success) {
         setShowCreateFolderModal(false);
         setNewFolderName('');
+        
+        // Añadir carpeta creada a recientes
+        if (result.folder) {
+          addToRecentFiles(result.folder);
+        }
+        
         loadFiles(); // Recargar archivos
       } else {
         alert('Error al crear carpeta: ' + result.message);
@@ -671,6 +950,12 @@ useEffect(() => {
 
   const navigateToFolder = (folderName) => {
     setCurrentPath([...currentPath, folderName]);
+    
+    // Buscar la carpeta en la lista actual y añadirla a recientes
+    const folder = files.find(f => f.name === folderName && f.type === 'folder');
+    if (folder) {
+      addToRecentFiles(folder);
+    }
   };
 
   const goBack = () => {
@@ -690,6 +975,8 @@ useEffect(() => {
   const openFileViewer = (file) => {
     setViewerFile(file);
     setShowFileViewer(true);
+    // Añadir a archivos recientes cuando se abre
+    addToRecentFiles(file);
   };
 
   const closeFileViewer = () => {
@@ -1016,6 +1303,9 @@ useEffect(() => {
     setEditorPanels([...editorPanels, newPanel]);
     setNextPanelId(nextPanelId + 1);
     setHighestZIndex(newZIndex);
+    
+    // Añadir a archivos recientes cuando se abre en editor
+    addToRecentFiles(file);
   };
 
   const closeEditorPanel = (panelId) => {
@@ -1235,12 +1525,11 @@ useEffect(() => {
             position: (isDragging || fileGridPosition.x !== 0 || fileGridPosition.y !== 0) ? 'absolute' : 'relative',
             left: (isDragging || fileGridPosition.x !== 0 || fileGridPosition.y !== 0) ? `${fileGridPosition.x}px` : 'auto',
             top: (isDragging || fileGridPosition.x !== 0 || fileGridPosition.y !== 0) ? `${fileGridPosition.y}px` : 'auto',
-            zIndex: isDragging ? 1000 : fileGridZIndex
+            zIndex: isDragging ? 1000 : 1
           }}
           onClick={() => {
             // Traer file-grid al frente al hacer click
             const newZIndex = highestZIndex + 1;
-            setFileGridZIndex(newZIndex);
             setHighestZIndex(newZIndex);
           }}
           onDragEnter={handleDragEnter}
@@ -1324,6 +1613,78 @@ useEffect(() => {
 </div>
 
 
+
+              {/* Botón IA */}
+              <div
+                role="button"
+                onClick={() => setIsAIExpanded(true)}
+                className={`ai-container relative flex items-center overflow-hidden transition-all duration-300 ease-in-out border cursor-text ${isAIExpanded
+                  ? 'w-72 h-9 rounded-lg shadow-md pl-3 pr-8 justify-start'
+                  : 'w-12 h-12 rounded-full justify-center'
+                }`}
+                title="Chatbot IA (Próximamente)"
+              >
+                {/* 🤖 Icono IA */}
+                <svg
+                  className={`transition-all duration-300 ease-in-out ${
+                    isAIExpanded
+                      ? 'w-4 h-4 mr-2 opacity-70 translate-x-0'
+                      : 'w-5 h-5 opacity-100'
+                  }`}
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+                </svg>
+
+                {/* Input IA */}
+                <input
+                  type="text"
+                  placeholder="Pregunta al asistente IA..."
+                  value={aiQuery}
+                  onChange={handleAISearch}
+                  onKeyPress={(e) => {
+                    if (e.key === 'Enter') {
+                      submitAIQuery();
+                    }
+                  }}
+                  onBlur={() => setIsAIExpanded(false)}
+                  autoFocus={isAIExpanded}
+                  className={`absolute left-0 w-full h-full bg-transparent border-none outline-none text-[14px] flex items-center px-8 transition-all duration-300 ease-in-out ${
+                    isAIExpanded
+                      ? 'opacity-100 translate-x-0 cursor-text'
+                      : 'opacity-0 -translate-x-5 pointer-events-none'
+                  }`}
+                  style={{ outline: 'none', boxShadow: 'none' }}
+                />
+
+                {/* Botón enviar IA */}
+                {isAIExpanded && aiQuery && (
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      submitAIQuery();
+                    }}
+                    className="absolute right-3 flex items-center justify-center w-5 h-5 rounded-full transition-colors duration-200 text-purple-500 hover:text-purple-700"
+                    title="Enviar consulta IA"
+                  >
+                    <svg
+                      className="w-3.5 h-3.5"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"
+                      />
+                    </svg>
+                  </button>
+                )}
+              </div>
 
               {/* Search Results Counter */}
               {searchQuery && (
@@ -1427,6 +1788,76 @@ useEffect(() => {
             </div>
           </div>
         </div>
+
+        {/* Sección de Archivos Recientes - Rediseño Elegante */}
+        {showRecentSection && recentFiles.length > 0 && (
+          <div className="recent-files-section">
+            <div className="recent-files-header">
+              <div className="recent-files-title">
+                <span className="recent-icon">⚡</span>
+                <h3>Recientes</h3>
+              </div>
+              <button
+                onClick={() => setShowRecentSection(false)}
+                className="recent-close-btn"
+                title="Ocultar archivos recientes"
+              >
+                ✕
+              </button>
+            </div>
+            
+            {/* Lista horizontal de archivos recientes */}
+            <div className="recent-files-grid">
+              {recentFiles.slice(0, 15).map((file, index) => (
+                <RecentFileItem
+                  key={`recent-${file.id}-${index}`}
+                  file={file}
+                  isDarkMode={isDarkMode}
+                  onFileClick={(file) => {
+                    if (file.type === 'folder') {
+                      navigateToFolder(file.name);
+                    } else if (canPreview(file.name)) {
+                      openFileViewer(file);
+                    } else {
+                      downloadFile(file.id, file.name);
+                    }
+                  }}
+                />
+              ))}
+              
+              {/* Botón Ver todos rediseñado */}
+              <div 
+                className="recent-view-all"
+                onClick={() => {
+                  // TODO: Implementar vista completa de archivos recientes
+                  console.log('Ver todos los archivos recientes');
+                }}
+                title="Ver todos los archivos recientes"
+              >
+                <div className="recent-view-all-content">
+                  <div className="recent-view-all-icon">📂</div>
+                  <span>Ver todos</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Botón para mostrar archivos recientes si está oculto */}
+        {!showRecentSection && (
+          <div className="relative z-10 mb-4 w-full px-6">
+            <button
+              onClick={() => setShowRecentSection(true)}
+              className="show-recent-files-btn"
+            >
+              <div className="flex items-center justify-center space-x-2">
+                <span className="text-lg">⚡</span>
+                <span className="text-sm font-medium">Mostrar archivos recientes</span>
+              </div>
+            </button>
+          </div>
+        )}
+
           {/* Upload Progress */}
           {uploadProgress && (
             <div className={`upload-progress ${uploadProgress.status}`}>
@@ -1669,11 +2100,66 @@ useEffect(() => {
   );
 };
 
+// Componente para el menú contextual usando portal
+const ContextMenu = ({ isOpen, position, onClose, children }) => {
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const handleClickOutside = (event) => {
+      const menuElement = event.target.closest('.context-menu-portal');
+      if (!menuElement) {
+        onClose();
+      }
+    };
+
+    const handleEscape = (event) => {
+      if (event.key === 'Escape') {
+        onClose();
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    document.addEventListener('keydown', handleEscape);
+    
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('keydown', handleEscape);
+    };
+  }, [isOpen, onClose]);
+
+  if (!isOpen) return null;
+
+  return createPortal(
+    <div
+      className="context-menu-portal"
+      style={{
+        position: 'fixed',
+        top: `${position.top}px`,
+        left: `${position.left}px`,
+        zIndex: 1000000,
+        background: 'var(--modal-bg)',
+        backdropFilter: 'blur(20px)',
+        WebkitBackdropFilter: 'blur(20px)',
+        border: '1px solid var(--sidebar-border)',
+        borderRadius: '8px',
+        boxShadow: '0 12px 40px rgba(0, 0, 0, 0.35)',
+        padding: '8px 0',
+        minWidth: '180px',
+        animation: 'fadeInScale 0.2s ease-out'
+      }}
+    >
+      {children}
+    </div>,
+    document.body
+  );
+};
+
 // File Item Component
 const FileItem = ({ item, onFolderClick, onDelete, onRename, onView, onHover, onLeave, isHovered, onOpenSidebar, onDuplicate, onDragStart, onDragEnd, viewMode = 'list' }) => {
   const [menuOpen, setMenuOpen] = useState(false);
   const [previewUrl, setPreviewUrl] = useState(null);
   const [previewLoading, setPreviewLoading] = useState(false);
+  const [menuPosition, setMenuPosition] = useState({ top: 0, left: 0 });
 
   // Handlers para drag and drop
   const handleDragStart = (e) => {
@@ -1688,23 +2174,9 @@ const FileItem = ({ item, onFolderClick, onDelete, onRename, onView, onHover, on
     }
   };
 
-  // useEffect para manejar clicks fuera del menú
+  // useEffect simplificado - ContextMenu maneja click outside
   useEffect(() => {
-    if (!menuOpen) return;
-
-    const handleClickOutside = (event) => {
-      const menuBtn = document.querySelector('.menu-trespuntos');
-      const menuPopup = document.querySelector('.menu-popup');
-      
-      if (menuBtn && menuPopup && !menuBtn.contains(event.target) && !menuPopup.contains(event.target)) {
-        setMenuOpen(false);
-      }
-    };
-
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-    };
+    // Solo para cerrar con Escape si no usamos ContextMenu en algún lugar
   }, [menuOpen]);
 
   const handleClick = () => {
@@ -1722,6 +2194,34 @@ const FileItem = ({ item, onFolderClick, onDelete, onRename, onView, onHover, on
 
   const handleMenuClick = (e) => {
     e.stopPropagation();
+    
+    if (!menuOpen) {
+      // Calcular posición del menú
+      const rect = e.target.getBoundingClientRect();
+      const menuHeight = 300; // Altura estimada del menú
+      const menuWidth = 180;
+      
+      let top = rect.bottom + 8;
+      let left = rect.right - menuWidth;
+      
+      // Ajustar si se sale de la pantalla por abajo
+      if (top + menuHeight > window.innerHeight) {
+        top = rect.top - menuHeight - 8;
+      }
+      
+      // Ajustar si se sale de la pantalla por la izquierda
+      if (left < 8) {
+        left = rect.left;
+      }
+      
+      // Ajustar si se sale de la pantalla por la derecha
+      if (left + menuWidth > window.innerWidth) {
+        left = window.innerWidth - menuWidth - 8;
+      }
+      
+      setMenuPosition({ top, left });
+    }
+    
     setMenuOpen(!menuOpen);
   };
 
@@ -1764,14 +2264,14 @@ const FileItem = ({ item, onFolderClick, onDelete, onRename, onView, onHover, on
       // Grid View
       return (
         <div
-          className={`group relative glassmorphism dark:bg-slate-800 rounded-xl shadow-md hover:shadow-xl transition-all duration-300 transform hover:scale-105 cursor-pointer border-gray-200 dark:border-slate-600 overflow-hidden ${isHovered ? 'ring-2 ring-blue-500' : ''}`}
+          className={`group relative file-grid-item cursor-pointer overflow-hidden ${isHovered ? 'ring-2 ring-blue-500' : ''}`}
           onClick={handleClick}
           onMouseEnter={handleMouseEnter}
           onMouseLeave={handleMouseLeave}
         >
           {/* Thumbnail - DRAGGABLE */}
           <div 
-            className="aspect-square p-4 flex items-center justify-center bg-gray-50 dark:bg-black cursor-grab active:cursor-grabbing"
+            className="aspect-square p-4 flex items-center justify-center grid-thumbnail"
             draggable={item.type === 'file'}
             onDragStart={handleDragStart}
             onDragEnd={handleDragEnd}
@@ -1826,11 +2326,11 @@ const FileItem = ({ item, onFolderClick, onDelete, onRename, onView, onHover, on
           </div>
 
           {/* File Info */}
-          <div className="p-3">
-            <h3 className="text-sm font-medium text-gray-900 dark:text-slate-100 truncate" title={item.name}>
+          <div className="p-3 grid-file-info">
+            <h3 className="file-grid-name" title={item.name}>
               {item.name}
             </h3>
-            <p className="text-xs text-gray-700 dark:text-slate-400 mt-1">
+            <p className="file-grid-size">
               {item.size ? formatFileSize(item.size) : ''}
             </p>
           </div>
@@ -1838,79 +2338,81 @@ const FileItem = ({ item, onFolderClick, onDelete, onRename, onView, onHover, on
           {/* Menu Button */}
           <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
             <button
-              className="p-1.5 glassmorphism-button rounded-full shadow-md hover:shadow-lg transition-all duration-200 transform hover:scale-110"
+              className="grid-menu-button"
               onClick={handleMenuClick}
             >
-              <svg className="w-4 h-4 text-gray-600" fill="currentColor" viewBox="0 0 20 20">
+              <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
                 <path d="M10 6a2 2 0 110-4 2 2 0 010 4zM10 12a2 2 0 110-4 2 2 0 010 4zM10 18a2 2 0 110-4 2 2 0 010 4z" />
               </svg>
             </button>
           </div>
 
           {/* Menu Popup */}
-          {menuOpen && (
-            <div className="absolute top-12 right-2 z-50 glassmorphism-strong rounded-lg shadow-xl border-gray-200 py-2 min-w-48 animate-fade-in">
-              <button className="w-full text-left px-4 py-2 text-sm hover:bg-gray-100 transition-colors duration-150 flex items-center space-x-2" onClick={() => { setMenuOpen(false); onOpenSidebar(item, 'view'); }}>
+          <ContextMenu
+            isOpen={menuOpen}
+            position={menuPosition}
+            onClose={() => setMenuOpen(false)}
+          >
+              <button className="context-menu-item" onClick={() => { setMenuOpen(false); onOpenSidebar(item, 'view'); }}>
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
                 </svg>
                 <span>Abrir en panel</span>
               </button>
-              <button className="w-full text-left px-4 py-2 text-sm hover:bg-gray-100 dark:hover:bg-slate-700 transition-colors duration-150 flex items-center space-x-2" onClick={() => { setMenuOpen(false); onOpenSidebar(item, 'edit'); }}>
+              <button className="context-menu-item" onClick={() => { setMenuOpen(false); onOpenSidebar(item, 'edit'); }}>
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                 </svg>
                 <span>Editar en panel</span>
               </button>
-              <button className="w-full text-left px-4 py-2 text-sm hover:bg-gray-100 dark:hover:bg-slate-700 transition-colors duration-150 flex items-center space-x-2" onClick={() => { setMenuOpen(false); onOpenSidebar(item, 'info'); }}>
+              <button className="context-menu-item" onClick={() => { setMenuOpen(false); onOpenSidebar(item, 'info'); }}>
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
                 <span>Información</span>
               </button>
               {canShowPreview ? (
-                <button className="w-full text-left px-4 py-2 text-sm hover:bg-gray-100 dark:hover:bg-slate-700 transition-colors duration-150 flex items-center space-x-2" onClick={() => { setMenuOpen(false); onView(item); }}>
+                <button className="context-menu-item" onClick={() => { setMenuOpen(false); onView(item); }}>
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
                   </svg>
                   <span>Ver completo</span>
                 </button>
               ) : (
-                <button className="w-full text-left px-4 py-2 text-sm hover:bg-gray-100 dark:hover:bg-slate-700 transition-colors duration-150 flex items-center space-x-2" onClick={() => { setMenuOpen(false); downloadFile(item.id, item.name); }}>
+                <button className="context-menu-item" onClick={() => { setMenuOpen(false); downloadFile(item.id, item.name); }}>
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                   </svg>
                   <span>Ver</span>
                 </button>
               )}
-              <button className="w-full text-left px-4 py-2 text-sm hover:bg-gray-100 dark:hover:bg-slate-700 transition-colors duration-150 flex items-center space-x-2" onClick={() => { setMenuOpen(false); downloadFile(item.id, item.name); }}>
+              <button className="context-menu-item" onClick={() => { setMenuOpen(false); downloadFile(item.id, item.name); }}>
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                 </svg>
                 <span>Descargar</span>
               </button>
-              <button className="w-full text-left px-4 py-2 text-sm hover:bg-gray-100 dark:hover:bg-slate-700 transition-colors duration-150 flex items-center space-x-2" onClick={() => { setMenuOpen(false); onDuplicate(item); }}>
+              <button className="context-menu-item" onClick={() => { setMenuOpen(false); onDuplicate(item); }}>
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
                 </svg>
                 <span>Duplicar</span>
               </button>
               <div className="border-t border-gray-200 dark:border-slate-600 my-1"></div>
-              <button className="w-full text-left px-4 py-2 text-sm hover:bg-gray-100 dark:hover:bg-slate-700 transition-colors duration-150 flex items-center space-x-2" onClick={() => { setMenuOpen(false); onRename(item); }}>
+              <button className="context-menu-item" onClick={() => { setMenuOpen(false); onRename(item); }}>
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                 </svg>
                 <span>Renombrar</span>
               </button>
-              <button className="w-full text-left px-4 py-2 text-sm hover:bg-red-50 dark:hover:bg-red-900/20 text-red-600 dark:text-red-400 transition-colors duration-150 flex items-center space-x-2" onClick={() => { setMenuOpen(false); onDelete(item); }}>
+              <button className="context-menu-danger" onClick={() => { setMenuOpen(false); onDelete(item); }}>
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                 </svg>
                 <span>Eliminar</span>
               </button>
-            </div>
-          )}
+          </ContextMenu>
         </div>
       );
     } else {
@@ -1985,42 +2487,45 @@ const FileItem = ({ item, onFolderClick, onDelete, onRename, onView, onHover, on
             <button className="menu-trespuntos" onClick={handleMenuClick}>
               ⋮
             </button>
-            {menuOpen && (
-              <div className={`mini-menu-frosted ${menuOpen ? 'show' : ''}`}>
-                <button className="mini-menu-item" onClick={() => { setMenuOpen(false); onOpenSidebar(item, 'view'); }}>
-                  👁 Abrir en panel
-                </button>
-                <button className="mini-menu-item" onClick={() => { setMenuOpen(false); onOpenSidebar(item, 'edit'); }}>
-                  ✏️ Editar en panel
-                </button>
-                <button className="mini-menu-item" onClick={() => { setMenuOpen(false); onOpenSidebar(item, 'info'); }}>
-                  ℹ️ Información
-                </button>
-                {canShowPreview ? (
-                  <button className="mini-menu-item" onClick={() => { setMenuOpen(false); onView(item); }}>
-                    👁 Ver completo
-                  </button>
-                ) : (
-                  <button className="mini-menu-item" onClick={() => { setMenuOpen(false); downloadFile(item.id, item.name); }}>
-                    👁 Ver
-                  </button>
-                )}
-                <button className="mini-menu-item" onClick={() => { setMenuOpen(false); downloadFile(item.id, item.name); }}>
-                  ⬇️ Descargar
-                </button>
-                <button className="mini-menu-item" onClick={() => { setMenuOpen(false); onDuplicate(item); }}>
-                  📋 Duplicar
-                </button>
-                <button className="mini-menu-item">📁 Mover</button>
-                <button className="mini-menu-item" onClick={() => { setMenuOpen(false); onRename(item); }}>
-                  ✏️ Renombrar
-                </button>
-                <button className="mini-menu-item danger" onClick={() => { setMenuOpen(false); onDelete(item); }}>
-                  🗑️ Eliminar
-                </button>
-              </div>
-            )}
           </div>
+          
+          <ContextMenu
+            isOpen={menuOpen}
+            position={menuPosition}
+            onClose={() => setMenuOpen(false)}
+          >
+            <button className="context-menu-item" onClick={() => { setMenuOpen(false); onOpenSidebar(item, 'view'); }}>
+              👁 Abrir en panel
+            </button>
+            <button className="context-menu-item" onClick={() => { setMenuOpen(false); onOpenSidebar(item, 'edit'); }}>
+              ✏️ Editar en panel
+            </button>
+            <button className="context-menu-item" onClick={() => { setMenuOpen(false); onOpenSidebar(item, 'info'); }}>
+              ℹ️ Información
+            </button>
+            {canShowPreview ? (
+              <button className="context-menu-item" onClick={() => { setMenuOpen(false); onView(item); }}>
+                👁 Ver completo
+              </button>
+            ) : (
+              <button className="context-menu-item" onClick={() => { setMenuOpen(false); downloadFile(item.id, item.name); }}>
+                👁 Ver
+              </button>
+            )}
+            <button className="context-menu-item" onClick={() => { setMenuOpen(false); downloadFile(item.id, item.name); }}>
+              ⬇️ Descargar
+            </button>
+            <button className="context-menu-item" onClick={() => { setMenuOpen(false); onDuplicate(item); }}>
+              📋 Duplicar
+            </button>
+            <button className="context-menu-item">📁 Mover</button>
+            <button className="context-menu-item" onClick={() => { setMenuOpen(false); onRename(item); }}>
+              ✏️ Renombrar
+            </button>
+            <button className="context-menu-item context-menu-danger" onClick={() => { setMenuOpen(false); onDelete(item); }}>
+              🗑️ Eliminar
+            </button>
+          </ContextMenu>
         </div>
       );
     }
@@ -2030,23 +2535,23 @@ const FileItem = ({ item, onFolderClick, onDelete, onRename, onView, onHover, on
     viewMode === 'grid' ? (
       // Grid View for Folders
       <div
-        className="group relative glassmorphism-light backdrop-blur-md rounded-xl shadow-md hover:shadow-xl transition-all duration-300 transform hover:scale-105 cursor-pointer border-gray-200/50 overflow-hidden"
+        className="group relative folder-grid-item cursor-pointer overflow-hidden"
         onClick={handleClick}
         onMouseEnter={handleMouseEnter}
         onMouseLeave={handleMouseLeave}
       >
         {/* Folder Icon */}
-        <div className="aspect-square p-6 flex items-center justify-center glassmorphism-thumbnail">
+        <div className="aspect-square p-6 flex items-center justify-center grid-folder-thumbnail">
           <div className="text-6xl">📁</div>
         </div>
 
         {/* Folder Info */}
-        <div className="p-3 glassmorphism">
-          <h3 className="text-sm font-medium text-gray-900 dark:text-slate-100 truncate" title={item.name}>
+        <div className="p-3 grid-folder-info">
+          <h3 className="folder-grid-name" title={item.name}>
             {item.name}
           </h3>
           {item.shared && (
-            <span className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300 mt-1">
+            <span className="folder-shared-badge">
               <span className="mr-1">🤝</span>
               Compartida
             </span>
@@ -2056,46 +2561,48 @@ const FileItem = ({ item, onFolderClick, onDelete, onRename, onView, onHover, on
         {/* Menu Button */}
         <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
           <button
-            className="p-1.5 glassmorphism-button dark:bg-slate-700 rounded-full shadow-md hover:shadow-lg transition-all duration-200 transform hover:scale-110"
+            className="grid-menu-button"
             onClick={handleMenuClick}
           >
-            <svg className="w-4 h-4 text-gray-600 dark:text-slate-300" fill="currentColor" viewBox="0 0 20 20">
+            <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
               <path d="M10 6a2 2 0 110-4 2 2 0 010 4zM10 12a2 2 0 110-4 2 2 0 010 4zM10 18a2 2 0 110-4 2 2 0 010 4z" />
             </svg>
           </button>
         </div>
 
         {/* Menu Popup */}
-        {menuOpen && (
-          <div className="absolute top-12 right-2 z-50 glassmorphism-strong dark:bg-slate-800 rounded-lg shadow-xl border-gray-200 dark:border-slate-600 py-2 min-w-48 animate-fade-in">
-            <button className="w-full text-left px-4 py-2 text-sm hover:bg-gray-100 dark:hover:bg-slate-700 transition-colors duration-150 flex items-center space-x-2" onClick={() => onFolderClick(item.name)}>
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2H5a2 2 0 00-2-2z" />
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 5a2 2 0 012-2h4a2 2 0 012 2v2H8V5z" />
-              </svg>
-              <span>Abrir</span>
-            </button>
-            <button className="w-full text-left px-4 py-2 text-sm hover:bg-gray-100 dark:hover:bg-slate-700 transition-colors duration-150 flex items-center space-x-2" onClick={() => { setMenuOpen(false); onDuplicate(item); }}>
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
-              </svg>
-              <span>Duplicar</span>
-            </button>
-            <div className="border-t border-gray-200 dark:border-slate-600 my-1"></div>
-            <button className="w-full text-left px-4 py-2 text-sm hover:bg-gray-100 dark:hover:bg-slate-700 transition-colors duration-150 flex items-center space-x-2" onClick={() => { setMenuOpen(false); onRename(item); }}>
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-              </svg>
-              <span>Renombrar</span>
-            </button>
-            <button className="w-full text-left px-4 py-2 text-sm hover:bg-red-50 dark:hover:bg-red-900/20 text-red-600 dark:text-red-400 transition-colors duration-150 flex items-center space-x-2" onClick={() => { setMenuOpen(false); onDelete(item); }}>
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-              </svg>
-              <span>Eliminar</span>
-            </button>
-          </div>
-        )}
+        <ContextMenu
+          isOpen={menuOpen}
+          position={menuPosition}
+          onClose={() => setMenuOpen(false)}
+        >
+          <button className="context-menu-item" onClick={() => onFolderClick(item.name)}>
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2H5a2 2 0 00-2-2z" />
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 5a2 2 0 012-2h4a2 2 0 012 2v2H8V5z" />
+            </svg>
+            <span>Abrir</span>
+          </button>
+          <button className="context-menu-item" onClick={() => { setMenuOpen(false); onDuplicate(item); }}>
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+            </svg>
+            <span>Duplicar</span>
+          </button>
+          <div className="border-t border-gray-200 dark:border-slate-600 my-1"></div>
+          <button className="context-menu-item" onClick={() => { setMenuOpen(false); onRename(item); }}>
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+            </svg>
+            <span>Renombrar</span>
+          </button>
+          <button className="context-menu-danger" onClick={() => { setMenuOpen(false); onDelete(item); }}>
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+            </svg>
+            <span>Eliminar</span>
+          </button>
+        </ContextMenu>
       </div>
     ) : (
       // List View for Folders (existing code)
