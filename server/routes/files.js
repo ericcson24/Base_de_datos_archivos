@@ -546,20 +546,40 @@ router.delete('/:fileId', authenticate, async (req, res) => {
   try {
     const { fileId } = req.params;
 
+    console.log(`🗑️ Solicitando eliminación del archivo con ID: ${fileId}`);
+
     // Decodificar el ID del archivo (que es el path codificado en base64)
-    const filePath = Buffer.from(fileId, 'base64').toString();
+    let filePath;
+    try {
+      filePath = Buffer.from(fileId, 'base64').toString();
+      console.log(`📄 Path decodificado: ${filePath}`);
+    } catch (error) {
+      console.error('❌ Error decodificando fileId:', error);
+      return res.status(400).json({
+        success: false,
+        message: 'ID de archivo inválido'
+      });
+    }
+
     const fullPath = path.join(__dirname, '../../../Datos', req.user.username, filePath);
+    console.log(`📂 Ruta completa: ${fullPath}`);
 
     // Verificar que el archivo/carpeta existe y está dentro del directorio del usuario
     try {
       await fs.access(fullPath);
+      console.log(`✅ Archivo existe: ${fullPath}`);
       
       // Verificar que está dentro del directorio del usuario (seguridad)
       const userDir = path.join(__dirname, '../../../Datos', req.user.username);
       const resolvedPath = path.resolve(fullPath);
       const resolvedUserDir = path.resolve(userDir);
       
+      console.log(`🔒 Verificando seguridad:`);
+      console.log(`   Archivo resuelto: ${resolvedPath}`);
+      console.log(`   Dir usuario: ${resolvedUserDir}`);
+      
       if (!resolvedPath.startsWith(resolvedUserDir)) {
+        console.error('🚨 Intento de acceso fuera del directorio del usuario');
         return res.status(403).json({
           success: false,
           message: 'Acceso denegado'
@@ -567,32 +587,57 @@ router.delete('/:fileId', authenticate, async (req, res) => {
       }
 
       const stats = await fs.stat(fullPath);
+      const isDirectory = stats.isDirectory();
+      console.log(`📋 Tipo de elemento: ${isDirectory ? 'Carpeta' : 'Archivo'}`);
       
-      if (stats.isDirectory()) {
+      if (isDirectory) {
         // Eliminar carpeta recursivamente
-        await fs.rmdir(fullPath, { recursive: true });
+        console.log(`📁 Eliminando carpeta recursivamente: ${fullPath}`);
+        await fs.rm(fullPath, { recursive: true, force: true });
+        console.log(`✅ Carpeta eliminada exitosamente`);
       } else {
         // Eliminar archivo
+        console.log(`📄 Eliminando archivo: ${fullPath}`);
         await fs.unlink(fullPath);
+        console.log(`✅ Archivo eliminado exitosamente`);
       }
 
       res.json({
         success: true,
-        message: `${stats.isDirectory() ? 'Carpeta' : 'Archivo'} eliminado exitosamente`
+        message: `${isDirectory ? 'Carpeta' : 'Archivo'} eliminado exitosamente`
       });
 
-    } catch (error) {
-      return res.status(404).json({
-        success: false,
-        message: 'Archivo o carpeta no encontrado'
-      });
+    } catch (accessError) {
+      console.error('❌ Error de acceso al archivo:', accessError);
+      
+      if (accessError.code === 'ENOENT') {
+        return res.status(404).json({
+          success: false,
+          message: 'Archivo o carpeta no encontrado'
+        });
+      } else if (accessError.code === 'EACCES') {
+        return res.status(403).json({
+          success: false,
+          message: 'Sin permisos para eliminar este elemento'
+        });
+      } else if (accessError.code === 'EBUSY') {
+        return res.status(409).json({
+          success: false,
+          message: 'El archivo está siendo usado por otro proceso'
+        });
+      } else {
+        return res.status(500).json({
+          success: false,
+          message: `Error al acceder al archivo: ${accessError.message}`
+        });
+      }
     }
 
   } catch (error) {
-    console.error('Error deleting file:', error);
+    console.error('❌ Error general eliminando archivo:', error);
     res.status(500).json({
       success: false,
-      message: 'Error al eliminar: ' + error.message
+      message: 'Error interno del servidor: ' + error.message
     });
   }
 });
