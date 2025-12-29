@@ -1,5 +1,41 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { getFileType, getFileIcon, canPreview, getAuthenticatedPreviewUrl, formatFileSize, downloadFile } from '../../utils/fileUtils';
+import mammoth from 'mammoth';
+import { getFileType, getFileIcon, canPreview, getAuthenticatedPreviewUrl, formatFileSize, downloadFile, getAuthToken } from '../../utils/fileUtils';
+
+const WordFileViewer = ({ fileId, fileName, onLoad, onError }) => {
+  const [content, setContent] = useState('');
+
+  useEffect(() => {
+    const loadWordFile = async () => {
+      try {
+        const token = getAuthToken();
+        const response = await fetch(`/api/files/preview/${encodeURIComponent(fileId)}?token=${encodeURIComponent(token)}`, {
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        });
+
+        if (!response.ok) throw new Error('Error al cargar el archivo');
+
+        const arrayBuffer = await response.arrayBuffer();
+        const result = await mammoth.convertToHtml({ arrayBuffer });
+        setContent(result.value);
+        onLoad();
+      } catch (error) {
+        console.error('Error loading Word file:', error);
+        onError('Error al cargar el documento Word');
+      }
+    };
+
+    loadWordFile();
+  }, [fileId, onLoad, onError]);
+
+  return (
+    <div className="glassmorphism-textarea dark:bg-slate-700 rounded-lg p-8 max-h-[70vh] overflow-y-auto bg-white text-black">
+      <div className="prose max-w-none" dangerouslySetInnerHTML={{ __html: content }} />
+    </div>
+  );
+};
 
 const TextFileViewer = ({ fileId, fileName, onLoad, onError }) => {
   const [content, setContent] = useState('');
@@ -7,8 +43,8 @@ const TextFileViewer = ({ fileId, fileName, onLoad, onError }) => {
   useEffect(() => {
     const loadTextFile = async () => {
       try {
-        const token = localStorage.getItem('auth_token') || '';
-        const response = await fetch(`/api/files/preview/${fileId}`, {
+        const token = getAuthToken();
+        const response = await fetch(`/api/files/preview/${encodeURIComponent(fileId)}?token=${encodeURIComponent(token)}`, {
           headers: {
             'Authorization': `Bearer ${token}`
           }
@@ -41,7 +77,8 @@ const FileViewerModal = ({ file, onClose, user }) => {
   const fileType = getFileType(file.name);
 
   const loadAuthenticatedPreview = useCallback(async () => {
-    if (!canPreview(file.name)) {
+    // Permitir preview para word aunque canPreview diga false
+    if (!canPreview(file.name) && fileType !== 'word') {
       setLoading(false);
       return;
     }
@@ -49,13 +86,16 @@ const FileViewerModal = ({ file, onClose, user }) => {
     try {
       const url = await getAuthenticatedPreviewUrl(file.id, file.name);
       setAuthenticatedUrl(url);
-      setLoading(false);
+      // Si es word, no necesitamos authenticatedUrl aquí, el componente lo maneja
+      if (fileType !== 'word') {
+        setLoading(false);
+      }
     } catch (error) {
       console.error('Error cargando preview autenticada:', error);
       setError('Error al cargar el archivo');
       setLoading(false);
     }
-  }, [file.id, file.name]);
+  }, [file.id, file.name, fileType]);
 
   useEffect(() => {
     setLoading(true);
@@ -129,6 +169,18 @@ const FileViewerModal = ({ file, onClose, user }) => {
         );
 
       case 'word':
+        return (
+          <WordFileViewer
+            fileId={file.id}
+            fileName={file.name}
+            onLoad={() => setLoading(false)}
+            onError={(err) => {
+              setError(err);
+              setLoading(false);
+            }}
+          />
+        );
+
       case 'excel':
       case 'powerpoint':
         // Usar Google Docs Viewer para archivos de Office

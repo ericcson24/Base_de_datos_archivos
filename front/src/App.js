@@ -58,86 +58,91 @@ function App() {
   useEffect(() => {
     const checkStoredToken = async () => {
       const storedToken = localStorage.getItem('auth_token');
-      if (storedToken) {
-        try {
-          // Verificar si el token es válido haciendo una petición
-          const response = await fetch('/api/auth/verify', {
-            headers: {
-              'Authorization': `Bearer ${storedToken}`
-            }
-          });
+      
+      try {
+        // Verificar si el token es válido haciendo una petición (usa cookie o header)
+        const headers = {};
+        if (storedToken) {
+          headers['Authorization'] = `Bearer ${storedToken}`;
+        }
 
-          if (response.ok) {
-            const data = await response.json();
-            const userWithToken = {
-              ...data.user,
-              token: storedToken
-            };
-            setUser(userWithToken);
-            setIsLoggedIn(true);
-            
-            // Detectar ruta actual y cambiar currentView
-            const currentPath = window.location.pathname;
-            if (currentPath === '/calendar' && storedToken) {
-              setCurrentView('calendar');
-            } else if (currentPath === '/panel' && storedToken) {
-              setCurrentView('panel');
-            } else if (currentPath === '/admin' && storedToken) {
-              setCurrentView('admin');
-            } else if (currentPath === '/folders' && storedToken) {
-              setCurrentView('folders');
-            } else if (!storedToken) {
-              setCurrentView('login');
-            } else {
-              // Redirigir según el rol del usuario si está autenticado
-              if (userWithToken.role === 'admin') {
-                setCurrentView('admin');
-                window.history.pushState(null, '', '/admin');
-              } else {
-                setCurrentView('folders');
-                window.history.pushState(null, '', '/folders');
-              }
-            }
-          } else {
-            // Token inválido, limpiarlo
-            localStorage.removeItem('auth_token');
+        const response = await fetch('/api/auth/verify', {
+          headers,
+          credentials: 'include' // Importante para enviar cookies
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          // Si el servidor devuelve usuario pero no token (porque usó cookie),
+          // usamos el storedToken si existe, o null si no.
+          // Nota: Si queremos restaurar el token en localStorage desde la cookie,
+          // el endpoint /verify debería devolver el token también.
+          const userWithToken = {
+            ...data.user,
+            token: storedToken || data.token // data.token podría venir si el backend lo añade
+          };
+          
+          setUser(userWithToken);
+          setIsLoggedIn(true);
+          
+          // Si el backend nos devolvió un token nuevo o recuperado, guardarlo
+          if (data.token) {
+            localStorage.setItem('auth_token', data.token);
           }
-        } catch (error) {
-          console.error('Error verificando token:', error);
-          localStorage.removeItem('auth_token');
-        }
-      }
-
-  // Verificar si hay parámetro redirect=calendar en la URL
-      const urlParams = new URLSearchParams(window.location.search);
-      const redirect = urlParams.get('redirect');
-
-      if (redirect === 'calendar') {
-        // Si viene del calendario y no está autenticado, ir directamente a login
-        if (!storedToken) {
-          setCurrentView('login');
+          
+          // Detectar ruta actual y cambiar currentView
+          const currentPath = window.location.pathname;
+          if (currentPath === '/calendar') {
+            setCurrentView('calendar');
+          } else if (currentPath === '/panel') {
+            setCurrentView('panel');
+          } else if (currentPath === '/admin') {
+            setCurrentView('admin');
+          } else if (currentPath === '/folders') {
+            setCurrentView('folders');
+          } else {
+            // Redirigir según el rol del usuario si está autenticado
+            if (userWithToken.role === 'admin') {
+              setCurrentView('admin');
+              window.history.pushState(null, '', '/admin');
+            } else {
+              setCurrentView('folders');
+              window.history.pushState(null, '', '/folders');
+            }
+          }
         } else {
-          // Si está autenticado, iniciar automáticamente login de Outlook
-          console.log('Usuario autenticado, iniciando login de Outlook para calendario...');
-          window.location.href = '/api/auth/login';
-          return; // No continuar con el flujo normal
+          // Token inválido o no hay sesión
+          localStorage.removeItem('auth_token');
+          if (!window.location.search.includes('redirect=calendar')) {
+             setCurrentView('login');
+          }
         }
-      }
-
-      // Detectar ruta actual y cambiar currentView
-      const currentPath = window.location.pathname;
-      if (currentPath === '/calendar' && storedToken) {
-        setCurrentView('calendar');
-      } else if (currentPath === '/panel' && storedToken) {
-        setCurrentView('panel');
-      } else if (currentPath === '/admin' && storedToken) {
-        setCurrentView('admin');
-      } else if (currentPath === '/folders' && storedToken) {
-        setCurrentView('folders');
-      } else if (!storedToken) {
+      } catch (error) {
+        console.error('Error verificando token:', error);
+        localStorage.removeItem('auth_token');
         setCurrentView('login');
       }
 
+      // Verificar si hay parámetro redirect=calendar en la URL
+      const urlParams = new URLSearchParams(window.location.search);
+      const redirect = urlParams.get('redirect');
+
+      // Variable para saber si la autenticación fue exitosa (ya que el estado isLoggedIn no se actualiza inmediatamente)
+      // Podemos inferirlo si setUser fue llamado, pero mejor usar una variable local si pudiéramos.
+      // Como no tenemos variable local accesible fuera del try, verificamos si localStorage tiene token (si fue exitoso lo guardamos/mantuvimos)
+      // O mejor, movemos esta lógica dentro del flujo.
+      
+      if (redirect === 'calendar') {
+        const tokenExists = localStorage.getItem('auth_token');
+        if (tokenExists) {
+          console.log('Usuario autenticado, iniciando login de Outlook para calendario...');
+          window.location.href = '/api/auth/login';
+          return;
+        } else {
+          setCurrentView('login');
+        }
+      }
+      
       setIsLoading(false);
     };
 

@@ -1,4 +1,5 @@
 import React, { useState, useRef } from 'react';
+import { getAuthToken } from '../../../utils/fileUtils';
 import './TextEditor.css';
 
 const TextEditor = ({ content, file }) => {
@@ -14,9 +15,9 @@ const TextEditor = ({ content, file }) => {
 
   const handleSave = async () => {
     try {
-      const token = localStorage.getItem('auth_token');
+      const token = getAuthToken();
       if (!token) {
-        alert('No hay sesión activa');
+        alert('No hay sesión activa. Por favor, recarga la página e inicia sesión nuevamente.');
         return;
       }
 

@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react';
+import SettingsModal from '../Modals/SettingsModal';
 import './AdminPanel.css';
 
 const AdminPanel = ({ user, onLogout, onBackToFolders, onThemeToggle, isDarkMode }) => {
   // Estados para los datos del sistema
+  const [showSettingsModal, setShowSettingsModal] = useState(false);
   const [systemData, setSystemData] = useState({});
   const [serverInfo, setServerInfo] = useState({});
   const [connections, setConnections] = useState({});
@@ -418,8 +420,8 @@ const AdminPanel = ({ user, onLogout, onBackToFolders, onThemeToggle, isDarkMode
             <button className="admin-btn admin-btn-secondary" onClick={refreshData}>
               🔄 Actualizar
             </button>
-            <button className="admin-btn admin-btn-secondary" onClick={onThemeToggle}>
-              {isDarkMode ? '☀️' : '🌙'}
+            <button className="admin-btn admin-btn-secondary" onClick={() => setShowSettingsModal(true)}>
+              ⚙️
             </button>
             <button className="admin-btn admin-btn-primary" onClick={onBackToFolders}>
               ← Volver
@@ -711,6 +713,15 @@ const AdminPanel = ({ user, onLogout, onBackToFolders, onThemeToggle, isDarkMode
         </div>
       </div>
 
+      {showSettingsModal && (
+        <SettingsModal
+          onClose={() => setShowSettingsModal(false)}
+          user={user}
+          onThemeToggle={onThemeToggle}
+          isDarkMode={isDarkMode}
+        />
+      )}
+      
       {/* Modal para añadir usuario */}
       {showAddUserModal && (
         <div className="admin-modal" onClick={() => setShowAddUserModal(false)}>

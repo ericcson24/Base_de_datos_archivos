@@ -17,10 +17,14 @@ const ImageEditor = ({ fileUrl, file }) => {
   const drawingCanvasRef = useRef(null);
 
   useEffect(() => {
-    if (fileUrl && imageRef.current) {
+    if (fileUrl) {
+      console.log('🖼️ [ImageEditor] Loading image from:', fileUrl);
       const img = new Image();
       img.onload = () => {
+        console.log('✅ [ImageEditor] Image loaded successfully:', img.width, 'x', img.height);
         const canvas = canvasRef.current;
+        if (!canvas) return;
+        
         const ctx = canvas.getContext('2d');
         canvas.width = img.width;
         canvas.height = img.height;
@@ -28,8 +32,13 @@ const ImageEditor = ({ fileUrl, file }) => {
 
         // Setup drawing canvas
         const drawCanvas = drawingCanvasRef.current;
-        drawCanvas.width = img.width;
-        drawCanvas.height = img.height;
+        if (drawCanvas) {
+          drawCanvas.width = img.width;
+          drawCanvas.height = img.height;
+        }
+      };
+      img.onerror = (err) => {
+        console.error('❌ [ImageEditor] Error loading image:', err);
       };
       img.src = fileUrl;
       imageRef.current = img;

@@ -1,9 +1,12 @@
-import React from 'react';
+import React, { useState } from 'react';
 import FrostedContainer from '../Common/FrostedContainer';
 import Button from '../Common/Button';
+import SettingsModal from '../Modals/SettingsModal';
 import './FolderSelector.css';
 
 const FolderSelector = ({ user, onSelectFolder, onLogout, onThemeToggle, isDarkMode, onGoToAdmin, onGoToCalendar }) => {
+  const [showSettingsModal, setShowSettingsModal] = useState(false);
+
   const handleFolderSelect = (tipo) => {
     // Establecer cookie como hacía el original
     document.cookie = `carpeta=${tipo}; path=/`;
@@ -25,14 +28,23 @@ const FolderSelector = ({ user, onSelectFolder, onLogout, onThemeToggle, isDarkM
       {/* Background */}
       <div className="bg"></div>
 
-      {/* Theme Toggle Button */}
+      {/* Settings Button */}
       <button
         className="theme-toggle-btn"
-        onClick={onThemeToggle}
-        title={isDarkMode ? 'Cambiar a modo claro' : 'Cambiar a modo oscuro'}
+        onClick={() => setShowSettingsModal(true)}
+        title="Ajustes"
       >
-        {isDarkMode ? '☀️' : '🌙'}
+        ⚙️
       </button>
+
+      {showSettingsModal && (
+        <SettingsModal
+          onClose={() => setShowSettingsModal(false)}
+          user={user}
+          onThemeToggle={onThemeToggle}
+          isDarkMode={isDarkMode}
+        />
+      )}
 
       <div className="selector-container">
         <FrostedContainer variant="card" className="options-container">

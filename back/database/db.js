@@ -27,7 +27,49 @@ function initDatabase() {
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       last_login DATETIME,
       is_locked BOOLEAN DEFAULT 0,
-      failed_attempts INTEGER DEFAULT 0
+      failed_attempts INTEGER DEFAULT 0,
+      avatar_url TEXT,
+      theme_preference TEXT DEFAULT 'light',
+      language TEXT DEFAULT 'es',
+      notifications BOOLEAN DEFAULT 1
+    )`);
+
+    // Intentar añadir columnas nuevas si no existen (migración simple)
+    const columnsToAdd = [
+      { name: 'avatar_url', type: 'TEXT' },
+      { name: 'theme_preference', type: 'TEXT DEFAULT "light"' },
+      { name: 'language', type: 'TEXT DEFAULT "es"' },
+      { name: 'notifications', type: 'BOOLEAN DEFAULT 1' },
+      { name: 'microsoft_id', type: 'TEXT' },
+      { name: 'microsoft_email', type: 'TEXT' },
+      { name: 'microsoft_access_token', type: 'TEXT' },
+      { name: 'microsoft_refresh_token', type: 'TEXT' }
+    ];
+
+    columnsToAdd.forEach(col => {
+      db.run(`ALTER TABLE users ADD COLUMN ${col.name} ${col.type}`, (err) => {
+        // Ignorar error si la columna ya existe
+        if (err && !err.message.includes('duplicate column name')) {
+          // console.error(`Error añadiendo columna ${col.name}:`, err.message);
+        }
+      });
+    });
+
+    // Tabla de Eventos de Calendario
+    db.run(`CREATE TABLE IF NOT EXISTS calendar_events (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      microsoft_id TEXT UNIQUE,
+      user_id INTEGER,
+      subject TEXT,
+      body_preview TEXT,
+      start_time DATETIME,
+      end_time DATETIME,
+      is_all_day BOOLEAN,
+      location TEXT,
+      web_link TEXT,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      last_synced DATETIME,
+      FOREIGN KEY(user_id) REFERENCES users(id)
     )`);
 
     // Tabla de Logs de Auditoría
@@ -39,6 +81,16 @@ function initDatabase() {
       details TEXT,
       ip_address TEXT,
       timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
+    )`);
+
+    // Tabla de Archivos Compartidos
+    db.run(`CREATE TABLE IF NOT EXISTS shared_files (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      path TEXT NOT NULL,
+      owner_username TEXT NOT NULL,
+      shared_with_username TEXT NOT NULL,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE(path, owner_username, shared_with_username)
     )`);
 
     // Crear usuario administrador por defecto si no existe

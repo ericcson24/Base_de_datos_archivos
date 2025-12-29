@@ -68,6 +68,12 @@ const authenticate = (req, res, next) => {
     console.log(`🔐 Middleware authenticate - Query token:`, token ? 'present' : 'missing');
   }
 
+  // Si no hay token, intentar obtenerlo de la cookie
+  if (!token && req.cookies && req.cookies.auth_token) {
+    token = req.cookies.auth_token;
+    console.log(`🔐 Middleware authenticate - Cookie token: present`);
+  }
+
   if (token) {
     try {
       // El token contiene el username por ahora (simplificado)
@@ -226,6 +232,7 @@ router.get('/', authenticate, async (req, res) => {
   try {
     const username = req.user.username;
     const requestedPath = req.query.path || '';
+    const owner = req.query.owner; // Nuevo parámetro para archivos compartidos
     
     // Prevent path traversal
     if (requestedPath.includes('..')) {
@@ -235,18 +242,50 @@ router.get('/', authenticate, async (req, res) => {
       });
     }
 
-    const userDir = path.join(__dirname, '../../../Datos', username);
-    const targetDir = path.join(userDir, requestedPath);
+    let targetDir;
+    
+    if (owner && owner !== username) {
+      // Acceso a contenido compartido
+      console.log(`📂 Accediendo a contenido compartido. Owner: ${owner}, Path: ${requestedPath}`);
+      
+      // Verificar permisos en DB
+      // Buscamos si el owner ha compartido este path o alguno de sus padres con el usuario actual
+      const shares = await dbAsync.all(
+        "SELECT path FROM shared_files WHERE owner_username = ? AND shared_with_username = ?",
+        [owner, username]
+      );
+      
+      const hasAccess = shares.some(share => {
+        const sharePath = share.path.replace(/\\/g, '/');
+        const reqPath = requestedPath.replace(/\\/g, '/');
+        // Acceso si es el path exacto o si el path solicitado empieza con el path compartido (es una subcarpeta)
+        return reqPath === sharePath || reqPath.startsWith(sharePath + '/');
+      });
 
-    console.log(`📂 Listando archivos para usuario: ${username}`);
-    console.log(`📂 Directorio objetivo: ${targetDir}`);
+      if (!hasAccess) {
+        return res.status(403).json({
+          success: false,
+          message: 'No tienes permiso para ver este contenido'
+        });
+      }
 
-    // Asegurar que el directorio del usuario existe
-    try {
-      await fs.access(userDir);
-    } catch (error) {
-      console.log(`📂 Creando directorio para usuario: ${username}`);
-      await fs.mkdir(userDir, { recursive: true });
+      targetDir = path.join(__dirname, '../../../Datos', owner, requestedPath);
+
+    } else {
+      // Acceso normal a mis archivos
+      const userDir = path.join(__dirname, '../../../Datos', username);
+      targetDir = path.join(userDir, requestedPath);
+
+      console.log(`📂 Listando archivos para usuario: ${username}`);
+      console.log(`📂 Directorio objetivo: ${targetDir}`);
+
+      // Asegurar que el directorio del usuario existe
+      try {
+        await fs.access(userDir);
+      } catch (error) {
+        console.log(`📂 Creando directorio para usuario: ${username}`);
+        await fs.mkdir(userDir, { recursive: true });
+      }
     }
 
     // Verificar que el directorio objetivo existe
@@ -262,6 +301,11 @@ router.get('/', authenticate, async (req, res) => {
     // Leer contenido del directorio solicitado
     // Pasamos requestedPath como base para que los IDs se generen correctamente
     let files = await readDirectoryContents(targetDir, requestedPath);
+    
+    // Si es compartido, añadir flag a los items
+    if (owner && owner !== username) {
+      files = files.map(f => ({ ...f, owner, shared: true }));
+    }
     
     // Ordenar archivos si se solicitó
     const sortBy = req.query.sortBy;
@@ -315,70 +359,163 @@ router.get('/', authenticate, async (req, res) => {
 router.get('/download/:fileId', authenticate, async (req, res) => {
   try {
     const { fileId } = req.params;
-    
-    // Decodificar el ID del archivo
-    const filePath = Buffer.from(fileId, 'base64').toString();
-    const fullPath = path.join(__dirname, '../../../Datos', req.user.username, filePath);
+    let fullPath;
+    let filename;
 
-    // Verificar que el archivo existe
+    // Estrategia 1: Intentar como archivo propio (Base64 ID)
     try {
-      await fs.access(fullPath);
-      
-      // Verificar que está dentro del directorio del usuario (seguridad)
-      const userDir = path.join(__dirname, '../../../Datos', req.user.username);
-      const resolvedPath = path.resolve(fullPath);
-      const resolvedUserDir = path.resolve(userDir);
-      
-      if (!resolvedPath.startsWith(resolvedUserDir)) {
-        return res.status(403).json({
-          success: false,
-          message: 'Acceso denegado'
-        });
+      const filePath = Buffer.from(fileId, 'base64').toString();
+      // Verificar si el string decodificado parece un path válido (no contiene caracteres raros)
+      if (filePath && !filePath.includes('\0')) {
+        const potentialPath = path.join(__dirname, '../../../Datos', req.user.username, filePath);
+        
+        // Verificar existencia y seguridad
+        try {
+          await fs.access(potentialPath);
+          const userDir = path.join(__dirname, '../../../Datos', req.user.username);
+          const resolvedPath = path.resolve(potentialPath);
+          const resolvedUserDir = path.resolve(userDir);
+          
+          if (resolvedPath.startsWith(resolvedUserDir)) {
+            fullPath = potentialPath;
+            filename = path.basename(filePath);
+          }
+        } catch (e) {
+          // No existe o no accesible
+        }
       }
+    } catch (e) {
+      // No es base64 válido
+    }
 
-      // Obtener tipo MIME
-      const ext = path.extname(fullPath).toLowerCase();
-      const mimeTypes = {
-        '.pdf': 'application/pdf',
-        '.jpg': 'image/jpeg',
-        '.jpeg': 'image/jpeg',
-        '.png': 'image/png',
-        '.gif': 'image/gif',
-        '.txt': 'text/plain',
-        '.mp4': 'video/mp4',
-        '.mp3': 'audio/mpeg',
-        '.zip': 'application/zip',
-        '.doc': 'application/msword',
-        '.docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-        '.xls': 'application/vnd.ms-excel',
-        '.xlsx': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
-      };
+    // Estrategia 2: Intentar como archivo compartido (ID numérico)
+    if (!fullPath) {
+      try {
+        // Verificar si es un ID numérico
+        if (/^\d+$/.test(fileId)) {
+          const share = await dbAsync.get(
+            "SELECT * FROM shared_files WHERE id = ? AND shared_with_username = ?",
+            [fileId, req.user.username]
+          );
 
-      const stats = await fs.stat(fullPath);
+          if (share) {
+            const potentialPath = path.join(__dirname, '../../../Datos', share.owner_username, share.path);
+            
+            // Verificar existencia
+            await fs.access(potentialPath);
+            
+            // Verificar seguridad (dentro del owner)
+            const ownerDir = path.join(__dirname, '../../../Datos', share.owner_username);
+            const resolvedPath = path.resolve(potentialPath);
+            const resolvedOwnerDir = path.resolve(ownerDir);
+            
+            if (resolvedPath.startsWith(resolvedOwnerDir)) {
+              fullPath = potentialPath;
+              filename = path.basename(share.path);
+            }
+          }
+        }
+      } catch (e) {
+        console.error('Error buscando archivo compartido:', e);
+      }
+    }
 
-      res.setHeader('Content-Type', mimeTypes[ext] || 'application/octet-stream');
-      res.setHeader('Content-Length', stats.size);
-
-      // Enviar archivo
-      const fileStream = require('fs').createReadStream(fullPath);
-      fileStream.pipe(res);
-
-      // Log de descarga (opcional, puede generar mucho ruido)
-      // await logAction(req.user.username, 'FILE_DOWNLOAD', `Descargado archivo: ${filePath}`);
-
-    } catch (error) {
+    if (!fullPath) {
       return res.status(404).json({
         success: false,
-        message: 'Archivo no encontrado'
+        message: 'Archivo no encontrado o acceso denegado'
       });
     }
 
+    // Obtener tipo MIME
+    const ext = path.extname(fullPath).toLowerCase();
+    const mimeTypes = {
+      '.pdf': 'application/pdf',
+      '.jpg': 'image/jpeg',
+      '.jpeg': 'image/jpeg',
+      '.png': 'image/png',
+      '.gif': 'image/gif',
+      '.txt': 'text/plain',
+      '.mp4': 'video/mp4',
+      '.mp3': 'audio/mpeg',
+      '.zip': 'application/zip',
+      '.doc': 'application/msword',
+      '.docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      '.xls': 'application/vnd.ms-excel',
+      '.xlsx': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    };
+
+    const stats = await fs.stat(fullPath);
+
+    res.setHeader('Content-Type', mimeTypes[ext] || 'application/octet-stream');
+    res.setHeader('Content-Length', stats.size);
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+
+    // Enviar archivo
+    const fileStream = require('fs').createReadStream(fullPath);
+    fileStream.pipe(res);
+
   } catch (error) {
     console.error('Error downloading file:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Error al descargar archivo'
+    if (!res.headersSent) {
+      res.status(500).json({
+        success: false,
+        message: 'Error al descargar archivo'
+      });
+    }
+  }
+});
+
+// Crear archivo vacío (para documentos nuevos)
+router.post('/create', authenticate, async (req, res) => {
+  try {
+    const { name, type, path: relativePath } = req.body;
+    const username = req.user.username;
+    
+    if (!name) {
+      return res.status(400).json({ success: false, message: 'Nombre de archivo requerido' });
+    }
+
+    const userDir = path.join(__dirname, '../../../Datos', username);
+    const targetDir = path.join(userDir, relativePath || '');
+    const fullPath = path.join(targetDir, name);
+
+    // Verificar seguridad
+    const resolvedPath = path.resolve(fullPath);
+    const resolvedUserDir = path.resolve(userDir);
+    if (!resolvedPath.startsWith(resolvedUserDir)) {
+      return res.status(403).json({ success: false, message: 'Acceso denegado' });
+    }
+
+    // Verificar si ya existe
+    try {
+      await fs.access(fullPath);
+      return res.status(400).json({ success: false, message: 'El archivo ya existe' });
+    } catch (e) {
+      // No existe, continuar
+    }
+
+    // Crear archivo vacío
+    await fs.writeFile(fullPath, '');
+
+    // Registrar log
+    // await logAction(username, 'CREATE_FILE', `Creado archivo: ${name}`);
+
+    res.json({
+      success: true,
+      message: 'Archivo creado exitosamente',
+      file: {
+        name: name,
+        path: path.join(relativePath || '', name),
+        type: 'file',
+        size: 0,
+        modified: new Date()
+      }
     });
+
+  } catch (error) {
+    console.error('Error creating file:', error);
+    res.status(500).json({ success: false, message: 'Error al crear archivo' });
   }
 });
 
@@ -867,43 +1004,83 @@ router.put('/:fileId/content', authenticate, async (req, res) => {
 
 // Previsualizar archivo (Stream)
 router.get('/preview/:fileId', authenticate, async (req, res) => {
+  const requestId = Math.random().toString(36).substring(7);
+  console.log(`[${requestId}] 🔍 Preview request for fileId: ${req.params.fileId}`);
+  
   try {
     const { fileId } = req.params;
-    
-    // Decodificar el ID del archivo
-    let filePath;
+    let fullPath;
+
+    // Estrategia 1: Intentar como archivo propio (Base64 ID)
     try {
-      filePath = Buffer.from(fileId, 'base64').toString();
-    } catch (error) {
-      return res.status(400).json({
-        success: false,
-        message: 'ID de archivo inválido'
-      });
+      const filePath = Buffer.from(fileId, 'base64').toString();
+      console.log(`[${requestId}] 📂 Decoded path: ${filePath}`);
+      
+      if (filePath && !filePath.includes('\0')) {
+        const potentialPath = path.join(__dirname, '../../../Datos', req.user.username, filePath);
+        console.log(`[${requestId}] 📂 Potential path: ${potentialPath}`);
+        
+        try {
+          await fs.access(potentialPath);
+          const userDir = path.join(__dirname, '../../../Datos', req.user.username);
+          const resolvedPath = path.resolve(potentialPath);
+          const resolvedUserDir = path.resolve(userDir);
+          
+          if (resolvedPath.startsWith(resolvedUserDir)) {
+            fullPath = potentialPath;
+            console.log(`[${requestId}] ✅ Path verified as user file`);
+          } else {
+            console.warn(`[${requestId}] ⚠️ Path traversal attempt detected`);
+          }
+        } catch (e) {
+          console.log(`[${requestId}] ❌ File access failed: ${e.message}`);
+        }
+      }
+    } catch (e) {
+      console.log(`[${requestId}] ⚠️ Base64 decode failed or invalid`);
     }
 
-    const fullPath = path.join(__dirname, '../../../Datos', req.user.username, filePath);
+    // Estrategia 2: Intentar como archivo compartido (ID numérico)
+    if (!fullPath) {
+      console.log(`[${requestId}] 🔄 Trying as shared file...`);
+      try {
+        if (/^\d+$/.test(fileId)) {
+          const share = await dbAsync.get(
+            "SELECT * FROM shared_files WHERE id = ? AND shared_with_username = ?",
+            [fileId, req.user.username]
+          );
 
-    // Verificar que el archivo existe
-    try {
-      await fs.access(fullPath);
-    } catch (error) {
+          if (share) {
+            const potentialPath = path.join(__dirname, '../../../Datos', share.owner_username, share.path);
+            console.log(`[${requestId}] 📂 Shared potential path: ${potentialPath}`);
+            
+            await fs.access(potentialPath);
+            const ownerDir = path.join(__dirname, '../../../Datos', share.owner_username);
+            const resolvedPath = path.resolve(potentialPath);
+            const resolvedOwnerDir = path.resolve(ownerDir);
+            
+            if (resolvedPath.startsWith(resolvedOwnerDir)) {
+              fullPath = potentialPath;
+              console.log(`[${requestId}] ✅ Path verified as shared file`);
+            }
+          } else {
+            console.log(`[${requestId}] ❌ Shared file record not found`);
+          }
+        }
+      } catch (e) {
+        console.error(`[${requestId}] Error buscando archivo compartido para preview:`, e);
+      }
+    }
+
+    if (!fullPath) {
+      console.log(`[${requestId}] ❌ File not found for preview: ${fileId}`);
       return res.status(404).json({
         success: false,
-        message: 'Archivo no encontrado'
+        message: 'Archivo no encontrado o acceso denegado'
       });
     }
 
-    // Verificar seguridad (path traversal)
-    const userDir = path.join(__dirname, '../../../Datos', req.user.username);
-    const resolvedPath = path.resolve(fullPath);
-    const resolvedUserDir = path.resolve(userDir);
-    
-    if (!resolvedPath.startsWith(resolvedUserDir)) {
-      return res.status(403).json({
-        success: false,
-        message: 'Acceso denegado'
-      });
-    }
+    console.log(`[${requestId}] ✅ Serving file: ${fullPath}`);
 
     // Obtener tipo MIME
     const ext = path.extname(fullPath).toLowerCase();
@@ -924,11 +1101,17 @@ router.get('/preview/:fileId', authenticate, async (req, res) => {
       '.mp4': 'video/mp4',
       '.webm': 'video/webm',
       '.mp3': 'audio/mpeg',
-      '.wav': 'audio/wav'
+      '.wav': 'audio/wav',
+      '.docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      '.xlsx': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      '.pptx': 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+      '.zip': 'application/zip'
     };
 
     const contentType = mimeTypes[ext] || 'application/octet-stream';
     const stats = await fs.stat(fullPath);
+    
+    console.log(`[${requestId}] 📊 File stats - Size: ${stats.size}, Type: ${contentType}`);
 
     res.setHeader('Content-Type', contentType);
     res.setHeader('Content-Length', stats.size);
@@ -938,14 +1121,32 @@ router.get('/preview/:fileId', authenticate, async (req, res) => {
 
     // Enviar archivo como stream
     const fileStream = require('fs').createReadStream(fullPath);
-    fileStream.pipe(res);
+    
+    fileStream.on('open', () => {
+      console.log(`[${requestId}] 🔓 Stream opened`);
+      fileStream.pipe(res);
+    });
+
+    fileStream.on('error', (err) => {
+      console.error(`[${requestId}] ❌ Stream error:`, err);
+      if (!res.headersSent) {
+        res.status(500).end();
+      }
+    });
+
+    res.on('close', () => {
+      console.log(`[${requestId}] 🔒 Response closed, destroying stream`);
+      fileStream.destroy();
+    });
 
   } catch (error) {
-    console.error('Error previewing file:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Error al previsualizar archivo: ' + error.message
-    });
+    console.error(`[${requestId}] Error previewing file:`, error);
+    if (!res.headersSent) {
+      res.status(500).json({
+        success: false,
+        message: 'Error al previsualizar archivo: ' + error.message
+      });
+    }
   }
 });
 
@@ -956,6 +1157,81 @@ router.get('/test', (req, res) => {
     message: 'Files API is working',
     timestamp: new Date().toISOString()
   });
+});
+
+// Compartir archivo/carpeta
+router.post('/share', authenticate, async (req, res) => {
+  try {
+    const { path: itemPath, username: targetUser } = req.body;
+    const owner = req.user.username;
+
+    if (!itemPath || !targetUser) {
+      return res.status(400).json({ success: false, message: 'Faltan datos' });
+    }
+
+    // Verificar que el usuario destino existe
+    const userExists = await dbAsync.get("SELECT id FROM users WHERE username = ?", [targetUser]);
+    if (!userExists) {
+      return res.status(404).json({ success: false, message: 'Usuario destino no encontrado' });
+    }
+
+    // Verificar que no se comparta con uno mismo
+    if (targetUser === owner) {
+      return res.status(400).json({ success: false, message: 'No puedes compartir contigo mismo' });
+    }
+
+    // Insertar en DB
+    await dbAsync.run(
+      "INSERT INTO shared_files (path, owner_username, shared_with_username) VALUES (?, ?, ?)",
+      [itemPath, owner, targetUser]
+    );
+
+    res.json({ success: true, message: `Compartido con ${targetUser}` });
+  } catch (error) {
+    if (error.message && error.message.includes('UNIQUE constraint failed')) {
+       return res.json({ success: true, message: `Ya estaba compartido con ${req.body.username}` });
+    }
+    console.error('Error sharing file:', error);
+    res.status(500).json({ success: false, message: 'Error al compartir' });
+  }
+});
+
+// Listar compartidos conmigo
+router.get('/shared-with-me', authenticate, async (req, res) => {
+  try {
+    const username = req.user.username;
+    const shares = await dbAsync.all(
+      "SELECT * FROM shared_files WHERE shared_with_username = ?",
+      [username]
+    );
+
+    // Para cada share, obtener info básica del archivo/carpeta real
+    const sharedItems = [];
+    for (const share of shares) {
+       const fullPath = path.join(__dirname, '../../../Datos', share.owner_username, share.path);
+       try {
+         const stats = await fs.stat(fullPath);
+         sharedItems.push({
+           id: share.id, // ID del share
+           name: path.basename(share.path),
+           path: share.path,
+           owner: share.owner_username,
+           type: stats.isDirectory() ? 'folder' : 'file',
+           size: stats.size,
+           modified: stats.mtime,
+           shared: true
+         });
+       } catch (e) {
+         // El archivo original quizás fue borrado
+         console.log(`Archivo compartido no encontrado: ${fullPath}`);
+       }
+    }
+
+    res.json({ success: true, files: sharedItems });
+  } catch (error) {
+    console.error('Error listing shared:', error);
+    res.status(500).json({ success: false, message: 'Error al listar compartidos' });
+  }
 });
 
 module.exports = router;

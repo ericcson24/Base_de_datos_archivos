@@ -1,6 +1,31 @@
 const express = require('express');
 const { Client } = require('@microsoft/microsoft-graph-client');
+const { dbAsync } = require('../database/db');
 const router = express.Router();
+
+// Middleware de autenticación (copiado de auth.js)
+const authenticate = (req, res, next) => {
+  const authHeader = req.headers.authorization;
+  let token = null;
+
+  if (authHeader && authHeader.startsWith('Bearer ')) {
+    token = authHeader.substring(7);
+  } else if (req.cookies && req.cookies.auth_token) {
+    token = req.cookies.auth_token;
+  }
+
+  if (token) {
+    try {
+      const userData = JSON.parse(Buffer.from(token, 'base64').toString());
+      req.user = userData;
+      next();
+    } catch (error) {
+      return res.status(401).json({ success: false, message: 'Token inválido' });
+    }
+  } else {
+    return res.status(401).json({ success: false, message: 'No autorizado' });
+  }
+};
 
 function getAuthenticatedClient(accessToken) {
   return Client.init({
@@ -61,14 +86,18 @@ function convertFromSpainTime(dateStr, timeStr = null, isAllDay = false) {
 }
 
 // GET - Obtener todas las categorías de Outlook
-router.get('/categories', async (req, res) => {
+router.get('/categories', authenticate, async (req, res) => {
   try {
-    if (!req.session.accessToken) {
-      return res.status(401).json({ error: 'REAUTH' });
+    const username = req.user.username;
+    const user = await dbAsync.get("SELECT microsoft_access_token FROM users WHERE username = ?", [username]);
+
+    if (!user || !user.microsoft_access_token) {
+      // Si no hay token, devolver array vacío en lugar de error 401 para no romper el frontend
+      return res.json([]);
     }
 
     console.log('🏷️ Obteniendo categorías de Outlook...');
-    const client = getAuthenticatedClient(req.session.accessToken);
+    const client = getAuthenticatedClient(user.microsoft_access_token);
 
     const categoriesResponse = await client
       .api('/me/outlook/masterCategories')
@@ -97,10 +126,13 @@ router.get('/categories', async (req, res) => {
 });
 
 // POST - Crear nueva categoría en Outlook
-router.post('/categories', async (req, res) => {
+router.post('/categories', authenticate, async (req, res) => {
   try {
-    if (!req.session.accessToken) {
-      return res.status(401).json({ error: 'REAUTH' });
+    const username = req.user.username;
+    const user = await dbAsync.get("SELECT microsoft_access_token FROM users WHERE username = ?", [username]);
+
+    if (!user || !user.microsoft_access_token) {
+      return res.status(401).json({ error: 'No vinculado con Microsoft' });
     }
 
     const { name, color } = req.body;
@@ -110,7 +142,7 @@ router.post('/categories', async (req, res) => {
     }
 
     console.log('🏷️ Creando nueva categoría:', { name, color });
-    const client = getAuthenticatedClient(req.session.accessToken);
+    const client = getAuthenticatedClient(user.microsoft_access_token);
 
     const newCategory = {
       displayName: name,
@@ -169,503 +201,178 @@ function getOutlookCategoryColor(outlookColor) {
 
   return colorMap[outlookColor] || '#4285f4';
 }
-// GET - Obtener eventos de Outlook (TODOS los calendarios)
-router.get('/', async (req, res) => {
+
+// POST - Forzar sincronización
+router.post('/sync', authenticate, async (req, res) => {
   try {
-    // Verificar que existe la sesión y el accessToken
-    if (!req.session || !req.session.accessToken) {
-      console.log('❌ No hay accessToken en la sesión');
-      console.log('📋 Sesión actual:', {
-        existe: !!req.session,
-        tieneAccessToken: !!req.session?.accessToken,
-        tieneAccount: !!req.session?.account
-      });
-      return res.status(401).json({ 
-        error: 'REAUTH',
-        message: 'No has iniciado sesión con Microsoft. Por favor, inicia sesión con tu cuenta de Outlook primero.',
-        needsMicrosoftAuth: true
-      });
+    const username = req.user.username;
+    const user = await dbAsync.get("SELECT id, microsoft_access_token FROM users WHERE username = ?", [username]);
+
+    if (!user || !user.microsoft_access_token) {
+      return res.status(400).json({ error: 'No vinculado con Microsoft' });
     }
 
-    // Los tokens de Microsoft Access Token no son JWT estándar (no tienen formato header.payload.signature)
-    // Microsoft usa un formato propietario que comienza con "EwA" - solo verificamos que sea string no vacío
-    const token = req.session.accessToken;
-    if (typeof token !== 'string' || token.trim().length === 0) {
-      console.log('❌ Token inválido - token vacío o no es string');
-      return res.status(401).json({ 
-        error: 'REAUTH',
-        message: 'Token de Microsoft inválido. Por favor, vuelve a iniciar sesión.',
-        needsMicrosoftAuth: true
-      });
+    const client = getAuthenticatedClient(user.microsoft_access_token);
+    
+    // Sync next 6 months and past 1 month
+    const now = new Date();
+    const start = new Date(now);
+    start.setMonth(start.getMonth() - 1);
+    const end = new Date(now);
+    end.setMonth(end.getMonth() + 6);
+
+    const startISO = start.toISOString();
+    const endISO = end.toISOString();
+
+    const eventsResponse = await client.api('/me/calendar/events')
+        .select('id,subject,bodyPreview,start,end,location,webLink,isAllDay')
+        .filter(`start/dateTime ge '${startISO}' and end/dateTime le '${endISO}'`)
+        .top(200)
+        .get();
+
+    let syncedCount = 0;
+    for (const event of eventsResponse.value) {
+        await dbAsync.run(`
+            INSERT INTO calendar_events (microsoft_id, user_id, subject, body_preview, start_time, end_time, is_all_day, location, web_link, last_synced)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+            ON CONFLICT(microsoft_id) DO UPDATE SET
+            subject=excluded.subject,
+            body_preview=excluded.body_preview,
+            start_time=excluded.start_time,
+            end_time=excluded.end_time,
+            is_all_day=excluded.is_all_day,
+            location=excluded.location,
+            web_link=excluded.web_link,
+            last_synced=CURRENT_TIMESTAMP
+        `, [
+            event.id,
+            user.id,
+            event.subject,
+            event.bodyPreview,
+            event.start.dateTime,
+            event.end.dateTime,
+            event.isAllDay ? 1 : 0,
+            event.location?.displayName,
+            event.webLink
+        ]);
+        syncedCount++;
     }
 
+    res.json({ success: true, message: `Sincronizados ${syncedCount} eventos` });
+
+  } catch (error) {
+    console.error('Error syncing events:', error);
+    res.status(500).json({ error: 'Error durante la sincronización' });
+  }
+});
+
+// GET - Obtener eventos (Sincronizados con DB)
+router.get('/', authenticate, async (req, res) => {
+  try {
+    const username = req.user.username;
     const { start, end } = req.query;
-    console.log('✅ Obteniendo eventos de TODOS los calendarios para:', req.session.account?.username || 'usuario desconocido');
-    console.log('📅 Rango de fechas solicitado:', start, 'a', end);
 
-    const client = getAuthenticatedClient(req.session.accessToken);
+    // 1. Obtener usuario y token
+    const user = await dbAsync.get("SELECT id, microsoft_access_token FROM users WHERE username = ?", [username]);
+    
+    if (!user) return res.status(404).json({ error: 'Usuario no encontrado' });
 
-    let allEvents = [];
-
-    try {
-      // PASO 1: Obtener TODOS los calendarios disponibles
-      console.log('🗂️ Obteniendo lista de calendarios...');
-
-      const calendarsResponse = await client
-        .api('/me/calendars')
-        .select('id,name,color,canEdit,owner')
-        .get();
-
-      console.log(`📅 Calendarios encontrados: ${calendarsResponse.value.length}`);
-      calendarsResponse.value.forEach((calendar, index) => {
-        console.log(`${index + 1}. "${calendar.name}" (ID: ${calendar.id}) - Owner: ${calendar.owner?.name || 'N/A'}`);
-      });
-
-      // PASO 2: Obtener eventos de CADA calendario
-      for (const calendar of calendarsResponse.value) {
-        console.log(`\n🔍 Obteniendo eventos del calendario: "${calendar.name}"`);
-
+    // 2. Si tiene token, sincronizar con Microsoft
+    if (user.microsoft_access_token) {
         try {
-          let calendarEvents = [];
+            const client = getAuthenticatedClient(user.microsoft_access_token);
+            
+            // Fetch events from Microsoft (Primary Calendar)
+            let query = client.api('/me/calendar/events')
+                .select('id,subject,bodyPreview,start,end,location,webLink,isAllDay')
+                .top(100);
 
-          // MÉTODO 1: Intentar con filtro de fechas
-          if (start && end) {
-            console.log(`📅 Método 1: Con filtro de fechas para "${calendar.name}"`);
-            try {
-              const startISO = new Date(start).toISOString();
-              const endISO = new Date(end).toISOString();
-
-              console.log(`📅 Fechas ISO: ${startISO} a ${endISO}`);
-
-              let nextUrl = null;
-              let currentPage = 1;
-
-              do {
-                console.log(`📄 Calendario "${calendar.name}" - Página ${currentPage} (con filtro)...`);
-
-                let query;
-                if (nextUrl) {
-                  query = client.api(nextUrl);
-                  console.log(`📄 Usando nextUrl: ${nextUrl}`);
-                } else {
-                  const filter = `start/dateTime ge '${startISO}' and start/dateTime le '${endISO}'`;
-                  console.log(`📄 Filtro: ${filter}`);
-
-                  query = client
-                    .api(`/me/calendars/${calendar.id}/events`)
-                    .select('id,subject,start,end,location,bodyPreview,attendees,isAllDay,categories,showAs,importance') // Añadir importance
-                    .filter(filter)
-                    .orderby('start/dateTime')
-                    .top(999); // Máximo permitido por Microsoft Graph
-                }
-
-                const response = await query.get();
-                console.log(`📄 Página ${currentPage}: ${response.value.length} eventos`);
-
-                if (response.value.length > 0) {
-                  const eventsWithCalendarInfo = response.value.map(event => ({
-                    ...event,
-                    calendarName: calendar.name,
-                    calendarId: calendar.id,
-                    calendarColor: calendar.color,
-                    calendarOwner: calendar.owner?.name || 'N/A'
-                  }));
-
-                  calendarEvents = calendarEvents.concat(eventsWithCalendarInfo);
-                }
-
-                nextUrl = response['@odata.nextLink'];
-                console.log(`📄 NextUrl: ${nextUrl ? 'Existe' : 'No existe'}`);
-                currentPage++;
-
-                // Límite de seguridad aumentado
-                if (currentPage > 50) {
-                  console.warn(`⚠️ Límite de páginas alcanzado para calendario "${calendar.name}" (${currentPage})`);
-                  break;
-                }
-
-              } while (nextUrl);
-
-            } catch (filterError) {
-              console.error(`❌ Error con filtro en "${calendar.name}":`, filterError.message);
-              calendarEvents = []; // Resetear para intentar método 2
+            if (start && end) {
+                const startISO = new Date(start).toISOString();
+                const endISO = new Date(end).toISOString();
+                query = query.filter(`start/dateTime ge '${startISO}' and end/dateTime le '${endISO}'`);
             }
-          }
+            
+            const eventsResponse = await query.get();
 
-          // MÉTODO 2: Si no hay filtro o falló el filtro, obtener TODOS los eventos
-          if (calendarEvents.length === 0) {
-            console.log(`📅 Método 2: Sin filtro para "${calendar.name}" - obteniendo TODOS los eventos`);
-
-            let nextUrl = null;
-            let currentPage = 1;
-
-            do {
-              console.log(`📄 Calendario "${calendar.name}" - Página ${currentPage} (sin filtro)...`);
-
-              let query;
-              if (nextUrl) {
-                query = client.api(nextUrl);
-              } else {
-                query = client
-                  .api(`/me/calendars/${calendar.id}/events`)
-                  .select('id,subject,start,end,location,bodyPreview,attendees,isAllDay,categories,showAs')
-                  .orderby('start/dateTime')
-                  .top(999);
-              }
-
-              const response = await query.get();
-              console.log(`📄 Página ${currentPage}: ${response.value.length} eventos`);
-
-              if (response.value.length > 0) {
-                const eventsWithCalendarInfo = response.value.map(event => ({
-                  ...event,
-                  calendarName: calendar.name,
-                  calendarId: calendar.id,
-                  calendarColor: calendar.color,
-                  calendarOwner: calendar.owner?.name || 'N/A'
-                }));
-
-                calendarEvents = calendarEvents.concat(eventsWithCalendarInfo);
-              }
-
-              nextUrl = response['@odata.nextLink'];
-              currentPage++;
-
-              // Límite de seguridad aumentado
-              if (currentPage > 50) {
-                console.warn(`⚠️ Límite de páginas alcanzado para calendario "${calendar.name}" (${currentPage})`);
-                break;
-              }
-
-              // Si no hay más eventos, salir
-              if (response.value.length === 0) {
-                console.log(`📄 No hay más eventos en "${calendar.name}"`);
-                break;
-              }
-
-            } while (nextUrl);
-
-            // Filtrar manualmente por fechas si se obtuvieron todos los eventos
-            if (start && end && calendarEvents.length > 0) {
-              const startDate = new Date(start);
-              const endDate = new Date(end);
-
-              console.log(`🔍 FILTRANDO ${calendarEvents.length} eventos entre ${startDate.toISOString()} y ${endDate.toISOString()}`);
-
-              const originalCount = calendarEvents.length;
-              calendarEvents = calendarEvents.filter(event => {
-                // Convertir fecha del evento a UTC para comparación correcta
-                let eventDate;
-                let eventDateStr;
-
-                if (event.start.dateTime) {
-                  eventDateStr = event.start.dateTime;
-                  eventDate = new Date(event.start.dateTime);
-                  // Si no tiene zona horaria, asumir que está en zona local del servidor
-                  if (!event.start.dateTime.includes('Z') && !event.start.dateTime.includes('+')) {
-                    // La fecha está en zona local, convertir a UTC
-                    eventDate = new Date(event.start.dateTime + 'Z');
-                  }
-                } else if (event.start.date) {
-                  eventDateStr = event.start.date;
-                  // Evento de todo el día
-                  eventDate = new Date(event.start.date + 'T00:00:00Z');
-                } else {
-                  console.log(`❌ Evento "${event.subject}" sin fecha válida`);
-                  return false; // Evento sin fecha válida
-                }
-
-                const isInRange = eventDate >= startDate && eventDate <= endDate;
-
-                if (!isInRange) {
-                  console.log(`❌ FUERA DE RANGO: "${event.subject}" - Fecha evento: ${eventDate.toISOString()} (${eventDateStr}) vs Rango: ${startDate.toISOString()} - ${endDate.toISOString()}`);
-                } else {
-                  console.log(`✅ DENTRO DE RANGO: "${event.subject}" - Fecha: ${eventDate.toISOString()}`);
-                }
-
-                return isInRange;
-              });
-
-              console.log(`🔍 Filtrado manual en "${calendar.name}": ${originalCount} → ${calendarEvents.length} eventos`);
+            // Sync to DB
+            for (const event of eventsResponse.value) {
+                await dbAsync.run(`
+                    INSERT INTO calendar_events (microsoft_id, user_id, subject, body_preview, start_time, end_time, is_all_day, location, web_link, last_synced)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+                    ON CONFLICT(microsoft_id) DO UPDATE SET
+                    subject=excluded.subject,
+                    body_preview=excluded.body_preview,
+                    start_time=excluded.start_time,
+                    end_time=excluded.end_time,
+                    is_all_day=excluded.is_all_day,
+                    location=excluded.location,
+                    web_link=excluded.web_link,
+                    last_synced=CURRENT_TIMESTAMP
+                `, [
+                    event.id,
+                    user.id,
+                    event.subject,
+                    event.bodyPreview,
+                    event.start.dateTime,
+                    event.end.dateTime,
+                    event.isAllDay ? 1 : 0,
+                    event.location?.displayName,
+                    event.webLink
+                ]);
             }
-          }
-
-          console.log(`✅ Calendario "${calendar.name}": ${calendarEvents.length} eventos obtenidos`);
-          allEvents = allEvents.concat(calendarEvents);
-
-        } catch (calendarError) {
-          console.error(`❌ Error obteniendo eventos del calendario "${calendar.name}":`, calendarError);
-          console.error(`❌ Detalles del error:`, calendarError.message);
-          // Continúa con el siguiente calendario
+        } catch (msError) {
+            console.error('Error syncing with Microsoft:', msError);
         }
-      }
-
-    } catch (calendarsError) {
-      console.error('❌ Error obteniendo lista de calendarios:', calendarsError);
-      console.log('🔄 Fallback: usando calendario principal...');
-
-      // FALLBACK: Obtener eventos del calendario principal
-      let nextUrl = null;
-      let currentPage = 1;
-
-      do {
-        console.log(`📄 Calendario principal - Página ${currentPage}...`);
-
-        let query;
-        if (nextUrl) {
-          query = client.api(nextUrl);
-        } else {
-          query = client
-            .api('/me/events')
-            .select('id,subject,start,end,location,bodyPreview,attendees,isAllDay,categories,showAs,importance') // Añadir importance
-            .orderby('start/dateTime')
-            .top(999);
-
-          // Aplicar filtro si existe
-          if (start && end) {
-            try {
-              const startISO = new Date(start).toISOString();
-              const endISO = new Date(end).toISOString();
-              const filter = `start/dateTime ge '${startISO}' and start/dateTime le '${endISO}'`;
-              query = query.filter(filter);
-            } catch (filterError) {
-              console.warn('⚠️ Error aplicando filtro en fallback, continuando sin filtro');
-            }
-          }
-        }
-
-        const response = await query.get();
-        console.log(`📄 Calendario principal - Página ${currentPage}: ${response.value.length} eventos`);
-
-        if (response.value.length > 0) {
-          const eventsWithCalendarInfo = response.value.map(event => ({
-            ...event,
-            calendarName: 'Calendario Principal',
-            calendarId: 'primary',
-            calendarColor: '#4285f4',
-            calendarOwner: req.session.account.name
-          }));
-
-          allEvents = allEvents.concat(eventsWithCalendarInfo);
-        }
-
-        nextUrl = response['@odata.nextLink'];
-        currentPage++;
-
-        if (currentPage > 50) {
-          console.warn('⚠️ Límite de páginas alcanzado en fallback');
-          break;
-        }
-
-        if (response.value.length === 0) {
-          console.log('📄 No hay más eventos en calendario principal');
-          break;
-        }
-      } while (nextUrl);
     }
 
-    console.log(`📊 TOTAL de eventos obtenidos de TODOS los calendarios: ${allEvents.length}`);
-
-    // DEBUG: Mostrar estadísticas por calendario
-    const calendarStats = {};
-    allEvents.forEach(event => {
-      const calName = event.calendarName || 'Sin nombre';
-      calendarStats[calName] = (calendarStats[calName] || 0) + 1;
-    });
-
-    console.log('📊 Eventos por calendario:');
-    Object.entries(calendarStats).forEach(([name, count]) => {
-      console.log(`  • ${name}: ${count} eventos`);
-    });
-
-    // Mostrar rango de fechas si hay eventos
-    if (allEvents.length > 0) {
-      const eventDates = allEvents.map(e => new Date(e.start.dateTime || e.start.date));
-      const minDate = new Date(Math.min(...eventDates));
-      const maxDate = new Date(Math.max(...eventDates));
-      console.log(`📅 Rango total de eventos: ${minDate.toISOString()} a ${maxDate.toISOString()}`);
+    // 3. Devolver eventos de la DB
+    let targetUserId = user.id;
+    if ((user.role === 'admin' || user.role === 'boss') && req.query.userId) {
+        targetUserId = req.query.userId;
     }
 
+    let query = "SELECT * FROM calendar_events WHERE user_id = ?";
+    let params = [targetUserId];
 
-    // Crear un cache de colores de categorías para optimizar
-    const categoryColorCache = {};
-
-    // Intentar obtener todas las categorías una vez
-    try {
-      const categoriesResponse = await client
-        .api('/me/outlook/masterCategories')
-        .get();
-
-      categoriesResponse.value.forEach(category => {
-        categoryColorCache[category.displayName] = getOutlookCategoryColor(category.color);
-      });
-
-      console.log(`🎨 Cache de colores creado para ${Object.keys(categoryColorCache).length} categorías`);
-    } catch (error) {
-      console.warn('⚠️ No se pudo cargar cache de colores de categorías:', error.message);
+    if (start && end) {
+        // Optional: Add DB filtering if needed
     }
 
-    // Formatear eventos para FullCalendar
-    const formattedEvents = allEvents.map(event => {
+    const dbEvents = await dbAsync.all(query, params);
 
-      // ====== PASO 1: PROCESAR FECHAS CORRECTAMENTE ======
-      let startDate, endDate;
+    // Format events for frontend
+    const formattedEvents = dbEvents.map(e => ({
+        id: e.microsoft_id || e.id.toString(),
+        title: e.subject,
+        start: e.start_time, // Assuming stored as ISO string or compatible
+        end: e.end_time,
+        allDay: e.is_all_day === 1,
+        location: e.location,
+        preview: e.body_preview,
+        url: e.web_link,
+        source: 'database',
+        color: '#4285f4' 
+    }));
 
-      if (event.isAllDay) {
-        startDate = event.start.date;
-        endDate = event.end.date;
-        console.log(`📅 TODO EL DÍA "${event.subject}": ${startDate} - ${endDate}`);
-      } else {
-        // CRÍTICO: Procesar ambas fechas de la misma manera
-        console.log(`📅 ANTES de convertir "${event.subject}":`);
-        console.log(`  • Start original: ${event.start.dateTime}`);
-        console.log(`  • End original: ${event.end.dateTime}`);
-
-        startDate = convertToSpainTime(event.start.dateTime, false);
-        endDate = convertToSpainTime(event.end.dateTime, false);
-
-        console.log(`📅 DESPUÉS de convertir "${event.subject}":`);
-        console.log(`  • Start convertido: ${startDate}`);
-        console.log(`  • End convertido: ${endDate}`);
-
-        // VERIFICACIÓN: Comprobar que las fechas son válidas
-        if (!startDate || !endDate) {
-          console.error(`❌ ERROR: Fechas inválidas para "${event.subject}"`);
-          console.error(`  • Start: ${startDate}`);
-          console.error(`  • End: ${endDate}`);
-          console.error(`  • Start original: ${event.start.dateTime}`);
-          console.error(`  • End original: ${event.end.dateTime}`);
-        }
-
-        // VERIFICACIÓN: Comprobar que end > start
-        if (startDate && endDate) {
-          const startMs = new Date(startDate).getTime();
-          const endMs = new Date(endDate).getTime();
-          if (endMs <= startMs) {
-            console.warn(`⚠️ ADVERTENCIA: Hora fin <= hora inicio para "${event.subject}"`);
-            console.warn(`  • Start: ${startDate} (${startMs})`);
-            console.warn(`  • End: ${endDate} (${endMs})`);
-          }
-        }
-      }
-
-      // ====== PASO 2: CREAR EVENTO BASE CON FECHAS VERIFICADAS ======
-      const baseEvent = {
-        id: event.id,
-        title: event.subject || 'Sin título',
-        start: startDate,
-        end: endDate,
-        allDay: event.isAllDay || false,
-        backgroundColor: '#4285f4', // Default azul
-        borderColor: '#4285f4',
-        textColor: '#ffffff',
-        extendedProps: {
-          location: event.location?.displayName || '',
-          description: event.bodyPreview || '',
-          calendarName: event.calendarName || 'Sin nombre',
-          calendarId: event.calendarId || '',
-          calendarOwner: event.calendarOwner || '',
-          categories: event.categories || [],
-          showAs: event.showAs || 'busy'
-        }
-      };
-
-      // ====== PASO 3: APLICAR COLORES SOLO SI HAY CATEGORÍAS ======
-      if (event.categories && Array.isArray(event.categories) && event.categories.length > 0) {
-        const firstCategory = event.categories[0];
-
-        // Usar cache de colores de categorías master
-        if (categoryColorCache[firstCategory]) {
-          baseEvent.backgroundColor = categoryColorCache[firstCategory];
-          baseEvent.borderColor = categoryColorCache[firstCategory];
-          console.log(`🎨 "${event.subject}" con categoría "${firstCategory}" → Color cache: ${baseEvent.backgroundColor}`);
-        } else {
-          // Mapear categorías comunes
-          const categoryColorMap = {
-            'Categoría roja': '#ff1a1a',
-            'Categoría naranja': '#ff8c00',
-            'Categoría amarilla': '#ffd700',
-            'Categoría verde': '#32cd32',
-            'Categoría azul': '#326acb',
-            'Categoría púrpura': '#800080',
-            'Trabajo': '#32cd32',
-            'Personal': '#326acb',
-            'Familia': '#ff69b4',
-            'Cumpleaños': '#ff8c00',
-            'Vacaciones': '#ffd700',
-            'Importante': '#ff1a1a',
-            'Reunión': '#800080',
-            'Cita médica': '#dc143c',
-            'Deporte': '#228b22'
-          };
-
-          const mappedColor = categoryColorMap[firstCategory] ||
-                             categoryColorMap[firstCategory.toLowerCase()] ||
-                             '#4285f4';
-
-          baseEvent.backgroundColor = mappedColor;
-          baseEvent.borderColor = mappedColor;
-          console.log(`🎨 "${event.subject}" con categoría "${firstCategory}" → Color mapeo: ${baseEvent.backgroundColor}`);
-        }
-      }
-
-      // ====== PASO 4: VERIFICACIÓN FINAL ======
-      console.log(`✅ EVENTO FINAL "${baseEvent.title}":`, {
-        start: baseEvent.start,
-        end: baseEvent.end,
-        allDay: baseEvent.allDay,
-        categories: baseEvent.extendedProps.categories,
-        color: baseEvent.backgroundColor,
-        startType: typeof baseEvent.start,
-        endType: typeof baseEvent.end
-      });
-
-      return baseEvent;
-    });
-
-    console.log('Eventos formateados para FullCalendar:', formattedEvents.length);
-    if (formattedEvents.length > 0) {
-      console.log('Ejemplo de evento formateado:', JSON.stringify(formattedEvents[0], null, 2));
-      console.log('Primeros 5 eventos del rango:');
-      formattedEvents.slice(0, 5).forEach((event, index) => {
-        console.log(`${index + 1}. "${event.title}" [${event.extendedProps.calendarName}] - ${event.start}`);
-      });
-    }
-
-    console.log(`✅ Se encontraron ${formattedEvents.length} eventos de TODOS los calendarios`);
     res.json(formattedEvents);
 
   } catch (error) {
-    console.error('❌ Error obteniendo eventos:', error);
-
-    if (error.statusCode === 401) {
-      return res.status(401).json({ error: 'REAUTH' });
-    }
-
-    if (error.statusCode === 403) {
-      return res.status(403).json({
-        error: 'INSUFFICIENT_PERMISSIONS',
-        message: 'No tienes permisos para acceder a los calendarios. Verifica los permisos de la aplicación.'
-      });
-    }
-
+    console.error('Error getting events:', error);
     res.status(500).json({ error: 'Error interno del servidor' });
   }
 });
 
 // POST - Crear evento en Outlook
-router.post('/', async (req, res) => {
+router.post('/', authenticate, async (req, res) => {
   try {
     console.log('📝 POST /api/events - Iniciando creación de evento');
-    console.log('📋 Datos de sesión:', {
-      hasAccessToken: !!req.session.accessToken,
-      accountType: req.session.accountType,
-      accountEmail: req.session.account?.username
-    });
+    const username = req.user.username;
+    const user = await dbAsync.get("SELECT id, microsoft_access_token FROM users WHERE username = ?", [username]);
 
-    if (!req.session.accessToken) {
-      console.log('❌ No access token found in session');
-      return res.status(401).json({ error: 'REAUTH' });
+    if (!user || !user.microsoft_access_token) {
+      console.log('❌ No access token found in DB');
+      return res.status(401).json({ error: 'No vinculado con Microsoft' });
     }
 
     const { title, start, end, allDay, location, description, attendees, categories } = req.body;
@@ -678,7 +385,7 @@ router.post('/', async (req, res) => {
 
     console.log('📝 Creando evento en Outlook:', { title, start, end, allDay, location, description, attendees, categories });
 
-    const client = getAuthenticatedClient(req.session.accessToken);
+    const client = getAuthenticatedClient(user.microsoft_access_token);
 
     const newEvent = {
       subject: title,
@@ -814,11 +521,32 @@ router.post('/', async (req, res) => {
         description: createdEvent.bodyPreview || '',
         calendarName: 'Calendario Principal',
         calendarId: 'primary',
-        calendarOwner: req.session.account.name,
+        calendarOwner: username,
         categories: createdEvent.categories || [],
         showAs: createdEvent.showAs || 'busy'
       }
     };
+
+    // Insert into DB
+    try {
+      await dbAsync.run(`
+          INSERT INTO calendar_events (microsoft_id, user_id, subject, body_preview, start_time, end_time, is_all_day, location, web_link, last_synced)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+      `, [
+          createdEvent.id,
+          user.id,
+          createdEvent.subject,
+          createdEvent.bodyPreview,
+          createdEvent.start.dateTime,
+          createdEvent.end.dateTime,
+          createdEvent.isAllDay ? 1 : 0,
+          createdEvent.location?.displayName,
+          createdEvent.webLink
+      ]);
+    } catch (dbError) {
+      console.error('Error saving new event to DB:', dbError);
+      // Continue anyway, it will be synced later
+    }
 
     console.log('✅ Evento creado y formateado (sin colores):', formattedEvent.title);
     console.log('📅 Fechas finales POST:', {
@@ -856,21 +584,27 @@ router.post('/', async (req, res) => {
 });
 
 // DELETE - Eliminar evento de Outlook
-router.delete('/:id', async (req, res) => {
+router.delete('/:id', authenticate, async (req, res) => {
   try {
-    if (!req.session.accessToken) {
-      return res.status(401).json({ error: 'REAUTH' });
+    const username = req.user.username;
+    const user = await dbAsync.get("SELECT id, microsoft_access_token FROM users WHERE username = ?", [username]);
+
+    if (!user || !user.microsoft_access_token) {
+      return res.status(401).json({ error: 'No vinculado con Microsoft' });
     }
 
     const { id } = req.params;
-    console.log('🗑️ Eliminando evento:', id, 'para usuario:', req.session.account.username);
+    console.log('🗑️ Eliminando evento:', id, 'para usuario:', username);
 
-    const client = getAuthenticatedClient(req.session.accessToken);
+    const client = getAuthenticatedClient(user.microsoft_access_token);
 
     // Intentar eliminar el evento
     await client.api(`/me/events/${id}`).delete();
 
-    console.log('✅ Evento eliminado de Outlook:', id);
+    // Delete from DB
+    await dbAsync.run("DELETE FROM calendar_events WHERE microsoft_id = ?", [id]);
+
+    console.log('✅ Evento eliminado de Outlook y DB:', id);
     res.json({
       success: true,
       message: 'Evento eliminado correctamente',
@@ -911,10 +645,13 @@ router.delete('/:id', async (req, res) => {
 });
 
 // PUT - Actualizar evento en Outlook
-router.put('/:id', async (req, res) => {
+router.put('/:id', authenticate, async (req, res) => {
   try {
-    if (!req.session.accessToken) {
-      return res.status(401).json({ error: 'REAUTH' });
+    const username = req.user.username;
+    const user = await dbAsync.get("SELECT id, microsoft_access_token FROM users WHERE username = ?", [username]);
+
+    if (!user || !user.microsoft_access_token) {
+      return res.status(401).json({ error: 'No vinculado con Microsoft' });
     }
 
     const { id } = req.params;
@@ -926,7 +663,7 @@ router.put('/:id', async (req, res) => {
 
     console.log('✏️ Actualizando evento en Outlook:', { id, title, start, end, allDay, location, description, attendees, categories });
 
-    const client = getAuthenticatedClient(req.session.accessToken);
+    const client = getAuthenticatedClient(user.microsoft_access_token);
 
     const updatedEvent = {
       subject: title,
@@ -981,6 +718,33 @@ router.put('/:id', async (req, res) => {
     console.log('📤 Enviando evento a Outlook:', JSON.stringify(updatedEvent, null, 2));
 
     const response = await client.api(`/me/events/${id}`).patch(updatedEvent);
+
+    // Update DB
+    try {
+      await dbAsync.run(`
+          UPDATE calendar_events SET
+          subject = ?,
+          body_preview = ?,
+          start_time = ?,
+          end_time = ?,
+          is_all_day = ?,
+          location = ?,
+          web_link = ?,
+          last_synced = CURRENT_TIMESTAMP
+          WHERE microsoft_id = ?
+      `, [
+          response.subject,
+          response.bodyPreview,
+          response.start.dateTime,
+          response.end.dateTime,
+          response.isAllDay ? 1 : 0,
+          response.location?.displayName,
+          response.webLink,
+          id
+      ]);
+    } catch (dbError) {
+      console.error('Error updating event in DB:', dbError);
+    }
 
     console.log('✅ Evento actualizado exitosamente en Microsoft Graph');
     console.log('📄 Respuesta cruda de Graph:', JSON.stringify(response, null, 2));
@@ -1050,7 +814,7 @@ router.put('/:id', async (req, res) => {
         description: response.bodyPreview || '',
         calendarName: 'Calendario Principal',
         calendarId: 'primary',
-        calendarOwner: req.session.account.name,
+        calendarOwner: username,
         categories: response.categories || [],
         showAs: response.showAs || 'busy'
       }
@@ -1077,16 +841,19 @@ router.put('/:id', async (req, res) => {
 });
 
 // GET - Obtener evento individual de Outlook
-router.get('/:id', async (req, res) => {
+router.get('/:id', authenticate, async (req, res) => {
   try {
-    if (!req.session.accessToken) {
-      return res.status(401).json({ error: 'REAUTH' });
+    const username = req.user.username;
+    const user = await dbAsync.get("SELECT microsoft_access_token FROM users WHERE username = ?", [username]);
+
+    if (!user || !user.microsoft_access_token) {
+      return res.status(401).json({ error: 'No vinculado con Microsoft' });
     }
 
     const { id } = req.params;
     console.log('📄 Obteniendo evento individual:', id);
 
-    const client = getAuthenticatedClient(req.session.accessToken);
+    const client = getAuthenticatedClient(user.microsoft_access_token);
 
     const event = await client
       .api(`/me/events/${id}`)

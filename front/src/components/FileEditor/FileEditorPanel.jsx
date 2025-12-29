@@ -5,7 +5,9 @@ import TextEditor from './editors/TextEditor';
 import VideoPlayer from './editors/VideoPlayer';
 import AudioPlayer from './editors/AudioPlayer';
 import ZipViewer from './editors/ZipViewer';
-import { downloadFile } from '../../utils/fileUtils';
+import ExcelEditor from './editors/ExcelEditor';
+import WordEditor from './editors/WordEditor';
+import { downloadFile, getAuthToken } from '../../utils/fileUtils';
 import './FileEditorPanel.css';
 
 const getFileType = (filename) => {
@@ -32,7 +34,9 @@ const FileEditorPanel = ({ file, onClose, position, zIndex, onBringToFront, pane
   const [isMaximized, setIsMaximized] = useState(false);
   const [preMaximizeState, setPreMaximizeState] = useState(null);
   const [fileUrl, setFileUrl] = useState(null);
+  const [fileBlob, setFileBlob] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
   const panelRef = useRef(null);
   const resizeHandleRef = useRef(null);
@@ -47,25 +51,67 @@ const FileEditorPanel = ({ file, onClose, position, zIndex, onBringToFront, pane
     const loadFile = async () => {
       setLoading(true);
       try {
-        const token = localStorage.getItem('auth_token');
-        const response = await fetch(`/api/files/preview/${file.id}?token=${encodeURIComponent(token)}`, {
+        const token = getAuthToken();
+        // URL base autenticada
+        const authenticatedUrl = `/api/files/preview/${encodeURIComponent(file.id)}?token=${encodeURIComponent(token)}`;
+        console.log('🔗 [FileEditorPanel] Generated URL:', authenticatedUrl);
+        
+        // Para tipos nativos, usar URL directa para evitar problemas con blobs y memoria
+        if (['image', 'video', 'audio', 'pdf'].includes(fileType)) {
+          console.log('🔗 [FileEditorPanel] Using direct URL for native type:', fileType);
+          setFileUrl(authenticatedUrl);
+          setLoading(false);
+          return;
+        }
+
+        // Para otros tipos (Word, Excel, Zip) que necesitan procesamiento, descargar el blob
+        console.log('📥 [FileEditorPanel] Fetching blob for processed type:', fileType);
+        const response = await fetch(authenticatedUrl, {
           headers: {
             'Authorization': `Bearer ${token}`
           }
         });
 
-        if (!response.ok) throw new Error('Error loading file');
+        console.log('📥 [FileEditorPanel] Response status:', response.status);
 
-        if (fileType === 'image' || fileType === 'video' || fileType === 'audio' || fileType === 'pdf') {
+        if (!response.ok) {
+          console.error('❌ [FileEditorPanel] Preview fetch failed:', response.status, response.statusText);
+          throw new Error(`Error loading file: ${response.status}`);
+        }
+
+        if (['zip', 'excel', 'word', 'powerpoint'].includes(fileType)) {
           const blob = await response.blob();
+          console.log('📦 [FileEditorPanel] Blob created:', blob.size, blob.type);
+          
+          if (blob.size === 0) {
+             console.error('❌ [FileEditorPanel] Blob is empty');
+             throw new Error('El archivo descargado está vacío');
+          }
+          
+          // Check if blob is actually an error page (HTML/JSON)
+          if (blob.type.includes('text/html') || blob.type.includes('application/json')) {
+             console.warn('⚠️ [FileEditorPanel] Blob type is suspicious for binary file:', blob.type);
+             // Try to read as text to see if it's an error
+             const text = await blob.text();
+             console.log('📄 [FileEditorPanel] Suspicious blob content start:', text.substring(0, 100));
+             if (text.includes('Error') || text.includes('success":false')) {
+                throw new Error('Error del servidor al descargar el archivo');
+             }
+          }
+
+          setFileBlob(blob);
+          // Mantener fileUrl por compatibilidad si algún componente lo usa, 
+          // pero preferir fileBlob para editores
           const url = URL.createObjectURL(blob);
           setFileUrl(url);
         } else if (fileType === 'text') {
           const text = await response.text();
+          console.log('📄 [FileEditorPanel] Text content loaded, length:', text.length);
           setFileUrl(text);
         }
       } catch (error) {
-        console.error('Error loading file:', error);
+        console.error('❌ [FileEditorPanel] Error loading file:', error);
+        setError('No se pudo cargar el archivo. Verifica tu conexión.');
       } finally {
         setLoading(false);
       }
@@ -74,7 +120,8 @@ const FileEditorPanel = ({ file, onClose, position, zIndex, onBringToFront, pane
     loadFile();
 
     return () => {
-      if (fileUrl && (fileType === 'image' || fileType === 'video' || fileType === 'audio' || fileType === 'pdf')) {
+      // Solo revocar si es un blob URL (comienza con blob:)
+      if (fileUrl && fileUrl.startsWith('blob:')) {
         URL.revokeObjectURL(fileUrl);
       }
     };
@@ -210,6 +257,17 @@ const FileEditorPanel = ({ file, onClose, position, zIndex, onBringToFront, pane
       );
     }
 
+    if (error) {
+      return (
+        <div className="flex items-center justify-center h-full text-red-500">
+          <div className="text-center">
+            <p className="text-xl mb-2">⚠️</p>
+            <p>{error}</p>
+          </div>
+        </div>
+      );
+    }
+
     switch (fileType) {
       case 'image':
         return <ImageEditor fileUrl={fileUrl} file={file} />;
@@ -222,22 +280,23 @@ const FileEditorPanel = ({ file, onClose, position, zIndex, onBringToFront, pane
       case 'audio':
         return <AudioPlayer fileUrl={fileUrl} file={file} />;
       case 'zip':
-        return <ZipViewer file={file} />;
+        return <ZipViewer file={fileBlob} fileUrl={fileUrl} onClose={onClose} />;
       case 'word':
+        return <WordEditor fileBlob={fileBlob} fileUrl={fileUrl} file={file} onClose={onClose} />;
       case 'excel':
+        return <ExcelEditor fileBlob={fileBlob} fileUrl={fileUrl} file={file} onClose={onClose} />;
       case 'powerpoint':
         return (
           <div className="flex items-center justify-center h-full text-gray-500 bg-gray-50 dark:bg-gray-900">
             <div className="text-center p-8 bg-white dark:bg-gray-800 rounded-xl shadow-lg max-w-md">
               <div className="text-6xl mb-4">
-                {fileType === 'word' ? '📝' : fileType === 'excel' ? '📊' : '📽️'}
+                📽️
               </div>
               <h3 className="text-xl font-bold mb-2 text-gray-800 dark:text-white">
-                {fileType === 'word' ? 'Documento de Word' : 
-                 fileType === 'excel' ? 'Hoja de cálculo' : 'Presentación'}
+                Presentación
               </h3>
               <p className="mb-6 text-gray-600 dark:text-gray-300">
-                La edición en línea de documentos de Office no está disponible en el entorno local.
+                La edición en línea de este tipo de archivo no está disponible en el entorno local.
                 Por favor, descarga el archivo para editarlo en tu ordenador.
               </p>
               <button

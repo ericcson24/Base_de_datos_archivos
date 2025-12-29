@@ -6,6 +6,8 @@ import HoverPreview from './HoverPreview';
 import CreateFolderModal from '../Modals/CreateFolderModal';
 import RenameModal from '../Modals/RenameModal';
 import MoveModal from '../Modals/MoveModal';
+import ShareModal from '../Modals/ShareModal';
+import SettingsModal from '../Modals/SettingsModal';
 import SidebarPanel from './SidebarPanel';
 import FileItem from './FileItem';
 import { 
@@ -40,6 +42,27 @@ const UserPanel = ({ user, onLogout, onBackToFolders, onThemeToggle, isDarkMode,
   const [renameValue, setRenameValue] = useState('');
   const [showMoveModal, setShowMoveModal] = useState(false);
   const [moveItem, setMoveItem] = useState(null);
+  const [showShareModal, setShowShareModal] = useState(false);
+  const [shareItem, setShareItem] = useState(null);
+  const [showSettingsModal, setShowSettingsModal] = useState(false);
+  const [settingsInitialTab, setSettingsInitialTab] = useState('general');
+
+  // Check for URL parameters on mount
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('settings') === 'true') {
+      setShowSettingsModal(true);
+      if (params.get('tab')) {
+        setSettingsInitialTab(params.get('tab'));
+      }
+      if (params.get('status') === 'success') {
+        // Clean URL
+        window.history.replaceState({}, document.title, window.location.pathname);
+        // Show success message (could be a toast, for now alert is fine or handled in modal)
+        alert('✅ Cuenta de Microsoft vinculada correctamente');
+      }
+    }
+  }, []);
 
   // Estados para viewer y hover
   const [viewerFile, setViewerFile] = useState(null);
@@ -74,7 +97,7 @@ const UserPanel = ({ user, onLogout, onBackToFolders, onThemeToggle, isDarkMode,
   const [isSearchExpanded, setIsSearchExpanded] = useState(false);
   const [sortBy, setSortBy] = useState('type'); // 'name', 'type', 'date' - Default: type
   const [sortOrder, setSortOrder] = useState('asc'); // 'asc', 'desc' - Default: asc
-  const [viewMode, setViewMode] = useState('list'); // 'list', 'grid'
+  const [viewMode, setViewMode] = useState('grid'); // 'list', 'grid'
 
   // Estados para múltiples paneles de edición
   const [editorPanels, setEditorPanels] = useState([]);
@@ -192,7 +215,7 @@ const UserPanel = ({ user, onLogout, onBackToFolders, onThemeToggle, isDarkMode,
     const handleClickOutside = (event) => {
       // Cerrar mini-menu-frosted si se hace click fuera
       if (uploadMenuOpen) {
-        const uploadBtn = document.querySelector('.upload-btn');
+        const uploadBtn = document.querySelector('.upload-btn-separado');
         const miniMenu = document.querySelector('.mini-menu-frosted');
         if (uploadBtn && miniMenu && !uploadBtn.contains(event.target) && !miniMenu.contains(event.target)) {
           setUploadMenuOpen(false);
@@ -236,12 +259,39 @@ const UserPanel = ({ user, onLogout, onBackToFolders, onThemeToggle, isDarkMode,
 const loadFiles = useCallback(async () => {
   try {
     setLoading(true);
+    
+    if (currentView === 'shared' && currentPath.length === 0) {
+      // Cargar lista de compartidos conmigo (raíz de compartidos)
+      const response = await fetch('/api/files/shared-with-me', {
+        headers: {
+          'Authorization': `Bearer ${getAuthToken()}`
+        }
+      });
+      const data = await response.json();
+      setFiles(data.files || []);
+      return;
+    }
+
     const queryParams = new URLSearchParams();
     if (currentPath.length > 0) {
       // currentPath contiene objetos carpeta, necesitamos sus nombres
       const pathString = currentPath.map(p => p.name).join('/');
       queryParams.append('path', pathString);
+      
+      // Si estamos navegando dentro de una carpeta compartida, necesitamos pasar el owner
+      if (currentView === 'shared') {
+        // El primer elemento del path debe tener la info del owner si venimos de la vista compartida
+        // Pero currentPath se construye al navegar.
+        // Necesitamos saber quién es el owner de la carpeta raíz compartida.
+        // Una forma es guardar el owner en el estado currentPath o tener un estado separado.
+        // Vamos a asumir que el primer elemento de currentPath tiene la propiedad 'owner' si es compartido.
+        const rootShared = currentPath[0];
+        if (rootShared && rootShared.owner) {
+          queryParams.append('owner', rootShared.owner);
+        }
+      }
     }
+    
     if (searchQuery) queryParams.append('search', searchQuery);
     queryParams.append('sortBy', sortBy);
     queryParams.append('order', sortOrder);
@@ -259,7 +309,7 @@ const loadFiles = useCallback(async () => {
   } finally {
     setLoading(false);
   }
-}, [currentPath, searchQuery, sortBy, sortOrder]);
+}, [currentPath, searchQuery, sortBy, sortOrder, currentView]);
 
 // Función para cargar archivos recientes
 const loadRecentFiles = useCallback(async () => {
@@ -419,24 +469,49 @@ useEffect(() => {
       if (failedCount === 0) {
         setUploadProgress({ status: 'success', message: `✅ Carpeta subida exitosamente con ${uploadedCount} archivo(s)` });
       } else {
-        setUploadProgress({ 
-          status: 'warning', 
-          message: `⚠️ Carpeta subida parcialmente: ${uploadedCount} exitosos, ${failedCount} fallidos` 
-        });
+        setUploadProgress({ status: 'warning', message: `⚠️ Carpeta subida parcialmente. ${failedCount} errores.` });
       }
       
-      // Recargar archivos después de subir
+      // Recargar archivos
       loadFiles();
       
-      // Limpiar mensaje después de 5 segundos
-      setTimeout(() => setUploadProgress(null), 5000);
+      setTimeout(() => setUploadProgress(null), 3000);
       
     } catch (error) {
       console.error('Error uploading folder:', error);
       setUploadProgress({ status: 'error', message: '❌ Error al subir carpeta: ' + error.message });
-      
-      // Limpiar mensaje de error después de 5 segundos
       setTimeout(() => setUploadProgress(null), 5000);
+    }
+  }, [currentPath, loadFiles]);
+
+  const handleCreateFile = useCallback(async (defaultName, type) => {
+    const fileName = prompt('Nombre del archivo:', defaultName);
+    if (!fileName) return;
+
+    try {
+      const response = await fetch('/api/files/create', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${getAuthToken()}`
+        },
+        body: JSON.stringify({
+          name: fileName,
+          type: type,
+          path: currentPath.join('/')
+        })
+      });
+
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.message || 'Error al crear archivo');
+      }
+
+      loadFiles();
+      setUploadMenuOpen(false);
+    } catch (error) {
+      console.error('Error creating file:', error);
+      alert('Error al crear archivo: ' + error.message);
     }
   }, [currentPath, loadFiles]);
 
@@ -484,7 +559,7 @@ useEffect(() => {
     }
 
     try {
-      const response = await fetch(`/api/files/${item.id}`, {
+      const response = await fetch(`/api/files/${encodeURIComponent(item.id)}`, {
         method: 'DELETE',
         headers: {
           'Authorization': `Bearer ${getAuthToken()}`
@@ -511,7 +586,7 @@ useEffect(() => {
     }
 
     try {
-      const response = await fetch(`/api/files/${renameItem.id}/rename`, {
+      const response = await fetch(`/api/files/${encodeURIComponent(renameItem.id)}/rename`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -540,7 +615,7 @@ useEffect(() => {
 
   const handleDuplicateItem = async (item) => {
     try {
-      const response = await fetch(`/api/files/${item.id}/duplicate`, {
+      const response = await fetch(`/api/files/${encodeURIComponent(item.id)}/duplicate`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${getAuthToken()}`
@@ -563,7 +638,7 @@ useEffect(() => {
 
   const handleMoveItem = async (item, destinationPath) => {
     try {
-      const response = await fetch(`/api/files/${item.id}/move`, {
+      const response = await fetch(`/api/files/${encodeURIComponent(item.id)}/move`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -590,6 +665,38 @@ useEffect(() => {
     }
   };
 
+  const handleShareItem = async (item, targetUsername) => {
+    try {
+      const response = await fetch('/api/files/share', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${getAuthToken()}`
+        },
+        body: JSON.stringify({
+          path: item.path,
+          username: targetUsername
+        })
+      });
+
+      const result = await response.json();
+      
+      if (result.success) {
+        alert(result.message);
+      } else {
+        throw new Error(result.message);
+      }
+    } catch (error) {
+      console.error('Error sharing item:', error);
+      throw error;
+    }
+  };
+
+  const openShareModal = (item) => {
+    setShareItem(item);
+    setShowShareModal(true);
+  };
+
   const openRenameModal = (item) => {
     setRenameItem(item);
     setRenameValue(item.name);
@@ -606,8 +713,8 @@ useEffect(() => {
     setCurrentPath([]);
   };
 
-  const navigateToFolder = (folderName) => {
-    setCurrentPath([...currentPath, folderName]);
+  const navigateToFolder = (folder) => {
+    setCurrentPath([...currentPath, { name: folder.name, owner: folder.owner }]);
   };
 
   const goBack = () => {
@@ -1013,13 +1120,16 @@ useEffect(() => {
         {/* Upload Button - Arriba de navegación */}
         <div className="upload-btn-container">
           <button
-            className="upload-btn-separado"
+            className="upload-btn-separado flex items-center justify-center w-14 h-14 rounded-full bg-blue-600 hover:bg-blue-700 text-white shadow-lg transition-all duration-300 transform hover:scale-110"
             onClick={() => setUploadMenuOpen(!uploadMenuOpen)}
+            title="Nuevo"
           >
-            <span>⬆️</span> Subir
+            <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+            </svg>
           </button>
           {uploadMenuOpen && (
-            <div className={`mini-menu-frosted show`}>
+            <div className={`mini-menu-frosted show absolute top-20 left-4 z-50 w-64`}>
               <button
                 className="mini-menu-item"
                 onClick={() => document.getElementById('fileInput').click()}
@@ -1030,13 +1140,38 @@ useEffect(() => {
                 className="mini-menu-item"
                 onClick={() => document.getElementById('folderInput').click()}
               >
-                 Subir carpeta
+                📁 Subir carpeta
               </button>
+              <div className="h-px bg-gray-200 dark:bg-gray-700 my-1"></div>
               <button
                 className="mini-menu-item"
                 onClick={() => setShowCreateFolderModal(true)}
               >
                 ➕ Nueva carpeta
+              </button>
+              <button
+                className="mini-menu-item"
+                onClick={() => handleCreateFile('Nuevo documento.txt', 'text')}
+              >
+                📝 Documento de texto
+              </button>
+              <button
+                className="mini-menu-item"
+                onClick={() => handleCreateFile('Documento.docx', 'word')}
+              >
+                📘 Documento Word
+              </button>
+              <button
+                className="mini-menu-item"
+                onClick={() => handleCreateFile('Hoja de cálculo.xlsx', 'excel')}
+              >
+                📗 Hoja de cálculo Excel
+              </button>
+              <button
+                className="mini-menu-item"
+                onClick={() => handleCreateFile('Presentación.pptx', 'powerpoint')}
+              >
+                📙 Presentación PowerPoint
               </button>
             </div>
           )}
@@ -1051,37 +1186,13 @@ useEffect(() => {
             <span>🗂️</span> Mi unidad
           </button>
 
-          {/* Shared Folders Dropdown */}
-          <div className="dropdown-container">
-            <button
-              className={`sidebar-btn ${currentView.startsWith('shared') ? 'active' : ''}`}
-              onClick={() => setSharedDropdownOpen(!sharedDropdownOpen)}
-            >
-              <span>🌍</span> Compartidos
-              <span className={`dropdown-arrow ${sharedDropdownOpen ? 'open' : ''}`}>▾</span>
-            </button>
-            {sharedDropdownOpen && (
-              <div className="dropdown-content">
-                <div className="dropdown-section">
-                  <button className="dropdown-item" onClick={() => changeView('public')}>
-                    📂 Compartido general
-                  </button>
-                  {sharedFolders.map(folder => (
-                    <button
-                      key={folder.id}
-                      className="dropdown-item"
-                      onClick={() => changeView(`shared-${folder.id}`)}
-                    >
-                      👥 Con {folder.withUser}
-                    </button>
-                  ))}
-                  <button className="dropdown-item" onClick={() => {/* open create shared modal */}}>
-                    ➕ Nueva carpeta compartida
-                  </button>
-                </div>
-              </div>
-            )}
-          </div>
+          {/* Shared Folders Button */}
+          <button
+            className={`sidebar-btn ${currentView === 'shared' ? 'active' : ''}`}
+            onClick={() => changeView('shared')}
+          >
+            <span>🌍</span> Compartidos conmigo
+          </button>
         </div>
 
         {/* Actions */}
@@ -1089,29 +1200,9 @@ useEffect(() => {
           <button className="acciones-btn" onClick={onBackToFolders}>
             ⬅️ Volver
           </button>
-          <button className="acciones-btn" onClick={async () => {
-            // Verificar si tiene sesión de Microsoft
-            try {
-              const response = await fetch('http://localhost:5000/api/auth/verify-microsoft', {
-                credentials: 'include'
-              });
-              const data = await response.json();
-              
-              if (data.hasMicrosoftAuth) {
-                // Tiene sesión de Microsoft, ir al calendario
-                window.location.href = 'http://localhost:3000/calendar';
-              } else {
-                // No tiene sesión, redirigir a login de Microsoft
-                if (window.confirm('Para acceder al calendario necesitas iniciar sesión con tu cuenta de Microsoft Outlook. ¿Deseas continuar?')) {
-                  window.location.href = 'http://localhost:5000/api/auth/login';
-                }
-              }
-            } catch (error) {
-              console.error('Error verificando sesión de Microsoft:', error);
-              // En caso de error, intentar login de Microsoft
-              if (window.confirm('Para acceder al calendario necesitas iniciar sesión con tu cuenta de Microsoft Outlook. ¿Deseas continuar?')) {
-                window.location.href = 'http://localhost:5000/api/auth/login';
-              }
+          <button className="acciones-btn" onClick={() => {
+            if (onGoToCalendar) {
+              onGoToCalendar();
             }
           }}>
             📅 Abrir calendario
@@ -1133,10 +1224,10 @@ useEffect(() => {
           </h1>
           <button 
             className="theme-toggle-btn"
-            onClick={toggleTheme}
-            title={isDarkMode ? 'Cambiar a modo claro' : 'Cambiar a modo oscuro'}
+            onClick={() => setShowSettingsModal(true)}
+            title="Ajustes"
           >
-            {isDarkMode ? '☀️' : '🌙'}
+            ⚙️
           </button>
         </div>
 
@@ -1571,6 +1662,7 @@ useEffect(() => {
                     onOpenSidebar={openSidebarPanel}
                     onEdit={openEditorPanel}
                     onDuplicate={handleDuplicateItem}
+                    onShare={openShareModal}
                     onDragStart={handleFileDragStart}
                     onDragEnd={handleFileDragEnd}
                     isHovered={hoveredFile?.id === item.id}
@@ -1694,6 +1786,25 @@ useEffect(() => {
         itemToMove={moveItem}
         onMove={handleMoveItem}
       />
+
+      {/* Share Modal */}
+      <ShareModal
+        isOpen={showShareModal}
+        onClose={() => setShowShareModal(false)}
+        onShare={handleShareItem}
+        item={shareItem}
+      />
+
+      {/* Settings Modal */}
+      {showSettingsModal && (
+        <SettingsModal
+          onClose={() => setShowSettingsModal(false)}
+          user={user}
+          onThemeToggle={onThemeToggle}
+          isDarkMode={isDarkMode}
+          initialTab={settingsInitialTab}
+        />
+      )}
 
       {/* File Viewer Modal */}
       {showFileViewer && viewerFile && (

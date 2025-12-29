@@ -12,7 +12,7 @@ export const getAuthenticatedUrl = (url) => {
 export const downloadFile = (fileId, fileName) => {
   try {
     const token = getAuthToken();
-    const downloadUrl = `/api/files/download/${fileId}?download=true&token=${encodeURIComponent(token)}`;
+    const downloadUrl = `/api/files/download/${encodeURIComponent(fileId)}?download=true&token=${encodeURIComponent(token)}`;
 
     // Create a hidden link to trigger download
     const link = document.createElement('a');
@@ -73,34 +73,17 @@ export const canPreview = (filename) => {
 };
 
 export const getAuthenticatedPreviewUrl = async (fileId, filename) => {
-  const type = getFileType(filename);
-  if (!canPreview(filename)) return null;
-
+  // Removed canPreview check to allow fetching URLs for all file types (e.g. for download or external viewers)
+  // The caller is responsible for determining if the file can actually be previewed/rendered.
+  
   try {
     const token = localStorage.getItem('auth_token');
     if (!token) return null;
 
-    const response = await fetch(`/api/files/preview/${fileId}`, {
-      headers: {
-        'Authorization': `Bearer ${token}`
-      }
-    });
-
-    if (!response.ok) return null;
-
-    if (type === 'image') {
-      const blob = await response.blob();
-      return new Promise((resolve) => {
-        const reader = new FileReader();
-        reader.onload = () => resolve(reader.result);
-        reader.readAsDataURL(blob);
-      });
-    }
-
-    return `/api/files/preview/${fileId}?token=${encodeURIComponent(token)}`;
-
+    // Return direct URL for all types
+    return `/api/files/preview/${encodeURIComponent(fileId)}?token=${encodeURIComponent(token)}`;
   } catch (error) {
-    console.error('Error obteniendo preview autenticada:', error);
+    console.error('Error getting preview URL:', error);
     return null;
   }
 };
