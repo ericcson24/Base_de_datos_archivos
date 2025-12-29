@@ -1,62 +1,16 @@
 {
   "name": "codigo_servidor",
   "version": "1.0.0",
-  "description": "Sistema de nube distribuible con autenticaciÃ³n y gestiÃ³n de archivos",
-  "main": "server/server.js",
-  "dependencies": {
-    "@azure/msal-node": "^3.8.0",
-    "@fullcalendar/core": "^6.1.19",
-    "@fullcalendar/daygrid": "^6.1.19",
-    "@fullcalendar/interaction": "^6.1.19",
-    "@fullcalendar/react": "^6.1.19",
-    "@fullcalendar/timegrid": "^6.1.19",
-    "@microsoft/microsoft-graph-client": "^3.0.7",
-    "body-parser": "^1.20.2",
-    "cookie-parser": "^1.4.7",
-    "cors": "^2.8.5",
-    "dotenv": "^17.2.3",
-    "express": "^4.18.2",
-    "express-session": "^1.18.2",
-    "jszip": "^3.10.1",
-    "mkdirp": "^3.0.1",
-    "multer": "^1.4.5-lts.1",
-    "react": "^18.2.0",
-    "react-dom": "^18.2.0",
-    "react-router-dom": "^7.9.4",
-    "react-scripts": "^5.0.1",
-    "web-vitals": "^5.1.0"
-  },
+  "description": "Sistema de nube distribuible con autenticación y gestión de archivos",
   "scripts": {
     "start": "concurrently \"npm run server\" \"npm run client\"",
-    "build": "react-scripts build",
-    "client": "react-scripts start",
-    "server": "node server/server.js",
-    "dev": "concurrently \"npm run server\" \"npm run client\""
+    "server": "cd back && npm start",
+    "client": "cd front && npm start",
+    "install-all": "npm install && cd front && npm install && cd back && npm install",
+    "dev": "concurrently \"npm run server:dev\" \"npm run client\"",
+    "server:dev": "cd back && npm run dev"
   },
-  "eslintConfig": {
-    "extends": [
-      "react-app"
-    ]
-  },
-  "browserslist": {
-    "production": [
-      ">0.2%",
-      "not dead",
-      "not op_mini all"
-    ],
-    "development": [
-      "last 1 chrome version",
-      "last 1 firefox version",
-      "last 1 safari version"
-    ]
-  },
-  "proxy": "http://localhost:5000",
   "devDependencies": {
-    "autoprefixer": "^10.4.21",
-    "concurrently": "^9.2.1",
-    "http-proxy-middleware": "^3.0.5",
-    "nodemon": "^3.1.10",
-    "postcss": "^8.5.6",
-    "tailwindcss": "^3.4.18"
+    "concurrently": "^9.2.1"
   }
 }
