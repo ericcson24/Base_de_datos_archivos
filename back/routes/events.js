@@ -117,6 +117,20 @@ router.get('/categories', authenticate, async (req, res) => {
   } catch (error) {
     console.error('❌ Error obteniendo categorías:', error);
 
+    // Detectar token corrupto o inválido y limpiar DB
+    if (error.code === 'InvalidAuthenticationToken' || (error.message && error.message.includes('JWT is not well formed'))) {
+      console.log('⚠️ Token inválido detectado. Eliminando token corrupto de la base de datos.');
+      try {
+        await dbAsync.run(
+          "UPDATE users SET microsoft_access_token = NULL, microsoft_refresh_token = NULL WHERE username = ?", 
+          [req.user.username]
+        );
+      } catch (dbError) {
+        console.error('Error limpiando token:', dbError);
+      }
+      return res.status(401).json({ error: 'REAUTH', message: 'Sesión de Microsoft inválida' });
+    }
+
     if (error.statusCode === 401) {
       return res.status(401).json({ error: 'REAUTH' });
     }
@@ -262,6 +276,21 @@ router.post('/sync', authenticate, async (req, res) => {
 
   } catch (error) {
     console.error('Error syncing events:', error);
+    
+    // Detectar token corrupto o inválido y limpiar DB
+    if (error.code === 'InvalidAuthenticationToken' || (error.message && error.message.includes('JWT is not well formed'))) {
+      console.log('⚠️ Token inválido detectado en sync. Eliminando token corrupto.');
+      try {
+        await dbAsync.run(
+          "UPDATE users SET microsoft_access_token = NULL, microsoft_refresh_token = NULL WHERE username = ?", 
+          [req.user.username]
+        );
+      } catch (dbError) {
+        console.error('Error limpiando token:', dbError);
+      }
+      return res.status(401).json({ error: 'REAUTH', message: 'Sesión de Microsoft inválida' });
+    }
+
     res.status(500).json({ error: 'Error durante la sincronización' });
   }
 });
@@ -284,7 +313,7 @@ router.get('/', authenticate, async (req, res) => {
             
             // Fetch events from Microsoft (Primary Calendar)
             let query = client.api('/me/calendar/events')
-                .select('id,subject,bodyPreview,start,end,location,webLink,isAllDay')
+                .select('id,subject,bodyPreview,start,end,location,webLink,isAllDay,categories')
                 .top(100);
 
             if (start && end) {
@@ -298,8 +327,8 @@ router.get('/', authenticate, async (req, res) => {
             // Sync to DB
             for (const event of eventsResponse.value) {
                 await dbAsync.run(`
-                    INSERT INTO calendar_events (microsoft_id, user_id, subject, body_preview, start_time, end_time, is_all_day, location, web_link, last_synced)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+                    INSERT INTO calendar_events (microsoft_id, user_id, subject, body_preview, start_time, end_time, is_all_day, location, web_link, categories, last_synced)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
                     ON CONFLICT(microsoft_id) DO UPDATE SET
                     subject=excluded.subject,
                     body_preview=excluded.body_preview,
@@ -308,6 +337,7 @@ router.get('/', authenticate, async (req, res) => {
                     is_all_day=excluded.is_all_day,
                     location=excluded.location,
                     web_link=excluded.web_link,
+                    categories=excluded.categories,
                     last_synced=CURRENT_TIMESTAMP
                 `, [
                     event.id,
@@ -318,11 +348,27 @@ router.get('/', authenticate, async (req, res) => {
                     event.end.dateTime,
                     event.isAllDay ? 1 : 0,
                     event.location?.displayName,
-                    event.webLink
+                    event.webLink,
+                    JSON.stringify(event.categories || [])
                 ]);
             }
         } catch (msError) {
             console.error('Error syncing with Microsoft:', msError);
+            
+            // Detectar token corrupto o inválido y limpiar DB
+            if (msError.code === 'InvalidAuthenticationToken' || (msError.message && msError.message.includes('JWT is not well formed'))) {
+              console.log('⚠️ Token inválido detectado en GET events. Eliminando token corrupto.');
+              try {
+                await dbAsync.run(
+                  "UPDATE users SET microsoft_access_token = NULL, microsoft_refresh_token = NULL WHERE username = ?", 
+                  [username]
+                );
+              } catch (dbError) {
+                console.error('Error limpiando token:', dbError);
+              }
+              // No retornamos error aquí para permitir que se carguen los eventos de la DB local
+              // pero el usuario verá que no está sincronizado en settings
+            }
         }
     }
 
@@ -342,18 +388,28 @@ router.get('/', authenticate, async (req, res) => {
     const dbEvents = await dbAsync.all(query, params);
 
     // Format events for frontend
-    const formattedEvents = dbEvents.map(e => ({
-        id: e.microsoft_id || e.id.toString(),
-        title: e.subject,
-        start: e.start_time, // Assuming stored as ISO string or compatible
-        end: e.end_time,
-        allDay: e.is_all_day === 1,
-        location: e.location,
-        preview: e.body_preview,
-        url: e.web_link,
-        source: 'database',
-        color: '#4285f4' 
-    }));
+    const formattedEvents = dbEvents.map(e => {
+        let categories = [];
+        try {
+            categories = e.categories ? JSON.parse(e.categories) : [];
+        } catch (err) {
+            console.error('Error parsing categories:', err);
+        }
+
+        return {
+            id: e.microsoft_id || e.id.toString(),
+            title: e.subject,
+            start: e.start_time, // Assuming stored as ISO string or compatible
+            end: e.end_time,
+            allDay: e.is_all_day === 1,
+            location: e.location,
+            preview: e.body_preview,
+            url: e.web_link,
+            categories: categories,
+            source: 'database',
+            color: '#4285f4' 
+        };
+    });
 
     res.json(formattedEvents);
 

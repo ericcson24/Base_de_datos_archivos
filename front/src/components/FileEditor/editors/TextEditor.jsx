@@ -1,8 +1,10 @@
 import React, { useState, useRef } from 'react';
 import { getAuthToken } from '../../../utils/fileUtils';
+import { useLanguage } from '../../../context/LanguageContext';
 import './TextEditor.css';
 
 const TextEditor = ({ content, file }) => {
+  const { t } = useLanguage();
   const [text, setText] = useState(content || '');
   const [fontSize, setFontSize] = useState(14);
   const [lineHeight, setLineHeight] = useState(1.6);
@@ -17,7 +19,7 @@ const TextEditor = ({ content, file }) => {
     try {
       const token = getAuthToken();
       if (!token) {
-        alert('No hay sesión activa. Por favor, recarga la página e inicia sesión nuevamente.');
+        alert(t('fileEditor.noSession'));
         return;
       }
 
@@ -34,13 +36,13 @@ const TextEditor = ({ content, file }) => {
 
       if (data.success) {
         setSavedText(text);
-        alert('Archivo guardado exitosamente');
+        alert(t('fileEditor.saveSuccess'));
       } else {
-        alert('Error al guardar: ' + data.message);
+        alert(t('fileEditor.saveError', { error: data.message }));
       }
     } catch (error) {
       console.error('Error saving file:', error);
-      alert('Error al guardar el archivo');
+      alert(t('fileEditor.genericSaveError'));
     }
   };
 
@@ -84,7 +86,7 @@ const TextEditor = ({ content, file }) => {
           {/* Font Size */}
           <div className="tool-group">
             <label className="text-xs font-medium text-gray-700 dark:text-gray-300">
-              Tamaño: {fontSize}px
+              {t('fileEditor.fontSize')}: {fontSize}px
             </label>
             <input
               type="range"
@@ -99,7 +101,7 @@ const TextEditor = ({ content, file }) => {
           {/* Line Height */}
           <div className="tool-group">
             <label className="text-xs font-medium text-gray-700 dark:text-gray-300">
-              Interlineado: {lineHeight}
+              {t('fileEditor.lineHeight')}: {lineHeight}
             </label>
             <input
               type="range"
@@ -118,13 +120,13 @@ const TextEditor = ({ content, file }) => {
               className={`btn-tool ${showLineNumbers ? 'active' : ''}`}
               onClick={() => setShowLineNumbers(!showLineNumbers)}
             >
-              #️⃣ Números
+              #️⃣ {t('fileEditor.lineNumbersShort')}
             </button>
             <button
               className={`btn-tool ${wordWrap ? 'active' : ''}`}
               onClick={() => setWordWrap(!wordWrap)}
             >
-              📄 Ajustar
+              📄 {t('fileEditor.wordWrapShort')}
             </button>
           </div>
 
@@ -135,27 +137,27 @@ const TextEditor = ({ content, file }) => {
 
           {/* Stats */}
           <div className="text-xs text-gray-600 dark:text-gray-400 ml-auto flex gap-3">
-            <span>{lineCount} líneas</span>
-            <span>{text.length} caracteres</span>
-            {hasChanges && <span className="text-orange-500 font-semibold">● Sin guardar</span>}
+            <span>{lineCount} {t('fileEditor.lines')}</span>
+            <span>{text.length} {t('fileEditor.characters')}</span>
+            {hasChanges && <span className="text-orange-500 font-semibold">● {t('fileEditor.unsaved')}</span>}
           </div>
 
           {/* Actions */}
           <div className="flex gap-2">
             {hasChanges && (
               <button className="btn-secondary" onClick={() => setText(savedText)}>
-                ↩️ Deshacer
+                ↩️ {t('fileEditor.undo')}
               </button>
             )}
             <button className="btn-secondary" onClick={handleDownload}>
-              💾 Descargar
+              💾 {t('fileEditor.download')}
             </button>
             <button 
               className="btn-primary" 
               onClick={handleSave}
               disabled={!hasChanges}
             >
-              💾 Guardar
+              💾 {t('fileEditor.save')}
             </button>
           </div>
         </div>

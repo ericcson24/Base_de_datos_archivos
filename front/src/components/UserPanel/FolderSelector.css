@@ -1,5 +1,5 @@
 /* FolderSelector.css */
-.folder-selector {
+.folder-selector-page {
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   background-color: #f6f6f6;
   display: flex;
@@ -13,213 +13,150 @@
   overflow: hidden;
 }
 
-.folder-selector .bg {
+.folder-selector-page .bg {
   position: fixed;
   inset: 0;
   z-index: -1;
-  background: linear-gradient(#ffffff 80%, #9c9a9a 100%);
+  background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
 }
 
 .selector-container {
-  width: 40%;
-  max-width: 80vw;
+  width: 100%;
+  max-width: 400px;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 1vw;
-  min-height: 40vh;
-  overflow-y: auto;
-  max-height: 60vh;
-  border-radius: 1vw;
-  padding: 2vw 1vw;
-  color: #000000;
-  margin-bottom: 1vw;
-  background: rgb(255 255 255 / 8%);
-  border-radius: 0.5rem;
-  border: 2px solid transparent;
-  box-shadow: 0 0 0 2px rgb(195 195 195 / 60%), 0 16px 32px rgba(0, 0, 0, 0.12);
-  border: 0.4vw dashed transparent;
-  position: relative;
-  margin: 0 auto;
-}
-
-/* Dark Mode Styles */
-[data-theme="dark"] .folder-selector {
-  background-color: #1a1a1a;
-}
-
-[data-theme="dark"] .folder-selector .bg {
-  background: linear-gradient(#0a0a0a 80%, #2a2a2a 100%);
-}
-
-[data-theme="dark"] .selector-container {
-  color: #ffffff;
-  background: rgb(0 0 0 / 20%);
-  box-shadow: 0 0 0 2px rgb(255 255 255 / 20%), 0 16px 32px rgba(0, 0, 0, 0.3);
-}
-
-[data-theme="dark"] .options-container h2 {
-  color: #ffffff;
-}
-
-[data-theme="dark"] .option-btn {
-  color: #ffffff;
-}
-
-[data-theme="dark"] .option-btn:hover {
-  background-color: rgba(255, 255, 255, 0.1);
-}
-
-[data-theme="dark"] .theme-toggle-btn {
-  background: rgba(0, 0, 0, 0.8);
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  color: #ffffff;
-}
-
-[data-theme="dark"] .theme-toggle-btn:hover {
-  background: rgba(25, 118, 210, 0.2);
-  color: #1976d2;
-}
-
-/* Theme Toggle Button - positioned on the full screen */
-.theme-toggle-btn {
-  position: fixed;
-  top: 1rem;
-  right: 1rem;
-  background: rgba(255, 255, 255, 0.9);
-  border: 1px solid rgba(0, 0, 0, 0.1);
-  border-radius: 50%;
-  width: 40px;
-  height: 40px;
-  display: flex;
-  align-items: center;
   justify-content: center;
-  cursor: pointer;
-  font-size: 1.2rem;
-  color: #333;
-  transition: all 0.3s ease;
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
-  z-index: 1000;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-}
-
-.theme-toggle-btn:hover {
-  background: rgba(25, 118, 210, 0.1);
-  color: #1976d2;
-  transform: scale(1.1);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+  z-index: 1;
+  padding: 1rem;
 }
 
 .options-container {
   width: 100%;
   display: flex;
   flex-direction: column;
-  align-items: center;
   gap: 1rem;
-  padding: 2rem;
+  padding: 2rem !important;
+  border-radius: 1.5rem !important;
 }
 
 .options-container h2 {
-  font-size: 1.4rem;
-  color: #333;
-  margin-bottom: 1rem;
+  font-size: 1.5rem;
+  color: #1f2937;
+  margin-bottom: 1.5rem;
   text-align: center;
+  font-weight: 700;
 }
 
-/* Información del usuario */
+/* User Info */
 .user-info {
-  width: 100%;
+  background: rgba(255, 255, 255, 0.5);
+  border-radius: 1rem;
+  padding: 1rem;
   text-align: center;
   margin-bottom: 1rem;
-  padding: 0.75rem;
-  background: rgba(255, 255, 255, 0.1);
-  border-radius: 0.5rem;
-  border: 1px solid rgba(0, 0, 0, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.2);
 }
 
 .user-info p {
-  margin: 0 0 0.5rem 0;
-  color: #333;
+  margin: 0;
+  color: #374151;
   font-size: 1rem;
 }
 
 .admin-badge {
   display: inline-block;
-  background: linear-gradient(90deg, #ffc107 60%, #ffeb3b 100%);
-  color: #212529;
+  background: #fbbf24;
+  color: #92400e;
   padding: 0.25rem 0.75rem;
-  border-radius: 1rem;
-  font-size: 0.875rem;
-  font-weight: 600;
-  box-shadow: 0 2px 4px rgba(255, 193, 7, 0.3);
+  border-radius: 9999px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  margin-top: 0.5rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
 }
 
-/* Estilos para tema oscuro de la info del usuario */
-[data-theme="dark"] .user-info {
-  background: rgba(0, 0, 0, 0.2);
-  border-color: rgba(255, 255, 255, 0.2);
-}
-
-[data-theme="dark"] .user-info p {
-  color: #ffffff;
-}
-
-.option-btn {
-  border: none;
-  border-radius: 1em;
-  padding: 0.6em 0.8em;
-  font-size: 1em;
-  font-weight: 500;
-  cursor: pointer;
-  transition: background 0.2s, color 0.2s;
-  width: 100%;
-  text-align: left;
+/* Settings Button Fixed */
+.settings-btn-fixed {
+  position: fixed;
+  top: 1.5rem;
+  right: 1.5rem;
+  width: 3rem;
+  height: 3rem;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.8);
+  backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 255, 255, 0.3);
   display: flex;
   align-items: center;
-  gap: 0.7em;
-  background: none;
-  color: #333;
-  margin-bottom: 0.4em;
-  min-height: 2.2em;
-  max-width: 100%;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  justify-content: center;
+  font-size: 1.5rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  z-index: 50;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+}
+
+.settings-btn-fixed:hover {
+  transform: rotate(45deg);
+  background: white;
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+}
+
+/* Option Buttons */
+.option-btn {
+  width: 100%;
+  justify-content: flex-start !important;
+  padding: 1rem !important;
+  font-size: 1rem !important;
+  transition: transform 0.2s ease, box-shadow 0.2s ease !important;
 }
 
 .option-btn:hover {
-  background-color: #ffffff;
+  transform: translateY(-2px);
 }
 
-.logout-btn {
-  background: linear-gradient(90deg, #ff3a30a5 60%, #ff7b6b 100%);
-  color: #fff;
-  margin-top: 1rem;
+/* Dark Mode */
+[data-theme="dark"] .folder-selector-page {
+  background-color: #111827;
 }
 
-.logout-btn:hover {
-  background: linear-gradient(90deg, #d32f2f9f 60%, #ff3b30 100%);
-  color: #fff;
-  box-shadow: 0 4px 16px rgba(255,59,48,0.18);
+[data-theme="dark"] .folder-selector-page .bg {
+  background: linear-gradient(135deg, #1f2937 0%, #111827 100%);
+}
+
+[data-theme="dark"] .options-container h2 {
+  color: #f3f4f6;
+}
+
+[data-theme="dark"] .user-info {
+  background: rgba(0, 0, 0, 0.3);
+  border-color: rgba(255, 255, 255, 0.1);
+}
+
+[data-theme="dark"] .user-info p {
+  color: #e5e7eb;
+}
+
+[data-theme="dark"] .settings-btn-fixed {
+  background: rgba(31, 41, 55, 0.8);
+  border-color: rgba(255, 255, 255, 0.1);
+  color: #e5e7eb;
+}
+
+[data-theme="dark"] .settings-btn-fixed:hover {
+  background: #374151;
 }
 
 /* Responsive */
-@media (max-width: 768px) {
+@media (max-width: 640px) {
   .selector-container {
-    width: 90%;
     padding: 1rem;
+    max-width: 100%;
   }
-
+  
   .options-container {
-    padding: 1.5rem;
-  }
-
-  .options-container h2 {
-    font-size: 1.2rem;
-  }
-
-  .option-btn {
-    font-size: 0.9rem;
-    padding: 0.8rem;
+    padding: 1.5rem !important;
   }
 }

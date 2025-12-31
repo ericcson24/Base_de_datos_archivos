@@ -8,6 +8,7 @@ import ZipViewer from './editors/ZipViewer';
 import ExcelEditor from './editors/ExcelEditor';
 import WordEditor from './editors/WordEditor';
 import { downloadFile, getAuthToken } from '../../utils/fileUtils';
+import { useLanguage } from '../../context/LanguageContext';
 import './FileEditorPanel.css';
 
 const getFileType = (filename) => {
@@ -25,6 +26,7 @@ const getFileType = (filename) => {
 };
 
 const FileEditorPanel = ({ file, onClose, position, zIndex, onBringToFront, panelId, isInline = false }) => {
+  const { t } = useLanguage();
   const [size, setSize] = useState({ width: 800, height: 600 });
   const [pos, setPos] = useState(position || { x: 100, y: 100 });
   const [isDragging, setIsDragging] = useState(false);
@@ -85,7 +87,7 @@ const FileEditorPanel = ({ file, onClose, position, zIndex, onBringToFront, pane
           
           if (blob.size === 0) {
              console.error('❌ [FileEditorPanel] Blob is empty');
-             throw new Error('El archivo descargado está vacío');
+             throw new Error(t('fileEditor.emptyFile'));
           }
           
           // Check if blob is actually an error page (HTML/JSON)
@@ -95,7 +97,7 @@ const FileEditorPanel = ({ file, onClose, position, zIndex, onBringToFront, pane
              const text = await blob.text();
              console.log('📄 [FileEditorPanel] Suspicious blob content start:', text.substring(0, 100));
              if (text.includes('Error') || text.includes('success":false')) {
-                throw new Error('Error del servidor al descargar el archivo');
+                throw new Error(t('fileEditor.serverError'));
              }
           }
 
@@ -111,7 +113,7 @@ const FileEditorPanel = ({ file, onClose, position, zIndex, onBringToFront, pane
         }
       } catch (error) {
         console.error('❌ [FileEditorPanel] Error loading file:', error);
-        setError('No se pudo cargar el archivo. Verifica tu conexión.');
+        setError(t('fileEditor.errorLoading', { error: error.message }));
       } finally {
         setLoading(false);
       }
@@ -126,7 +128,7 @@ const FileEditorPanel = ({ file, onClose, position, zIndex, onBringToFront, pane
       }
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [file.id, fileType]);
+  }, [file.id, fileType, t]);
 
   // Dragging handlers - Usando la misma lógica que file-grid
   const handleMouseDown = useCallback((e) => {
@@ -293,20 +295,19 @@ const FileEditorPanel = ({ file, onClose, position, zIndex, onBringToFront, pane
                 📽️
               </div>
               <h3 className="text-xl font-bold mb-2 text-gray-800 dark:text-white">
-                Presentación
+                {t('fileEditor.presentation')}
               </h3>
               <p className="mb-6 text-gray-600 dark:text-gray-300">
-                La edición en línea de este tipo de archivo no está disponible en el entorno local.
-                Por favor, descarga el archivo para editarlo en tu ordenador.
+                {t('fileEditor.presentationDesc')}
               </p>
               <button
-                onClick={() => downloadFile(file.id, file.name)}
+                onClick={() => downloadFile(file.id, file.name, t)}
                 className="px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors flex items-center justify-center mx-auto space-x-2"
               >
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
                 </svg>
-                <span>Descargar para editar</span>
+                <span>{t('fileEditor.downloadToEdit')}</span>
               </button>
             </div>
           </div>
@@ -318,8 +319,8 @@ const FileEditorPanel = ({ file, onClose, position, zIndex, onBringToFront, pane
               <svg className="w-16 h-16 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
               </svg>
-              <p>No se puede editar este tipo de archivo</p>
-              <p className="text-sm mt-2">Tipo: {fileType}</p>
+              <p>{t('fileEditor.cannotEdit')}</p>
+              <p className="text-sm mt-2">{t('fileEditor.type', { type: fileType })}</p>
             </div>
           </div>
         );
@@ -348,7 +349,7 @@ const FileEditorPanel = ({ file, onClose, position, zIndex, onBringToFront, pane
           <button
             onClick={onClose}
             className="w-8 h-8 rounded-lg hover:bg-red-500/20 transition-colors flex items-center justify-center"
-            title="Cerrar"
+            title={t('common.close')}
           >
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -416,7 +417,7 @@ const FileEditorPanel = ({ file, onClose, position, zIndex, onBringToFront, pane
           <button
             onClick={handleMinimize}
             className="w-8 h-8 rounded-lg hover:bg-yellow-500/20 transition-colors flex items-center justify-center"
-            title="Minimizar"
+            title={t('common.minimize')}
           >
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 12H4" />
@@ -425,7 +426,7 @@ const FileEditorPanel = ({ file, onClose, position, zIndex, onBringToFront, pane
           <button
             onClick={handleMaximize}
             className="w-8 h-8 rounded-lg hover:bg-green-500/20 transition-colors flex items-center justify-center"
-            title="Maximizar"
+            title={t('common.maximize')}
           >
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               {isMaximized ? (
@@ -438,7 +439,7 @@ const FileEditorPanel = ({ file, onClose, position, zIndex, onBringToFront, pane
           <button
             onClick={onClose}
             className="w-8 h-8 rounded-lg hover:bg-red-500/20 transition-colors flex items-center justify-center"
-            title="Cerrar"
+            title={t('common.close')}
           >
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />

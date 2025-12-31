@@ -2,9 +2,11 @@ import React, { useState } from 'react';
 import FrostedContainer from '../Common/FrostedContainer';
 import Button from '../Common/Button';
 import SettingsModal from '../Modals/SettingsModal';
+import { useLanguage } from '../../context/LanguageContext';
 import './FolderSelector.css';
 
 const FolderSelector = ({ user, onSelectFolder, onLogout, onThemeToggle, isDarkMode, onGoToAdmin, onGoToCalendar }) => {
+  const { t } = useLanguage();
   const [showSettingsModal, setShowSettingsModal] = useState(false);
 
   const handleFolderSelect = (tipo) => {
@@ -24,15 +26,15 @@ const FolderSelector = ({ user, onSelectFolder, onLogout, onThemeToggle, isDarkM
   };
 
   return (
-    <div className="folder-selector">
+    <div className="folder-selector-page">
       {/* Background */}
       <div className="bg"></div>
 
       {/* Settings Button */}
       <button
-        className="theme-toggle-btn"
+        className="settings-btn-fixed"
         onClick={() => setShowSettingsModal(true)}
-        title="Ajustes"
+        title={t('userPanel.settings')}
       >
         ⚙️
       </button>
@@ -48,13 +50,13 @@ const FolderSelector = ({ user, onSelectFolder, onLogout, onThemeToggle, isDarkM
 
       <div className="selector-container">
         <FrostedContainer variant="card" className="options-container">
-          <h2>¿Qué quieres hacer?</h2>
+          <h2>{t('folders.subtitle')}</h2>
           
           {/* Mostrar información del usuario */}
           {user && (
             <div className="user-info">
-              <p>Bienvenido, <strong>{user.username}</strong></p>
-              {user.role === 'admin' && <span className="admin-badge">👑 Administrador</span>}
+              <p>{t('userPanel.welcome')}, <strong>{user.username}</strong></p>
+              {user.role === 'admin' && <span className="admin-badge">👑 Admin</span>}
             </div>
           )}
 
@@ -63,7 +65,7 @@ const FolderSelector = ({ user, onSelectFolder, onLogout, onThemeToggle, isDarkM
             onClick={() => handleFolderSelect('privada')}
             className="option-btn"
           >
-            📁 Carpeta Privada
+            📁 {t('userPanel.myFiles')}
           </Button>
 
           <Button
@@ -71,7 +73,7 @@ const FolderSelector = ({ user, onSelectFolder, onLogout, onThemeToggle, isDarkM
             onClick={handleRemoteWork}
             className="option-btn"
           >
-            💻 Trabajar Remoto
+            💻 {t('userPanel.remoteWork')}
           </Button>
 
           <Button
@@ -79,7 +81,7 @@ const FolderSelector = ({ user, onSelectFolder, onLogout, onThemeToggle, isDarkM
             onClick={handleCalendar}
             className="option-btn"
           >
-            📅 Calendario
+            📅 {t('userPanel.calendar')}
           </Button>
 
           {/* Botón de administrador solo para admins */}
@@ -89,7 +91,7 @@ const FolderSelector = ({ user, onSelectFolder, onLogout, onThemeToggle, isDarkM
               onClick={onGoToAdmin}
               className="option-btn admin-btn"
             >
-              🛠️ Panel de Administración
+              🛠️ {t('folders.adminPanel')}
             </Button>
           )}
 
@@ -98,7 +100,7 @@ const FolderSelector = ({ user, onSelectFolder, onLogout, onThemeToggle, isDarkM
             onClick={onLogout}
             className="option-btn logout-btn"
           >
-            🚪 Cerrar sesión
+            {t('userPanel.logout')}
           </Button>
         </FrostedContainer>
       </div>

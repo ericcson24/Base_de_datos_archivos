@@ -3,13 +3,42 @@ const router = express.Router();
 const path = require('path');
 const bcrypt = require('bcrypt');
 const si = require('systeminformation');
+const multer = require('multer');
+const fs = require('fs');
 const { dbAsync } = require('../database/db');
 const { msalClient, scopes } = require('../utils/microsoft-auth');
+
+// Configuración de Multer para avatares
+const avatarStorage = multer.diskStorage({
+  destination: function (req, file, cb) {
+    const uploadDir = path.join(__dirname, '../public/avatars/uploads');
+    if (!fs.existsSync(uploadDir)) {
+      fs.mkdirSync(uploadDir, { recursive: true });
+    }
+    cb(null, uploadDir);
+  },
+  filename: function (req, file, cb) {
+    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+    cb(null, 'avatar-' + uniqueSuffix + path.extname(file.originalname));
+  }
+});
+
+const uploadAvatar = multer({ 
+  storage: avatarStorage,
+  limits: { fileSize: 5 * 1024 * 1024 }, // 5MB limit
+  fileFilter: (req, file, cb) => {
+    if (file.mimetype.startsWith('image/')) {
+      cb(null, true);
+    } else {
+      cb(new Error('Solo se permiten imágenes'));
+    }
+  }
+});
 
 // Función para validar credenciales usando la base de datos SQLite
 async function validateCredentials(username, password) {
   try {
-    console.log(`🔐 Validando credenciales para: ${username}`);
+    console.log(`Validando credenciales para: ${username}`);
 
     // Buscar usuario en la base de datos
     const user = await dbAsync.get("SELECT * FROM users WHERE username = ?", [username]);
@@ -112,13 +141,14 @@ router.post('/login', async (req, res) => {
       console.log(`✅ Login exitoso para: ${username}`);
 
       // Guardar token en cookie HTTP-only segura
-      res.cookie('auth_token', token, {
+      const cookieOptions = {
         httpOnly: true,
         secure: process.env.NODE_ENV === 'production', // Solo HTTPS en producción
         sameSite: 'lax',
         maxAge: 7 * 24 * 60 * 60 * 1000, // 7 días
         path: '/'
-      });
+      };
+      res.cookie('auth_token', token, cookieOptions);
 
       res.json({
         success: true,
@@ -146,18 +176,48 @@ router.post('/login', async (req, res) => {
 // Logout endpoint
 router.post('/logout', (req, res) => {
   try {
-    console.log('👋 Cerrando sesión de Microsoft');
+    console.log('👋 Cerrando sesión. Cookies recibidas:', req.cookies);
 
-    // Limpiar sesión
-    req.session.accessToken = null;
-    req.session.refreshToken = null;
-    req.session.tokenExpires = null;
-    req.session.account = null;
+    // Destruir sesión de servidor primero
+    if (req.session) {
+      req.session.destroy((err) => {
+        if (err) console.error('Error destroying session:', err);
+      });
+    }
 
-    res.json({ success: true });
+    // Usar setHeader directamente para enviar múltiples Set-Cookie con todas las variaciones posibles
+    // Esto es "fuerza bruta" para asegurar que el navegador borre la cookie
+    const pastDate = 'Thu, 01 Jan 1970 00:00:00 GMT';
+    
+    // Construir lista de cookies a borrar
+    const cookiesToClear = [
+      // Variaciones genéricas
+      `auth_token=; Path=/; Expires=${pastDate}; HttpOnly`,
+      `auth_token=; Path=/; Expires=${pastDate}; HttpOnly; SameSite=Lax`,
+      `auth_token=; Path=/; Expires=${pastDate}; HttpOnly; SameSite=Strict`,
+      `auth_token=; Path=/; Expires=${pastDate}; HttpOnly; SameSite=None; Secure`,
+      
+      // Variaciones con Domain explícito (localhost)
+      `auth_token=; Path=/; Domain=localhost; Expires=${pastDate}; HttpOnly; SameSite=Lax`,
+      `auth_token=; Path=/; Domain=localhost; Expires=${pastDate}; HttpOnly`,
+      
+      // Variaciones para connect.sid
+      `connect.sid=; Path=/; Expires=${pastDate}; HttpOnly; SameSite=Lax`,
+      `connect.sid=; Path=/; Expires=${pastDate}; HttpOnly`
+    ];
+
+    // Agregar variación con el dominio actual de la petición si es diferente a localhost
+    if (req.hostname && req.hostname !== 'localhost') {
+      cookiesToClear.push(`auth_token=; Path=/; Domain=${req.hostname}; Expires=${pastDate}; HttpOnly; SameSite=Lax`);
+      cookiesToClear.push(`auth_token=; Path=/; Domain=${req.hostname}; Expires=${pastDate}; HttpOnly`);
+    }
+
+    res.setHeader('Set-Cookie', cookiesToClear);
+
+    res.json({ success: true, message: 'Sesión cerrada' });
   } catch (error) {
-    console.error('❌ Error en logout:', error);
-    res.status(500).json({ error: 'Error interno del servidor' });
+    console.error('Error en logout:', error);
+    res.status(500).json({ success: false, message: 'Error al cerrar sesión' });
   }
 });
 
@@ -238,6 +298,7 @@ router.get('/verify', async (req, res) => {
     const token = req.cookies.auth_token || req.headers.authorization?.split(' ')[1];
 
     if (!token) {
+      // console.log('Verify: No token found');
       return res.status(401).json({ success: false, message: 'No hay sesión activa' });
     }
 
@@ -245,6 +306,11 @@ router.get('/verify', async (req, res) => {
     const userDataString = Buffer.from(token, 'base64').toString('utf-8');
     const userData = JSON.parse(userDataString);
 
+    // console.log('Verify: Token valid for', userData.username);
+
+    // Si el token es válido, refrescar la cookie para mantener la sesión viva
+    // Solo si no es una petición de verificación rápida (opcional)
+    
     res.json({
       success: true,
       user: userData
@@ -421,7 +487,7 @@ router.get('/microsoft/url', authenticate, async (req, res) => {
     
     res.json({ url: response });
   } catch (error) {
-    console.error('🔴 [DEBUG] Error:', error);
+    console.error(' [DEBUG] Error:', error);
     res.status(500).json({ success: false, message: error.message });
   }
 });
@@ -442,21 +508,73 @@ router.get('/microsoft/callback', async (req, res) => {
     const response = await msalClient.acquireTokenByCode(tokenRequest);
     const username = req.query.state;
 
+    console.log(' [DEBUG] Callback Microsoft:', { 
+      username, 
+      hasToken: !!response.accessToken,
+      account: response.account?.username 
+    });
+
     if (username) {
-        await dbAsync.run(
-          "UPDATE users SET microsoft_access_token = ?, microsoft_refresh_token = ?, microsoft_email = ?, microsoft_id = ? WHERE username = ?",
-          [response.accessToken, response.refreshToken || '', response.account.username, response.account.homeAccountId, username]
-        );
+        // Verificar si el usuario existe antes de actualizar
+        const user = await dbAsync.get("SELECT * FROM users WHERE username = ?", [username]);
         
-        res.redirect(`${frontendUrl}/panel?settings=true&tab=integrations&status=success`);
+        if (user) {
+          await dbAsync.run(
+            "UPDATE users SET microsoft_access_token = ?, microsoft_refresh_token = ?, microsoft_email = ?, microsoft_id = ? WHERE username = ?",
+            [response.accessToken, response.refreshToken || '', response.account.username, response.account.homeAccountId, username]
+          );
+          console.log(' [DEBUG] Usuario actualizado con tokens Microsoft');
+          res.redirect(`${frontendUrl}/panel?settings=true&tab=integrations&status=success`);
+        } else {
+          console.error(' [DEBUG] Usuario no encontrado en DB:', username);
+          res.redirect(`${frontendUrl}/panel?error=user_not_found`);
+        }
     } else {
+        console.error(' [DEBUG] State (username) missing in callback');
         res.redirect(`${frontendUrl}/login?error=state_missing`);
     }
 
   } catch (error) {
-    console.error('🔴 Error en callback Microsoft:', error);
+    console.error(' Error en callback Microsoft:', error);
     const frontendUrl = process.env.REACT_APP_FRONTEND_URL || 'http://localhost:3000';
     res.redirect(`${frontendUrl}/panel?error=microsoft_auth_failed`);
+  }
+});
+
+// Obtener lista de avatares predeterminados
+router.get('/avatars', async (req, res) => {
+  try {
+    const defaultsDir = path.join(__dirname, '../public/avatars/defaults');
+    if (!fs.existsSync(defaultsDir)) {
+      fs.mkdirSync(defaultsDir, { recursive: true });
+    }
+    
+    const files = fs.readdirSync(defaultsDir);
+    const avatarUrls = files.map(file => `/avatars/defaults/${file}`);
+    
+    res.json({ success: true, avatars: avatarUrls });
+  } catch (error) {
+    console.error('Error listando avatares:', error);
+    res.status(500).json({ success: false, message: 'Error al obtener avatares' });
+  }
+});
+
+// Subir avatar personalizado
+router.post('/avatar', authenticate, uploadAvatar.single('avatar'), async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ success: false, message: 'No se subió ningún archivo' });
+    }
+
+    const avatarUrl = `/avatars/uploads/${req.file.filename}`;
+    const username = req.user.username;
+
+    await dbAsync.run("UPDATE users SET avatar_url = ? WHERE username = ?", [avatarUrl, username]);
+
+    res.json({ success: true, avatarUrl, message: 'Avatar actualizado correctamente' });
+  } catch (error) {
+    console.error('Error subiendo avatar:', error);
+    res.status(500).json({ success: false, message: 'Error al subir avatar' });
   }
 });
 

@@ -1,9 +1,11 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import * as XLSX from 'xlsx';
+import { useLanguage } from '../../../context/LanguageContext';
 import { getAuthToken } from '../../../utils/fileUtils';
 import './ExcelEditor.css';
 
 const ExcelEditor = ({ fileUrl, fileBlob, file, onClose }) => {
+  const { t } = useLanguage();
   const [workbook, setWorkbook] = useState(null);
   const [activeSheet, setActiveSheet] = useState('');
   const [data, setData] = useState([]);
@@ -19,7 +21,7 @@ const ExcelEditor = ({ fileUrl, fileBlob, file, onClose }) => {
       if (fileBlob) {
         console.log('📊 [ExcelEditor] Loading from blob, size:', fileBlob.size);
         if (fileBlob.size === 0) {
-          throw new Error('El archivo está vacío');
+          throw new Error(t('excelEditor.emptyFile'));
         }
         arrayBuffer = await fileBlob.arrayBuffer();
       } else if (fileUrl) {
@@ -31,7 +33,7 @@ const ExcelEditor = ({ fileUrl, fileBlob, file, onClose }) => {
           }
         });
 
-        if (!response.ok) throw new Error('Error al cargar el archivo');
+        if (!response.ok) throw new Error(t('excelEditor.loadError'));
         const blob = await response.blob();
         arrayBuffer = await blob.arrayBuffer();
       } else {
@@ -41,7 +43,7 @@ const ExcelEditor = ({ fileUrl, fileBlob, file, onClose }) => {
       const wb = XLSX.read(arrayBuffer, { type: 'array' });
 
       if (!wb.SheetNames || wb.SheetNames.length === 0) {
-        throw new Error('El archivo Excel no contiene hojas');
+        throw new Error(t('excelEditor.noSheets'));
       }
 
       setWorkbook(wb);
@@ -50,7 +52,7 @@ const ExcelEditor = ({ fileUrl, fileBlob, file, onClose }) => {
       parseSheet(wb.Sheets[firstSheet]);
     } catch (err) {
       console.error('Error loading Excel file:', err);
-      setError(`No se pudo cargar el archivo Excel: ${err.message}`);
+      setError(`${t('excelEditor.loadErrorGeneric')}${err.message}`);
     } finally {
       setLoading(false);
     }
@@ -81,7 +83,7 @@ const ExcelEditor = ({ fileUrl, fileBlob, file, onClose }) => {
     try {
       const token = getAuthToken();
       if (!token) {
-        alert('No hay sesión activa. Por favor, recarga la página.');
+        alert(t('excelEditor.noSession'));
         return;
       }
 
@@ -121,18 +123,18 @@ const ExcelEditor = ({ fileUrl, fileBlob, file, onClose }) => {
         body: uploadFormData
       });
 
-      if (!response.ok) throw new Error('Error al guardar');
+      if (!response.ok) throw new Error(t('excelEditor.saveError'));
 
-      alert('Archivo guardado correctamente');
+      alert(t('excelEditor.saveSuccess'));
     } catch (err) {
       console.error('Error saving Excel file:', err);
-      alert('Error al guardar el archivo');
+      alert(t('excelEditor.saveError'));
     } finally {
       setSaving(false);
     }
   };
 
-  if (loading) return <div className="flex items-center justify-center h-full">Cargando hoja de cálculo...</div>;
+  if (loading) return <div className="flex items-center justify-center h-full">{t('excelEditor.loading')}</div>;
   if (error) return <div className="flex items-center justify-center h-full text-red-500">{error}</div>;
 
   return (
@@ -143,7 +145,7 @@ const ExcelEditor = ({ fileUrl, fileBlob, file, onClose }) => {
           disabled={saving}
           className="px-3 py-1 bg-green-600 text-white rounded hover:bg-green-700 text-sm flex items-center"
         >
-          {saving ? 'Guardando...' : '💾 Guardar'}
+          {saving ? t('excelEditor.saving') : `💾 ${t('excelEditor.save')}`}
         </button>
         <span className="text-sm text-gray-500 ml-2">{file.name}</span>
       </div>

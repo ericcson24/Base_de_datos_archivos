@@ -1,7 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { getAuthToken } from '../../utils/fileUtils';
+import { useLanguage } from '../../context/LanguageContext';
 
 const MoveModal = ({ isOpen, onClose, itemToMove, onMove }) => {
+  const { t } = useLanguage();
   const [currentPath, setCurrentPath] = useState([]);
   const [folders, setFolders] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -64,7 +66,7 @@ const MoveModal = ({ isOpen, onClose, itemToMove, onMove }) => {
         <div className="p-4 border-b border-gray-200 dark:border-slate-700 flex justify-between items-center bg-gray-50 dark:bg-slate-800/50">
           <h3 className="text-lg font-semibold text-gray-900 dark:text-slate-100 flex items-center">
             <span className="mr-2 text-xl">🚚</span>
-            Mover "{itemToMove?.name}"
+            {t('move.title', { name: itemToMove?.name })}
           </h3>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600 dark:hover:text-slate-300">
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -82,7 +84,7 @@ const MoveModal = ({ isOpen, onClose, itemToMove, onMove }) => {
             <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
             </svg>
-            Inicio
+            {t('move.home')}
           </button>
           
           {currentPath.map((folder, index) => (
@@ -103,7 +105,7 @@ const MoveModal = ({ isOpen, onClose, itemToMove, onMove }) => {
           {loading ? (
             <div className="flex flex-col items-center justify-center h-full text-gray-500">
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500 mb-2"></div>
-              <span>Cargando carpetas...</span>
+              <span>{t('move.loadingFolders')}</span>
             </div>
           ) : (
             <div className="space-y-1">
@@ -122,7 +124,7 @@ const MoveModal = ({ isOpen, onClose, itemToMove, onMove }) => {
                     </svg>
                   </div>
                   <div>
-                    <span className="font-medium text-gray-700 dark:text-slate-200">.. (Subir nivel)</span>
+                    <span className="font-medium text-gray-700 dark:text-slate-200">{t('move.upLevel')}</span>
                   </div>
                 </div>
               )}
@@ -148,7 +150,7 @@ const MoveModal = ({ isOpen, onClose, itemToMove, onMove }) => {
                   </div>
                   <div className="flex flex-col">
                     <span className="font-medium text-gray-700 dark:text-slate-200">{folder.name}</span>
-                    <span className="text-xs text-gray-400 dark:text-slate-500">Carpeta</span>
+                    <span className="text-xs text-gray-400 dark:text-slate-500">{t('move.folder')}</span>
                   </div>
                   <div className="ml-auto text-gray-400">
                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -164,7 +166,7 @@ const MoveModal = ({ isOpen, onClose, itemToMove, onMove }) => {
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2H5a2 2 0 00-2-2z" />
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 5a2 2 0 012-2h4a2 2 0 012 2v2H8V5z" />
                   </svg>
-                  <p>Esta carpeta está vacía</p>
+                  <p>{t('userPanel.emptyFolder')}</p>
                 </div>
               )}
             </div>
@@ -174,20 +176,20 @@ const MoveModal = ({ isOpen, onClose, itemToMove, onMove }) => {
         {/* Footer */}
         <div className="p-4 border-t border-gray-200 dark:border-slate-700 bg-gray-50 dark:bg-slate-800/50 flex justify-between items-center">
           <div className="text-sm text-gray-500 dark:text-slate-400 truncate max-w-[200px]">
-            Destino: <span className="font-medium text-gray-700 dark:text-slate-300">/{currentPath.join('/')}</span>
+            {t('move.destination')} <span className="font-medium text-gray-700 dark:text-slate-300">/{currentPath.join('/')}</span>
           </div>
           <div className="flex space-x-3">
             <button 
               onClick={onClose}
               className="px-4 py-2 text-gray-600 dark:text-slate-300 hover:bg-gray-200 dark:hover:bg-slate-700 rounded-lg transition-colors duration-200 font-medium"
             >
-              Cancelar
+              {t('common.cancel')}
             </button>
             <button 
               onClick={handleMove}
               className="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors duration-200 shadow-lg shadow-blue-500/30 font-medium flex items-center"
             >
-              <span className="mr-2">Mover aquí</span>
+              <span className="mr-2">{t('move.moveHere')}</span>
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
               </svg>

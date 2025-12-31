@@ -36,6 +36,7 @@ app.use(express.static(path.join(__dirname, 'public')));
 // API Routes
 app.use('/api/auth', require('./routes/auth'));
 app.use('/api/files', require('./routes/files'));
+app.use('/api/users', require('./routes/users'));
 app.use('/api/events', require('./routes/events'));
 app.use('/admin', require('./routes/admin'));
 

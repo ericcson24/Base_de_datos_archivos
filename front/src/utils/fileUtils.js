@@ -9,7 +9,7 @@ export const getAuthenticatedUrl = (url) => {
   return `${url}${separator}token=${encodeURIComponent(token)}`;
 };
 
-export const downloadFile = (fileId, fileName) => {
+export const downloadFile = (fileId, fileName, t) => {
   try {
     const token = getAuthToken();
     const downloadUrl = `/api/files/download/${encodeURIComponent(fileId)}?download=true&token=${encodeURIComponent(token)}`;
@@ -24,7 +24,11 @@ export const downloadFile = (fileId, fileName) => {
     document.body.removeChild(link);
   } catch (error) {
     console.error('Error initiating download:', error);
-    alert('Error al iniciar la descarga');
+    if (t) {
+      alert(t('common.downloadError'));
+    } else {
+      alert('Error initiating download');
+    }
   }
 };
 

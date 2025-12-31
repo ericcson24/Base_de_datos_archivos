@@ -73,13 +73,14 @@ function App() {
 
         if (response.ok) {
           const data = await response.json();
-          // Si el servidor devuelve usuario pero no token (porque usó cookie),
-          // usamos el storedToken si existe, o null si no.
-          // Nota: Si queremos restaurar el token en localStorage desde la cookie,
-          // el endpoint /verify debería devolver el token también.
+          
+          // Si el usuario hizo logout recientemente, no deberíamos restaurar la sesión
+          // aunque la cookie persista por alguna razón extraña.
+          // Pero aquí asumimos que si el servidor dice OK, es OK.
+          
           const userWithToken = {
             ...data.user,
-            token: storedToken || data.token // data.token podría venir si el backend lo añade
+            token: storedToken || data.token 
           };
           
           setUser(userWithToken);
@@ -250,15 +251,30 @@ function App() {
 
   const handleLogout = async () => {
     try {
+      // Llamar al endpoint de logout para limpiar cookies
+      await fetch('/api/auth/logout', { 
+        method: 'POST',
+        credentials: 'include'
+      });
+
       // Limpiar token del localStorage
       localStorage.removeItem('auth_token');
+      
+      // Limpiar cookie client-side por si acaso
+      deleteCookie('auth_token');
+      deleteCookie('connect.sid');
 
       setIsLoggedIn(false);
       setUser(null);
-      setCurrentView('login');
-      window.history.pushState(null, '', '/login');
+      // Usar window.location.href para forzar una recarga completa y limpiar estado en memoria
+      window.location.href = '/login';
     } catch (error) {
       console.error('Error en logout:', error);
+      // Forzar logout local incluso si falla el servidor
+      localStorage.removeItem('auth_token');
+      setIsLoggedIn(false);
+      setUser(null);
+      window.location.href = '/login';
     }
   };
 
@@ -346,6 +362,10 @@ function App() {
         setCurrentView('panel');
         window.history.pushState(null, '', '/panel');
       }}
+      onBackToFolders={() => {
+        setCurrentView('folders');
+        window.history.pushState(null, '', '/folders');
+      }}
       onThemeToggle={toggleTheme}
       isDarkMode={isDarkMode}
     />;
@@ -355,13 +375,62 @@ function App() {
   console.log('Fallback render - isLoggedIn:', isLoggedIn, 'currentView:', currentView, 'user:', user);
   return (
     <div className="App">
-      <div style={{ padding: '20px', background: 'red', color: 'white' }}>
+      {/* <div style={{ padding: '20px', background: 'red', color: 'white' }}>
         <h2>DEBUG INFO:</h2>
         <p>isLoggedIn: {isLoggedIn ? 'true' : 'false'}</p>
         <p>currentView: {currentView}</p>
         <p>user: {user ? JSON.stringify(user) : 'null'}</p>
-      </div>
-      <Login onLogin={handleLogin} onThemeToggle={toggleTheme} isDarkMode={isDarkMode} />
+      </div> */}
+      {isLoggedIn ? (
+        currentView === 'admin' ? (
+          <AdminPanel 
+            user={user} 
+            onLogout={handleLogout} 
+            onThemeToggle={toggleTheme} 
+            isDarkMode={isDarkMode} 
+          />
+        ) : currentView === 'calendar' ? (
+          <Calendar 
+            user={user} 
+            onLogout={handleLogout} 
+            onBackToPanel={() => {
+              setCurrentView('panel');
+              window.history.pushState(null, '', '/panel');
+            }}
+            onThemeToggle={toggleTheme}
+            isDarkMode={isDarkMode}
+          />
+        ) : currentView === 'panel' ? (
+          <UserPanel 
+            user={user} 
+            onLogout={handleLogout} 
+            onBackToFolders={() => {
+              setCurrentView('folders');
+              window.history.pushState(null, '', '/folders');
+            }}
+            onThemeToggle={toggleTheme}
+            isDarkMode={isDarkMode}
+            onGoToCalendar={() => {
+              setCurrentView('calendar');
+              window.history.pushState(null, '', '/calendar');
+            }}
+          />
+        ) : (
+          <FolderSelector 
+            user={user} 
+            onSelectFolder={(folder) => {
+              // Lógica para seleccionar carpeta si fuera necesario
+              setCurrentView('panel');
+              window.history.pushState(null, '', '/panel');
+            }} 
+            onLogout={handleLogout}
+            onThemeToggle={toggleTheme}
+            isDarkMode={isDarkMode}
+          />
+        )
+      ) : (
+        <Login onLogin={handleLogin} onThemeToggle={toggleTheme} isDarkMode={isDarkMode} />
+      )}
     </div>
   );
 }

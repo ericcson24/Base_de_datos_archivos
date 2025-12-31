@@ -1,4 +1,5 @@
 import React from 'react';
+import { useLanguage } from '../../context/LanguageContext';
 
 const RenameModal = ({ 
   isOpen, 
@@ -8,15 +9,17 @@ const RenameModal = ({
   setRenameValue, 
   handleRenameItem 
 }) => {
+  const { t } = useLanguage();
+
   if (!isOpen) return null;
 
   return (
     <div className="fixed inset-0 bg-black/50 dark:bg-black/70 flex items-center justify-center z-50" onClick={onClose}>
       <div className="glassmorphism-modal dark:bg-slate-800 rounded-lg shadow-xl border-gray-200 dark:border-slate-600 p-6 w-full max-w-md mx-4" onClick={(e) => e.stopPropagation()}>
-        <h3 className="text-lg font-semibold text-gray-900 dark:text-slate-100 mb-4">Renombrar {renameItem?.type === 'folder' ? 'Carpeta' : 'Archivo'}</h3>
+        <h3 className="text-lg font-semibold text-gray-900 dark:text-slate-100 mb-4">{t('userPanel.contextMenu.rename')}</h3>
         <input
           type="text"
-          placeholder="Nuevo nombre"
+          placeholder={t('userPanel.enterNewName')}
           value={renameValue}
           onChange={(e) => setRenameValue(e.target.value)}
           onKeyPress={(e) => e.key === 'Enter' && handleRenameItem()}
@@ -28,13 +31,13 @@ const RenameModal = ({
             onClick={onClose}
             className="px-4 py-2 text-gray-600 dark:text-slate-300 hover:bg-gray-100 dark:hover:bg-slate-700 rounded-lg transition-colors duration-200"
           >
-            Cancelar
+            {t('common.cancel')}
           </button>
           <button 
             onClick={handleRenameItem}
             className="px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg transition-colors duration-200"
           >
-            Renombrar
+            {t('userPanel.contextMenu.rename')}
           </button>
         </div>
       </div>

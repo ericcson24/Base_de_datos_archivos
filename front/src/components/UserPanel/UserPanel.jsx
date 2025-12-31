@@ -16,15 +16,14 @@ import {
   formatFileSize, 
   canPreview
 } from '../../utils/fileUtils';
+import { useToast } from '../../context/ToastContext';
+import { useLanguage } from '../../context/LanguageContext';
 import './UserPanel.css';
 
 const UserPanel = ({ user, onLogout, onBackToFolders, onThemeToggle, isDarkMode, onGoToCalendar }) => {
-  console.log('🎯 UserPanel se está renderizando con user:', user);
-
-  // Grid snapping constants
-  const GRID_SIZE = 40; // Tamaño del grid en píxeles (aumentado de 20 a 40)
-  const MIN_WIDTH = 200;
-  const MIN_HEIGHT = 200;
+  console.log('UserPanel se está renderizando con user:', user);
+  const { addToast } = useToast();
+  const { t } = useLanguage();
 
   const [files, setFiles] = useState([]);
   const [currentView, setCurrentView] = useState('privada');
@@ -59,7 +58,7 @@ const UserPanel = ({ user, onLogout, onBackToFolders, onThemeToggle, isDarkMode,
         // Clean URL
         window.history.replaceState({}, document.title, window.location.pathname);
         // Show success message (could be a toast, for now alert is fine or handled in modal)
-        alert('✅ Cuenta de Microsoft vinculada correctamente');
+        alert(t('userPanel.microsoftLinkedSuccess'));
       }
     }
   }, []);
@@ -72,17 +71,6 @@ const UserPanel = ({ user, onLogout, onBackToFolders, onThemeToggle, isDarkMode,
   // Nuevos estados para redimensionamiento y panel lateral
   const [sidebarPanelOpen, setSidebarPanelOpen] = useState(false);
   const [sidebarPanelFile, setSidebarPanelFile] = useState(null);
-  const [fileGridSize, setFileGridSize] = useState({ width: '100%', height: '70vh' });
-  const [fileGridPosition, setFileGridPosition] = useState({ x: 0, y: 0 });
-  const [isDragging, setIsDragging] = useState(false);
-  const [isResizing, setIsResizing] = useState(false);
-  const [initialSize, setInitialSize] = useState({ width: 0, height: 0 });
-  const [initialMouse, setInitialMouse] = useState({ x: 0, y: 0 });
-  const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
-
-  // Estado para mostrar límites de arrastre
-  const [showDragBounds, setShowDragBounds] = useState(false);
-  const [dragBounds, setDragBounds] = useState({ top: 0, left: 0, right: 0, bottom: 0 });
   
   // Z-index para file-grid (inicia en 1, paneles en 10+)
   
@@ -117,44 +105,6 @@ const UserPanel = ({ user, onLogout, onBackToFolders, onThemeToggle, isDarkMode,
     onThemeToggle();
   };
 
-  // Inicializar file-grid con ancho al 100% en píxeles
-  useEffect(() => {
-    const initializeFileGridWidth = () => {
-      // Si hay paneles de edición abiertos, no forzar el ancho
-      if (editorPanels.length > 0) return;
-
-      const mainContent = document.querySelector('.main-content-container');
-      if (mainContent) {
-        // Obtener el ancho completo del contenedor disponible
-        const availableWidth = mainContent.offsetWidth;
-        
-        // Restar paddings del contenedor
-        const mainContentStyles = window.getComputedStyle(mainContent);
-        const paddingLeft = parseFloat(mainContentStyles.paddingLeft) || 0;
-        const paddingRight = parseFloat(mainContentStyles.paddingRight) || 0;
-        
-        // Ancho inicial del file-grid (100% del espacio disponible)
-        const initialWidth = availableWidth - paddingLeft - paddingRight;
-        
-        setFileGridSize({ 
-          width: `${initialWidth}px`, 
-          height: '70vh' 
-        });
-      }
-    };
-
-    // Ejecutar después de que el DOM esté listo
-    const timer = setTimeout(initializeFileGridWidth, 100);
-    
-    // También ejecutar cuando cambie el tamaño de la ventana
-    window.addEventListener('resize', initializeFileGridWidth);
-    
-    return () => {
-      clearTimeout(timer);
-      window.removeEventListener('resize', initializeFileGridWidth);
-    };
-  }, [editorPanels.length]); // Dependencia añadida para recalcular si se cierran paneles
-
   // Funciones para búsqueda y ordenamiento
   const handleSearch = (e) => {
     setSearchQuery(e.target.value);
@@ -162,16 +112,13 @@ const UserPanel = ({ user, onLogout, onBackToFolders, onThemeToggle, isDarkMode,
 
   const handleSort = (newSortBy) => {
     if (sortBy === newSortBy) {
-      // Si ya está ordenado por este campo, cambiar dirección
       setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
     } else {
-      // Nuevo campo de ordenamiento
       setSortBy(newSortBy);
       setSortOrder('asc');
     }
   };
 
-  // Funciones para la IA
   const handleAISearch = (e) => {
     setAIQuery(e.target.value);
   };
@@ -179,17 +126,13 @@ const UserPanel = ({ user, onLogout, onBackToFolders, onThemeToggle, isDarkMode,
   const submitAIQuery = async () => {
     if (!aiQuery.trim()) return;
     
-    // TODO: Implementar llamada al chatbot de IA
     console.log('Consulta IA:', aiQuery);
-    // Placeholder para futura implementación
-    alert(`Funcionalidad de IA próximamente disponible!\nConsulta: "${aiQuery}"`);
+    alert(t('userPanel.aiComingSoon', { query: aiQuery }));
     
     setAIQuery('');
     setIsAIExpanded(false);
   };
 
-  // Función para validar archivos antes de subir
-  // Nota: El backend también valida el tamaño, pero esto mejora la UX
   const validateFiles = (files) => {
     const maxFileSize = 100 * 1024 * 1024; // 100MB por archivo
     const maxTotalSize = 500 * 1024 * 1024; // 500MB total
@@ -198,13 +141,13 @@ const UserPanel = ({ user, onLogout, onBackToFolders, onThemeToggle, isDarkMode,
 
     for (let file of files) {
       if (file.size > maxFileSize) {
-        invalidFiles.push(`${file.name}: archivo demasiado grande (máx. 100MB)`);
+        invalidFiles.push(t('userPanel.fileTooBig', { name: file.name }));
       }
       totalSize += file.size;
     }
 
     if (totalSize > maxTotalSize) {
-      invalidFiles.push(`Tamaño total demasiado grande (máx. 500MB)`);
+      invalidFiles.push(t('userPanel.totalSizeTooBig'));
     }
 
     return invalidFiles;
@@ -215,7 +158,7 @@ const UserPanel = ({ user, onLogout, onBackToFolders, onThemeToggle, isDarkMode,
     const handleClickOutside = (event) => {
       // Cerrar mini-menu-frosted si se hace click fuera
       if (uploadMenuOpen) {
-        const uploadBtn = document.querySelector('.upload-btn-separado');
+        const uploadBtn = document.querySelector('.create-event-btn');
         const miniMenu = document.querySelector('.mini-menu-frosted');
         if (uploadBtn && miniMenu && !uploadBtn.contains(event.target) && !miniMenu.contains(event.target)) {
           setUploadMenuOpen(false);
@@ -357,12 +300,12 @@ useEffect(() => {
     // Validar archivos
     const validationErrors = validateFiles(files);
     if (validationErrors.length > 0) {
-      alert('❌ Errores de validación:\n' + validationErrors.join('\n'));
+      alert(t('userPanel.validationErrors') + '\n' + validationErrors.join('\n'));
       return;
     }
 
     try {
-      setUploadProgress({ status: 'uploading', message: 'Subiendo archivos...' });
+      setUploadProgress({ status: 'uploading', message: t('userPanel.uploadingFiles') });
       
       const formData = new FormData();
       
@@ -372,7 +315,7 @@ useEffect(() => {
       }
       
       // Agregar el path actual
-      formData.append('path', currentPath.join('/'));
+      formData.append('path', currentPath.map(p => p.name).join('/'));
 
       const response = await fetch('/api/files/upload', {
         method: 'POST',
@@ -384,13 +327,13 @@ useEffect(() => {
 
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.message || 'Error uploading files');
+        throw new Error(errorData.message || t('userPanel.errorUploadingFiles'));
       }
 
       const result = await response.json();
       console.log('Upload result:', result);
       
-      setUploadProgress({ status: 'success', message: `✅ ${files.length} archivo(s) subido(s) exitosamente` });
+      setUploadProgress({ status: 'success', message: t('userPanel.uploadSuccess', { count: files.length }) });
       
       // Recargar archivos y recientes después de subir
       loadFiles();
@@ -401,7 +344,7 @@ useEffect(() => {
       
     } catch (error) {
       console.error('Error uploading files:', error);
-      setUploadProgress({ status: 'error', message: '❌ Error al subir archivos: ' + error.message });
+      setUploadProgress({ status: 'error', message: t('userPanel.uploadError', { error: error.message }) });
       
       // Limpiar mensaje de error después de 5 segundos
       setTimeout(() => setUploadProgress(null), 5000);
@@ -414,12 +357,12 @@ useEffect(() => {
     // Validar archivos
     const validationErrors = validateFiles(files);
     if (validationErrors.length > 0) {
-      alert('❌ Errores de validación:\n' + validationErrors.join('\n'));
+      alert(t('userPanel.validationErrors') + '\n' + validationErrors.join('\n'));
       return;
     }
 
     try {
-      setUploadProgress({ status: 'uploading', message: 'Subiendo carpeta...' });
+      setUploadProgress({ status: 'uploading', message: t('userPanel.uploadingFolder') });
       
       let uploadedCount = 0;
       let failedCount = 0;
@@ -429,7 +372,7 @@ useEffect(() => {
         const file = files[i];
         const formData = new FormData();
         formData.append('file', file);
-        formData.append('path', currentPath.join('/'));
+        formData.append('path', currentPath.map(p => p.name).join('/'));
         
         // Si el archivo tiene webkitRelativePath, usarlo
         if (file.webkitRelativePath) {
@@ -447,7 +390,7 @@ useEffect(() => {
 
           if (!response.ok) {
             const errorData = await response.json();
-            throw new Error(errorData.message || 'Error uploading file');
+            throw new Error(errorData.message || t('userPanel.errorUploadingFile'));
           }
           
           uploadedCount++;
@@ -455,7 +398,7 @@ useEffect(() => {
           // Actualizar progreso
           setUploadProgress({ 
             status: 'uploading', 
-            message: `Subiendo carpeta... ${uploadedCount}/${files.length} archivos` 
+            message: t('userPanel.uploadingFolderProgress', { current: uploadedCount, total: files.length }) 
           });
           
         } catch (fileError) {
@@ -467,9 +410,11 @@ useEffect(() => {
       console.log(`Uploaded ${uploadedCount} files from folder, ${failedCount} failed`);
       
       if (failedCount === 0) {
-        setUploadProgress({ status: 'success', message: `✅ Carpeta subida exitosamente con ${uploadedCount} archivo(s)` });
+        setUploadProgress({ status: 'success', message: t('userPanel.folderUploadSuccess', { count: uploadedCount }) });
+        addToast(t('userPanel.folderUploadSuccess', { count: uploadedCount }), 'success');
       } else {
-        setUploadProgress({ status: 'warning', message: `⚠️ Carpeta subida parcialmente. ${failedCount} errores.` });
+        setUploadProgress({ status: 'warning', message: t('userPanel.folderUploadPartial', { errors: failedCount }) });
+        addToast(t('userPanel.folderUploadPartial', { errors: failedCount }), 'warning');
       }
       
       // Recargar archivos
@@ -479,13 +424,14 @@ useEffect(() => {
       
     } catch (error) {
       console.error('Error uploading folder:', error);
-      setUploadProgress({ status: 'error', message: '❌ Error al subir carpeta: ' + error.message });
+      setUploadProgress({ status: 'error', message: t('userPanel.folderUploadError', { error: error.message }) });
+      addToast(t('userPanel.folderUploadError', { error: error.message }), 'error');
       setTimeout(() => setUploadProgress(null), 5000);
     }
-  }, [currentPath, loadFiles]);
+  }, [currentPath, loadFiles, addToast]);
 
   const handleCreateFile = useCallback(async (defaultName, type) => {
-    const fileName = prompt('Nombre del archivo:', defaultName);
+    const fileName = prompt(t('userPanel.fileNamePrompt'), defaultName);
     if (!fileName) return;
 
     try {
@@ -498,26 +444,27 @@ useEffect(() => {
         body: JSON.stringify({
           name: fileName,
           type: type,
-          path: currentPath.join('/')
+          path: currentPath.map(p => p.name).join('/')
         })
       });
 
       if (!response.ok) {
         const data = await response.json();
-        throw new Error(data.message || 'Error al crear archivo');
+        throw new Error(data.message || t('userPanel.errorCreatingFile'));
       }
 
       loadFiles();
       setUploadMenuOpen(false);
+      addToast(t('userPanel.fileCreatedSuccess'), 'success');
     } catch (error) {
       console.error('Error creating file:', error);
-      alert('Error al crear archivo: ' + error.message);
+      addToast(t('userPanel.errorCreatingFile') + ': ' + error.message, 'error');
     }
-  }, [currentPath, loadFiles]);
+  }, [currentPath, loadFiles, addToast]);
 
   const handleCreateFolder = async () => {
     if (!newFolderName.trim()) {
-      alert('Por favor ingresa un nombre para la carpeta');
+      addToast(t('userPanel.enterFolderName'), 'warning');
       return;
     }
 
@@ -530,7 +477,7 @@ useEffect(() => {
         },
         body: JSON.stringify({
           name: newFolderName.trim(),
-          path: currentPath.join('/')
+          path: currentPath.map(p => p.name).join('/')
         })
       });
 
@@ -543,18 +490,19 @@ useEffect(() => {
         // Recargar archivos y recientes
         loadFiles();
         loadRecentFiles();
+        addToast(t('userPanel.folderCreatedSuccess'), 'success');
       } else {
-        alert('Error al crear carpeta: ' + result.message);
+        addToast(t('userPanel.errorCreatingFolder') + ': ' + result.message, 'error');
       }
     } catch (error) {
       console.error('Error creating folder:', error);
-      alert('Error al crear carpeta');
+      addToast(t('userPanel.errorCreatingFolder'), 'error');
     }
   };
 
   const handleDeleteItem = async (item) => {
     // eslint-disable-next-line no-restricted-globals
-    if (!confirm(`¿Estás seguro de que quieres eliminar "${item.name}"?`)) {
+    if (!confirm(t('userPanel.confirmDelete', { name: item.name }))) {
       return;
     }
 
@@ -570,18 +518,19 @@ useEffect(() => {
       
       if (result.success) {
         loadFiles(); // Recargar archivos
+        addToast(t('userPanel.itemDeletedSuccess'), 'success');
       } else {
-        alert('Error al eliminar: ' + result.message);
+        addToast(t('userPanel.errorDeleting') + ': ' + result.message, 'error');
       }
     } catch (error) {
       console.error('Error deleting item:', error);
-      alert('Error al eliminar');
+      addToast(t('userPanel.errorDeleting'), 'error');
     }
   };
 
   const handleRenameItem = async () => {
     if (!renameValue.trim()) {
-      alert('Por favor ingresa un nuevo nombre');
+      addToast(t('userPanel.enterNewName'), 'warning');
       return;
     }
 
@@ -604,12 +553,13 @@ useEffect(() => {
         setRenameItem(null);
         setRenameValue('');
         loadFiles(); // Recargar archivos
+        addToast(t('userPanel.itemRenamedSuccess'), 'success');
       } else {
-        alert('Error al renombrar: ' + result.message);
+        addToast(t('userPanel.errorRenaming') + ': ' + result.message, 'error');
       }
     } catch (error) {
       console.error('Error renaming item:', error);
-      alert('Error al renombrar');
+      addToast(t('userPanel.errorRenaming'), 'error');
     }
   };
 
@@ -626,13 +576,13 @@ useEffect(() => {
       
       if (result.success) {
         loadFiles(); // Recargar archivos
-        alert('Archivo duplicado exitosamente');
+        addToast(t('userPanel.fileDuplicatedSuccess'), 'success');
       } else {
-        alert('Error al duplicar: ' + result.message);
+        addToast(t('userPanel.errorDuplicating') + ': ' + result.message, 'error');
       }
     } catch (error) {
       console.error('Error duplicating item:', error);
-      alert('Error al duplicar');
+      addToast(t('userPanel.errorDuplicating'), 'error');
     }
   };
 
@@ -655,13 +605,13 @@ useEffect(() => {
         setShowMoveModal(false);
         setMoveItem(null);
         loadFiles(); // Recargar archivos
-        alert('Elemento movido exitosamente');
+        addToast(t('userPanel.itemMovedSuccess'), 'success');
       } else {
-        alert('Error al mover: ' + result.message);
+        addToast(t('userPanel.errorMoving') + ': ' + result.message, 'error');
       }
     } catch (error) {
       console.error('Error moving item:', error);
-      alert('Error al mover');
+      addToast(t('userPanel.errorMoving'), 'error');
     }
   };
 
@@ -682,7 +632,7 @@ useEffect(() => {
       const result = await response.json();
       
       if (result.success) {
-        alert(result.message);
+        addToast(result.message, 'success');
       } else {
         throw new Error(result.message);
       }
@@ -789,241 +739,6 @@ useEffect(() => {
     }
   }, [handleFileUpload, handleFolderUpload]);
 
-  // Funciones para redimensionamiento y movimiento del file-grid
-  const handleMouseDown = (e, action) => {
-    e.preventDefault();
-    const fileGrid = e.currentTarget.closest('.file-grid');
-    const mainPanel = document.querySelector('.main-panel');
-    const panelHeader = document.querySelector('.panel-header');
-    
-    if (!mainPanel || !panelHeader) return;
-
-    if (action === 'move') {
-      // Capturar dimensiones actuales
-      const currentWidth = fileGrid.offsetWidth;
-      const currentHeight = fileGrid.offsetHeight;
-      
-      // Fijar dimensiones en píxeles
-      setFileGridSize({ 
-        width: `${currentWidth}px`, 
-        height: `${currentHeight}px` 
-      });
-      
-      // Calcular área CONSTANTE donde puede estar el grid (independiente del tamaño del grid)
-      const storageBar = document.querySelector('.storage-bar');
-      const storageBarHeight = storageBar ? storageBar.offsetHeight : 0;
-      
-      const topMargin = 20;
-      const bottomMargin = 20;
-      const leftPadding = 40;   // Padding izquierdo
-      const topPadding = 40;    // Padding superior adicional
-      const rightPadding = 40;  // Padding derecho
-      const bottomPadding = 40; // Padding inferior adicional
-      
-      const panelHeaderHeight = panelHeader.offsetHeight;
-      const availableTop = panelHeaderHeight + topMargin + topPadding;
-      const totalAvailableHeight = mainPanel.offsetHeight - panelHeaderHeight - storageBarHeight - topMargin - bottomMargin - bottomPadding - topPadding;
-      
-      // Límites CONSTANTES - el área completa disponible con padding en todos los lados
-      const bounds = {
-        top: availableTop,
-        left: leftPadding,
-        right: mainPanel.offsetWidth - rightPadding,
-        bottom: availableTop + totalAvailableHeight
-      };
-      
-      setDragBounds(bounds);
-      
-      // Obtener posición actual del file-grid
-      const fileGridRect = fileGrid.getBoundingClientRect();
-      
-      // Offset entre el click y la esquina del grid - esto es CRÍTICO para mantener el ratón en su lugar
-      const offsetX = e.clientX - fileGridRect.left;
-      const offsetY = e.clientY - fileGridRect.top;
-      setDragOffset({ x: offsetX, y: offsetY });
-      
-      setInitialMouse({ x: e.clientX, y: e.clientY });
-      
-      setIsDragging(true);
-      setShowDragBounds(true);
-    } else if (action === 'resize') {
-      setIsResizing(true);
-      const currentWidth = fileGrid.offsetWidth;
-      const currentHeight = fileGrid.offsetHeight;
-      setInitialSize({ width: currentWidth, height: currentHeight });
-      setInitialMouse({ x: e.clientX, y: e.clientY });
-    }
-  };
-
-  const handleMouseMove = useCallback((e) => {
-    if (isDragging) {
-      const mainPanel = document.querySelector('.main-panel');
-      const fileGrid = document.querySelector('.file-grid');
-      if (!mainPanel || !fileGrid) return;
-      
-      const mainPanelRect = mainPanel.getBoundingClientRect();
-      
-      // Posición donde DEBE estar la esquina superior izquierda del grid
-      // para que el ratón se mantenga en el move-handle
-      let topLeftX = e.clientX - mainPanelRect.left - dragOffset.x;
-      let topLeftY = e.clientY - mainPanelRect.top - dragOffset.y;
-      
-      // Dimensiones actuales
-      let currentWidth = fileGrid.offsetWidth;
-      let currentHeight = fileGrid.offsetHeight;
-      
-      // Tamaño mínimo en píxeles (20% del ancho del panel)
-      const minWidthPx = Math.max(MIN_WIDTH, mainPanel.offsetWidth * 0.20);
-      const minHeightPx = MIN_HEIGHT;
-      
-      // Factor de reducción de sensibilidad (cuanto más alto, más lento se redimensiona)
-      const resizeSensitivity = 0.3; // Solo aplica 30% del cambio
-      
-      let newX = topLeftX;
-      let newY = topLeftY;
-      let newWidth = currentWidth;
-      let newHeight = currentHeight;
-      
-      // AJUSTE HORIZONTAL
-      if (topLeftX < dragBounds.left) {
-        // Se sale por la izquierda
-        const overflow = dragBounds.left - topLeftX;
-        newX = dragBounds.left;
-        // Reducir solo una fracción del overflow
-        const widthReduction = overflow * resizeSensitivity;
-        newWidth = Math.max(minWidthPx, currentWidth - widthReduction);
-      } else if (topLeftX + currentWidth > dragBounds.right) {
-        // La parte derecha del grid se sale
-        const overflow = (topLeftX + currentWidth) - dragBounds.right;
-        
-        // Verificar si el grid ya está en su tamaño mínimo
-        const isAtMinWidth = currentWidth <= minWidthPx;
-        
-        if (isAtMinWidth) {
-          // Grid YA está en tamaño mínimo: NO permitir que se salga
-          // Limitar la posición para que la parte derecha no exceda dragBounds.right
-          newX = Math.min(topLeftX, dragBounds.right - currentWidth);
-          newWidth = minWidthPx;
-        } else {
-          // Aún puede reducirse
-          const widthReduction = overflow * resizeSensitivity;
-          const potentialWidth = currentWidth - widthReduction;
-          newX = topLeftX;
-          newWidth = Math.max(minWidthPx, potentialWidth);
-        }
-      } else {
-        // Dentro de límites horizontales
-        newX = topLeftX;
-        newWidth = currentWidth;
-      }
-      
-      // AJUSTE VERTICAL
-      if (topLeftY < dragBounds.top) {
-        // Se sale por arriba
-        const overflow = dragBounds.top - topLeftY;
-        newY = dragBounds.top;
-        // Reducir solo una fracción del overflow
-        const heightReduction = overflow * resizeSensitivity;
-        const potentialHeight = currentHeight - heightReduction;
-        
-        // Si ya está en el mínimo, no puede seguir moviéndose hacia arriba
-        if (potentialHeight <= minHeightPx && currentHeight <= minHeightPx) {
-          newY = dragBounds.top;
-          newHeight = minHeightPx;
-        } else {
-          newHeight = Math.max(minHeightPx, potentialHeight);
-        }
-      } else if (topLeftY + currentHeight > dragBounds.bottom) {
-        // La parte inferior del grid se sale
-        const overflow = (topLeftY + currentHeight) - dragBounds.bottom;
-        
-        // Verificar si el grid ya está en su tamaño mínimo
-        const isAtMinHeight = currentHeight <= minHeightPx;
-        
-        if (isAtMinHeight) {
-          // Grid YA está en tamaño mínimo: NO permitir que se salga
-          // Limitar la posición para que la parte inferior no exceda dragBounds.bottom
-          newY = Math.min(topLeftY, dragBounds.bottom - currentHeight);
-          newHeight = minHeightPx;
-        } else {
-          // Aún puede reducirse
-          const heightReduction = overflow * resizeSensitivity;
-          const potentialHeight = currentHeight - heightReduction;
-          newY = topLeftY;
-          newHeight = Math.max(minHeightPx, potentialHeight);
-        }
-      } else {
-        // Dentro de límites verticales
-        newY = topLeftY;
-        newHeight = currentHeight;
-      }
-      
-      // VERIFICACIÓN FINAL: Doble seguridad para evitar que se salga
-      if (newY + newHeight > dragBounds.bottom) {
-        newY = dragBounds.bottom - newHeight;
-      }
-      
-      if (newX + newWidth > dragBounds.right) {
-        newX = dragBounds.right - newWidth;
-      }
-      
-      // Actualizar estado
-      setFileGridPosition({ x: newX, y: newY });
-      if (newWidth !== currentWidth || newHeight !== currentHeight) {
-        setFileGridSize({ width: `${newWidth}px`, height: `${newHeight}px` });
-      }
-    } else if (isResizing) {
-      // ...existing code...
-      const deltaX = e.clientX - initialMouse.x;
-      const deltaY = e.clientY - initialMouse.y;
-
-      let newWidth = Math.max(MIN_WIDTH, initialSize.width + deltaX);
-      let newHeight = Math.max(MIN_HEIGHT, initialSize.height + deltaY);
-
-      // Snap to grid durante resize (esto sí funciona bien)
-      newWidth = Math.round(newWidth / GRID_SIZE) * GRID_SIZE;
-      newHeight = Math.round(newHeight / GRID_SIZE) * GRID_SIZE;
-
-      // Get main-panel boundaries for size constraints
-      const mainPanel = document.querySelector('.main-panel');
-      if (mainPanel) {
-        const maxWidth = mainPanel.offsetWidth;
-        const maxHeight = mainPanel.offsetHeight * 0.8; // Max 80% of main-panel height
-
-        // Limit to main-panel dimensions
-        newWidth = Math.min(newWidth, maxWidth);
-        newHeight = Math.min(newHeight, maxHeight);
-      }
-
-      setFileGridSize({
-        width: `${newWidth}px`,
-        height: `${newHeight}px`
-      });
-    }
-  }, [isDragging, isResizing, initialMouse, initialSize, GRID_SIZE, MIN_WIDTH, MIN_HEIGHT, dragOffset.x, dragOffset.y, dragBounds.left, dragBounds.right, dragBounds.top, dragBounds.bottom]);
-
-  const handleMouseUp = useCallback((e) => {
-    setIsDragging(false);
-    setIsResizing(false);
-    setShowDragBounds(false);
-    
-    // La posición y el tamaño ya están establecidos por handleMouseMove
-    // No necesitamos hacer nada más aquí
-  }, []);
-
-  useEffect(() => {
-    if (isDragging || isResizing) {
-      document.addEventListener('mousemove', handleMouseMove);
-      // Crear un wrapper para pasar el evento a handleMouseUp
-      const mouseUpHandler = (e) => handleMouseUp(e);
-      document.addEventListener('mouseup', mouseUpHandler);
-      return () => {
-        document.removeEventListener('mousemove', handleMouseMove);
-        document.removeEventListener('mouseup', mouseUpHandler);
-      };
-    }
-  }, [isDragging, isResizing, handleMouseMove, handleMouseUp]);
-
   // Funciones para el panel lateral
   const openSidebarPanel = (file, action = 'view') => {
     setSidebarPanelFile({ ...file, action });
@@ -1111,104 +826,122 @@ useEffect(() => {
 
       {/* Sidebar */}
       <div className="sidebar">
-        {/* Logo */}
-        <div className="logo">
-          <img className="logo-img" src="/icons/nube.svg" alt="Nube" />
-          <span>Nube Personal</span>
+        <div className="sidebar-header">
+          <div className="logo-container">
+            <img className="logo-img" src="/icons/nube.svg" alt="Nube" />
+            <span>{t('userPanel.personalCloud')}</span>
+          </div>
         </div>
 
-        {/* Upload Button - Arriba de navegación */}
-        <div className="upload-btn-container">
-          <button
-            className="upload-btn-separado flex items-center justify-center w-14 h-14 rounded-full bg-blue-600 hover:bg-blue-700 text-white shadow-lg transition-all duration-300 transform hover:scale-110"
-            onClick={() => setUploadMenuOpen(!uploadMenuOpen)}
-            title="Nuevo"
-          >
-            <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-            </svg>
-          </button>
-          {uploadMenuOpen && (
-            <div className={`mini-menu-frosted show absolute top-20 left-4 z-50 w-64`}>
+        <div className="sidebar-content">
+          <div className="upload-btn-container relative">
+            <button
+              className="create-event-btn"
+              onClick={() => setUploadMenuOpen(!uploadMenuOpen)}
+              title={t('common.create')}
+            >
+              <span>+</span> {t('common.create')}
+            </button>
+            {uploadMenuOpen && (
+              <div className={`mini-menu-frosted show absolute top-12 left-0 z-50 w-64`}>
+                <button
+                  className="mini-menu-item"
+                  onClick={() => document.getElementById('fileInput').click()}
+                >
+                  {t('userPanel.uploadMenu.file')}
+                </button>
+                <button
+                  className="mini-menu-item"
+                  onClick={() => document.getElementById('folderInput').click()}
+                >
+                  {t('userPanel.uploadMenu.folder')}
+                </button>
+                <div className="h-px bg-gray-200 dark:bg-gray-700 my-1"></div>
+                <button
+                  className="mini-menu-item"
+                  onClick={() => {
+                    setShowCreateFolderModal(true);
+                    setUploadMenuOpen(false);
+                  }}
+                >
+                  {t('userPanel.uploadMenu.createFolder')}
+                </button>
+                <button
+                  className="mini-menu-item"
+                  onClick={() => {
+                    handleCreateFile(t('userPanel.defaultFileName.text'), 'text');
+                    setUploadMenuOpen(false);
+                  }}
+                >
+                  {t('userPanel.uploadMenu.createDoc')}
+                </button>
+                <button
+                  className="mini-menu-item"
+                  onClick={() => {
+                    handleCreateFile(t('userPanel.defaultFileName.word'), 'word');
+                    setUploadMenuOpen(false);
+                  }}
+                >
+                  {t('userPanel.uploadMenu.createWord')}
+                </button>
+                <button
+                  className="mini-menu-item"
+                  onClick={() => {
+                    handleCreateFile(t('userPanel.defaultFileName.excel'), 'excel');
+                    setUploadMenuOpen(false);
+                  }}
+                >
+                  {t('userPanel.uploadMenu.createExcel')}
+                </button>
+                <button
+                  className="mini-menu-item"
+                  onClick={() => {
+                    handleCreateFile(t('userPanel.defaultFileName.powerpoint'), 'powerpoint');
+                    setUploadMenuOpen(false);
+                  }}
+                >
+                  {t('userPanel.uploadMenu.createPowerPoint')}
+                </button>
+              </div>
+            )}
+          </div>
+
+          <div className="sidebar-section">
+            <div className="section-title">{t('userPanel.navigation')}</div>
+            <div className="category-list">
               <button
-                className="mini-menu-item"
-                onClick={() => document.getElementById('fileInput').click()}
+                className={`sidebar-btn ${currentView === 'privada' ? 'active' : ''}`}
+                onClick={() => changeView('privada')}
               >
-                📄 Subir archivos
+                {t('userPanel.myDrive')}
               </button>
+
               <button
-                className="mini-menu-item"
-                onClick={() => document.getElementById('folderInput').click()}
+                className={`sidebar-btn ${currentView === 'shared' ? 'active' : ''}`}
+                onClick={() => changeView('shared')}
               >
-                📁 Subir carpeta
-              </button>
-              <div className="h-px bg-gray-200 dark:bg-gray-700 my-1"></div>
-              <button
-                className="mini-menu-item"
-                onClick={() => setShowCreateFolderModal(true)}
-              >
-                ➕ Nueva carpeta
-              </button>
-              <button
-                className="mini-menu-item"
-                onClick={() => handleCreateFile('Nuevo documento.txt', 'text')}
-              >
-                📝 Documento de texto
-              </button>
-              <button
-                className="mini-menu-item"
-                onClick={() => handleCreateFile('Documento.docx', 'word')}
-              >
-                📘 Documento Word
-              </button>
-              <button
-                className="mini-menu-item"
-                onClick={() => handleCreateFile('Hoja de cálculo.xlsx', 'excel')}
-              >
-                📗 Hoja de cálculo Excel
-              </button>
-              <button
-                className="mini-menu-item"
-                onClick={() => handleCreateFile('Presentación.pptx', 'powerpoint')}
-              >
-                📙 Presentación PowerPoint
+                {t('userPanel.sharedWithMe')}
               </button>
             </div>
-          )}
+          </div>
         </div>
 
-        {/* Navigation - En contenedor superior */}
-        <div className="sidebar-navigation">
-          <button
-            className={`sidebar-btn ${currentView === 'privada' ? 'active' : ''}`}
-            onClick={() => changeView('privada')}
-          >
-            <span>🗂️</span> Mi unidad
+        <div className="sidebar-footer">
+          <button className="sidebar-btn" onClick={onBackToFolders}>
+            {t('common.back')}
           </button>
-
-          {/* Shared Folders Button */}
-          <button
-            className={`sidebar-btn ${currentView === 'shared' ? 'active' : ''}`}
-            onClick={() => changeView('shared')}
-          >
-            <span>🌍</span> Compartidos conmigo
-          </button>
-        </div>
-
-        {/* Actions */}
-        <div className="sidebar-actions">
-          <button className="acciones-btn" onClick={onBackToFolders}>
-            ⬅️ Volver
-          </button>
-          <button className="acciones-btn" onClick={() => {
+          <button className="sidebar-btn" onClick={() => {
             if (onGoToCalendar) {
               onGoToCalendar();
             }
           }}>
-            📅 Abrir calendario
+            {t('userPanel.calendar')}
           </button>
-          <button className="acciones-btn" onClick={onLogout}>
-            🚪 Cerrar sesión
+          <button className="sidebar-btn" onClick={() => setShowSettingsModal(true)}>
+            {t('userPanel.settings')}
+          </button>
+          <button className="sidebar-btn" onClick={onLogout}>
+            {t('userPanel.logout')}
           </button>
         </div>
       </div>
@@ -1217,60 +950,18 @@ useEffect(() => {
       <div className="main-panel">
         <div className="panel-header">
           <h1 className="panel-title">
-            {currentView === 'privada' ? 'Mi unidad' :
-             currentView === 'public' ? 'Compartido general' :
-             currentView.startsWith('shared') ? 'Carpeta compartida' :
-             'Archivos'}
+            {currentView === 'privada' ? t('userPanel.myDrive') :
+             currentView === 'public' ? t('userPanel.sharedGeneral') :
+             currentView.startsWith('shared') ? t('userPanel.sharedFolder') :
+             t('userPanel.files')}
           </h1>
-          <button 
-            className="theme-toggle-btn"
-            onClick={() => setShowSettingsModal(true)}
-            title="Ajustes"
-          >
-            ⚙️
-          </button>
         </div>
 
         {/* Contenedor flexible para file-grid y paneles */}
         <div className="main-content-container">
         
-        {/* Overlay de límites de arrastre - ÁREA CONSTANTE */}
-        {showDragBounds && (
-          <div 
-            className="drag-bounds-overlay"
-            style={{
-              position: 'absolute',
-              top: `${dragBounds.top}px`,
-              left: `${dragBounds.left}px`,
-              width: `${dragBounds.right - dragBounds.left}px`,
-              height: `${dragBounds.bottom - dragBounds.top}px`,
-              border: '2px dashed rgba(59, 130, 246, 0.6)',
-              backgroundColor: 'rgba(59, 130, 246, 0.08)',
-              borderRadius: '8px',
-              pointerEvents: 'none',
-              zIndex: 999,
-              transition: 'opacity 0.2s ease-in-out'
-            }}
-          />
-        )}
-
         <div 
           className={`file-grid ${isDragOver ? 'drag-over' : ''}`}
-          
-          style={{
-            width: editorPanels.length > 0 ? '50%' : fileGridSize.width,
-            height: fileGridSize.height,
-            position: (isDragging || fileGridPosition.x !== 0 || fileGridPosition.y !== 0) ? 'absolute' : 'relative',
-            left: (isDragging || fileGridPosition.x !== 0 || fileGridPosition.y !== 0) ? `${fileGridPosition.x}px` : 'auto',
-            top: (isDragging || fileGridPosition.x !== 0 || fileGridPosition.y !== 0) ? `${fileGridPosition.y}px` : 'auto',
-            zIndex: isDragging ? 1000 : 1,
-            transition: 'width 0.3s ease-in-out'
-          }}
-          onClick={() => {
-            // Traer file-grid al frente al hacer click
-            const newZIndex = highestZIndex + 1;
-            setHighestZIndex(newZIndex);
-          }}
           onDragEnter={handleDragEnter}
           onDragLeave={handleDragLeave}
           onDragOver={handleDragOver}
@@ -1307,10 +998,10 @@ useEffect(() => {
     />
   </svg>
 
-  {/* 🔤 Input */}
+  {/* Input */}
   <input
     type="text"
-    placeholder="Buscar archivos..."
+    placeholder={t('userPanel.searchPlaceholder')}
     value={searchQuery}
     onChange={handleSearch}
     onKeyPress={(e) => e.key === 'Enter' && e.target.blur()}
@@ -1324,15 +1015,15 @@ useEffect(() => {
     style={{ outline: 'none', boxShadow: 'none' }}
   />
 
-  {/* ❌ Botón limpiar */}
+  {/* Botón limpiar */}
   {isSearchExpanded && searchQuery && (
     <button
       onClick={(e) => {
-        e.stopPropagation(); // 👈 evita cerrar el buscador
+        e.stopPropagation(); // evita cerrar el buscador
         setSearchQuery('');
       }}
       className="search-clear-btn absolute right-3 flex items-center justify-center w-5 h-5 rounded-full transition-colors duration-200"
-      title="Limpiar búsqueda"
+      title={t('userPanel.clearSearch')}
     >
       <svg
         className="w-3.5 h-3.5"
@@ -1361,9 +1052,8 @@ useEffect(() => {
                   ? 'w-72 h-9 rounded-lg shadow-md pl-3 pr-8 justify-start'
                   : 'w-12 h-12 rounded-full justify-center'
                 }`}
-                title="Chatbot IA (Próximamente)"
+                title={t('userPanel.aiChatbotTitle')}
               >
-                {/* 🤖 Icono IA */}
                 <svg
                   className={`transition-all duration-300 ease-in-out ${
                     isAIExpanded
@@ -1377,10 +1067,9 @@ useEffect(() => {
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
                 </svg>
 
-                {/* Input IA */}
                 <input
                   type="text"
-                  placeholder="Pregunta al asistente IA..."
+                  placeholder={t('userPanel.aiPlaceholder')}
                   value={aiQuery}
                   onChange={handleAISearch}
                   onKeyPress={(e) => {
@@ -1398,7 +1087,6 @@ useEffect(() => {
                   style={{ outline: 'none', boxShadow: 'none' }}
                 />
 
-                {/* Botón enviar IA */}
                 {isAIExpanded && aiQuery && (
                   <button
                     onClick={(e) => {
@@ -1406,7 +1094,7 @@ useEffect(() => {
                       submitAIQuery();
                     }}
                     className="absolute right-3 flex items-center justify-center w-5 h-5 rounded-full transition-colors duration-200 text-purple-500 hover:text-purple-700"
-                    title="Enviar consulta IA"
+                    title={t('userPanel.sendAIQuery')}
                   >
                     <svg
                       className="w-3.5 h-3.5"
@@ -1428,7 +1116,7 @@ useEffect(() => {
               {/* Search Results Counter */}
               {searchQuery && (
                 <div className={`animate-fade-in ${isDarkMode ? 'bg-blue-900/20 text-blue-300 border-blue-800' : 'bg-blue-50 text-blue-700 border-blue-200'} px-3 py-1 rounded-lg text-sm font-medium border`}>
-                  {files.length} resultado{files.length !== 1 ? 's' : ''}
+                  {t('userPanel.searchResults', { count: files.length })}
                 </div>
               )}
             </div>
@@ -1444,7 +1132,7 @@ useEffect(() => {
                       : `text-gray-600 ${isDarkMode ? 'text-slate-300 hover:bg-slate-600' : 'hover:bg-gray-200'}`
                   }`}
                   onClick={() => handleSort('name')}
-                  title="Ordenar por nombre"
+                  title={t('userPanel.sort.name')}
                 >
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 12h.01M7 17h.01M12 7h.01M12 12h.01M12 17h.01M17 7h.01M17 12h.01M17 17h.01" />
@@ -1457,7 +1145,7 @@ useEffect(() => {
                       : `text-gray-600 ${isDarkMode ? 'text-slate-300 hover:bg-slate-600' : 'hover:bg-gray-200'}`
                   }`}
                   onClick={() => handleSort('type')}
-                  title="Ordenar por tipo"
+                  title={t('userPanel.sort.type')}
                 >
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2H5a2 2 0 00-2-2z" />
@@ -1471,7 +1159,7 @@ useEffect(() => {
                       : `text-gray-600 ${isDarkMode ? 'text-slate-300 hover:bg-slate-600' : 'hover:bg-gray-200'}`
                   }`}
                   onClick={() => handleSort('date')}
-                  title="Ordenar por fecha"
+                  title={t('userPanel.sort.date')}
                 >
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
@@ -1483,7 +1171,7 @@ useEffect(() => {
               <button
                 className={`p-2 ${isDarkMode ? 'bg-slate-700 hover:bg-slate-600' : 'bg-gray-50 hover:bg-gray-200'} rounded-xl transition-all duration-200 transform hover:scale-105`}
                 onClick={() => setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')}
-                title={`Orden ${sortOrder === 'asc' ? 'ascendente' : 'descendente'}`}
+                title={t('userPanel.sortOrder', { order: sortOrder === 'asc' ? t('userPanel.sortAsc') : t('userPanel.sortDesc') })}
               >
                 <svg
                   className={`w-4 h-4 ${isDarkMode ? 'text-slate-300' : 'text-gray-600'} transition-transform duration-200 ${sortOrder === 'desc' ? 'rotate-180' : ''}`}
@@ -1504,7 +1192,7 @@ useEffect(() => {
                       : `text-gray-600 ${isDarkMode ? 'text-slate-300 hover:bg-slate-600' : 'hover:bg-gray-200'}`
                   }`}
                   onClick={() => setViewMode('list')}
-                  title="Vista de lista"
+                  title={t('userPanel.view.list')}
                 >
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 10h16M4 14h16M4 18h16" />
@@ -1517,7 +1205,7 @@ useEffect(() => {
                       : `text-gray-600 ${isDarkMode ? 'text-slate-300 hover:bg-slate-600' : 'hover:bg-gray-200'}`
                   }`}
                   onClick={() => setViewMode('grid')}
-                  title="Vista de cuadrícula"
+                  title={t('userPanel.view.grid')}
                 >
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
@@ -1533,13 +1221,13 @@ useEffect(() => {
           <div className="recent-files-section">
             <div className="recent-files-header">
               <div className="recent-files-title">
-                <span className="recent-icon">⚡</span>
-                <h3>Recientes</h3>
+                <span className="recent-icon"></span>
+                <h3>{t('userPanel.recent')}</h3>
               </div>
               <button
                 onClick={() => setShowRecentSection(false)}
                 className="recent-close-btn"
-                title="Ocultar archivos recientes"
+                title={t('userPanel.hideRecent')}
               >
                 ✕
               </button>
@@ -1558,7 +1246,7 @@ useEffect(() => {
                     } else if (canPreview(file.name)) {
                       openFileViewer(file);
                     } else {
-                      downloadFile(file.id, file.name);
+                      downloadFile(file.id, file.name, t);
                     }
                   }}
                 />
@@ -1569,13 +1257,13 @@ useEffect(() => {
                 className="recent-view-all"
                 onClick={() => {
                   // TODO: Implementar vista completa de archivos recientes
-                  console.log('Ver todos los archivos recientes');
+                  console.log(t('userPanel.viewAllRecent'));
                 }}
-                title="Ver todos los archivos recientes"
+                title={t('userPanel.viewAllRecent')}
               >
                 <div className="recent-view-all-content">
-                  <div className="recent-view-all-icon">📂</div>
-                  <span>Ver todos</span>
+                  <div className="recent-view-all-icon"></div>
+                  <span>{t('userPanel.viewAll')}</span>
                 </div>
               </div>
             </div>
@@ -1597,13 +1285,13 @@ useEffect(() => {
                 </div>
                 <div className="flex flex-col items-start">
                   <span className="font-medium text-gray-700 dark:text-slate-200 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
-                    Archivos Recientes
+                    {t('userPanel.recentFiles')}
                   </span>
                 </div>
               </div>
               
               <div className="flex items-center text-gray-400 group-hover:text-blue-500 transition-colors">
-                <span className="text-sm mr-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200">Mostrar</span>
+                <span className="text-sm mr-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200">{t('userPanel.show')}</span>
                 <svg className="w-5 h-5 transform group-hover:translate-y-1 transition-transform duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                 </svg>
@@ -1617,33 +1305,26 @@ useEffect(() => {
             <div className={`upload-progress ${uploadProgress.status}`}>
               <div className="upload-progress-content">
                 <span className="upload-progress-icon">
-                  {uploadProgress.status === 'uploading' && '⏳'}
-                  {uploadProgress.status === 'success' && '✅'}
-                  {uploadProgress.status === 'error' && '❌'}
-                  {uploadProgress.status === 'warning' && '⚠️'}
+                  {uploadProgress.status === 'uploading' && ''}
+                  {uploadProgress.status === 'success' && ''}
+                  {uploadProgress.status === 'error' && ''}
+                  {uploadProgress.status === 'warning' && ''}
                 </span>
                 <span className="upload-progress-message">{uploadProgress.message}</span>
               </div>
             </div>
           )}
-          {/* Move Handle - Only show if no editor panels are open */}
-          {editorPanels.length === 0 && (
-            <div 
-              className="move-handle"
-              onMouseDown={(e) => handleMouseDown(e, 'move')}
-            ></div>
-          )}
 
           {/* Files and folders */}
           <div className={`files-container ${viewMode === 'grid' ? 'grid-view' : 'list-view'}`}>
             {loading ? (
-              <div className="loading">Cargando archivos...</div>
+              <div className="loading">{t('common.loading')}</div>
             ) : (
               <>
                 {/* Back button */}
                 {currentPath.length > 0 && (
                   <button className="back-btn" onClick={goBack}>
-                    ⬅ Volver
+                    {t('common.back')}
                   </button>
                 )}
 
@@ -1673,11 +1354,11 @@ useEffect(() => {
                 {/* Empty state */}
                 {getCurrentFiles().length === 0 && !loading && (
                   <div className="empty-state">
-                    <span>📁</span>
+                    <span></span>
                     <p>
                       {searchQuery 
-                        ? `No se encontraron archivos que coincidan con "${searchQuery}"`
-                        : 'No hay archivos en esta carpeta'
+                        ? t('userPanel.noSearchResults', { query: searchQuery })
+                        : t('userPanel.emptyFolder')
                       }
                     </p>
                   </div>
@@ -1693,14 +1374,6 @@ useEffect(() => {
               onClose={closeSidebarPanel}
               user={user}
             />
-          )}
-
-          {/* Resize Handle - Only show if no editor panels are open */}
-          {editorPanels.length === 0 && (
-            <div 
-              className="resize-handle"
-              onMouseDown={(e) => handleMouseDown(e, 'resize')}
-            ></div>
           )}
         </div>
 
@@ -1834,7 +1507,7 @@ useEffect(() => {
             <svg className="w-12 h-12 mb-3 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 15l-2 5L9 9l11 4-5 2zm0 0l5 5M7.188 2.239l.777 2.897M5.136 7.965l-2.898-.777M13.95 4.05l-2.122 2.122m-5.657 5.656l-2.12 2.122" />
             </svg>
-            <p className="text-base font-semibold">Suelta para ver/editar</p>
+            <p className="text-base font-semibold">{t('userPanel.dropToView')}</p>
             <p className="text-xs opacity-75">{fileDragging?.name}</p>
           </div>
         </div>

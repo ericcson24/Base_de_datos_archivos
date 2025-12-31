@@ -2,9 +2,11 @@ import React, { useState } from 'react';
 import FormContainer from '../Common/FormContainer';
 import Button from '../Common/Button';
 import Input from '../Common/Input';
+import { useLanguage } from '../../context/LanguageContext';
 import './Login.css';
 
 const Login = ({ onLogin, onSwitchToRegister, onThemeToggle, isDarkMode }) => {
+  const { t, language, changeLanguage } = useLanguage();
   const [formData, setFormData] = useState({
     username: '',
     password: ''
@@ -32,10 +34,10 @@ const Login = ({ onLogin, onSwitchToRegister, onThemeToggle, isDarkMode }) => {
   const validateForm = () => {
     const newErrors = {};
     if (!formData.username.trim()) {
-      newErrors.username = 'El nombre de usuario es requerido';
+      newErrors.username = t('auth.username') + ' ' + t('common.error').toLowerCase();
     }
     if (!isRecovering && !formData.password) {
-      newErrors.password = 'La contraseña es requerida';
+      newErrors.password = t('auth.password') + ' ' + t('common.error').toLowerCase();
     }
     return newErrors;
   };
@@ -43,7 +45,7 @@ const Login = ({ onLogin, onSwitchToRegister, onThemeToggle, isDarkMode }) => {
   const handleRecovery = async (e) => {
     e.preventDefault();
     if (!formData.username.trim()) {
-      setErrors({ username: 'Ingresa tu usuario para recuperar la contraseña' });
+      setErrors({ username: t('auth.recoveryInstruction') });
       return;
     }
 
@@ -65,10 +67,10 @@ const Login = ({ onLogin, onSwitchToRegister, onThemeToggle, isDarkMode }) => {
       if (data.success) {
         setRecoveryMessage(data.message);
       } else {
-        setErrors({ general: data.message || 'Error al solicitar recuperación' });
+        setErrors({ general: data.message || t('common.error') });
       }
     } catch (error) {
-      setErrors({ general: 'Error de conexión al servidor' });
+      setErrors({ general: t('common.error') });
     } finally {
       setIsLoading(false);
     }
@@ -87,7 +89,7 @@ const Login = ({ onLogin, onSwitchToRegister, onThemeToggle, isDarkMode }) => {
     try {
       await onLogin(formData); // Pasar las credenciales a App.js
     } catch (error) {
-      setErrors({ general: error.message || 'Error al iniciar sesión' });
+      setErrors({ general: error.message || t('common.error') });
     } finally {
       setIsLoading(false);
     }
@@ -95,24 +97,47 @@ const Login = ({ onLogin, onSwitchToRegister, onThemeToggle, isDarkMode }) => {
 
   return (
     <div className="login-container">
-      {/* Theme Toggle Button */}
-      <button 
-        className="theme-toggle-btn"
-        onClick={onThemeToggle}
-        title={isDarkMode ? 'Cambiar a modo claro' : 'Cambiar a modo oscuro'}
-        style={{
-          position: 'absolute',
-          top: '1rem',
-          right: '1rem',
-          zIndex: 1000
-        }}
-      >
-        {isDarkMode ? '☀️' : '🌙'}
-      </button>
+      {/* Theme & Language Controls */}
+      <div style={{
+        position: 'absolute',
+        top: '1rem',
+        right: '1rem',
+        zIndex: 1000,
+        display: 'flex',
+        gap: '10px',
+        alignItems: 'center'
+      }}>
+        <select 
+          value={language} 
+          onChange={(e) => changeLanguage(e.target.value)}
+          className="language-select"
+          style={{
+            padding: '5px 10px',
+            borderRadius: '20px',
+            border: '1px solid var(--border-color)',
+            background: 'var(--bg-secondary)',
+            color: 'var(--text-primary)',
+            cursor: 'pointer',
+            outline: 'none'
+          }}
+        >
+          <option value="es">Español</option>
+          <option value="en">English</option>
+          <option value="pl">Polski</option>
+        </select>
+
+        <button 
+          className="theme-toggle-btn"
+          onClick={onThemeToggle}
+          title={isDarkMode ? t('common.theme.light') : t('common.theme.dark')}
+        >
+          {isDarkMode ? '☀️' : '🌙'}
+        </button>
+      </div>
 
       <FormContainer
-        title={isRecovering ? "Recuperar Contraseña" : "Iniciar Sesión"}
-        subtitle={isRecovering ? "Ingresa tu usuario para recibir instrucciones" : "Accede a tu nube personal"}
+        title={isRecovering ? t('auth.recover') : t('auth.loginTitle')}
+        subtitle={isRecovering ? t('auth.recoveryInstruction') : "Accede a tu nube personal"}
         maxWidth="400px"
       >
         {isRecovering ? (
@@ -130,7 +155,7 @@ const Login = ({ onLogin, onSwitchToRegister, onThemeToggle, isDarkMode }) => {
                     }}
                     fullWidth
                   >
-                    Volver al Login
+                    {t('auth.backToLogin')}
                   </Button>
                 </div>
               </div>
@@ -145,7 +170,7 @@ const Login = ({ onLogin, onSwitchToRegister, onThemeToggle, isDarkMode }) => {
                 <Input
                   type="text"
                   name="username"
-                  placeholder="Nombre de usuario"
+                  placeholder={t('auth.username')}
                   value={formData.username}
                   onChange={handleChange}
                   error={errors.username}
@@ -160,7 +185,7 @@ const Login = ({ onLogin, onSwitchToRegister, onThemeToggle, isDarkMode }) => {
                   loading={isLoading}
                   fullWidth
                 >
-                  {isLoading ? 'Enviando...' : 'Recuperar Contraseña'}
+                  {isLoading ? t('auth.sending') : t('auth.sendRecovery')}
                 </Button>
 
                 <div className="form-footer">
@@ -172,7 +197,7 @@ const Login = ({ onLogin, onSwitchToRegister, onThemeToggle, isDarkMode }) => {
                       setErrors({});
                     }}
                   >
-                    Volver a Iniciar Sesión
+                    {t('auth.backToLogin')}
                   </button>
                 </div>
               </>
@@ -189,7 +214,7 @@ const Login = ({ onLogin, onSwitchToRegister, onThemeToggle, isDarkMode }) => {
             <Input
               type="text"
               name="username"
-              placeholder="Nombre de usuario"
+              placeholder={t('auth.username')}
               value={formData.username}
               onChange={handleChange}
               error={errors.username}
@@ -200,7 +225,7 @@ const Login = ({ onLogin, onSwitchToRegister, onThemeToggle, isDarkMode }) => {
             <Input
               type="password"
               name="password"
-              placeholder="Contraseña"
+              placeholder={t('auth.password')}
               value={formData.password}
               onChange={handleChange}
               error={errors.password}
@@ -218,7 +243,7 @@ const Login = ({ onLogin, onSwitchToRegister, onThemeToggle, isDarkMode }) => {
                   setErrors({});
                 }}
               >
-                ¿Olvidaste tu contraseña?
+                {t('auth.forgotPassword')}
               </button>
             </div>
 
@@ -229,7 +254,7 @@ const Login = ({ onLogin, onSwitchToRegister, onThemeToggle, isDarkMode }) => {
               loading={isLoading}
               fullWidth
             >
-              {isLoading ? 'Iniciando sesión...' : 'Iniciar Sesión'}
+              {isLoading ? t('auth.loggingIn') : t('auth.loginButton')}
             </Button>
 
             {onSwitchToRegister && (

@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import './EventModal.css';
+import LocationPickerModal from './LocationPickerModal';
+import { useLanguage } from '../../context/LanguageContext';
 
 const EventModal = ({
   isOpen,
@@ -12,7 +14,9 @@ const EventModal = ({
   isLoading = false,
   selectedDates = null // Para modo create
 }) => {
+  const { t, language } = useLanguage();
   const [currentMode, setCurrentMode] = useState(mode);
+  const [showLocationPicker, setShowLocationPicker] = useState(false);
   const [formData, setFormData] = useState({
     title: '',
     start: '',
@@ -27,6 +31,23 @@ const EventModal = ({
   const [errors, setErrors] = useState({});
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
+  // Helper to format date for datetime-local input (YYYY-MM-DDTHH:mm)
+  const formatDateForInput = (date) => {
+    if (!date) return '';
+    const d = new Date(date);
+    // Adjust for timezone to keep local time in ISO string
+    const offset = d.getTimezoneOffset() * 60000;
+    return (new Date(d - offset)).toISOString().slice(0, 16);
+  };
+
+  // Helper for date input (YYYY-MM-DD)
+  const formatDateForDateInput = (date) => {
+    if (!date) return '';
+    const d = new Date(date);
+    const offset = d.getTimezoneOffset() * 60000;
+    return (new Date(d - offset)).toISOString().split('T')[0];
+  };
+
   // Initialize form data when modal opens or event/mode changes
   useEffect(() => {
     if (isOpen && event && (mode === 'view' || mode === 'edit')) {
@@ -35,8 +56,8 @@ const EventModal = ({
 
       setFormData({
         title: event.title || '',
-        start: event.allDay ? startDate.split('T')[0] : startDate,
-        end: event.allDay ? endDate.split('T')[0] : endDate,
+        start: event.allDay ? formatDateForDateInput(startDate) : formatDateForInput(startDate),
+        end: event.allDay ? formatDateForDateInput(endDate) : formatDateForInput(endDate),
         allDay: event.allDay || false,
         location: event.extendedProps?.location || '',
         description: event.extendedProps?.description || '',
@@ -50,10 +71,10 @@ const EventModal = ({
         // Use selected dates from calendar
         const startDate = selectedDates.allDay
           ? selectedDates.start.toISOString().split('T')[0]
-          : selectedDates.start.toISOString().slice(0, 16);
+          : formatDateForInput(selectedDates.start);
         const endDate = selectedDates.allDay
           ? selectedDates.end.toISOString().split('T')[0]
-          : selectedDates.end.toISOString().slice(0, 16);
+          : formatDateForInput(selectedDates.end);
 
         setFormData({
           title: '',
@@ -73,8 +94,8 @@ const EventModal = ({
 
         setFormData({
           title: '',
-          start: now.toISOString().slice(0, 16), // YYYY-MM-DDTHH:MM format
-          end: tomorrow.toISOString().slice(0, 16),
+          start: formatDateForInput(now),
+          end: formatDateForInput(tomorrow),
           allDay: false,
           location: '',
           description: '',
@@ -89,10 +110,42 @@ const EventModal = ({
   }, [isOpen, event, mode, selectedDates]);
 
   const handleInputChange = (field, value) => {
-    setFormData(prev => ({
-      ...prev,
-      [field]: value
-    }));
+    // Lógica especial para el cambio de "Todo el día"
+    if (field === 'allDay') {
+      const isAllDay = value;
+      const now = new Date();
+      
+      // Si activamos "Todo el día", solo guardamos la fecha (YYYY-MM-DD)
+      if (isAllDay) {
+        setFormData(prev => ({
+          ...prev,
+          allDay: true,
+          start: prev.start ? prev.start.split('T')[0] : formatDateForDateInput(now),
+          end: prev.end ? prev.end.split('T')[0] : formatDateForDateInput(now)
+        }));
+      } else {
+        // Si desactivamos "Todo el día", añadimos hora por defecto (ej: hora actual o 09:00)
+        // Intentamos preservar la fecha que ya estaba seleccionada
+        const currentStartDate = formData.start || formatDateForDateInput(now);
+        const currentEndDate = formData.end || formatDateForDateInput(now);
+        
+        // Añadimos hora actual para inicio y +1 hora para fin
+        const startTime = now.toTimeString().slice(0, 5); // HH:mm
+        const endTime = new Date(now.getTime() + 60*60*1000).toTimeString().slice(0, 5);
+
+        setFormData(prev => ({
+          ...prev,
+          allDay: false,
+          start: `${currentStartDate}T${startTime}`,
+          end: `${currentEndDate}T${endTime}`
+        }));
+      }
+    } else {
+      setFormData(prev => ({
+        ...prev,
+        [field]: value
+      }));
+    }
 
     // Clear error for this field
     if (errors[field]) {
@@ -103,26 +156,42 @@ const EventModal = ({
     }
   };
 
+  const toggleCategory = (categoryName) => {
+    setFormData(prev => {
+      const currentCats = prev.categories || [];
+      if (currentCats.includes(categoryName)) {
+        return { ...prev, categories: currentCats.filter(c => c !== categoryName) };
+      } else {
+        return { ...prev, categories: [...currentCats, categoryName] };
+      }
+    });
+  };
+
+  const getCategoryColor = (categoryName) => {
+    const category = categories.find(c => c.name === categoryName);
+    return category ? (category.hexColor || category.color) : 'var(--cal-primary)';
+  };
+
   const validateForm = () => {
     const newErrors = {};
 
     if (!formData.title.trim()) {
-      newErrors.title = 'El título es obligatorio';
+      newErrors.title = t('calendar.titleRequired');
     }
 
     if (!formData.start) {
-      newErrors.start = 'La fecha de inicio es obligatoria';
+      newErrors.start = t('calendar.startDateRequired');
     }
 
     if (!formData.allDay && !formData.end) {
-      newErrors.end = 'La fecha de fin es obligatoria para eventos con hora';
+      newErrors.end = t('calendar.endDateRequired');
     }
 
     if (formData.start && formData.end && !formData.allDay) {
       const startDate = new Date(formData.start);
       const endDate = new Date(formData.end);
       if (endDate <= startDate) {
-        newErrors.end = 'La fecha de fin debe ser posterior a la fecha de inicio';
+        newErrors.end = t('calendar.endDateInvalid');
       }
     }
 
@@ -145,7 +214,7 @@ const EventModal = ({
       onClose();
     } catch (error) {
       console.error('Error saving event:', error);
-      setErrors({ general: 'Error al guardar el evento' });
+      setErrors({ general: t('calendar.errorSavingEvent') });
     }
   };
 
@@ -155,7 +224,7 @@ const EventModal = ({
       onClose();
     } catch (error) {
       console.error('Error deleting event:', error);
-      setErrors({ general: 'Error al eliminar el evento' });
+      setErrors({ general: t('calendar.errorDeletingEvent') });
     }
   };
 
@@ -164,7 +233,7 @@ const EventModal = ({
 
     const date = new Date(dateStr);
     if (allDay) {
-      return date.toLocaleDateString('es-ES', {
+      return date.toLocaleDateString(language === 'es' ? 'es-ES' : language === 'pl' ? 'pl-PL' : 'en-US', {
         weekday: 'long',
         year: 'numeric',
         month: 'long',
@@ -172,7 +241,7 @@ const EventModal = ({
       });
     }
 
-    return date.toLocaleString('es-ES', {
+    return date.toLocaleString(language === 'es' ? 'es-ES' : language === 'pl' ? 'pl-PL' : 'en-US', {
       weekday: 'long',
       year: 'numeric',
       month: 'long',
@@ -184,10 +253,10 @@ const EventModal = ({
 
   const getModalTitle = () => {
     switch (currentMode) {
-      case 'view': return '📅 Ver Evento';
-      case 'edit': return '✏️ Editar Evento';
-      case 'create': return '➕ Nuevo Evento';
-      default: return 'Evento';
+      case 'view': return t('calendar.viewEvent');
+      case 'edit': return t('calendar.editEvent');
+      case 'create': return t('calendar.newEvent');
+      default: return t('calendar.viewEvent');
     }
   };
 
@@ -213,73 +282,75 @@ const EventModal = ({
               // VIEW MODE
               <div className="event-details">
                 <div className="detail-group">
-                  <label className="detail-label">📝 Título:</label>
-                  <div className="detail-value">{event?.title || 'Sin título'}</div>
+                  <label className="detail-label">{t('calendar.eventTitle')}</label>
+                  <div className="detail-value title-value">{event?.title || t('calendar.noTitle')}</div>
                 </div>
 
-                <div className="detail-group">
-                  <label className="detail-label">📅 Inicio:</label>
-                  <div className="detail-value">
-                    {formatDateTime(event?.start, event?.allDay)}
-                  </div>
-                </div>
-
-                {!event?.allDay && (
+                <div className="detail-row">
                   <div className="detail-group">
-                    <label className="detail-label">🏁 Fin:</label>
+                    <label className="detail-label">{t('calendar.eventStart')}</label>
                     <div className="detail-value">
-                      {formatDateTime(event?.end, false)}
+                      {formatDateTime(event?.start, event?.allDay)}
                     </div>
                   </div>
-                )}
+
+                  {!event?.allDay && (
+                    <div className="detail-group">
+                      <label className="detail-label">{t('calendar.eventEnd')}</label>
+                      <div className="detail-value">
+                        {formatDateTime(event?.end, false)}
+                      </div>
+                    </div>
+                  )}
+                </div>
 
                 {event?.allDay && (
                   <div className="detail-group">
-                    <label className="detail-label">⏰ Tipo:</label>
-                    <div className="detail-value">Todo el día</div>
+                    <label className="detail-label">{t('calendar.eventType')}</label>
+                    <div className="detail-value">{t('calendar.allDay')}</div>
                   </div>
                 )}
 
                 {event?.extendedProps?.location && (
                   <div className="detail-group">
-                    <label className="detail-label">📍 Ubicación:</label>
+                    <label className="detail-label">{t('calendar.location')}</label>
                     <div className="detail-value">{event.extendedProps.location}</div>
                   </div>
                 )}
 
                 {event?.extendedProps?.description && (
                   <div className="detail-group">
-                    <label className="detail-label">📄 Descripción:</label>
-                    <div className="detail-value">{event.extendedProps.description}</div>
+                    <label className="detail-label">{t('calendar.description')}</label>
+                    <div className="detail-value description-value">{event.extendedProps.description}</div>
                   </div>
                 )}
 
                 {event?.extendedProps?.attendeesEmails && (
                   <div className="detail-group">
-                    <label className="detail-label">👥 Asistentes:</label>
+                    <label className="detail-label">{t('calendar.attendees')}</label>
                     <div className="detail-value">{event.extendedProps.attendeesEmails}</div>
                   </div>
                 )}
 
                 {event?.extendedProps?.categories && event.extendedProps.categories.length > 0 && (
                   <div className="detail-group">
-                    <label className="detail-label">🏷️ Categorías:</label>
+                    <label className="detail-label">{t('calendar.categories')}</label>
                     <div className="detail-value">
                       <div className="categories-tags">
-                        {event.extendedProps.categories.map((category, index) => (
-                          <span key={index} className="category-tag">
-                            {category}
+                        {event.extendedProps.categories.map((categoryName, index) => (
+                          <span 
+                            key={index} 
+                            className="category-tag"
+                            style={{ 
+                              backgroundColor: getCategoryColor(categoryName),
+                              color: '#fff' // Asumimos texto blanco para contraste
+                            }}
+                          >
+                            {categoryName}
                           </span>
                         ))}
                       </div>
                     </div>
-                  </div>
-                )}
-
-                {event?.extendedProps?.calendarName && (
-                  <div className="detail-group">
-                    <label className="detail-label">📊 Calendario:</label>
-                    <div className="detail-value">{event.extendedProps.calendarName}</div>
                   </div>
                 )}
               </div>
@@ -287,33 +358,33 @@ const EventModal = ({
               // EDIT/CREATE MODE
               <form className="event-form">
                 <div className="form-group">
-                  <label className="form-label required">📝 Título</label>
+                  <label className="form-label required">{t('calendar.eventTitle')}</label>
                   <input
                     type="text"
                     className={`form-input ${errors.title ? 'error' : ''}`}
                     value={formData.title}
                     onChange={(e) => handleInputChange('title', e.target.value)}
-                    placeholder="Título del evento"
+                    placeholder={t('calendar.titlePlaceholder')}
                   />
                   {errors.title && <div className="error-message">{errors.title}</div>}
                 </div>
 
-                <div className="form-group">
-                  <label className="form-label">
+                <div className="form-group checkbox-group">
+                  <label className="form-checkbox-label">
                     <input
                       type="checkbox"
                       className="form-checkbox"
                       checked={formData.allDay}
                       onChange={(e) => handleInputChange('allDay', e.target.checked)}
                     />
-                    <span className="form-checkbox-label">Todo el día</span>
+                    {t('calendar.allDay')}
                   </label>
                 </div>
 
                 <div className="form-row">
                   <div className="form-group">
                     <label className="form-label required">
-                      📅 {formData.allDay ? 'Fecha de inicio' : 'Fecha y hora de inicio'}
+                      {formData.allDay ? t('calendar.eventStart') : t('calendar.eventStart')}
                     </label>
                     <input
                       type={formData.allDay ? 'date' : 'datetime-local'}
@@ -324,84 +395,86 @@ const EventModal = ({
                     {errors.start && <div className="error-message">{errors.start}</div>}
                   </div>
 
-                  {!formData.allDay && (
-                    <div className="form-group">
-                      <label className="form-label required">🏁 Fecha y hora de fin</label>
-                      <input
-                        type="datetime-local"
-                        className={`form-input ${errors.end ? 'error' : ''}`}
-                        value={formData.end}
-                        onChange={(e) => handleInputChange('end', e.target.value)}
-                      />
-                      {errors.end && <div className="error-message">{errors.end}</div>}
-                    </div>
-                  )}
-
-                  {formData.allDay && (
-                    <div className="form-group">
-                      <label className="form-label required">🏁 Fecha de fin</label>
-                      <input
-                        type="date"
-                        className={`form-input ${errors.end ? 'error' : ''}`}
-                        value={formData.end}
-                        onChange={(e) => handleInputChange('end', e.target.value)}
-                      />
-                      {errors.end && <div className="error-message">{errors.end}</div>}
-                    </div>
-                  )}
+                  <div className="form-group">
+                    <label className="form-label required">
+                      {formData.allDay ? t('calendar.eventEnd') : t('calendar.eventEnd')}
+                    </label>
+                    <input
+                      type={formData.allDay ? 'date' : 'datetime-local'}
+                      className={`form-input ${errors.end ? 'error' : ''}`}
+                      value={formData.end}
+                      onChange={(e) => handleInputChange('end', e.target.value)}
+                    />
+                    {errors.end && <div className="error-message">{errors.end}</div>}
+                  </div>
                 </div>
 
                 <div className="form-group">
-                  <label className="form-label">📍 Ubicación</label>
-                  <input
-                    type="text"
-                    className="form-input"
-                    value={formData.location}
-                    onChange={(e) => handleInputChange('location', e.target.value)}
-                    placeholder="Lugar del evento (opcional)"
-                  />
+                  <label className="form-label">{t('calendar.location')}</label>
+                  <div style={{ display: 'flex', gap: '8px' }}>
+                    <input
+                      type="text"
+                      className="form-input"
+                      value={formData.location}
+                      onChange={(e) => handleInputChange('location', e.target.value)}
+                      placeholder={t('calendar.locationPlaceholder')}
+                      style={{ flex: 1 }}
+                    />
+                    <button 
+                      type="button"
+                      className="btn btn-secondary"
+                      onClick={() => setShowLocationPicker(true)}
+                      title={t('calendar.searchMap')}
+                      style={{ padding: '0 12px' }}
+                    >
+                      📍
+                    </button>
+                  </div>
                 </div>
 
                 <div className="form-group">
-                  <label className="form-label">📄 Descripción</label>
+                  <label className="form-label">{t('calendar.description')}</label>
                   <textarea
                     className="form-textarea"
                     value={formData.description}
                     onChange={(e) => handleInputChange('description', e.target.value)}
-                    placeholder="Descripción del evento (opcional)"
+                    placeholder={t('calendar.descriptionPlaceholder')}
                     rows="3"
                   />
                 </div>
 
                 <div className="form-group">
-                  <label className="form-label">👥 Asistentes</label>
+                  <label className="form-label">{t('calendar.attendees')}</label>
                   <input
                     type="text"
                     className="form-input"
                     value={formData.attendees}
                     onChange={(e) => handleInputChange('attendees', e.target.value)}
-                    placeholder="Correos electrónicos separados por comas (opcional)"
+                    placeholder={t('calendar.attendeesPlaceholder')}
                   />
                 </div>
 
                 <div className="form-group">
-                  <label className="form-label">🏷️ Categorías</label>
-                  <select
-                    multiple
-                    className="form-select"
-                    value={formData.categories}
-                    onChange={(e) => {
-                      const selectedOptions = Array.from(e.target.selectedOptions, option => option.value);
-                      handleInputChange('categories', selectedOptions);
-                    }}
-                  >
-                    {categories.map(category => (
-                      <option key={category.id} value={category.name}>
-                        {category.name}
-                      </option>
-                    ))}
-                  </select>
-                  <small className="form-help">Mantén Ctrl (Cmd en Mac) para seleccionar múltiples categorías</small>
+                  <label className="form-label">{t('calendar.categories')}</label>
+                  <div className="category-selector">
+                    {categories.length > 0 ? categories.map(cat => (
+                      <div
+                        key={cat.id}
+                        className={`category-option ${formData.categories.includes(cat.name) ? 'selected' : ''}`}
+                        style={{
+                          '--cat-color': cat.hexColor || cat.color,
+                          backgroundColor: formData.categories.includes(cat.name) ? (cat.hexColor || cat.color) : 'transparent',
+                          borderColor: cat.hexColor || cat.color,
+                          color: formData.categories.includes(cat.name) ? '#fff' : 'var(--cal-text)'
+                        }}
+                        onClick={() => toggleCategory(cat.name)}
+                      >
+                        {cat.name}
+                      </div>
+                    )) : (
+                      <div className="text-sm text-gray-500 italic">{t('calendar.noCategories')}</div>
+                    )}
+                  </div>
                 </div>
               </form>
             )}
@@ -415,20 +488,20 @@ const EventModal = ({
                   onClick={() => setCurrentMode('edit')}
                   disabled={isLoading}
                 >
-                  ✏️ Editar
+                  {t('calendar.edit')}
                 </button>
                 <button
                   className="btn btn-danger"
                   onClick={() => setShowDeleteConfirm(true)}
                   disabled={isLoading}
                 >
-                  🗑️ Eliminar
+                  {t('calendar.delete')}
                 </button>
                 <button
                   className="btn btn-primary"
                   onClick={onClose}
                 >
-                  ✅ Cerrar
+                  {t('calendar.close')}
                 </button>
               </>
             ) : (
@@ -438,14 +511,14 @@ const EventModal = ({
                   onClick={onClose}
                   disabled={isLoading}
                 >
-                  ❌ Cancelar
+                  {t('calendar.cancel')}
                 </button>
                 <button
                   className="btn btn-primary"
                   onClick={handleSave}
                   disabled={isLoading}
                 >
-                  💾 {currentMode === 'create' ? 'Crear' : 'Guardar'}
+                  {currentMode === 'create' ? t('calendar.create') : t('calendar.save')}
                 </button>
               </>
             )}
@@ -458,7 +531,7 @@ const EventModal = ({
         <div className="modal-backdrop show" onClick={() => setShowDeleteConfirm(false)}>
           <div className="confirm-modal" onClick={e => e.stopPropagation()}>
             <div className="modal-header">
-              <h3>🗑️ Confirmar eliminación</h3>
+              <h3>{t('calendar.confirmDelete')}</h3>
               <button
                 className="close-modal"
                 onClick={() => setShowDeleteConfirm(false)}
@@ -467,8 +540,8 @@ const EventModal = ({
               </button>
             </div>
             <div className="modal-body">
-              <p>¿Estás seguro de que quieres eliminar el evento "{event?.title}"?</p>
-              <p className="warning-text">Esta acción no se puede deshacer.</p>
+              <p>{t('calendar.deleteConfirmation', { title: event?.title })}</p>
+              <p className="warning-text">{t('calendar.irreversibleAction')}</p>
             </div>
             <div className="modal-footer">
               <button
@@ -476,19 +549,27 @@ const EventModal = ({
                 onClick={() => setShowDeleteConfirm(false)}
                 disabled={isLoading}
               >
-                ❌ Cancelar
+                {t('calendar.cancel')}
               </button>
               <button
                 className="btn btn-danger"
                 onClick={handleDelete}
                 disabled={isLoading}
               >
-                🗑️ Eliminar
+                {t('calendar.delete')}
               </button>
             </div>
           </div>
         </div>
       )}
+
+      {/* Location Picker Modal */}
+      <LocationPickerModal
+        isOpen={showLocationPicker}
+        onClose={() => setShowLocationPicker(false)}
+        onSelect={(location) => handleInputChange('location', location)}
+        initialLocation={formData.location}
+      />
     </>
   );
 };

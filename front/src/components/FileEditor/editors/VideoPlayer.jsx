@@ -1,7 +1,9 @@
 import React, { useState, useRef } from 'react';
+import { useLanguage } from '../../../context/LanguageContext';
 import './VideoPlayer.css';
 
 const VideoPlayer = ({ fileUrl, file }) => {
+  const { t } = useLanguage();
   const [playing, setPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
@@ -126,10 +128,10 @@ const VideoPlayer = ({ fileUrl, file }) => {
           {/* Actions */}
           <div className="flex gap-2 ml-auto">
             <button className="btn-secondary" onClick={toggleFullscreen}>
-              {isFullscreen ? '🗗' : '⛶'} Pantalla completa
+              {isFullscreen ? '🗗' : '⛶'} {t('videoPlayer.fullscreen')}
             </button>
             <button className="btn-primary" onClick={handleDownload}>
-              💾 Descargar
+              💾 {t('videoPlayer.download')}
             </button>
           </div>
         </div>

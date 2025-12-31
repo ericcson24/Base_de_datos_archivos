@@ -1,9 +1,11 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import mammoth from 'mammoth';
 import { getFileType, getFileIcon, canPreview, getAuthenticatedPreviewUrl, formatFileSize, downloadFile, getAuthToken } from '../../utils/fileUtils';
+import { useLanguage } from '../../context/LanguageContext';
 
 const WordFileViewer = ({ fileId, fileName, onLoad, onError }) => {
   const [content, setContent] = useState('');
+  const { t } = useLanguage();
 
   useEffect(() => {
     const loadWordFile = async () => {
@@ -15,7 +17,7 @@ const WordFileViewer = ({ fileId, fileName, onLoad, onError }) => {
           }
         });
 
-        if (!response.ok) throw new Error('Error al cargar el archivo');
+        if (!response.ok) throw new Error(t('fileViewer.errorLoading'));
 
         const arrayBuffer = await response.arrayBuffer();
         const result = await mammoth.convertToHtml({ arrayBuffer });
@@ -23,12 +25,12 @@ const WordFileViewer = ({ fileId, fileName, onLoad, onError }) => {
         onLoad();
       } catch (error) {
         console.error('Error loading Word file:', error);
-        onError('Error al cargar el documento Word');
+        onError(t('fileViewer.errorWord'));
       }
     };
 
     loadWordFile();
-  }, [fileId, onLoad, onError]);
+  }, [fileId, onLoad, onError, t]);
 
   return (
     <div className="glassmorphism-textarea dark:bg-slate-700 rounded-lg p-8 max-h-[70vh] overflow-y-auto bg-white text-black">
@@ -39,6 +41,7 @@ const WordFileViewer = ({ fileId, fileName, onLoad, onError }) => {
 
 const TextFileViewer = ({ fileId, fileName, onLoad, onError }) => {
   const [content, setContent] = useState('');
+  const { t } = useLanguage();
 
   useEffect(() => {
     const loadTextFile = async () => {
@@ -50,18 +53,18 @@ const TextFileViewer = ({ fileId, fileName, onLoad, onError }) => {
           }
         });
 
-        if (!response.ok) throw new Error('Error al cargar el archivo');
+        if (!response.ok) throw new Error(t('fileViewer.errorLoading'));
 
         const text = await response.text();
         setContent(text);
         onLoad();
       } catch (error) {
-        onError('Error al cargar el archivo de texto');
+        onError(t('fileViewer.errorText'));
       }
     };
 
     loadTextFile();
-  }, [fileId, onLoad, onError]);
+  }, [fileId, onLoad, onError, t]);
 
   return (
     <div className="glassmorphism-textarea dark:bg-slate-700 rounded-lg p-4 max-h-96 overflow-y-auto">
@@ -75,6 +78,7 @@ const FileViewerModal = ({ file, onClose, user }) => {
   const [error, setError] = useState(null);
   const [authenticatedUrl, setAuthenticatedUrl] = useState(null);
   const fileType = getFileType(file.name);
+  const { t } = useLanguage();
 
   const loadAuthenticatedPreview = useCallback(async () => {
     // Permitir preview para word aunque canPreview diga false
@@ -92,10 +96,10 @@ const FileViewerModal = ({ file, onClose, user }) => {
       }
     } catch (error) {
       console.error('Error cargando preview autenticada:', error);
-      setError('Error al cargar el archivo');
+      setError(t('fileViewer.errorLoading'));
       setLoading(false);
     }
-  }, [file.id, file.name, fileType]);
+  }, [file.id, file.name, fileType, t]);
 
   useEffect(() => {
     setLoading(true);
@@ -104,7 +108,7 @@ const FileViewerModal = ({ file, onClose, user }) => {
   }, [file, loadAuthenticatedPreview]);
 
   const handleDownload = () => {
-    downloadFile(file.id, file.name);
+    downloadFile(file.id, file.name, t);
   };
 
   const renderFileContent = () => {
@@ -112,7 +116,7 @@ const FileViewerModal = ({ file, onClose, user }) => {
       return (
         <div className="viewer-content loading">
           <div className="loading-spinner"></div>
-          <p>Cargando archivo...</p>
+          <p>{t('fileViewer.loading')}</p>
         </div>
       );
     }
@@ -126,7 +130,7 @@ const FileViewerModal = ({ file, onClose, user }) => {
               alt={file.name}
               onLoad={() => setLoading(false)}
               onError={() => {
-                setError('Error al cargar la imagen');
+                setError(t('fileViewer.errorImage'));
                 setLoading(false);
               }}
               style={{ maxWidth: '100%', maxHeight: '70vh', objectFit: 'contain' }}
@@ -141,13 +145,13 @@ const FileViewerModal = ({ file, onClose, user }) => {
               controls
               onLoadedData={() => setLoading(false)}
               onError={() => {
-                setError('Error al cargar el video');
+                setError(t('fileViewer.errorVideo'));
                 setLoading(false);
               }}
               style={{ maxWidth: '100%', maxHeight: '70vh' }}
             >
               <source src={authenticatedUrl} />
-              Tu navegador no soporta el elemento de video.
+              {t('fileViewer.videoNotSupported')}
             </video>
           </div>
         );
@@ -159,7 +163,7 @@ const FileViewerModal = ({ file, onClose, user }) => {
               src={authenticatedUrl}
               onLoad={() => setLoading(false)}
               onError={() => {
-                setError('Error al cargar el PDF');
+                setError(t('fileViewer.errorPdf'));
                 setLoading(false);
               }}
               style={{ width: '100%', height: '70vh', border: 'none' }}
@@ -191,11 +195,11 @@ const FileViewerModal = ({ file, onClose, user }) => {
         return (
           <div className="viewer-content office-viewer flex flex-col items-center justify-center h-full p-8">
             <div className="text-6xl mb-4">{getFileIcon(file.name)}</div>
-            <h3 className="text-xl font-semibold mb-2">Vista previa no disponible en local</h3>
+            <h3 className="text-xl font-semibold mb-2">{t('fileViewer.previewNotAvailable')}</h3>
             <p className="text-gray-600 dark:text-gray-400 text-center mb-6">
-              Los archivos de Office requieren un servidor público para ser previsualizados con Google Docs Viewer.
+              {t('fileViewer.officeRequirement')}
               <br />
-              Por favor, descarga el archivo para verlo.
+              {t('fileViewer.downloadToView')}
             </p>
             <button 
               onClick={handleDownload}
@@ -204,7 +208,7 @@ const FileViewerModal = ({ file, onClose, user }) => {
               <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
               </svg>
-              Descargar para ver
+              {t('fileViewer.downloadButton')}
             </button>
           </div>
         );
@@ -227,9 +231,9 @@ const FileViewerModal = ({ file, onClose, user }) => {
           <div className="viewer-content unsupported">
             <div className="unsupported-content">
               <span className="file-icon-large">{getFileIcon(file.name)}</span>
-              <p>Este tipo de archivo no se puede previsualizar</p>
-              <p>Archivo: {file.name}</p>
-              <p>Tamaño: {formatFileSize(file.size)}</p>
+              <p>{t('fileViewer.unsupportedType')}</p>
+              <p>{t('fileViewer.file')}: {file.name}</p>
+              <p>{t('fileViewer.size')}: {formatFileSize(file.size)}</p>
             </div>
           </div>
         );
@@ -242,12 +246,12 @@ const FileViewerModal = ({ file, onClose, user }) => {
         <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-slate-600">
           <h3 className="text-lg font-semibold text-gray-900 dark:text-slate-100 truncate">{file.name}</h3>
           <div className="flex items-center space-x-2">
-            <button onClick={handleDownload} className="p-2 text-gray-700 dark:text-slate-400 hover:text-gray-900 dark:hover:text-slate-200 hover:bg-gray-100 dark:hover:bg-slate-700 rounded-lg transition-colors duration-200" title="Descargar">
+            <button onClick={handleDownload} className="p-2 text-gray-700 dark:text-slate-400 hover:text-gray-900 dark:hover:text-slate-200 hover:bg-gray-100 dark:hover:bg-slate-700 rounded-lg transition-colors duration-200" title={t('fileViewer.download')}>
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
               </svg>
             </button>
-            <button onClick={onClose} className="p-2 text-gray-700 dark:text-slate-400 hover:text-gray-900 dark:hover:text-slate-200 hover:bg-gray-100 dark:hover:bg-slate-700 rounded-lg transition-colors duration-200" title="Cerrar">
+            <button onClick={onClose} className="p-2 text-gray-700 dark:text-slate-400 hover:text-gray-900 dark:hover:text-slate-200 hover:bg-gray-100 dark:hover:bg-slate-700 rounded-lg transition-colors duration-200" title={t('fileViewer.close')}>
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
               </svg>
@@ -259,7 +263,7 @@ const FileViewerModal = ({ file, onClose, user }) => {
           {loading && (
             <div className="flex flex-col items-center justify-center py-16">
               <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mb-4"></div>
-              <p className="text-gray-600 dark:text-slate-400">Cargando archivo...</p>
+              <p className="text-gray-600 dark:text-slate-400">{t('fileViewer.loading')}</p>
             </div>
           )}
 
@@ -270,7 +274,7 @@ const FileViewerModal = ({ file, onClose, user }) => {
               </svg>
               <p className="text-red-600 dark:text-red-400 mb-4">{error}</p>
               <button onClick={handleDownload} className="px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg transition-colors duration-200">
-                Descargar archivo
+                {t('fileViewer.downloadFile')}
               </button>
             </div>
           )}

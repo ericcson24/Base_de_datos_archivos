@@ -8,9 +8,9 @@ const dbPath = path.join(__dirname, 'server.db');
 // Crear conexión
 const db = new sqlite3.Database(dbPath, (err) => {
   if (err) {
-    console.error('❌ Error conectando a la base de datos:', err.message);
+    console.error('Error conectando a la base de datos:', err.message);
   } else {
-    console.log('✅ Conectado a la base de datos SQLite');
+    console.log('Conectado a la base de datos SQLite');
     initDatabase();
   }
 });
@@ -67,10 +67,18 @@ function initDatabase() {
       is_all_day BOOLEAN,
       location TEXT,
       web_link TEXT,
+      categories TEXT,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       last_synced DATETIME,
       FOREIGN KEY(user_id) REFERENCES users(id)
     )`);
+
+    // Migración para añadir columna categories si no existe
+    db.run(`ALTER TABLE calendar_events ADD COLUMN categories TEXT`, (err) => {
+      if (err && !err.message.includes('duplicate column name')) {
+        // console.error('Error adding categories column:', err.message);
+      }
+    });
 
     // Tabla de Logs de Auditoría
     db.run(`CREATE TABLE IF NOT EXISTS audit_logs (
@@ -110,7 +118,7 @@ function initDatabase() {
             [adminUser, hash, 'admin'], 
             (err) => {
               if (err) console.error('Error creando admin:', err);
-              else console.log('✅ Usuario administrador creado por defecto');
+              else console.log('Usuario administrador creado por defecto');
             }
           );
         } catch (error) {
@@ -131,7 +139,7 @@ function initDatabase() {
             [testUser, hash, 'user'], 
             (err) => {
               if (err) console.error('Error creando usuario eric:', err);
-              else console.log('✅ Usuario eric creado por defecto');
+              else console.log('Usuario eric creado por defecto');
             }
           );
         } catch (error) {

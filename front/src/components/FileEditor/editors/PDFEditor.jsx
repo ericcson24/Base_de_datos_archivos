@@ -1,7 +1,9 @@
 import React, { useState } from 'react';
+import { useLanguage } from '../../../context/LanguageContext';
 import './PDFEditor.css';
 
 const PDFEditor = ({ fileUrl, file }) => {
+  const { t } = useLanguage();
   const [currentPage, setCurrentPage] = useState(1);
   const [scale, setScale] = useState(1);
   const [drawColor, setDrawColor] = useState('#ff0000');
@@ -24,7 +26,7 @@ const PDFEditor = ({ fileUrl, file }) => {
   };
 
   const addTextAnnotation = () => {
-    const text = prompt('Ingrese el texto de la anotación:');
+    const text = prompt(t('pdfEditor.enterAnnotation'));
     if (text) {
       setAnnotations([...annotations, {
         type: 'text',
@@ -47,7 +49,7 @@ const PDFEditor = ({ fileUrl, file }) => {
               ←
             </button>
             <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
-              Página {currentPage}
+              {t('pdfEditor.page')} {currentPage}
             </span>
             <button className="btn-icon" onClick={() => setCurrentPage(p => p + 1)}>
               →
@@ -56,13 +58,13 @@ const PDFEditor = ({ fileUrl, file }) => {
 
           {/* Zoom */}
           <div className="tool-group flex items-center gap-2">
-            <button className="btn-icon" onClick={handleZoomOut} title="Alejar">
+            <button className="btn-icon" onClick={handleZoomOut} title={t('pdfEditor.zoomOut')}>
               🔍−
             </button>
             <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
               {Math.round(scale * 100)}%
             </span>
-            <button className="btn-icon" onClick={handleZoomIn} title="Acercar">
+            <button className="btn-icon" onClick={handleZoomIn} title={t('pdfEditor.zoomIn')}>
               🔍+
             </button>
           </div>
@@ -72,16 +74,16 @@ const PDFEditor = ({ fileUrl, file }) => {
             <button
               className={`btn-tool ${selectedTool === 'draw' ? 'active' : ''}`}
               onClick={() => setSelectedTool(selectedTool === 'draw' ? 'none' : 'draw')}
-              title="Dibujar"
+              title={t('pdfEditor.draw')}
             >
-              ✏️ Dibujar
+              ✏️ {t('pdfEditor.draw')}
             </button>
             <button
               className={`btn-tool ${selectedTool === 'highlight' ? 'active' : ''}`}
               onClick={() => setSelectedTool(selectedTool === 'highlight' ? 'none' : 'highlight')}
-              title="Resaltar"
+              title={t('pdfEditor.highlight')}
             >
-              🖍️ Resaltar
+              🖍️ {t('pdfEditor.highlight')}
             </button>
             <button
               className={`btn-tool ${selectedTool === 'text' ? 'active' : ''}`}
@@ -89,9 +91,9 @@ const PDFEditor = ({ fileUrl, file }) => {
                 setSelectedTool('text');
                 addTextAnnotation();
               }}
-              title="Añadir texto"
+              title={t('pdfEditor.addText')}
             >
-              📝 Texto
+              📝 {t('pdfEditor.text')}
             </button>
             {selectedTool !== 'none' && (
               <input
@@ -106,10 +108,10 @@ const PDFEditor = ({ fileUrl, file }) => {
           {/* Actions */}
           <div className="flex gap-2 ml-auto">
             <button className="btn-secondary" onClick={() => setAnnotations([])}>
-              🗑️ Limpiar
+              🗑️ {t('pdfEditor.clear')}
             </button>
             <button className="btn-primary" onClick={handleDownload}>
-              💾 Descargar
+              💾 {t('pdfEditor.download')}
             </button>
           </div>
         </div>

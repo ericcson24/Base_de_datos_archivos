@@ -1,7 +1,9 @@
 import React, { useState, useEffect } from 'react';
+import { useLanguage } from '../../../context/LanguageContext';
 import './ZipViewer.css';
 
 const ZipViewer = ({ file }) => {
+  const { t } = useLanguage();
   const [entries, setEntries] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -44,7 +46,7 @@ const ZipViewer = ({ file }) => {
       setLoading(false);
     } catch (err) {
       console.error('Error loading ZIP file:', err);
-      setError('Error al cargar el archivo ZIP: ' + err.message);
+      setError(t('zipViewer.errorLoading', { error: err.message }));
       setLoading(false);
     }
   };
@@ -117,14 +119,14 @@ const ZipViewer = ({ file }) => {
       else {
         setPreviewContent({
           type: 'unsupported',
-          message: 'Tipo de archivo no soportado para vista previa'
+          message: t('zipViewer.unsupportedPreview')
         });
       }
     } catch (err) {
       console.error('Error previewing file:', err);
       setPreviewContent({
         type: 'error',
-        message: 'Error al previsualizar el archivo: ' + err.message
+        message: t('zipViewer.errorPreview', { error: err.message })
       });
     }
   };
@@ -142,7 +144,7 @@ const ZipViewer = ({ file }) => {
       URL.revokeObjectURL(url);
     } catch (err) {
       console.error('Error downloading file:', err);
-      alert('Error al descargar el archivo: ' + err.message);
+      alert(t('zipViewer.errorDownload', { error: err.message }));
     }
   };
 
@@ -176,7 +178,7 @@ const ZipViewer = ({ file }) => {
       <div className="zip-viewer">
         <div className="zip-loading">
           <div className="spinner"></div>
-          <p>Cargando archivo ZIP...</p>
+          <p>{t('zipViewer.loadingZip')}</p>
         </div>
       </div>
     );
@@ -197,7 +199,7 @@ const ZipViewer = ({ file }) => {
       <div className="zip-header">
         <h3>📦 {file.name}</h3>
         <div className="zip-stats">
-          <span>{entries.length} archivos</span>
+          <span>{entries.length} {t('zipViewer.files')}</span>
           <span>{formatSize(entries.reduce((sum, e) => sum + e.size, 0))}</span>
         </div>
       </div>
@@ -206,12 +208,12 @@ const ZipViewer = ({ file }) => {
         <div className="zip-list">
           <div className="zip-list-header">
             <div className="header-cell name" onClick={() => handleSort('name')}>
-              Nombre {sortBy === 'name' && (sortOrder === 'asc' ? '▲' : '▼')}
+              {t('zipViewer.name')} {sortBy === 'name' && (sortOrder === 'asc' ? '▲' : '▼')}
             </div>
             <div className="header-cell size" onClick={() => handleSort('size')}>
-              Tamaño {sortBy === 'size' && (sortOrder === 'asc' ? '▲' : '▼')}
+              {t('zipViewer.size')} {sortBy === 'size' && (sortOrder === 'asc' ? '▲' : '▼')}
             </div>
-            <div className="header-cell actions">Acciones</div>
+            <div className="header-cell actions">{t('zipViewer.actions')}</div>
           </div>
 
           <div className="zip-list-body">
@@ -262,7 +264,7 @@ const ZipViewer = ({ file }) => {
               {!previewContent && (
                 <div className="preview-loading">
                   <div className="spinner"></div>
-                  <p>Cargando vista previa...</p>
+                  <p>{t('zipViewer.loadingPreview')}</p>
                 </div>
               )}
 
@@ -288,7 +290,7 @@ const ZipViewer = ({ file }) => {
                 <div className="preview-message">
                   <p>⚠️ {previewContent.message}</p>
                   <button onClick={() => handleDownload(selectedEntry)}>
-                    Descargar archivo
+                    {t('zipViewer.downloadFile')}
                   </button>
                 </div>
               )}

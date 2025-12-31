@@ -1,7 +1,9 @@
 import React, { useState, useRef, useEffect } from 'react';
+import { useLanguage } from '../../../context/LanguageContext';
 import './ImageEditor.css';
 
 const ImageEditor = ({ fileUrl, file }) => {
+  const { t } = useLanguage();
   const [brightness, setBrightness] = useState(100);
   const [contrast, setContrast] = useState(100);
   const [saturation, setSaturation] = useState(100);
@@ -102,7 +104,7 @@ const ImageEditor = ({ fileUrl, file }) => {
       
       const token = localStorage.getItem('auth_token');
       if (!token) {
-        alert('No hay sesión activa');
+        alert(t('imageEditor.noSession'));
         return;
       }
 
@@ -120,14 +122,14 @@ const ImageEditor = ({ fileUrl, file }) => {
       
       const data = await response.json();
       if (data.success) {
-        alert('Imagen guardada exitosamente en el servidor');
+        alert(t('imageEditor.saveSuccess'));
       } else {
-        alert('Error al guardar: ' + data.message);
+        alert(t('imageEditor.saveError') + data.message);
       }
 
     } catch (error) {
       console.error('Error saving image:', error);
-      alert('Error al guardar la imagen');
+      alert(t('imageEditor.saveErrorGeneric'));
     }
   };
 
@@ -181,7 +183,7 @@ const ImageEditor = ({ fileUrl, file }) => {
           {/* Brightness */}
           <div className="tool-group">
             <label className="text-xs font-medium text-gray-700 dark:text-gray-300">
-              Brillo: {brightness}%
+              {t('imageEditor.brightness')}: {brightness}%
             </label>
             <input
               type="range"
@@ -196,7 +198,7 @@ const ImageEditor = ({ fileUrl, file }) => {
           {/* Contrast */}
           <div className="tool-group">
             <label className="text-xs font-medium text-gray-700 dark:text-gray-300">
-              Contraste: {contrast}%
+              {t('imageEditor.contrast')}: {contrast}%
             </label>
             <input
               type="range"
@@ -211,7 +213,7 @@ const ImageEditor = ({ fileUrl, file }) => {
           {/* Saturation */}
           <div className="tool-group">
             <label className="text-xs font-medium text-gray-700 dark:text-gray-300">
-              Saturación: {saturation}%
+              {t('imageEditor.saturation')}: {saturation}%
             </label>
             <input
               type="range"
@@ -226,20 +228,20 @@ const ImageEditor = ({ fileUrl, file }) => {
           {/* Rotation */}
           <div className="tool-group">
             <label className="text-xs font-medium text-gray-700 dark:text-gray-300">
-              Rotación: {rotation}°
+              {t('imageEditor.rotation')}: {rotation}°
             </label>
             <div className="flex gap-2">
               <button
                 onClick={() => setRotation(r => r - 90)}
                 className="btn-icon"
-                title="Rotar izquierda"
+                title={t('imageEditor.rotateLeft')}
               >
                 ↶
               </button>
               <button
                 onClick={() => setRotation(r => r + 90)}
                 className="btn-icon"
-                title="Rotar derecha"
+                title={t('imageEditor.rotateRight')}
               >
                 ↷
               </button>
@@ -249,18 +251,18 @@ const ImageEditor = ({ fileUrl, file }) => {
           {/* Filters */}
           <div className="tool-group">
             <label className="text-xs font-medium text-gray-700 dark:text-gray-300">
-              Filtro
+              {t('imageEditor.filter')}
             </label>
             <select
               value={filter}
               onChange={(e) => setFilter(e.target.value)}
               className="select-filter"
             >
-              <option value="none">Normal</option>
-              <option value="grayscale(100%)">Blanco y Negro</option>
-              <option value="sepia(100%)">Sepia</option>
-              <option value="blur(2px)">Desenfoque</option>
-              <option value="invert(100%)">Invertir</option>
+              <option value="none">{t('imageEditor.normal')}</option>
+              <option value="grayscale(100%)">{t('imageEditor.grayscale')}</option>
+              <option value="sepia(100%)">{t('imageEditor.sepia')}</option>
+              <option value="blur(2px)">{t('imageEditor.blur')}</option>
+              <option value="invert(100%)">{t('imageEditor.invert')}</option>
             </select>
           </div>
 
@@ -269,9 +271,9 @@ const ImageEditor = ({ fileUrl, file }) => {
             <button
               onClick={() => setIsDrawing(!isDrawing)}
               className={`btn-tool ${isDrawing ? 'active' : ''}`}
-              title="Dibujar"
+              title={t('imageEditor.draw')}
             >
-              ✏️ {isDrawing ? 'Dibujando' : 'Dibujar'}
+              ✏️ {isDrawing ? t('imageEditor.drawing') : t('imageEditor.draw')}
             </button>
             {isDrawing && (
               <div className="flex gap-2 items-center">
@@ -295,14 +297,14 @@ const ImageEditor = ({ fileUrl, file }) => {
 
           {/* Actions */}
           <div className="flex gap-2 ml-auto">
-            <button onClick={handleReset} className="btn-secondary" title="Deshacer cambios">
-              🔄 Reset
+            <button onClick={handleReset} className="btn-secondary" title={t('imageEditor.undoChanges')}>
+              🔄 {t('imageEditor.reset')}
             </button>
-            <button onClick={handleDownload} className="btn-secondary" title="Descargar a mi PC">
-              ⬇️ Descargar
+            <button onClick={handleDownload} className="btn-secondary" title={t('imageEditor.downloadPC')}>
+              ⬇️ {t('imageEditor.download')}
             </button>
-            <button onClick={handleSaveCloud} className="btn-primary" title="Guardar en Servidor">
-              💾 Guardar
+            <button onClick={handleSaveCloud} className="btn-primary" title={t('imageEditor.saveServer')}>
+              💾 {t('imageEditor.save')}
             </button>
           </div>
         </div>

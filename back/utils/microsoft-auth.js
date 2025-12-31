@@ -29,6 +29,7 @@ try {
 const scopes = [
   'Calendars.ReadWrite',
   'User.Read',
+  'MailboxSettings.ReadWrite',
   'offline_access'
 ];
 

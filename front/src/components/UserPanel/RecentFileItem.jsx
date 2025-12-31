@@ -1,9 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { getFileType, getFileIcon, canPreview, getAuthenticatedPreviewUrl } from '../../utils/fileUtils';
+import { useLanguage } from '../../context/LanguageContext';
 
 const RecentFileItem = ({ file, isDarkMode, onFileClick }) => {
   const [previewUrl, setPreviewUrl] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
+  const { t, language } = useLanguage();
 
   useEffect(() => {
     const loadPreview = async () => {
@@ -95,12 +97,12 @@ const RecentFileItem = ({ file, isDarkMode, onFileClick }) => {
         </p>
         <p className="recent-file-date">
           {file.modifiedAt ? 
-            new Date(file.modifiedAt).toLocaleDateString('es-ES', { 
+            new Date(file.modifiedAt).toLocaleDateString(language === 'es' ? 'es-ES' : language === 'pl' ? 'pl-PL' : 'en-US', { 
               month: 'short', 
               day: 'numeric',
               year: new Date(file.modifiedAt).getFullYear() !== new Date().getFullYear() ? 'numeric' : undefined
             }) : 
-            'Reciente'
+            t('userPanel.recentLabel')
           }
         </p>
       </div>

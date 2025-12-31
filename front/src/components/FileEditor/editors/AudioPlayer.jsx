@@ -1,7 +1,9 @@
 import React, { useState, useRef } from 'react';
+import { useLanguage } from '../../../context/LanguageContext';
 import './AudioPlayer.css';
 
 const AudioPlayer = ({ fileUrl, file }) => {
+  const { t } = useLanguage();
   const [playing, setPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
@@ -119,7 +121,7 @@ const AudioPlayer = ({ fileUrl, file }) => {
           {/* Actions */}
           <div className="flex gap-2 ml-auto">
             <button className="btn-primary" onClick={handleDownload}>
-              💾 Descargar
+              💾 {t('audioPlayer.download')}
             </button>
           </div>
         </div>
@@ -137,7 +139,7 @@ const AudioPlayer = ({ fileUrl, file }) => {
 
           {/* File Name */}
           <h2 className="text-2xl font-bold text-white mb-2">{file.name}</h2>
-          <p className="text-white/80 mb-8">Reproductor de Audio</p>
+          <p className="text-white/80 mb-8">{t('audioPlayer.title')}</p>
 
           {/* Large Play Button */}
           <button 

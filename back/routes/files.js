@@ -53,7 +53,7 @@ const authenticate = (req, res, next) => {
   // Por ahora, obtener usuario del header Authorization o de la sesión
   // En producción: verificar token JWT
   const authHeader = req.headers.authorization;
-  console.log(`🔐 Middleware authenticate - Auth header:`, authHeader ? 'present' : 'missing');
+  console.log(`Middleware authenticate - Auth header:`, authHeader ? 'present' : 'missing');
 
   let token = null;
 
@@ -65,13 +65,13 @@ const authenticate = (req, res, next) => {
   // Si no hay token en header, intentar obtenerlo de query parameter (para window.open)
   if (!token) {
     token = req.query.token;
-    console.log(`🔐 Middleware authenticate - Query token:`, token ? 'present' : 'missing');
+    console.log(`Middleware authenticate - Query token:`, token ? 'present' : 'missing');
   }
 
   // Si no hay token, intentar obtenerlo de la cookie
   if (!token && req.cookies && req.cookies.auth_token) {
     token = req.cookies.auth_token;
-    console.log(`🔐 Middleware authenticate - Cookie token: present`);
+    console.log(`Middleware authenticate - Cookie token: present`);
   }
 
   if (token) {
@@ -79,17 +79,17 @@ const authenticate = (req, res, next) => {
       // El token contiene el username por ahora (simplificado)
       const userData = JSON.parse(Buffer.from(token, 'base64').toString());
       req.user = userData;
-      console.log(`✅ Usuario autenticado:`, userData.username);
+      console.log(`Usuario autenticado:`, userData.username);
       next();
     } catch (error) {
-      console.log(`❌ Error parseando token:`, error.message);
+      console.log(`Error parseando token:`, error.message);
       return res.status(401).json({
         success: false,
         message: 'Token inválido'
       });
     }
   } else {
-    console.log(`❌ No hay header de autorización ni token en query`);
+    console.log(`No hay header de autorización ni token en query`);
     return res.status(401).json({
       success: false,
       message: 'No autorizado'
