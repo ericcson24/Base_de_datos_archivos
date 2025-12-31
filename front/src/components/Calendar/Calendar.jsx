@@ -14,11 +14,55 @@ import { getAuthToken } from '../../utils/fileUtils';
 const DailyTimeline = ({ events }) => {
   const { t, language } = useLanguage();
   const [currentTime, setCurrentTime] = useState(new Date());
+  const containerRef = useRef(null);
+  const [isDragging, setIsDragging] = useState(false);
+  const [startX, setStartX] = useState(0);
+  const [scrollLeft, setScrollLeft] = useState(0);
 
   useEffect(() => {
     const timer = setInterval(() => setCurrentTime(new Date()), 60000);
     return () => clearInterval(timer);
   }, []);
+
+  // Scroll to current time on mount
+  useEffect(() => {
+    if (containerRef.current) {
+      const minutes = new Date().getHours() * 60 + new Date().getMinutes();
+      const percent = minutes / 1440;
+      // Scroll to center the current time
+      // Container width is scrollWidth. Visible width is clientWidth.
+      const scrollWidth = containerRef.current.scrollWidth;
+      const clientWidth = containerRef.current.clientWidth;
+      const targetScroll = (scrollWidth * percent) - (clientWidth / 2);
+      
+      containerRef.current.scrollTo({
+        left: Math.max(0, targetScroll),
+        behavior: 'smooth'
+      });
+    }
+  }, []);
+
+  const handleMouseDown = (e) => {
+    setIsDragging(true);
+    setStartX(e.pageX - containerRef.current.offsetLeft);
+    setScrollLeft(containerRef.current.scrollLeft);
+  };
+
+  const handleMouseLeave = () => {
+    setIsDragging(false);
+  };
+
+  const handleMouseUp = () => {
+    setIsDragging(false);
+  };
+
+  const handleMouseMove = (e) => {
+    if (!isDragging) return;
+    e.preventDefault();
+    const x = e.pageX - containerRef.current.offsetLeft;
+    const walk = (x - startX) * 1.5; // Scroll-fast multiplier
+    containerRef.current.scrollLeft = scrollLeft - walk;
+  };
 
   const today = new Date();
   const startOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate(), 0, 0, 0);
@@ -39,8 +83,15 @@ const DailyTimeline = ({ events }) => {
   const currentTimePos = getPosition(currentTime);
 
   return (
-    <div className="daily-timeline-container">
-      <div className="daily-timeline-header">
+    <div 
+      className="daily-timeline-container" 
+      ref={containerRef}
+      onMouseDown={handleMouseDown}
+      onMouseLeave={handleMouseLeave}
+      onMouseUp={handleMouseUp}
+      onMouseMove={handleMouseMove}
+    >
+      <div className="daily-timeline-header" style={{ position: 'sticky', left: 0, zIndex: 40, marginBottom: '0.5rem' }}>
         <h3>{t('calendar.todayDate', { date: today.toLocaleDateString(language === 'es' ? 'es-ES' : language === 'pl' ? 'pl-PL' : 'en-US', { weekday: 'long', day: 'numeric', month: 'long' }) })}</h3>
       </div>
       <div className="daily-timeline-track">
@@ -49,7 +100,7 @@ const DailyTimeline = ({ events }) => {
 
         {Array.from({ length: 25 }).map((_, i) => (
            <div key={i} className="timeline-hour-marker" style={{ left: `${(i / 24) * 100}%` }}>
-             {i % 2 === 0 && <span className="timeline-hour-label">{i}:00</span>}
+             <span className="timeline-hour-label">{i}:00</span>
            </div>
         ))}
         
@@ -72,8 +123,10 @@ const DailyTimeline = ({ events }) => {
                         width: `${Math.max(width, 0.5)}%`,
                         backgroundColor: event.backgroundColor || '#3788d8'
                     }}
-                    title={`${event.title}`}
-                />
+                    title={`${event.title} (${start.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})})`}
+                >
+                  {event.title}
+                </div>
             );
         })}
 
@@ -291,7 +344,8 @@ const Calendar = ({ user, onLogout, onBackToPanel, onBackToFolders, onThemeToggl
     return {
       ...event,
       backgroundColor: eventColor,
-      borderColor: eventBorderColor
+      borderColor: eventBorderColor,
+      display: 'block'
     };
   });
 

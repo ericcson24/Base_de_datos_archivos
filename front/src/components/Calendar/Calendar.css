@@ -403,12 +403,40 @@
 
 .daily-timeline-track {
   position: relative;
-  height: 24px; /* Más pequeño */
+  height: 60px; /* Más alto para ver texto */
   background: rgba(0, 0, 0, 0.03);
   border-radius: 6px;
-  width: 100%;
+  min-width: 1440px; /* 60px por hora aprox */
   overflow: hidden;
   border: 1px solid var(--cal-border);
+}
+
+.daily-timeline-container {
+  overflow-x: auto;
+  padding-bottom: 10px; /* Espacio para scrollbar */
+  margin-bottom: 1rem;
+  /* Estilo de scrollbar fino */
+  scrollbar-width: thin;
+  scrollbar-color: var(--cal-border) transparent;
+  cursor: grab;
+  user-select: none; /* Evitar selección de texto al arrastrar */
+}
+
+.daily-timeline-container:active {
+  cursor: grabbing;
+}
+
+.daily-timeline-container::-webkit-scrollbar {
+  height: 6px;
+}
+
+.daily-timeline-container::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.daily-timeline-container::-webkit-scrollbar-thumb {
+  background-color: var(--cal-border);
+  border-radius: 3px;
 }
 
 [data-theme="dark"] .daily-timeline-track {
@@ -421,14 +449,14 @@
   top: 0;
   bottom: 0;
   left: 0;
-  background: rgba(255, 255, 255, 0.5);
-  backdrop-filter: blur(1px);
+  background: rgba(200, 200, 200, 0.2);
+  backdrop-filter: grayscale(100%);
   z-index: 15;
   pointer-events: none;
 }
 
 [data-theme="dark"] .timeline-past-overlay {
-  background: rgba(0, 0, 0, 0.5);
+  background: rgba(0, 0, 0, 0.4);
 }
 
 .timeline-hour-marker {
@@ -441,18 +469,34 @@
 }
 
 .timeline-hour-label {
-  display: none; /* Ocultar etiquetas para diseño más limpio/compacto */
+  display: block;
+  position: absolute;
+  top: 2px;
+  left: 4px;
+  font-size: 0.7rem;
+  color: var(--cal-text-secondary);
+  font-weight: 500;
 }
 
 .timeline-event-block {
   position: absolute;
   top: 4px;
   bottom: 4px;
-  border-radius: 3px;
+  border-radius: 4px;
   opacity: 0.9;
   transition: all 0.2s ease;
   cursor: pointer;
   box-shadow: 0 1px 2px rgba(0,0,0,0.1);
+  padding: 2px 6px;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  color: white;
+  font-size: 0.75rem;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  z-index: 20;
 }
 
 .timeline-event-block:hover {

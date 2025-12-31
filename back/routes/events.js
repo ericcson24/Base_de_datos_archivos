@@ -176,13 +176,13 @@ function getOutlookCategoryColor(outlookColor) {
     'preset3': '#ffd700',   // Amarillo
     'preset4': '#32cd32',   // Verde
     'preset5': '#008080',   // Turquesa
-    'preset6': '#326acb',   // Azul
+    'preset6': '#2563eb',   // Azul (Updated to be more blue)
     'preset7': '#800080',   // Púrpura
     'preset8': '#c0c0c0',   // Gris
     'preset9': '#696969',   // Gris oscuro
     'preset10': '#dc143c',  // Crimson
     'preset11': '#ff69b4',  // Rosa
-    'preset12': '#4169e1',  // Azul real
+    'preset12': '#3b82f6',  // Azul real (Updated)
     'preset13': '#228b22',  // Verde bosque
     'preset14': '#ff4500',  // Rojo naranja
     'preset15': '#9932cc',  // Orquídea oscura
@@ -191,7 +191,7 @@ function getOutlookCategoryColor(outlookColor) {
     'preset18': '#2f4f4f',  // Gris pizarra oscuro
     'preset19': '#b22222',  // Ladrillo
     'preset20': '#8fbc8f',  // Verde marino oscuro
-    'preset21': '#483d8b',  // Azul pizarra oscuro
+    'preset21': '#1e40af',  // Azul pizarra oscuro (Updated to be less purple)
     'preset22': '#2e8b57',  // Verde marino
     'preset23': '#800000',  // Granate
     'preset24': '#9acd32'   // Verde amarillo
