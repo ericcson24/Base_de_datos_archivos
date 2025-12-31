@@ -1,6 +1,7 @@
 const sqlite3 = require('sqlite3').verbose();
 const path = require('path');
 const bcrypt = require('bcrypt');
+require('dotenv').config(); // Cargar variables de entorno
 
 // Ruta a la base de datos
 const dbPath = path.join(__dirname, 'server.db');
@@ -18,23 +19,114 @@ const db = new sqlite3.Database(dbPath, (err) => {
 // Inicializar tablas
 function initDatabase() {
   db.serialize(() => {
-    // Tabla de Usuarios
+    // 1. Tabla de Usuarios (Perfil)
     db.run(`CREATE TABLE IF NOT EXISTS users (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       username TEXT UNIQUE NOT NULL,
-      password TEXT NOT NULL,
       role TEXT DEFAULT 'user',
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-      last_login DATETIME,
-      is_locked BOOLEAN DEFAULT 0,
-      failed_attempts INTEGER DEFAULT 0,
       avatar_url TEXT,
       theme_preference TEXT DEFAULT 'light',
       language TEXT DEFAULT 'es',
-      notifications BOOLEAN DEFAULT 1
+      notifications BOOLEAN DEFAULT 1,
+      microsoft_id TEXT,
+      microsoft_email TEXT,
+      microsoft_access_token TEXT,
+      microsoft_refresh_token TEXT
     )`);
 
-    // Intentar añadir columnas nuevas si no existen (migración simple)
+    // 2. Tabla de Credenciales (Separada para seguridad)
+    db.run(`CREATE TABLE IF NOT EXISTS user_credentials (
+      user_id INTEGER PRIMARY KEY,
+      password_hash TEXT NOT NULL,
+      last_login DATETIME,
+      failed_attempts INTEGER DEFAULT 0,
+      is_locked BOOLEAN DEFAULT 0,
+      lockout_until DATETIME,
+      reset_token TEXT,
+      reset_token_expires DATETIME,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
+    )`);
+
+    // Migración para añadir columnas de bloqueo temporal y reset
+    const credCols = [
+      { name: 'lockout_until', type: 'DATETIME' },
+      { name: 'reset_token', type: 'TEXT' },
+      { name: 'reset_token_expires', type: 'DATETIME' }
+    ];
+    credCols.forEach(col => {
+      db.run(`ALTER TABLE user_credentials ADD COLUMN ${col.name} ${col.type}`, (err) => {
+        if (err && !err.message.includes('duplicate column name')) {}
+      });
+    });
+
+    // 2.1 Tabla de Configuración de Seguridad (Email de recuperación encriptado)
+    db.run(`CREATE TABLE IF NOT EXISTS security_settings (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id INTEGER UNIQUE,
+      recovery_email_enc TEXT,
+      recovery_email_iv TEXT,
+      FOREIGN KEY(user_id) REFERENCES users(id)
+    )`);
+
+    // 2.2 Tabla de Buzón de Admin (Notificaciones)
+    db.run(`CREATE TABLE IF NOT EXISTS admin_inbox (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      type TEXT NOT NULL, -- 'LOCKOUT', 'RESET_REQUEST', 'SYSTEM'
+      user_id INTEGER,
+      message TEXT,
+      is_read BOOLEAN DEFAULT 0,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY(user_id) REFERENCES users(id)
+    )`);
+
+    // 3. Tabla de Carpetas (Estructura de archivos)
+    db.run(`CREATE TABLE IF NOT EXISTS folders (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      parent_id INTEGER,
+      name TEXT NOT NULL,
+      owner_id INTEGER NOT NULL,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY(owner_id) REFERENCES users(id),
+      FOREIGN KEY(parent_id) REFERENCES folders(id)
+    )`);
+
+    // 4. Tabla de Archivos (Metadatos)
+    db.run(`CREATE TABLE IF NOT EXISTS files (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      folder_id INTEGER,
+      name TEXT NOT NULL,
+      physical_path TEXT,
+      size INTEGER,
+      mime_type TEXT,
+      owner_id INTEGER NOT NULL,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY(folder_id) REFERENCES folders(id),
+      FOREIGN KEY(owner_id) REFERENCES users(id)
+    )`);
+
+    // 5. Tabla de Grupos (Para compartir)
+    db.run(`CREATE TABLE IF NOT EXISTS groups (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      name TEXT NOT NULL,
+      description TEXT,
+      created_by INTEGER,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    )`);
+
+    // 6. Tabla de Miembros de Grupo
+    db.run(`CREATE TABLE IF NOT EXISTS group_members (
+      group_id INTEGER,
+      user_id INTEGER,
+      role TEXT DEFAULT 'member',
+      joined_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      PRIMARY KEY(group_id, user_id),
+      FOREIGN KEY(group_id) REFERENCES groups(id),
+      FOREIGN KEY(user_id) REFERENCES users(id)
+    )`);
+
+    // Migración de columnas antiguas en 'users' si existen (para compatibilidad)
     const columnsToAdd = [
       { name: 'avatar_url', type: 'TEXT' },
       { name: 'theme_preference', type: 'TEXT DEFAULT "light"' },
@@ -48,7 +140,6 @@ function initDatabase() {
 
     columnsToAdd.forEach(col => {
       db.run(`ALTER TABLE users ADD COLUMN ${col.name} ${col.type}`, (err) => {
-        // Ignorar error si la columna ya existe
         if (err && !err.message.includes('duplicate column name')) {
           // console.error(`Error añadiendo columna ${col.name}:`, err.message);
         }
@@ -73,11 +164,8 @@ function initDatabase() {
       FOREIGN KEY(user_id) REFERENCES users(id)
     )`);
 
-    // Migración para añadir columna categories si no existe
     db.run(`ALTER TABLE calendar_events ADD COLUMN categories TEXT`, (err) => {
-      if (err && !err.message.includes('duplicate column name')) {
-        // console.error('Error adding categories column:', err.message);
-      }
+      if (err && !err.message.includes('duplicate column name')) {}
     });
 
     // Tabla de Logs de Auditoría
@@ -91,7 +179,7 @@ function initDatabase() {
       timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
     )`);
 
-    // Tabla de Archivos Compartidos
+    // Tabla de Archivos Compartidos (Legacy + New)
     db.run(`CREATE TABLE IF NOT EXISTS shared_files (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       path TEXT NOT NULL,
@@ -101,9 +189,26 @@ function initDatabase() {
       UNIQUE(path, owner_username, shared_with_username)
     )`);
 
+    // --- MIGRACIÓN DE CONTRASEÑAS ---
+    // Si existen usuarios con contraseña en la tabla 'users' pero no en 'user_credentials', migrarlos.
+    db.all("SELECT id, password FROM users", (err, rows) => {
+      if (!err && rows) {
+        rows.forEach(row => {
+          if (row.password) { // Si tiene contraseña en la tabla antigua
+             db.get("SELECT user_id FROM user_credentials WHERE user_id = ?", [row.id], (err, cred) => {
+               if (!cred) {
+                 console.log(`Migrando credenciales para usuario ID ${row.id}...`);
+                 db.run("INSERT INTO user_credentials (user_id, password_hash) VALUES (?, ?)", [row.id, row.password]);
+               }
+             });
+          }
+        });
+      }
+    });
+
     // Crear usuario administrador por defecto si no existe
     const adminUser = 'administrador';
-    const adminPass = '12341234'; // Contraseña por defecto
+    const adminPass = process.env.ADMIN_INITIAL_PASSWORD || 'admin123'; // Fallback seguro
 
     db.get("SELECT * FROM users WHERE username = ?", [adminUser], async (err, row) => {
       if (err) {
@@ -114,11 +219,15 @@ function initDatabase() {
       if (!row) {
         try {
           const hash = await bcrypt.hash(adminPass, 10);
-          db.run("INSERT INTO users (username, password, role) VALUES (?, ?, ?)", 
-            [adminUser, hash, 'admin'], 
-            (err) => {
+          db.run("INSERT INTO users (username, role) VALUES (?, ?)", 
+            [adminUser, 'admin'], 
+            function(err) {
               if (err) console.error('Error creando admin:', err);
-              else console.log('Usuario administrador creado por defecto');
+              else {
+                const userId = this.lastID;
+                db.run("INSERT INTO user_credentials (user_id, password_hash) VALUES (?, ?)", [userId, hash]);
+                console.log('Usuario administrador creado por defecto (Credenciales en tabla separada)');
+              }
             }
           );
         } catch (error) {
@@ -129,17 +238,21 @@ function initDatabase() {
 
     // Crear usuario de prueba 'eric' si no existe
     const testUser = 'eric';
-    const testPass = '12345';
+    const testPass = process.env.USER_INITIAL_PASSWORD || 'user123';
 
     db.get("SELECT * FROM users WHERE username = ?", [testUser], async (err, row) => {
       if (!row) {
         try {
           const hash = await bcrypt.hash(testPass, 10);
-          db.run("INSERT INTO users (username, password, role) VALUES (?, ?, ?)", 
-            [testUser, hash, 'user'], 
-            (err) => {
+          db.run("INSERT INTO users (username, role) VALUES (?, ?)", 
+            [testUser, 'user'], 
+            function(err) {
               if (err) console.error('Error creando usuario eric:', err);
-              else console.log('Usuario eric creado por defecto');
+              else {
+                const userId = this.lastID;
+                db.run("INSERT INTO user_credentials (user_id, password_hash) VALUES (?, ?)", [userId, hash]);
+                console.log('Usuario eric creado por defecto (Credenciales en tabla separada)');
+              }
             }
           );
         } catch (error) {

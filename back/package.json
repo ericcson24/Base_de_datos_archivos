@@ -15,6 +15,7 @@
     "jszip": "^3.10.1",
     "mkdirp": "^3.0.1",
     "multer": "^1.4.5-lts.1",
+    "nodemailer": "^7.0.12",
     "sqlite3": "^5.1.7",
     "systeminformation": "^5.28.3",
     "xlsx": "^0.18.5"

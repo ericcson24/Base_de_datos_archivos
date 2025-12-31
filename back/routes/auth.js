@@ -35,81 +35,114 @@ const uploadAvatar = multer({
   }
 });
 
+const { encrypt, decrypt } = require('../utils/cryptoUtils');
+const { sendEmail } = require('../utils/emailService');
+
 // Función para validar credenciales usando la base de datos SQLite
 async function validateCredentials(username, password) {
   try {
     console.log(`Validando credenciales para: ${username}`);
 
-    // Buscar usuario en la base de datos
+    // 1. Buscar usuario
     const user = await dbAsync.get("SELECT * FROM users WHERE username = ?", [username]);
 
     if (!user) {
-      return {
-        success: false,
-        message: 'Usuario no encontrado',
-        info: {}
-      };
+      return { success: false, message: 'Usuario no encontrado', errorCode: 'USER_NOT_FOUND', info: {} };
     }
 
-    if (user.is_locked) {
-      return {
-        success: false,
-        message: 'Cuenta bloqueada. Contacte al administrador.',
-        info: {}
-      };
+    // 2. Buscar credenciales en la nueva tabla
+    let credentials = await dbAsync.get("SELECT * FROM user_credentials WHERE user_id = ?", [user.id]);
+
+    // Fallback: Si no hay credenciales en la nueva tabla, intentar usar la antigua (migración al vuelo)
+    if (!credentials && user.password) {
+      console.log(`Migrando credenciales al vuelo para ${username}...`);
+      await dbAsync.run("INSERT INTO user_credentials (user_id, password_hash) VALUES (?, ?)", [user.id, user.password]);
+      credentials = await dbAsync.get("SELECT * FROM user_credentials WHERE user_id = ?", [user.id]);
     }
 
-    // Verificar contraseña
-    const match = await bcrypt.compare(password, user.password);
+    if (!credentials) {
+      return { success: false, message: 'Credenciales no encontradas', errorCode: 'CREDENTIALS_MISSING', info: {} };
+    }
+
+    // Verificar bloqueo temporal
+    if (credentials.lockout_until) {
+      const lockoutTime = new Date(credentials.lockout_until);
+      if (lockoutTime > new Date()) {
+        return { 
+          success: false, 
+          message: `Cuenta bloqueada temporalmente. Intente de nuevo en ${Math.ceil((lockoutTime - new Date()) / 60000)} minutos.`, 
+          errorCode: 'ACCOUNT_LOCKED_TEMP', 
+          info: {} 
+        };
+      } else {
+        // Desbloquear si pasó el tiempo
+        await dbAsync.run("UPDATE user_credentials SET is_locked = 0, lockout_until = NULL, failed_attempts = 0 WHERE user_id = ?", [user.id]);
+        credentials.is_locked = 0;
+      }
+    }
+
+    if (credentials.is_locked) {
+      return { success: false, message: 'Cuenta bloqueada. Contacte al administrador.', errorCode: 'ACCOUNT_LOCKED', info: {} };
+    }
+
+    // 3. Verificar contraseña
+    const match = await bcrypt.compare(password, credentials.password_hash);
 
     if (match) {
-      // Resetear intentos fallidos y actualizar último login
-      await dbAsync.run("UPDATE users SET failed_attempts = 0, last_login = CURRENT_TIMESTAMP WHERE id = ?", [user.id]);
+      // Resetear intentos y actualizar login
+      await dbAsync.run("UPDATE user_credentials SET failed_attempts = 0, last_login = CURRENT_TIMESTAMP, lockout_until = NULL, is_locked = 0 WHERE user_id = ?", [user.id]);
       
-      // Registrar log de login exitoso
       await dbAsync.run("INSERT INTO audit_logs (user_id, username, action, details, ip_address) VALUES (?, ?, ?, ?, ?)", 
         [user.id, user.username, 'LOGIN', 'Inicio de sesión exitoso', '::1']);
 
       return {
         success: true,
         message: 'Autenticación exitosa',
-        info: {
-          role: user.role,
-          validation_type: 'database'
-        }
+        info: { id: user.id, role: user.role, validation_type: 'database' }
       };
     } else {
-      // Incrementar intentos fallidos
-      const newAttempts = (user.failed_attempts || 0) + 1;
-      await dbAsync.run("UPDATE users SET failed_attempts = ? WHERE id = ?", [newAttempts, user.id]);
+      // Incrementar intentos
+      const newAttempts = (credentials.failed_attempts || 0) + 1;
+      let updateSql = "UPDATE user_credentials SET failed_attempts = ? WHERE user_id = ?";
+      let params = [newAttempts, user.id];
 
       // Bloquear si supera 5 intentos
       if (newAttempts >= 5) {
-        await dbAsync.run("UPDATE users SET is_locked = 1 WHERE id = ?", [user.id]);
-        return {
-          success: false,
-          message: 'Cuenta bloqueada por demasiados intentos fallidos.',
-          info: {}
-        };
+        // Bloqueo temporal de 15 minutos
+        const lockoutTime = new Date(Date.now() + 15 * 60000).toISOString();
+        updateSql = "UPDATE user_credentials SET failed_attempts = ?, is_locked = 1, lockout_until = ? WHERE user_id = ?";
+        params = [newAttempts, lockoutTime, user.id];
+        
+        // Notificar al admin si es una cuenta importante o si es el propio admin
+        if (user.role === 'admin') {
+           // Buscar email de recuperación del admin
+           const adminSettings = await dbAsync.get("SELECT * FROM security_settings WHERE user_id = ?", [user.id]);
+           if (adminSettings && adminSettings.recovery_email_enc) {
+             const email = decrypt({ iv: adminSettings.recovery_email_iv, encryptedData: adminSettings.recovery_email_enc });
+             if (email) {
+               sendEmail(email, 'ALERTA DE SEGURIDAD: Cuenta de Administrador Bloqueada', 
+                 `<p>Su cuenta de administrador ha sido bloqueada temporalmente debido a múltiples intentos fallidos.</p>
+                  <p>Se desbloqueará automáticamente en 15 minutos.</p>
+                  <p>Si no fue usted, contacte a soporte inmediatamente.</p>`
+               );
+             }
+           }
+        }
+
+        await dbAsync.run(updateSql, params);
+        return { success: false, message: 'Cuenta bloqueada temporalmente por demasiados intentos fallidos.', errorCode: 'ACCOUNT_LOCKED_TEMP', info: {} };
+      } else {
+        await dbAsync.run(updateSql, params);
       }
 
-      // Registrar log de login fallido
       await dbAsync.run("INSERT INTO audit_logs (user_id, username, action, details, ip_address) VALUES (?, ?, ?, ?, ?)", 
         [user.id, user.username, 'LOGIN_FAILED', `Intento fallido (${newAttempts}/5)`, '::1']);
 
-      return {
-        success: false,
-        message: 'Credenciales incorrectas',
-        info: {}
-      };
+      return { success: false, message: 'Credenciales incorrectas', errorCode: 'INVALID_CREDENTIALS', info: {} };
     }
   } catch (error) {
     console.error('Error en validación DB:', error);
-    return {
-      success: false,
-      message: 'Error interno del servidor',
-      info: {}
-    };
+    return { success: false, message: 'Error interno del servidor', info: {} };
   }
 }
 
@@ -132,7 +165,7 @@ router.post('/login', async (req, res) => {
     if (result.success) {
       // Crear token simple (en producción usar JWT)
       const userData = {
-        id: Date.now(),
+        id: result.info.id,
         username: username,
         role: result.info.role || 'user'
       };
@@ -161,7 +194,8 @@ router.post('/login', async (req, res) => {
 
       res.status(401).json({
         success: false,
-        message: result.message
+        message: result.message,
+        errorCode: result.errorCode || 'AUTH_FAILED'
       });
     }
   } catch (error) {
@@ -604,6 +638,52 @@ router.delete('/avatar', authenticate, async (req, res) => {
   } catch (error) {
     console.error('Error eliminando avatar:', error);
     res.status(500).json({ success: false, message: 'Error al eliminar avatar' });
+  }
+});
+
+// Endpoint para recuperar contraseña
+router.post('/recover-password', async (req, res) => {
+  const { username } = req.body;
+
+  if (!username) {
+    return res.status(400).json({ success: false, message: 'Usuario requerido' });
+  }
+
+  try {
+    const user = await dbAsync.get("SELECT * FROM users WHERE username = ?", [username]);
+
+    if (!user) {
+      // Por seguridad, no decimos si el usuario existe o no
+      return res.json({ success: true, message: 'Si el usuario existe, se ha enviado una solicitud al administrador.' });
+    }
+
+    // Crear notificación para el administrador
+    await dbAsync.run(
+      "INSERT INTO admin_inbox (type, user_id, message) VALUES (?, ?, ?)",
+      ['RESET_REQUEST', user.id, `El usuario ${username} ha solicitado restablecer su contraseña.`]
+    );
+
+    // Buscar si hay un administrador con email configurado para notificarle
+    const admins = await dbAsync.all("SELECT u.id, u.username FROM users u WHERE u.role = 'admin'");
+    
+    for (const admin of admins) {
+      const settings = await dbAsync.get("SELECT * FROM security_settings WHERE user_id = ?", [admin.id]);
+      if (settings && settings.recovery_email_enc) {
+        const email = decrypt({ iv: settings.recovery_email_iv, encryptedData: settings.recovery_email_enc });
+        if (email) {
+          await sendEmail(email, 'Solicitud de Restablecimiento de Contraseña', 
+            `<p>El usuario <strong>${username}</strong> ha solicitado restablecer su contraseña.</p>
+             <p>Por favor, inicie sesión en el panel de administración para gestionar esta solicitud.</p>`
+          );
+        }
+      }
+    }
+
+    res.json({ success: true, message: 'Solicitud enviada al administrador.' });
+
+  } catch (error) {
+    console.error('Error en recuperación:', error);
+    res.status(500).json({ success: false, message: 'Error interno' });
   }
 });
 

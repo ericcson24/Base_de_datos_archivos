@@ -7,6 +7,8 @@ const fs = require('fs');
 const util = require('util');
 const bcrypt = require('bcrypt');
 const { dbAsync } = require('../database/db');
+const { encrypt, decrypt } = require('../utils/cryptoUtils');
+const { sendEmail } = require('../utils/emailService');
 
 const execAsync = util.promisify(exec);
 
@@ -247,14 +249,40 @@ router.get('/api/users', requireAdmin, async (req, res) => {
   try {
     console.log('👥 Admin solicitando lista de usuarios');
     
-    const users = await dbAsync.all("SELECT id, username, role, is_locked, last_login, failed_attempts, created_at FROM users");
+    // JOIN para obtener datos de perfil y credenciales
+    const users = await dbAsync.all(`
+      SELECT 
+        u.id, u.username, u.role, u.created_at,
+        uc.is_locked, uc.last_login, uc.failed_attempts, uc.lockout_until
+      FROM users u
+      LEFT JOIN user_credentials uc ON u.id = uc.user_id
+    `);
     
     // Calcular días desde creación y último login
-    const usersWithStats = users.map(user => ({
-      ...user,
-      days_since_creation: Math.floor((Date.now() - new Date(user.created_at).getTime()) / 86400000),
-      days_since_last_login: user.last_login ? Math.floor((Date.now() - new Date(user.last_login).getTime()) / 86400000) : null
-    }));
+    const usersWithStats = users.map(user => {
+      // Calcular tiempo restante de bloqueo si está bloqueado
+      let time_remaining = null;
+      if (user.is_locked && user.lockout_until) {
+        const now = new Date();
+        const lockoutEnd = new Date(user.lockout_until);
+        if (lockoutEnd > now) {
+          const diffMs = lockoutEnd - now;
+          const diffMins = Math.ceil(diffMs / 60000);
+          time_remaining = `${diffMins} min`;
+        } else {
+          // Si ya pasó el tiempo, visualmente no está bloqueado (aunque la DB diga 1 hasta el próximo login)
+          // Opcional: Podríamos marcarlo como desbloqueado aquí, pero mejor dejar que el login lo maneje
+          time_remaining = '0 min';
+        }
+      }
+
+      return {
+        ...user,
+        time_remaining,
+        days_since_creation: Math.floor((Date.now() - new Date(user.created_at).getTime()) / 86400000),
+        days_since_last_login: user.last_login ? Math.floor((Date.now() - new Date(user.last_login).getTime()) / 86400000) : null
+      };
+    });
 
     await addLog('info', `Lista de usuarios solicitada por ${req.user.username} (${users.length} usuarios)`, 'admin', req.user.username);
     
@@ -376,7 +404,21 @@ router.post('/api/users/unlock', requireAdmin, async (req, res) => {
 
     console.log(`Admin ${req.user.username} está desbloqueando usuario: ${username}`);
     
-    await dbAsync.run("UPDATE users SET is_locked = 0, failed_attempts = 0 WHERE username = ?", [username]);
+    // Obtener ID del usuario
+    const user = await dbAsync.get("SELECT id FROM users WHERE username = ?", [username]);
+    
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'Usuario no encontrado'
+      });
+    }
+
+    // Actualizar credenciales
+    await dbAsync.run(
+      "UPDATE user_credentials SET is_locked = 0, failed_attempts = 0, lockout_until = NULL WHERE user_id = ?", 
+      [user.id]
+    );
     
     await addLog('info', `Usuario '${username}' desbloqueado por ${req.user.username}`, 'admin', req.user.username);
 
@@ -398,7 +440,7 @@ router.post('/api/users/unlock-all', requireAdmin, async (req, res) => {
   try {
     console.log(`Admin ${req.user.username} está desbloqueando todos los usuarios`);
     
-    await dbAsync.run("UPDATE users SET is_locked = 0, failed_attempts = 0");
+    await dbAsync.run("UPDATE user_credentials SET is_locked = 0, failed_attempts = 0, lockout_until = NULL");
     
     await addLog('info', `Todos los usuarios desbloqueados por ${req.user.username}`, 'admin', req.user.username);
 
@@ -948,5 +990,129 @@ router.get('/api/monitoring/realtime', requireAdmin, async (req, res) => {
     });
   }
 });
+
+// --- NUEVAS RUTAS DE SEGURIDAD Y GESTIÓN ---
+
+// Obtener configuración de seguridad (Email de recuperación)
+router.get('/security-settings', requireAdmin, async (req, res) => {
+  try {
+    const settings = await dbAsync.get("SELECT * FROM security_settings WHERE user_id = ?", [req.user.id]);
+    let email = '';
+    if (settings && settings.recovery_email_enc) {
+      email = decrypt({ iv: settings.recovery_email_iv, encryptedData: settings.recovery_email_enc });
+    }
+    res.json({ success: true, recoveryEmail: email });
+  } catch (error) {
+    console.error('Error obteniendo settings:', error);
+    res.status(500).json({ success: false, message: 'Error interno' });
+  }
+});
+
+// Guardar configuración de seguridad
+router.post('/security-settings', requireAdmin, async (req, res) => {
+  const { recoveryEmail } = req.body;
+  try {
+    let encryptedData = null;
+    let iv = null;
+
+    if (recoveryEmail) {
+      const encrypted = encrypt(recoveryEmail);
+      if (encrypted) {
+        encryptedData = encrypted.encryptedData;
+        iv = encrypted.iv;
+      }
+    }
+    
+    // Verificar si ya existe configuración
+    const existing = await dbAsync.get("SELECT id FROM security_settings WHERE user_id = ?", [req.user.id]);
+    
+    if (existing) {
+      await dbAsync.run(
+        "UPDATE security_settings SET recovery_email_enc = ?, recovery_email_iv = ? WHERE user_id = ?",
+        [encryptedData, iv, req.user.id]
+      );
+    } else {
+      await dbAsync.run(
+        "INSERT INTO security_settings (user_id, recovery_email_enc, recovery_email_iv) VALUES (?, ?, ?)",
+        [req.user.id, encryptedData, iv]
+      );
+    }
+    
+    res.json({ success: true, message: 'Configuración guardada correctamente' });
+  } catch (error) {
+    console.error('Error guardando settings:', error);
+    res.status(500).json({ success: false, message: 'Error interno' });
+  }
+});
+
+// Obtener notificaciones (Buzón de entrada)
+router.get('/inbox', requireAdmin, async (req, res) => {
+  try {
+    const messages = await dbAsync.all(`
+      SELECT i.*, u.username 
+      FROM admin_inbox i 
+      LEFT JOIN users u ON i.user_id = u.id 
+      ORDER BY i.created_at DESC
+    `);
+    res.json({ success: true, messages });
+  } catch (error) {
+    console.error('Error obteniendo inbox:', error);
+    res.status(500).json({ success: false, message: 'Error interno' });
+  }
+});
+
+// Marcar notificación como leída
+router.put('/inbox/:id/read', requireAdmin, async (req, res) => {
+  try {
+    await dbAsync.run("UPDATE admin_inbox SET is_read = 1 WHERE id = ?", [req.params.id]);
+    res.json({ success: true });
+  } catch (error) {
+    res.status(500).json({ success: false, message: 'Error interno' });
+  }
+});
+
+// Desbloquear usuario
+router.post('/users/:id/unlock', requireAdmin, async (req, res) => {
+  try {
+    await dbAsync.run(
+      "UPDATE user_credentials SET is_locked = 0, lockout_until = NULL, failed_attempts = 0 WHERE user_id = ?", 
+      [req.params.id]
+    );
+    
+    // Registrar acción
+    await dbAsync.run("INSERT INTO audit_logs (user_id, username, action, details, ip_address) VALUES (?, ?, ?, ?, ?)", 
+        [req.user.id, req.user.username, 'USER_UNLOCK', `Desbloqueó al usuario ID ${req.params.id}`, '::1']);
+
+    res.json({ success: true, message: 'Usuario desbloqueado correctamente' });
+  } catch (error) {
+    console.error('Error desbloqueando:', error);
+    res.status(500).json({ success: false, message: 'Error interno' });
+  }
+});
+
+// Restablecer contraseña de usuario (Manual por Admin)
+router.post('/users/:id/reset-password', requireAdmin, async (req, res) => {
+  const { newPassword } = req.body;
+  if (!newPassword) return res.status(400).json({ success: false, message: 'Contraseña requerida' });
+
+  try {
+    const hash = await bcrypt.hash(newPassword, 10);
+    await dbAsync.run(
+      "UPDATE user_credentials SET password_hash = ?, is_locked = 0, failed_attempts = 0, lockout_until = NULL WHERE user_id = ?", 
+      [hash, req.params.id]
+    );
+
+    // Registrar acción
+    await dbAsync.run("INSERT INTO audit_logs (user_id, username, action, details, ip_address) VALUES (?, ?, ?, ?, ?)", 
+        [req.user.id, req.user.username, 'PASSWORD_RESET', `Restableció contraseña usuario ID ${req.params.id}`, '::1']);
+
+    res.json({ success: true, message: 'Contraseña actualizada correctamente' });
+  } catch (error) {
+    console.error('Error reset password:', error);
+    res.status(500).json({ success: false, message: 'Error interno' });
+  }
+});
+
+module.exports = router;
 
 module.exports = router;
