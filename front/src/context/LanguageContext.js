@@ -41,7 +41,7 @@ export const LanguageProvider = ({ children }) => {
     }
   };
 
-  const t = (key) => {
+  const t = (key, params = {}) => {
     const keys = key.split('.');
     let value = translations[language];
     
@@ -58,9 +58,17 @@ export const LanguageProvider = ({ children }) => {
                 return key; // Return key if not found anywhere
             }
         }
-        return fallback;
+        value = fallback;
       }
     }
+
+    // Interpolation
+    if (typeof value === 'string' && params) {
+      Object.keys(params).forEach(param => {
+        value = value.replace(`{{${param}}}`, params[param]);
+      });
+    }
+
     return value;
   };
 

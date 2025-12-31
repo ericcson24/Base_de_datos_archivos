@@ -9,6 +9,7 @@ import SettingsModal from '../Modals/SettingsModal';
 import DayPanel from './DayPanel';
 import { useToast } from '../../context/ToastContext';
 import { useLanguage } from '../../context/LanguageContext';
+import { getAuthToken } from '../../utils/fileUtils';
 
 const DailyTimeline = ({ events }) => {
   const { t, language } = useLanguage();
@@ -109,6 +110,35 @@ const Calendar = ({ user, onLogout, onBackToPanel, onBackToFolders, onThemeToggl
     event: null,
     selectedDates: null
   });
+  const [microsoftStatus, setMicrosoftStatus] = useState({ linked: false, email: null });
+
+  const fetchStatus = useCallback(async () => {
+    try {
+      const token = getAuthToken();
+      const headers = {};
+      if (token) headers['Authorization'] = `Bearer ${token}`;
+
+      const response = await fetch('/api/auth/settings', { 
+        headers,
+        credentials: 'include' 
+      });
+      if (response.ok) {
+        const data = await response.json();
+        if (data.success) {
+          setMicrosoftStatus({
+            linked: data.settings.microsoftLinked,
+            email: data.settings.microsoftEmail
+          });
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching status:', error);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchStatus();
+  }, [fetchStatus]);
 
   // Helper to generate consistent color from string (Fallback for missing categories)
   const stringToColor = (str) => {
@@ -156,8 +186,10 @@ const Calendar = ({ user, onLogout, onBackToPanel, onBackToFolders, onThemeToggl
     if (events.length > 0) {
       const eventCategories = new Set();
       events.forEach(e => {
-        if (e.extendedProps?.categories) {
-          e.extendedProps.categories.forEach(c => eventCategories.add(c));
+        // Check both direct property (raw) and extendedProps (FullCalendar object)
+        const cats = e.categories || e.extendedProps?.categories;
+        if (cats) {
+          cats.forEach(c => eventCategories.add(c));
         }
       });
 
@@ -226,17 +258,22 @@ const Calendar = ({ user, onLogout, onBackToPanel, onBackToFolders, onThemeToggl
 
   const filteredEvents = events.filter(event => {
     if (categories.length === 0 || selectedCategories.size === 0) return true;
-    if (!event.extendedProps?.categories || event.extendedProps.categories.length === 0) {
+    
+    const eventCats = event.categories || event.extendedProps?.categories;
+    
+    if (!eventCats || eventCats.length === 0) {
       return selectedCategories.has(t('calendar.noCategory'));
     }
-    return event.extendedProps.categories.some(category => selectedCategories.has(category));
+    return eventCats.some(category => selectedCategories.has(category));
   }).map(event => {
     // Assign color based on the first category found
     let eventColor = '#3788d8'; // Default blue
     let eventBorderColor = '#3788d8';
 
-    if (event.extendedProps?.categories && event.extendedProps.categories.length > 0) {
-      const categoryName = event.extendedProps.categories[0];
+    const eventCats = event.categories || event.extendedProps?.categories;
+
+    if (eventCats && eventCats.length > 0) {
+      const categoryName = eventCats[0];
       const category = categories.find(c => c.name === categoryName);
       if (category && category.hexColor) {
         eventColor = category.hexColor;
@@ -357,6 +394,30 @@ const Calendar = ({ user, onLogout, onBackToPanel, onBackToFolders, onThemeToggl
               ))}
             </div>
           </div>
+
+          <div className="sidebar-section mt-auto">
+             <div className="section-title" style={{marginBottom: '10px'}}>Estado de Conexión</div>
+             <div className="connection-status-item" style={{
+               display: 'flex', 
+               alignItems: 'center', 
+               gap: '10px', 
+               padding: '8px', 
+               background: 'rgba(0,0,0,0.05)', 
+               borderRadius: '6px',
+               fontSize: '0.9rem'
+             }}>
+                <div style={{
+                  width: '10px', 
+                  height: '10px', 
+                  borderRadius: '50%', 
+                  backgroundColor: microsoftStatus.linked ? '#10B981' : '#EF4444',
+                  boxShadow: microsoftStatus.linked ? '0 0 5px #10B981' : 'none'
+                }}></div>
+                <span style={{color: 'var(--text-primary)'}}>
+                  {microsoftStatus.linked ? 'Conectado' : 'Desconectado'}
+                </span>
+             </div>
+          </div>
         </div>
 
         <div className="sidebar-footer">
@@ -402,6 +463,7 @@ const Calendar = ({ user, onLogout, onBackToPanel, onBackToFolders, onThemeToggl
               selectable={true}
               selectMirror={true}
               dayMaxEvents={true}
+              eventDisplay="block"
               events={filteredEvents}
               eventClick={handleEventClick}
               select={handleDateSelect}
@@ -428,7 +490,10 @@ const Calendar = ({ user, onLogout, onBackToPanel, onBackToFolders, onThemeToggl
 
       {showSettingsModal && (
         <SettingsModal
-          onClose={() => setShowSettingsModal(false)}
+          onClose={() => {
+            setShowSettingsModal(false);
+            fetchStatus();
+          }}
           user={user}
           onThemeToggle={onThemeToggle}
           isDarkMode={isDarkMode}

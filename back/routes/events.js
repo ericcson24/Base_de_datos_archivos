@@ -37,32 +37,16 @@ function getAuthenticatedClient(accessToken) {
 
 
 
-// Función CORREGIDA - Sumar 2 horas a lo que devuelve Graph
+// Función CORREGIDA - Usar UTC
 function convertToSpainTime(dateStr, isAllDay = false) {
   if (!dateStr) return null;
   if (isAllDay) return dateStr.includes('T') ? dateStr.split('T')[0] : dateStr;
 
-  // Limpiar milisegundos
-  let cleanDate = dateStr;
-  if (cleanDate.includes('.')) cleanDate = cleanDate.split('.')[0];
-
-  // Si ya tiene Z o +02:00, no tocar
-  if (cleanDate.endsWith('Z') || /\+\d{2}:\d{2}$/.test(cleanDate)) return cleanDate;
-
-  // Sumar 2 horas y devolver con offset explícito
-  const date = new Date(cleanDate);
-  date.setHours(date.getHours() + 2);
-
-  // Formatear como ISO y añadir offset de Madrid (verano: +02:00)
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  const day = String(date.getDate()).padStart(2, '0');
-  const hours = String(date.getHours()).padStart(2, '0');
-  const minutes = String(date.getMinutes()).padStart(2, '0');
-  const seconds = String(date.getSeconds()).padStart(2, '0');
-
-  // DEVOLVER SIEMPRE CON OFFSET
-  return `${year}-${month}-${day}T${hours}:${minutes}:${seconds}+02:00`;
+  // Si no tiene Z y no tiene offset, asumir que es UTC y añadir Z
+  if (!dateStr.endsWith('Z') && !/[+-]\d{2}:\d{2}$/.test(dateStr)) {
+      return dateStr + 'Z';
+  }
+  return dateStr;
 }
 
 // Función CORREGIDA para convertir desde España a UTC para envío
@@ -239,16 +223,21 @@ router.post('/sync', authenticate, async (req, res) => {
     const endISO = end.toISOString();
 
     const eventsResponse = await client.api('/me/calendar/events')
-        .select('id,subject,bodyPreview,start,end,location,webLink,isAllDay')
+        .header('Prefer', 'outlook.timezone="UTC"')
+        .select('id,subject,bodyPreview,start,end,location,webLink,isAllDay,categories')
         .filter(`start/dateTime ge '${startISO}' and end/dateTime le '${endISO}'`)
         .top(200)
         .get();
 
     let syncedCount = 0;
     for (const event of eventsResponse.value) {
+        // Asegurar que las fechas tengan Z si son UTC
+        const startTime = event.start.dateTime.endsWith('Z') ? event.start.dateTime : event.start.dateTime + 'Z';
+        const endTime = event.end.dateTime.endsWith('Z') ? event.end.dateTime : event.end.dateTime + 'Z';
+
         await dbAsync.run(`
-            INSERT INTO calendar_events (microsoft_id, user_id, subject, body_preview, start_time, end_time, is_all_day, location, web_link, last_synced)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+            INSERT INTO calendar_events (microsoft_id, user_id, subject, body_preview, start_time, end_time, is_all_day, location, web_link, categories, last_synced)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
             ON CONFLICT(microsoft_id) DO UPDATE SET
             subject=excluded.subject,
             body_preview=excluded.body_preview,
@@ -257,17 +246,19 @@ router.post('/sync', authenticate, async (req, res) => {
             is_all_day=excluded.is_all_day,
             location=excluded.location,
             web_link=excluded.web_link,
+            categories=excluded.categories,
             last_synced=CURRENT_TIMESTAMP
         `, [
             event.id,
             user.id,
             event.subject,
             event.bodyPreview,
-            event.start.dateTime,
-            event.end.dateTime,
+            startTime,
+            endTime,
             event.isAllDay ? 1 : 0,
             event.location?.displayName,
-            event.webLink
+            event.webLink,
+            JSON.stringify(event.categories || [])
         ]);
         syncedCount++;
     }
@@ -313,6 +304,7 @@ router.get('/', authenticate, async (req, res) => {
             
             // Fetch events from Microsoft (Primary Calendar)
             let query = client.api('/me/calendar/events')
+                .header('Prefer', 'outlook.timezone="UTC"')
                 .select('id,subject,bodyPreview,start,end,location,webLink,isAllDay,categories')
                 .top(100);
 
@@ -326,6 +318,10 @@ router.get('/', authenticate, async (req, res) => {
 
             // Sync to DB
             for (const event of eventsResponse.value) {
+                // Asegurar que las fechas tengan Z si son UTC
+                const startTime = event.start.dateTime.endsWith('Z') ? event.start.dateTime : event.start.dateTime + 'Z';
+                const endTime = event.end.dateTime.endsWith('Z') ? event.end.dateTime : event.end.dateTime + 'Z';
+
                 await dbAsync.run(`
                     INSERT INTO calendar_events (microsoft_id, user_id, subject, body_preview, start_time, end_time, is_all_day, location, web_link, categories, last_synced)
                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
@@ -344,8 +340,8 @@ router.get('/', authenticate, async (req, res) => {
                     user.id,
                     event.subject,
                     event.bodyPreview,
-                    event.start.dateTime,
-                    event.end.dateTime,
+                    startTime,
+                    endTime,
                     event.isAllDay ? 1 : 0,
                     event.location?.displayName,
                     event.webLink,
@@ -406,8 +402,7 @@ router.get('/', authenticate, async (req, res) => {
             preview: e.body_preview,
             url: e.web_link,
             categories: categories,
-            source: 'database',
-            color: '#4285f4' 
+            source: 'database'
         };
     });
 
@@ -519,47 +514,9 @@ router.post('/', authenticate, async (req, res) => {
       startDate = createdEvent.start.date;
       endDate = createdEvent.end.date;
     } else {
-      // Función inline para convertir fechas (copia de convertToSpainTime)
-      const convertToSpainTimeInline = (dateStr) => {
-        if (!dateStr) return null;
-
-        console.log('📅 Graph original (España-2h):', dateStr);
-
-        // Limpiar el formato y quitar milisegundos
-        let cleanDate = dateStr;
-        if (cleanDate.includes('.')) {
-          cleanDate = cleanDate.split('.')[0];
-        }
-
-        // Crear fecha y SUMAR 2 horas (porque Graph la devuelve 2 horas menos)
-        const date = new Date(cleanDate);
-        date.setHours(date.getHours() + 2);
-
-        // Formatear como ISO local sin Z
-        const year = date.getFullYear();
-        const month = String(date.getMonth() + 1).padStart(2, '0');
-        const day = String(date.getDate()).padStart(2, '0');
-        const hours = String(date.getHours()).padStart(2, '0');
-        const minutes = String(date.getMinutes()).padStart(2, '0');
-        const seconds = String(date.getSeconds()).padStart(2, '0');
-
-        const result = `${year}-${month}-${day}T${hours}:${minutes}:${seconds}`;
-
-        console.log('✅ España (+2h):', result);
-        console.log('🕐 Hora original:', cleanDate.split('T')[1]);
-        console.log('🕐 Hora final:', result.split('T')[1]);
-
-        return result;
-      };
-
-      console.log('🔄 Convirtiendo fechas de respuesta...');
-      startDate = convertToSpainTimeInline(createdEvent.start.dateTime);
-      endDate = convertToSpainTimeInline(createdEvent.end.dateTime);
-
-      console.log('✅ Fechas convertidas para respuesta:', {
-        start: startDate,
-        end: endDate
-      });
+      // Usar UTC directamente
+      startDate = createdEvent.start.dateTime.endsWith('Z') ? createdEvent.start.dateTime : createdEvent.start.dateTime + 'Z';
+      endDate = createdEvent.end.dateTime.endsWith('Z') ? createdEvent.end.dateTime : createdEvent.end.dateTime + 'Z';
     }
 
     // Formatear respuesta SIMPLE - sin colores de categorías (se aplican en GET)
@@ -569,8 +526,8 @@ router.post('/', authenticate, async (req, res) => {
       start: startDate,
       end: endDate,
       allDay: createdEvent.isAllDay || false,
-      backgroundColor: '#4285f4', // Color por defecto - se aplicará el correcto en GET
-      borderColor: '#4285f4',
+      // backgroundColor: '#4285f4', // REMOVED: Let frontend handle colors
+      // borderColor: '#4285f4',
       textColor: '#ffffff',
       extendedProps: {
         location: createdEvent.location?.displayName || '',

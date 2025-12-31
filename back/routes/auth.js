@@ -349,7 +349,7 @@ const authenticate = (req, res, next) => {
 router.get('/settings', authenticate, async (req, res) => {
   try {
     const user = await dbAsync.get(
-      "SELECT id, username, role, avatar_url, theme_preference, language, notifications FROM users WHERE username = ?", 
+      "SELECT id, username, role, avatar_url, theme_preference, language, notifications, microsoft_access_token, microsoft_email FROM users WHERE username = ?", 
       [req.user.username]
     );
 
