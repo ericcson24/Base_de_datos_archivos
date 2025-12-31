@@ -578,4 +578,33 @@ router.post('/avatar', authenticate, uploadAvatar.single('avatar'), async (req, 
   }
 });
 
+// Eliminar avatar personalizado
+router.delete('/avatar', authenticate, async (req, res) => {
+  try {
+    const username = req.user.username;
+    const user = await dbAsync.get("SELECT avatar_url FROM users WHERE username = ?", [username]);
+
+    if (!user) {
+      return res.status(404).json({ success: false, message: 'Usuario no encontrado' });
+    }
+
+    const currentAvatar = user.avatar_url;
+    if (currentAvatar && currentAvatar.startsWith('/avatars/uploads/')) {
+      const filePath = path.join(__dirname, '../public', currentAvatar);
+      if (fs.existsSync(filePath)) {
+        fs.unlink(filePath, (err) => {
+          if (err) console.error('No se pudo borrar avatar:', err);
+        });
+      }
+    }
+
+    await dbAsync.run("UPDATE users SET avatar_url = NULL WHERE username = ?", [username]);
+
+    res.json({ success: true, avatarUrl: null, message: 'Avatar eliminado' });
+  } catch (error) {
+    console.error('Error eliminando avatar:', error);
+    res.status(500).json({ success: false, message: 'Error al eliminar avatar' });
+  }
+});
+
 module.exports = router;

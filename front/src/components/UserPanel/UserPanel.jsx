@@ -975,7 +975,7 @@ useEffect(() => {
   role="search"
   onClick={() => setIsSearchExpanded(true)}
   className={`search-container relative flex items-center overflow-hidden transition-all duration-300 ease-in-out border cursor-text ${isSearchExpanded
-    ? 'w-72 h-9 rounded-lg shadow-md pl-3 pr-8 justify-start'
+    ? 'w-80 h-11 rounded-xl shadow-lg pl-3 pr-10 justify-start'
     : 'w-12 h-12 rounded-full justify-center'
   }`}
 >
@@ -1007,7 +1007,7 @@ useEffect(() => {
     onKeyPress={(e) => e.key === 'Enter' && e.target.blur()}
     onBlur={() => setIsSearchExpanded(false)}
     autoFocus={isSearchExpanded}
-    className={`search-input absolute left-0 w-full h-full bg-transparent border-none outline-none text-[14px] flex items-center px-8 transition-all duration-300 ease-in-out ${
+    className={`search-input absolute left-0 w-full h-full bg-transparent border-none outline-none text-[14px] flex items-center px-9 transition-all duration-300 ease-in-out ${
       isSearchExpanded
         ? 'opacity-100 translate-x-0 cursor-text'
         : 'opacity-0 -translate-x-5 pointer-events-none'
@@ -1022,11 +1022,11 @@ useEffect(() => {
         e.stopPropagation(); // evita cerrar el buscador
         setSearchQuery('');
       }}
-      className="search-clear-btn absolute right-3 flex items-center justify-center w-5 h-5 rounded-full transition-colors duration-200"
+      className="search-clear-btn absolute right-3 flex items-center justify-center w-6 h-6 rounded-full transition-colors duration-200"
       title={t('userPanel.clearSearch')}
     >
       <svg
-        className="w-3.5 h-3.5"
+        className="w-4 h-4"
         fill="none"
         stroke="currentColor"
         viewBox="0 0 24 24"

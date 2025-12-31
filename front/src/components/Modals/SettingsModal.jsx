@@ -30,6 +30,7 @@ const SettingsModal = ({ onClose, user, onThemeToggle, isDarkMode, initialTab = 
   const [showAvatarSelector, setShowAvatarSelector] = useState(false);
   const [defaultAvatars, setDefaultAvatars] = useState([]);
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
+  const [deletingAvatar, setDeletingAvatar] = useState(false);
 
   useEffect(() => {
     fetchSettings();
@@ -96,6 +97,31 @@ const SettingsModal = ({ onClose, user, onThemeToggle, isDarkMode, initialTab = 
       addToast(t('settings.avatarConnectionError'), 'error');
     } finally {
       setUploadingAvatar(false);
+    }
+  };
+
+  const handleAvatarDelete = async () => {
+    setDeletingAvatar(true);
+    try {
+      const response = await fetch('/api/auth/avatar', {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${getAuthToken()}`
+        }
+      });
+      const data = await response.json();
+      if (response.ok && data.success) {
+        setSettings({ ...settings, avatarUrl: null });
+        addToast(t('settings.avatarDeleted'), 'success');
+        setShowAvatarSelector(false);
+      } else {
+        addToast(data.message || t('settings.avatarDeleteError'), 'error');
+      }
+    } catch (error) {
+      console.error('Error deleting avatar:', error);
+      addToast(t('settings.avatarConnectionError'), 'error');
+    } finally {
+      setDeletingAvatar(false);
     }
   };
 
@@ -315,6 +341,9 @@ const SettingsModal = ({ onClose, user, onThemeToggle, isDarkMode, initialTab = 
                           className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 dark:file:bg-blue-900/30 dark:file:text-blue-300"
                           disabled={uploadingAvatar}
                         />
+                        <Button variant="secondary" onClick={handleAvatarDelete} disabled={deletingAvatar || uploadingAvatar}>
+                          {deletingAvatar ? t('common.loading') : t('settings.removeAvatar')}
+                        </Button>
                         {uploadingAvatar && <span className="text-sm text-blue-500">{t('settings.uploading')}</span>}
                       </div>
                     </div>

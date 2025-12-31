@@ -41,7 +41,7 @@ router.get('/search', authenticate, async (req, res) => {
 
     // Search for users excluding the current user
     const users = await dbAsync.all(
-      "SELECT id, username, avatar_url FROM users WHERE username LIKE ? AND username != ? LIMIT 10",
+      "SELECT id, username, avatar_url AS avatarUrl FROM users WHERE username LIKE ? AND username != ? LIMIT 10",
       [`%${q}%`, req.user.username]
     );
 
