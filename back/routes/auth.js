@@ -593,11 +593,17 @@ router.get('/avatars', async (req, res) => {
   }
 });
 
+const { sendResponse } = require('../utils/responseHandler');
+
 // Subir avatar personalizado
 router.post('/avatar', authenticate, uploadAvatar.single('avatar'), async (req, res) => {
   try {
     if (!req.file) {
-      return res.status(400).json({ success: false, message: 'No se subió ningún archivo' });
+      return sendResponse(res, 400, { success: false }, {
+        title: 'Error',
+        message: 'No se subió ningún archivo',
+        type: 'error'
+      });
     }
 
     const avatarUrl = `/avatars/uploads/${req.file.filename}`;
@@ -605,10 +611,18 @@ router.post('/avatar', authenticate, uploadAvatar.single('avatar'), async (req, 
 
     await dbAsync.run("UPDATE users SET avatar_url = ? WHERE username = ?", [avatarUrl, username]);
 
-    res.json({ success: true, avatarUrl, message: 'Avatar actualizado correctamente' });
+    return sendResponse(res, 200, { success: true, avatarUrl }, {
+      title: 'Perfil Actualizado',
+      message: 'Tu foto de perfil ha sido cambiada exitosamente.',
+      type: 'success'
+    });
   } catch (error) {
     console.error('Error subiendo avatar:', error);
-    res.status(500).json({ success: false, message: 'Error al subir avatar' });
+    return sendResponse(res, 500, { success: false }, {
+      title: 'Error',
+      message: 'Error al subir avatar',
+      type: 'error'
+    });
   }
 });
 

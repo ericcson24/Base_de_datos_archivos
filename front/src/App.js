@@ -196,8 +196,13 @@ function App() {
         // Intentar obtener el mensaje de error del servidor
         try {
           const errorData = await response.json();
-          throw new Error(errorData.message || `Error HTTP ${response.status}`);
+          const error = new Error(errorData.message || `Error HTTP ${response.status}`);
+          error.code = errorData.errorCode; // Adjuntar código de error
+          throw error;
         } catch (jsonError) {
+          // Si ya es el error que lanzamos arriba, relanzarlo
+          if (jsonError.code) throw jsonError;
+          
           // Si no hay JSON válido en la respuesta de error, usar el status
           throw new Error(`Error del servidor: ${response.status} ${response.statusText}`);
         }

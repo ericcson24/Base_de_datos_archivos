@@ -16,6 +16,7 @@ import {
   formatFileSize, 
   canPreview
 } from '../../utils/fileUtils';
+import { useFetch } from '../../hooks/useFetch';
 import { useToast } from '../../context/ToastContext';
 import { useLanguage } from '../../context/LanguageContext';
 import './UserPanel.css';
@@ -23,6 +24,7 @@ import './UserPanel.css';
 const UserPanel = ({ user, onLogout, onBackToFolders, onThemeToggle, isDarkMode, onGoToCalendar }) => {
   console.log('UserPanel se está renderizando con user:', user);
   const { addToast } = useToast();
+  const fetchWithNotify = useFetch();
   const { t } = useLanguage();
 
   const [files, setFiles] = useState([]);
@@ -617,7 +619,7 @@ useEffect(() => {
 
   const handleShareItem = async (item, targetUsername) => {
     try {
-      const response = await fetch('/api/files/share', {
+      const response = await fetchWithNotify('/api/files/share', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -632,7 +634,7 @@ useEffect(() => {
       const result = await response.json();
       
       if (result.success) {
-        addToast(result.message, 'success');
+        // Notification handled by backend
       } else {
         throw new Error(result.message);
       }

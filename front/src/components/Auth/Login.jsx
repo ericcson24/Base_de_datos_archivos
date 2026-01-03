@@ -89,7 +89,26 @@ const Login = ({ onLogin, onSwitchToRegister, onThemeToggle, isDarkMode }) => {
     try {
       await onLogin(formData); // Pasar las credenciales a App.js
     } catch (error) {
-      setErrors({ general: error.message || t('common.error') });
+      // Usar traducción si hay código de error, sino usar mensaje del servidor o genérico
+      let errorMessage = t('common.error');
+      
+      if (error.code) {
+        // Mapear códigos de error a claves de traducción
+        const errorKey = `auth.errors.${error.code}`;
+        const translatedError = t(errorKey);
+        
+        // Si la traducción existe (no devuelve la clave), usarla
+        if (translatedError !== errorKey) {
+          errorMessage = translatedError;
+        } else {
+           // Fallback para códigos no traducidos
+           errorMessage = error.message;
+        }
+      } else {
+        errorMessage = error.message || t('common.error');
+      }
+      
+      setErrors({ general: errorMessage });
     } finally {
       setIsLoading(false);
     }

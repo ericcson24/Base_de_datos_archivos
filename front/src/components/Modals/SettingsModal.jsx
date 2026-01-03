@@ -5,10 +5,12 @@ import Input from '../Common/Input';
 import { getAuthToken } from '../../utils/fileUtils';
 import { useToast } from '../../context/ToastContext';
 import { useLanguage } from '../../context/LanguageContext';
+import { useFetch } from '../../hooks/useFetch';
 import './SettingsModal.css';
 
 const SettingsModal = ({ onClose, user, onThemeToggle, isDarkMode, initialTab = 'general' }) => {
   const { addToast } = useToast();
+  const fetchWithNotify = useFetch();
   const { t, changeLanguage } = useLanguage();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -76,7 +78,7 @@ const SettingsModal = ({ onClose, user, onThemeToggle, isDarkMode, initialTab = 
 
     setUploadingAvatar(true);
     try {
-      const response = await fetch('/api/auth/avatar', {
+      const response = await fetchWithNotify('/api/auth/avatar', {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${getAuthToken()}`
@@ -87,14 +89,12 @@ const SettingsModal = ({ onClose, user, onThemeToggle, isDarkMode, initialTab = 
       const data = await response.json();
       if (data.success) {
         setSettings({ ...settings, avatarUrl: data.avatarUrl });
-        addToast(t('settings.avatarUploaded'), 'success');
+        // Notification handled by backend
         setShowAvatarSelector(false);
-      } else {
-        addToast(data.message || t('settings.avatarUploadError'), 'error');
       }
     } catch (error) {
       console.error('Error uploading avatar:', error);
-      addToast(t('settings.avatarConnectionError'), 'error');
+      // Notification handled by backend or generic error
     } finally {
       setUploadingAvatar(false);
     }
@@ -232,20 +232,17 @@ const SettingsModal = ({ onClose, user, onThemeToggle, isDarkMode, initialTab = 
   const handleSync = async () => {
     setSyncing(true);
     try {
-      const response = await fetch('/api/events/sync', {
+      const response = await fetchWithNotify('/api/events/sync', {
         method: 'POST',
         headers: { 'Authorization': `Bearer ${getAuthToken()}` }
       });
       
       if (response.ok) {
-        const data = await response.json();
-        addToast(data.message || t('settings.syncSuccess'), 'success');
-      } else {
-        addToast(t('settings.syncError'), 'error');
+        // Notification handled by backend
       }
     } catch (error) {
       console.error('Error syncing:', error);
-      addToast(t('settings.connectionErrorGeneric'), 'error');
+      // Notification handled by backend or generic error
     } finally {
       setSyncing(false);
     }

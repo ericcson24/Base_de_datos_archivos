@@ -91,7 +91,7 @@ const DailyTimeline = ({ events }) => {
       onMouseUp={handleMouseUp}
       onMouseMove={handleMouseMove}
     >
-      <div className="daily-timeline-header" style={{ position: 'sticky', left: 0, zIndex: 40, marginBottom: '0.5rem' }}>
+      <div className="daily-timeline-header daily-timeline-header-sticky">
         <h3>{t('calendar.todayDate', { date: today.toLocaleDateString(language === 'es' ? 'es-ES' : language === 'pl' ? 'pl-PL' : 'en-US', { weekday: 'long', day: 'numeric', month: 'long' }) })}</h3>
       </div>
       <div className="daily-timeline-track">
@@ -432,7 +432,7 @@ const Calendar = ({ user, onLogout, onBackToPanel, onBackToFolders, onThemeToggl
             <div className="section-title">{t('calendar.categories')}</div>
             <div className="category-list">
               <div className="category-item" onClick={() => setSelectedCategories(new Set(categories.map(c => c.name)))}>
-                <span style={{fontSize: '0.8rem'}}> {t('calendar.viewAll')}</span>
+                <span className="category-view-all"> {t('calendar.viewAll')}</span>
               </div>
               {categories.map(category => (
                 <div key={category.id} className="category-item" onClick={() => toggleCategory(category.name)}>
@@ -450,25 +450,17 @@ const Calendar = ({ user, onLogout, onBackToPanel, onBackToFolders, onThemeToggl
           </div>
 
           <div className="sidebar-section mt-auto">
-             <div className="section-title" style={{marginBottom: '10px'}}>Estado de Conexión</div>
-             <div className="connection-status-item" style={{
-               display: 'flex', 
-               alignItems: 'center', 
-               gap: '10px', 
-               padding: '8px', 
-               background: 'rgba(0,0,0,0.05)', 
-               borderRadius: '6px',
-               fontSize: '0.9rem'
-             }}>
-                <div style={{
-                  width: '10px', 
-                  height: '10px', 
-                  borderRadius: '50%', 
-                  backgroundColor: microsoftStatus.linked ? '#10B981' : '#EF4444',
-                  boxShadow: microsoftStatus.linked ? '0 0 5px #10B981' : 'none'
-                }}></div>
-                <span style={{color: 'var(--text-primary)'}}>
-                  {microsoftStatus.linked ? 'Conectado' : 'Desconectado'}
+             <div className="section-title connection-status-section">{t('calendar.connectionStatus')}</div>
+             <div className="connection-status-container">
+                <div 
+                  className="connection-status-dot"
+                  style={{
+                    backgroundColor: microsoftStatus.linked ? '#10B981' : '#EF4444',
+                    boxShadow: microsoftStatus.linked ? '0 0 5px #10B981' : 'none'
+                  }}
+                ></div>
+                <span className="connection-status-text">
+                  {microsoftStatus.linked ? t('calendar.connected') : t('calendar.disconnected')}
                 </span>
              </div>
           </div>
@@ -492,6 +484,29 @@ const Calendar = ({ user, onLogout, onBackToPanel, onBackToFolders, onThemeToggl
 
       {/* Main Content */}
       <div className="calendar-main">
+        {!microsoftStatus.linked && (
+          <div className="bg-red-50 dark:bg-red-900/20 border-l-4 border-red-500 p-4 m-4 rounded shadow-sm flex justify-between items-center">
+            <div className="flex items-center">
+              <div className="flex-shrink-0">
+                <svg className="h-5 w-5 text-red-500" viewBox="0 0 20 20" fill="currentColor">
+                  <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                </svg>
+              </div>
+              <div className="ml-3">
+                <p className="text-sm text-red-700 dark:text-red-200 font-medium">
+                  {t('calendar.disconnectedMessage')}
+                </p>
+              </div>
+            </div>
+            <button
+              onClick={() => setShowSettingsModal(true)}
+              className="ml-4 px-3 py-1.5 bg-red-100 dark:bg-red-800 text-red-700 dark:text-red-100 text-sm font-medium rounded-md hover:bg-red-200 dark:hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 transition-colors"
+            >
+              {t('calendar.connectButton')}
+            </button>
+          </div>
+        )}
+
         <DailyTimeline events={filteredEvents} />
 
         <div className="calendar-view">

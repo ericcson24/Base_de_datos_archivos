@@ -10,7 +10,14 @@
     "backToLogin": "Back to login",
     "recoveryInstruction": "Enter your username to recover password",
     "sendRecovery": "Send instructions",
-    "sending": "Sending..."
+    "sending": "Sending...",
+    "errors": {
+      "USER_NOT_FOUND": "User does not exist",
+      "CREDENTIALS_MISSING": "Credentials not found",
+      "ACCOUNT_LOCKED": "Account locked due to too many attempts. Contact administrator.",
+      "INVALID_CREDENTIALS": "Incorrect username or password",
+      "AUTH_FAILED": "Authentication error"
+    }
   },
   "common": {
     "loading": "Loading...",
@@ -270,7 +277,12 @@
     "searchMap": "Search on map",
     "selectLocation": "📍 Select Location",
     "searchLocationPlaceholder": "Search city, street...",
-    "confirmLocation": "Confirm Location"
+    "confirmLocation": "Confirm Location",
+    "disconnectedMessage": "⚠️ You are disconnected from Outlook. Your events and emails are not syncing.",
+    "connectButton": "Connect / Sync",
+    "connectionStatus": "Connection Status",
+    "connected": "Connected",
+    "disconnected": "Disconnected"
   },
   "sidebar": {
     "errorLoadingFile": "Error loading file",

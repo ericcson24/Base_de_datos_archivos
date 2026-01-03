@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import './Toast.css';
 
-const Toast = ({ id, message, type = 'info', duration = 3000, onClose }) => {
+const Toast = ({ id, title, message, type = 'info', duration = 3000, onClose }) => {
   const [isExiting, setIsExiting] = useState(false);
 
   useEffect(() => {
@@ -32,7 +32,10 @@ const Toast = ({ id, message, type = 'info', duration = 3000, onClose }) => {
     <div className={`toast ${type} ${isExiting ? 'exiting' : ''}`}>
       <div className="toast-content">
         <span className="toast-icon">{getIcon()}</span>
-        <span className="toast-message">{message}</span>
+        <div className="toast-text">
+          {title && <div className="toast-title">{title}</div>}
+          <div className="toast-message">{message}</div>
+        </div>
       </div>
       <button className="toast-close" onClick={handleClose}>
         ✕
