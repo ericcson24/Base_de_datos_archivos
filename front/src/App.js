@@ -83,6 +83,10 @@ function App() {
             token: storedToken || data.token 
           };
           
+          // Normalizar rol
+          const role = (userWithToken.role || '').toLowerCase();
+          userWithToken.role = role;
+          
           setUser(userWithToken);
           setIsLoggedIn(true);
           
@@ -92,7 +96,15 @@ function App() {
           }
           
           // Detectar ruta actual y cambiar currentView
-          const currentPath = window.location.pathname;
+          let currentPath = window.location.pathname;
+          
+          // Normalizar ruta (eliminar slash final si existe)
+          if (currentPath.endsWith('/') && currentPath.length > 1) {
+            currentPath = currentPath.slice(0, -1);
+            // Actualizar URL visualmente sin recargar
+            window.history.replaceState(null, '', currentPath);
+          }
+          
           if (currentPath === '/calendar') {
             setCurrentView('calendar');
           } else if (currentPath === '/panel') {
@@ -103,12 +115,12 @@ function App() {
             setCurrentView('folders');
           } else {
             // Redirigir según el rol del usuario si está autenticado
-            if (userWithToken.role === 'admin') {
+            if (role === 'admin') {
               setCurrentView('admin');
-              window.history.pushState(null, '', '/admin');
+              window.history.replaceState(null, '', '/admin');
             } else {
               setCurrentView('folders');
-              window.history.pushState(null, '', '/folders');
+              window.history.replaceState(null, '', '/folders');
             }
           }
         } else {
@@ -153,7 +165,11 @@ function App() {
   // Detectar cambios en la ruta del navegador
   useEffect(() => {
     const handleLocationChange = () => {
-      const currentPath = window.location.pathname;
+      let currentPath = window.location.pathname;
+      if (currentPath.endsWith('/') && currentPath.length > 1) {
+        currentPath = currentPath.slice(0, -1);
+      }
+
       if (isLoggedIn && user) {
         if (currentPath === '/calendar') {
           setCurrentView('calendar');
@@ -215,11 +231,17 @@ function App() {
           ...data.user,
           token: data.token
         };
+        
+        // Normalizar rol para evitar problemas de mayúsculas/minúsculas
+        const role = (userWithToken.role || '').toLowerCase();
+        // Asegurarnos de que el rol en el estado esté normalizado
+        userWithToken.role = role;
+
         setUser(userWithToken);
         setIsLoggedIn(true);
         
         // Verificar si es administrador y redirigir apropiadamente
-        if (userWithToken.role === 'admin') {
+        if (role === 'admin') {
           setCurrentView('admin');
           window.history.pushState(null, '', '/admin');
           console.log('Login exitoso como administrador:', data);

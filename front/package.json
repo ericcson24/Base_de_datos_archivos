@@ -8,6 +8,7 @@
     "@fullcalendar/interaction": "^6.1.19",
     "@fullcalendar/react": "^6.1.19",
     "@fullcalendar/timegrid": "^6.1.19",
+    "guacamole-common-js": "^1.5.0",
     "leaflet": "^1.9.4",
     "mammoth": "^1.11.0",
     "react": "^18.2.0",

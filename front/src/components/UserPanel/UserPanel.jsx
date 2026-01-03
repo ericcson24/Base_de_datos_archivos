@@ -9,6 +9,8 @@ import MoveModal from '../Modals/MoveModal';
 import ShareModal from '../Modals/ShareModal';
 import DeleteConfirmationModal from '../Modals/DeleteConfirmationModal';
 import SettingsModal from '../Modals/SettingsModal';
+import RDPViewer from '../RDP/RDPViewer';
+import RDPConnectionModal from '../Modals/RDPConnectionModal';
 import SidebarPanel from './SidebarPanel';
 import FileItem from './FileItem';
 import { 
@@ -50,6 +52,9 @@ const UserPanel = ({ user, onLogout, onBackToFolders, onThemeToggle, isDarkMode,
   const [settingsInitialTab, setSettingsInitialTab] = useState('general');
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [itemToDelete, setItemToDelete] = useState(null);
+  const [showRDPViewer, setShowRDPViewer] = useState(false);
+  const [showRDPModal, setShowRDPModal] = useState(false);
+  const [rdpConnectionId, setRdpConnectionId] = useState(null);
 
   // Check for URL parameters on mount
   useEffect(() => {
@@ -950,6 +955,9 @@ useEffect(() => {
           }}>
             {t('userPanel.calendar')}
           </button>
+          <button className="sidebar-btn" onClick={() => setShowRDPModal(true)}>
+            {t('userPanel.remoteDesktop')}
+          </button>
           <button className="sidebar-btn" onClick={() => setShowSettingsModal(true)}>
             {t('userPanel.settings')}
           </button>
@@ -1491,6 +1499,30 @@ useEffect(() => {
           file={viewerFile}
           onClose={closeFileViewer}
           user={user}
+        />
+      )}
+
+      {/* RDP Connection Modal */}
+      {showRDPModal && (
+        <RDPConnectionModal
+            onClose={() => setShowRDPModal(false)}
+            onConnect={(id) => {
+                setRdpConnectionId(id);
+                setShowRDPModal(false);
+                setShowRDPViewer(true);
+            }}
+        />
+      )}
+
+      {/* RDP Viewer */}
+      {showRDPViewer && (
+        <RDPViewer
+          connectionToken={getAuthToken()}
+          connectionId={rdpConnectionId}
+          onClose={() => {
+              setShowRDPViewer(false);
+              setRdpConnectionId(null);
+          }}
         />
       )}
 

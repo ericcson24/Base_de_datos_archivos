@@ -42,7 +42,16 @@
     "maximize": "Maximizar",
     "downloadError": "Error al iniciar la descarga",
     "settings": "Ajustes",
-    "logout": "Cerrar Sesión"
+    "logout": "Cerrar Sesión",
+    "remoteDesktop": "Escritorio Remoto"
+  },
+  "rdp": {
+    "connecting": "Conectando al Escritorio Remoto...",
+    "connected": "Conectado",
+    "disconnected": "Desconectado",
+    "error": "Error de conexión",
+    "sendCtrlAltDel": "Enviar Ctrl+Alt+Supr",
+    "disconnect": "Desconectar"
   },
   "folders": {
     "title": "Selecciona una carpeta",
@@ -545,5 +554,13 @@
     "from": "de {{owner}}",
     "shared": "Compartido",
     "by": "por {{owner}}"
+  },
+  "rdp": {
+    "connecting": "Conectando al Escritorio Remoto...",
+    "connected": "Conectado",
+    "disconnected": "Desconectado",
+    "error": "Error de conexión",
+    "sendCtrlAltDel": "Enviar Ctrl+Alt+Supr",
+    "disconnect": "Desconectar"
   }
 }

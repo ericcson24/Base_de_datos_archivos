@@ -42,7 +42,8 @@
     "maximize": "Maximize",
     "downloadError": "Error initiating download",
     "settings": "Settings",
-    "logout": "Logout"
+    "logout": "Logout",
+    "remoteDesktop": "Remote Desktop"
   },
   "folders": {
     "title": "Select a folder",
@@ -545,5 +546,13 @@
     "from": "from {{owner}}",
     "shared": "Shared",
     "by": "by {{owner}}"
+  },
+  "rdp": {
+    "connecting": "Connecting to Remote Desktop...",
+    "connected": "Connected",
+    "disconnected": "Disconnected",
+    "error": "Connection Error",
+    "sendCtrlAltDel": "Send Ctrl+Alt+Del",
+    "disconnect": "Disconnect"
   }
 }

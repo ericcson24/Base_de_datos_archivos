@@ -1,0 +1,325 @@
+.rdp-manager-container {
+    padding: 20px;
+    color: var(--text-color);
+}
+
+.rdp-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+}
+
+.rdp-header h2 {
+    font-size: 1.5rem;
+    font-weight: 600;
+    color: var(--text-color);
+    margin: 0;
+}
+
+.rdp-add-btn {
+    background: var(--button-primary-bg, #000);
+    color: var(--button-primary-text, #fff);
+    border: 1px solid var(--sidebar-border, #333);
+    padding: 10px 20px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-weight: 600;
+    transition: all 0.2s ease;
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.1);
+}
+
+.rdp-add-btn:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.15);
+    background: var(--button-primary-hover, #333);
+}
+
+.rdp-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 24px;
+}
+
+.rdp-card {
+    padding: 24px;
+    border-radius: 16px;
+    transition: all 0.3s ease;
+    border: 1px solid var(--sidebar-border, rgba(255,255,255,0.1));
+    background: var(--sidebar-bg, rgba(255,255,255,0.05));
+    backdrop-filter: blur(10px);
+}
+
+.rdp-card:hover {
+    transform: translateY(-4px);
+    box-shadow: var(--shadow-hover, 0 10px 20px rgba(0,0,0,0.2));
+}
+
+.rdp-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 16px;
+    border-bottom: 1px solid var(--sidebar-border, rgba(255,255,255,0.1));
+    padding-bottom: 12px;
+}
+
+.rdp-card-header h3 {
+    margin: 0;
+    font-size: 1.2rem;
+    font-weight: 600;
+    color: var(--text-color);
+}
+
+.protocol-badge {
+    background: rgba(255, 255, 255, 0.1);
+    color: var(--text-color);
+    padding: 4px 10px;
+    border-radius: 20px;
+    font-size: 0.75rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    border: 1px solid rgba(255,255,255,0.2);
+}
+
+.rdp-card-body p {
+    margin: 8px 0;
+    font-size: 0.95rem;
+    color: var(--text-color);
+    opacity: 0.8;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.rdp-card-actions {
+    margin-top: 20px;
+    display: flex;
+    gap: 12px;
+}
+
+.connect-btn {
+    flex: 1;
+    background: #fff;
+    color: #000;
+    border: none;
+    padding: 10px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-weight: 600;
+    transition: all 0.2s;
+    box-shadow: 0 4px 12px rgba(255, 255, 255, 0.1);
+}
+
+.connect-btn:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 6px 16px rgba(255, 255, 255, 0.2);
+    background: #f0f0f0;
+}
+
+.delete-btn {
+    background: rgba(244, 67, 54, 0.1);
+    border: 1px solid rgba(244, 67, 54, 0.2);
+    color: #f44336;
+    padding: 10px 14px;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.delete-btn:hover {
+    background: rgba(244, 67, 54, 0.2);
+}
+
+.modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.7);
+    backdrop-filter: blur(5px);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 1000;
+    animation: fadeIn 0.2s ease;
+}
+
+.modal-content {
+    background: #1a1a1a;
+    color: #fff;
+    padding: 30px;
+    border-radius: 16px;
+    width: 100%;
+    max-width: 500px;
+    border: 1px solid rgba(255,255,255,0.1);
+    box-shadow: 0 20px 50px rgba(0,0,0,0.5);
+    animation: modalSlideIn 0.3s ease;
+}
+
+.modal-content h3 {
+    margin-top: 0;
+    margin-bottom: 20px;
+    font-size: 1.5rem;
+    border-bottom: 1px solid rgba(255,255,255,0.1);
+    padding-bottom: 15px;
+}
+
+.form-group {
+    margin-bottom: 15px;
+}
+
+.form-group label {
+    display: block;
+    margin-bottom: 8px;
+    font-weight: 500;
+    font-size: 0.9rem;
+    opacity: 0.9;
+}
+
+.glassmorphism-input {
+    width: 100%;
+    padding: 12px;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 8px;
+    color: #fff;
+    font-size: 1rem;
+    transition: all 0.2s;
+}
+
+.glassmorphism-input:focus {
+    outline: none;
+    border-color: rgba(255, 255, 255, 0.3);
+    background: rgba(255, 255, 255, 0.1);
+}
+
+.form-row {
+    display: flex;
+    gap: 15px;
+}
+
+.form-group.small {
+    width: 100px;
+}
+
+.modal-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 12px;
+    margin-top: 25px;
+    padding-top: 20px;
+    border-top: 1px solid rgba(255,255,255,0.1);
+}
+
+.modal-actions button {
+    padding: 10px 20px;
+    border-radius: 8px;
+    border: 1px solid rgba(255,255,255,0.1);
+    background: transparent;
+    color: #fff;
+    cursor: pointer;
+    font-weight: 500;
+    transition: all 0.2s;
+}
+
+.modal-actions button:hover {
+    background: rgba(255,255,255,0.1);
+}
+
+.modal-actions button.primary {
+    background: #fff;
+    color: #000;
+    border: none;
+}
+
+.modal-actions button.primary:hover {
+    background: #f0f0f0;
+    transform: translateY(-1px);
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+@keyframes modalSlideIn {
+    from { transform: translateY(20px); opacity: 0; }
+    to { transform: translateY(0); opacity: 1; }
+}
+
+.no-connections {
+    grid-column: 1 / -1;
+    text-align: center;
+    padding: 40px;
+    background: rgba(255,255,255,0.05);
+    border-radius: 12px;
+    border: 1px dashed rgba(255,255,255,0.2);
+    color: rgba(255,255,255,0.5);
+}
+
+/* Switch Toggle */
+.switch {
+  position: relative;
+  display: inline-block;
+  width: 50px;
+  height: 24px;
+  margin-right: 10px;
+  vertical-align: middle;
+}
+
+.switch input { 
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.slider {
+  position: absolute;
+  cursor: pointer;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: #ccc;
+  -webkit-transition: .4s;
+  transition: .4s;
+}
+
+.slider:before {
+  position: absolute;
+  content: '';
+  height: 16px;
+  width: 16px;
+  left: 4px;
+  bottom: 4px;
+  background-color: white;
+  -webkit-transition: .4s;
+  transition: .4s;
+}
+
+input:checked + .slider {
+  background-color: #2196F3;
+}
+
+input:focus + .slider {
+  box-shadow: 0 0 1px #2196F3;
+}
+
+input:checked + .slider:before {
+  -webkit-transform: translateX(26px);
+  -ms-transform: translateX(26px);
+  transform: translateX(26px);
+}
+
+/* Rounded sliders */
+.slider.round {
+  border-radius: 34px;
+}
+
+.slider.round:before {
+  border-radius: 50%;
+}
+
