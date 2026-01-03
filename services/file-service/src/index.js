@@ -274,7 +274,13 @@ app.post('/upload', authenticate, upload.array('files'), async (req, res) => {
       path: path.relative(path.join(UPLOAD_DIR, req.user.username), file.path)
     }));
 
-    await logAction(req.user.username, 'FILE_UPLOAD', `Subidos ${req.files.length} archivos`);
+    // Log each file individually for "Recent Files" tracking
+    for (const file of req.files) {
+        // We log the relative path if possible, or just the name
+        const relPath = path.relative(path.join(UPLOAD_DIR, req.user.username), file.path);
+        await logAction(req.user.username, 'FILE_UPLOAD', `Subido archivo: ${relPath}`);
+    }
+
     res.json({ success: true, files: fileDetails });
 });
 
@@ -408,6 +414,9 @@ app.get('/preview/:fileId', authenticate, async (req, res) => {
         return res.status(404).json({ success: false, message: 'Archivo no encontrado' });
     }
 
+    // Log file open
+    await logAction(req.user.username, 'FILE_OPEN', `Abierto archivo: ${filePath}`);
+
     // Determinar mime type básico o dejar que express/res.sendFile lo maneje
     // Para preview, queremos que el navegador intente mostrarlo (inline)
     res.sendFile(fullPath, { headers: { 'Content-Disposition': 'inline' } });
@@ -430,11 +439,11 @@ app.get('/recent', authenticate, async (req, res) => {
     }
 
     // Get recent file actions from audit_logs
-    // We look for CREATE_FILE, FILE_UPLOAD, FILE_EDIT
+    // We look for CREATE_FILE, FILE_UPLOAD, FILE_EDIT, FOLDER_UPLOAD, FILE_OPEN
     const logs = await dbAsync.all(
-        `SELECT details, created_at, action FROM audit_logs 
-         WHERE user_id = ? AND action IN ('CREATE_FILE', 'FILE_UPLOAD', 'FILE_EDIT') 
-         ORDER BY created_at DESC LIMIT 20`,
+        `SELECT details, timestamp, action FROM audit_logs 
+         WHERE user_id = ? AND action IN ('CREATE_FILE', 'FILE_UPLOAD', 'FILE_EDIT', 'FOLDER_UPLOAD', 'FILE_OPEN') 
+         ORDER BY timestamp DESC LIMIT 20`,
         [user.id]
     );
 
@@ -443,23 +452,28 @@ app.get('/recent', authenticate, async (req, res) => {
 
     for (const log of logs) {
         let filePath = '';
-        // Parse details to extract filename/path. 
-        // This depends on how we logged it.
-        // Examples: 
-        // "Creado archivo: filename.txt" (CREATE_FILE)
-        // "Subidos X archivos" (FILE_UPLOAD) - This one is hard because we didn't log the names individually in the main log message, 
-        // but maybe we should have. 
-        // "Editado archivo: base64path" (FILE_EDIT)
-
+        
         if (log.action === 'FILE_EDIT') {
              const match = log.details.match(/Editado archivo: (.+)/);
              if (match) {
                  try {
+                    // Try to decode if it looks like base64, otherwise use as is
+                    // The log might contain the raw path or base64
+                    // In previous code we assumed base64 but let's be safe
                     filePath = Buffer.from(match[1], 'base64').toString();
-                 } catch (e) { continue; }
+                 } catch (e) { filePath = match[1]; }
              }
         } else if (log.action === 'CREATE_FILE') {
              const match = log.details.match(/Creado archivo: (.+)/);
+             if (match) filePath = match[1];
+        } else if (log.action === 'FILE_UPLOAD') {
+             const match = log.details.match(/Subido archivo: (.+)/);
+             if (match) filePath = match[1];
+        } else if (log.action === 'FOLDER_UPLOAD') {
+             const match = log.details.match(/Subido archivo de carpeta: (.+)/);
+             if (match) filePath = match[1];
+        } else if (log.action === 'FILE_OPEN') {
+             const match = log.details.match(/Abierto archivo: (.+)/);
              if (match) filePath = match[1];
         }
 

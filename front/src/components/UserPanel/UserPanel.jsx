@@ -7,6 +7,7 @@ import CreateFolderModal from '../Modals/CreateFolderModal';
 import RenameModal from '../Modals/RenameModal';
 import MoveModal from '../Modals/MoveModal';
 import ShareModal from '../Modals/ShareModal';
+import DeleteConfirmationModal from '../Modals/DeleteConfirmationModal';
 import SettingsModal from '../Modals/SettingsModal';
 import SidebarPanel from './SidebarPanel';
 import FileItem from './FileItem';
@@ -47,6 +48,8 @@ const UserPanel = ({ user, onLogout, onBackToFolders, onThemeToggle, isDarkMode,
   const [shareItem, setShareItem] = useState(null);
   const [showSettingsModal, setShowSettingsModal] = useState(false);
   const [settingsInitialTab, setSettingsInitialTab] = useState('general');
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [itemToDelete, setItemToDelete] = useState(null);
 
   // Check for URL parameters on mount
   useEffect(() => {
@@ -59,8 +62,8 @@ const UserPanel = ({ user, onLogout, onBackToFolders, onThemeToggle, isDarkMode,
       if (params.get('status') === 'success') {
         // Clean URL
         window.history.replaceState({}, document.title, window.location.pathname);
-        // Show success message (could be a toast, for now alert is fine or handled in modal)
-        alert(t('userPanel.microsoftLinkedSuccess'));
+        // Show success message
+        addToast(t('userPanel.microsoftLinkedSuccess'), 'success');
       }
     }
   }, []);
@@ -129,7 +132,7 @@ const UserPanel = ({ user, onLogout, onBackToFolders, onThemeToggle, isDarkMode,
     if (!aiQuery.trim()) return;
     
     console.log('Consulta IA:', aiQuery);
-    alert(t('userPanel.aiComingSoon', { query: aiQuery }));
+    addToast(t('userPanel.aiComingSoon', { query: aiQuery }), 'info');
     
     setAIQuery('');
     setIsAIExpanded(false);
@@ -302,7 +305,7 @@ useEffect(() => {
     // Validar archivos
     const validationErrors = validateFiles(files);
     if (validationErrors.length > 0) {
-      alert(t('userPanel.validationErrors') + '\n' + validationErrors.join('\n'));
+      addToast(t('userPanel.validationErrors') + '\n' + validationErrors.join('\n'), 'error');
       return;
     }
 
@@ -336,6 +339,7 @@ useEffect(() => {
       console.log('Upload result:', result);
       
       setUploadProgress({ status: 'success', message: t('userPanel.uploadSuccess', { count: files.length }) });
+      addToast(t('userPanel.uploadSuccess', { count: files.length }), 'success');
       
       // Recargar archivos y recientes después de subir
       loadFiles();
@@ -347,6 +351,7 @@ useEffect(() => {
     } catch (error) {
       console.error('Error uploading files:', error);
       setUploadProgress({ status: 'error', message: t('userPanel.uploadError', { error: error.message }) });
+      addToast(t('userPanel.uploadError', { error: error.message }), 'error');
       
       // Limpiar mensaje de error después de 5 segundos
       setTimeout(() => setUploadProgress(null), 5000);
@@ -359,7 +364,7 @@ useEffect(() => {
     // Validar archivos
     const validationErrors = validateFiles(files);
     if (validationErrors.length > 0) {
-      alert(t('userPanel.validationErrors') + '\n' + validationErrors.join('\n'));
+      addToast(t('userPanel.validationErrors') + '\n' + validationErrors.join('\n'), 'error');
       return;
     }
 
@@ -502,14 +507,16 @@ useEffect(() => {
     }
   };
 
-  const handleDeleteItem = async (item) => {
-    // eslint-disable-next-line no-restricted-globals
-    if (!confirm(t('userPanel.confirmDelete', { name: item.name }))) {
-      return;
-    }
+  const handleDeleteItem = (item) => {
+    setItemToDelete(item);
+    setShowDeleteModal(true);
+  };
+
+  const executeDelete = async () => {
+    if (!itemToDelete) return;
 
     try {
-      const response = await fetch(`/api/files/${encodeURIComponent(item.id)}`, {
+      const response = await fetch(`/api/files/${encodeURIComponent(itemToDelete.id)}`, {
         method: 'DELETE',
         headers: {
           'Authorization': `Bearer ${getAuthToken()}`
@@ -520,6 +527,7 @@ useEffect(() => {
       
       if (result.success) {
         loadFiles(); // Recargar archivos
+        loadRecentFiles(); // Recargar recientes
         addToast(t('userPanel.itemDeletedSuccess'), 'success');
       } else {
         addToast(t('userPanel.errorDeleting') + ': ' + result.message, 'error');
@@ -527,6 +535,9 @@ useEffect(() => {
     } catch (error) {
       console.error('Error deleting item:', error);
       addToast(t('userPanel.errorDeleting'), 'error');
+    } finally {
+      setShowDeleteModal(false);
+      setItemToDelete(null);
     }
   };
 
@@ -1480,6 +1491,14 @@ useEffect(() => {
           initialTab={settingsInitialTab}
         />
       )}
+
+      {/* Delete Confirmation Modal */}
+      <DeleteConfirmationModal
+        isOpen={showDeleteModal}
+        onClose={() => setShowDeleteModal(false)}
+        onConfirm={executeDelete}
+        itemName={itemToDelete ? itemToDelete.name : ''}
+      />
 
       {/* File Viewer Modal */}
       {showFileViewer && viewerFile && (
