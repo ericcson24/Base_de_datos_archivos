@@ -10,7 +10,14 @@
     "backToLogin": "Powrót do logowania",
     "recoveryInstruction": "Wpisz nazwę użytkownika, aby odzyskać hasło",
     "sendRecovery": "Wyślij instrukcje",
-    "sending": "Wysyłanie..."
+    "sending": "Wysyłanie...",
+    "errors": {
+      "USER_NOT_FOUND": "Użytkownik nie istnieje",
+      "CREDENTIALS_MISSING": "Nie znaleziono poświadczeń",
+      "ACCOUNT_LOCKED": "Konto zablokowane z powodu zbyt wielu prób. Skontaktuj się z administratorem.",
+      "INVALID_CREDENTIALS": "Nieprawidłowa nazwa użytkownika lub hasło",
+      "AUTH_FAILED": "Błąd uwierzytelniania"
+    }
   },
   "common": {
     "loading": "Ładowanie...",
@@ -270,7 +277,12 @@
     "searchMap": "Szukaj na mapie",
     "selectLocation": "📍 Wybierz lokalizację",
     "searchLocationPlaceholder": "Szukaj miasta, ulicy...",
-    "confirmLocation": "Potwierdź lokalizację"
+    "confirmLocation": "Potwierdź lokalizację",
+    "disconnectedMessage": "⚠️ Nie jesteś połączony z Outlookiem. Twoje wydarzenia i e-maile nie są synchronizowane.",
+    "connectButton": "Połącz / Synchronizuj",
+    "connectionStatus": "Stan połączenia",
+    "connected": "Połączony",
+    "disconnected": "Rozłączony"
   },
   "sidebar": {
     "errorLoadingFile": "Błąd podczas ładowania pliku",

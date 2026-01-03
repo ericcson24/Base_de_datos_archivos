@@ -10,7 +10,14 @@
     "backToLogin": "Volver al login",
     "recoveryInstruction": "Introduce tu usuario para recuperar la contraseña",
     "sendRecovery": "Enviar instrucciones",
-    "sending": "Enviando..."
+    "sending": "Enviando...",
+    "errors": {
+      "USER_NOT_FOUND": "El usuario no existe",
+      "CREDENTIALS_MISSING": "Credenciales no encontradas",
+      "ACCOUNT_LOCKED": "Cuenta bloqueada por demasiados intentos. Contacta al administrador.",
+      "INVALID_CREDENTIALS": "Usuario o contraseña incorrectos",
+      "AUTH_FAILED": "Error de autenticación"
+    }
   },
   "common": {
     "loading": "Cargando...",
@@ -270,7 +277,12 @@
     "searchMap": "Buscar en mapa",
     "selectLocation": "📍 Seleccionar Ubicación",
     "searchLocationPlaceholder": "Buscar ciudad, calle...",
-    "confirmLocation": "Confirmar Ubicación"
+    "confirmLocation": "Confirmar Ubicación",
+    "disconnectedMessage": "⚠️ No estás conectado a Outlook. Tus eventos y correos no se están sincronizando.",
+    "connectButton": "Conectar / Sincronizar",
+    "connectionStatus": "Estado de Conexión",
+    "connected": "Conectado",
+    "disconnected": "Desconectado"
   },
   "sidebar": {
     "errorLoadingFile": "Error al cargar el archivo",

@@ -15,6 +15,10 @@ const AdminPanel = ({ user, onLogout, onBackToFolders, onThemeToggle, isDarkMode
   const [logs, setLogs] = useState([]);
   const [diagnostics, setDiagnostics] = useState([]);
   const [loading, setLoading] = useState(true);
+  
+  // Estado para configuración de seguridad
+  const [recoveryEmail, setRecoveryEmail] = useState('');
+  const [isSavingEmail, setIsSavingEmail] = useState(false);
 
   // Estados para los modales
   const [showAddUserModal, setShowAddUserModal] = useState(false);
@@ -43,7 +47,9 @@ const AdminPanel = ({ user, onLogout, onBackToFolders, onThemeToggle, isDarkMode
           loadServerInfo(),
           loadConnections(),
           loadUsers(),
-          loadLogs()
+          loadLogs(),
+          loadSecuritySettings(),
+          loadInbox()
         ]);
       } finally {
         setLoading(false);
@@ -61,10 +67,91 @@ const AdminPanel = ({ user, onLogout, onBackToFolders, onThemeToggle, isDarkMode
         loadServerInfo(),
         loadConnections(),
         loadUsers(),
-        loadLogs()
+        loadLogs(),
+        loadSecuritySettings(),
+        loadInbox()
       ]);
     } finally {
       setLoading(false);
+    }
+  };
+
+  // Cargar configuración de seguridad
+  const loadSecuritySettings = async () => {
+    try {
+      const response = await fetch('/admin/api/security-settings');
+      const data = await response.json();
+      if (data.success) {
+        setRecoveryEmail(data.recoveryEmail || '');
+      }
+    } catch (error) {
+      console.error('Error loading security settings:', error);
+    }
+  };
+
+  // Guardar configuración de seguridad
+  const saveSecuritySettings = async (e) => {
+    e.preventDefault();
+    setIsSavingEmail(true);
+    try {
+      const response = await fetch('/admin/api/security-settings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ recoveryEmail })
+      });
+      const data = await response.json();
+      if (data.success) {
+        showAlert('success', 'Correo de recuperación guardado correctamente');
+      } else {
+        showAlert('error', data.message || 'Error al guardar');
+      }
+    } catch (error) {
+      showAlert('error', 'Error de conexión');
+    } finally {
+      setIsSavingEmail(false);
+    }
+  };
+
+  // Estado para buzón de entrada
+  const [inboxMessages, setInboxMessages] = useState([]);
+
+  // Cargar buzón de entrada
+  const loadInbox = async () => {
+    try {
+      const response = await fetch('/admin/api/inbox');
+      const data = await response.json();
+      if (data.success) {
+        setInboxMessages(data.messages);
+      }
+    } catch (error) {
+      console.error('Error loading inbox:', error);
+    }
+  };
+
+  // Marcar mensaje como leído
+  const markAsRead = async (id) => {
+    try {
+      const response = await fetch(`/admin/api/inbox/${id}/read`, { method: 'POST' });
+      const data = await response.json();
+      if (data.success) {
+        loadInbox(); // Recargar para actualizar estado
+      }
+    } catch (error) {
+      console.error('Error marking message as read:', error);
+    }
+  };
+
+  // Eliminar mensaje
+  const deleteMessage = async (id) => {
+    if (!window.confirm('¿Eliminar esta notificación?')) return;
+    try {
+      const response = await fetch(`/admin/api/inbox/${id}`, { method: 'DELETE' });
+      const data = await response.json();
+      if (data.success) {
+        loadInbox();
+      }
+    } catch (error) {
+      console.error('Error deleting message:', error);
     }
   };
 
@@ -528,6 +615,78 @@ const AdminPanel = ({ user, onLogout, onBackToFolders, onThemeToggle, isDarkMode
                 </div>
               )}
             </div>
+          </div>
+        </div>
+
+        {/* Configuración de Seguridad */}
+        <div className="admin-card">
+          <div className="admin-card-header">
+            <h2 className="admin-card-title">🛡️ Configuración de Seguridad</h2>
+          </div>
+          <div className="admin-card-content">
+            <form onSubmit={saveSecuritySettings} className="security-form" style={{ display: 'flex', gap: '1rem', alignItems: 'flex-end' }}>
+              <div style={{ flex: 1 }}>
+                <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '500' }}>Correo de Recuperación (Admin)</label>
+                <input 
+                  type="email" 
+                  value={recoveryEmail} 
+                  onChange={(e) => setRecoveryEmail(e.target.value)}
+                  placeholder="admin@empresa.com"
+                  className="admin-input"
+                  style={{ width: '100%', padding: '0.5rem', borderRadius: '4px', border: '1px solid var(--border-color)' }}
+                />
+                <small style={{ display: 'block', marginTop: '0.25rem', color: 'var(--text-secondary)', fontSize: '0.8rem' }}>
+                  Este correo se usará para enviar alertas de bloqueo y solicitudes de restablecimiento. Se guarda encriptado.
+                </small>
+              </div>
+              <button type="submit" className="admin-btn admin-btn-primary" disabled={isSavingEmail}>
+                {isSavingEmail ? 'Guardando...' : 'Guardar Configuración'}
+              </button>
+            </form>
+          </div>
+        </div>
+
+        {/* Buzón de Admin */}
+        <div className="admin-card">
+          <div className="admin-card-header">
+            <h2 className="admin-card-title">📬 Buzón de Admin</h2>
+            <button className="admin-btn admin-btn-secondary" onClick={loadInbox}>
+              🔄 Actualizar
+            </button>
+          </div>
+          <div className="admin-card-content">
+            {inboxMessages.length === 0 ? (
+              <p style={{ padding: '1rem', textAlign: 'center', color: 'var(--text-secondary)' }}>No hay notificaciones nuevas</p>
+            ) : (
+              <div className="admin-inbox-list" style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                {inboxMessages.map((msg) => (
+                  <div key={msg.id} className={`admin-inbox-item ${msg.is_read ? 'read' : 'unread'}`} 
+                       style={{ 
+                         padding: '1rem', 
+                         border: '1px solid var(--border-color)', 
+                         borderRadius: '8px',
+                         backgroundColor: msg.is_read ? 'transparent' : 'rgba(var(--primary-rgb), 0.05)',
+                         borderLeft: msg.is_read ? '1px solid var(--border-color)' : '4px solid var(--primary-color)'
+                       }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
+                      <strong style={{ fontSize: '1.1em' }}>{msg.subject}</strong>
+                      <span style={{ fontSize: '0.85em', color: 'var(--text-secondary)' }}>{new Date(msg.created_at).toLocaleString()}</span>
+                    </div>
+                    <p style={{ margin: '0 0 0.5rem 0', whiteSpace: 'pre-wrap' }}>{msg.message}</p>
+                    <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem' }}>
+                      {!msg.is_read && (
+                        <button onClick={() => markAsRead(msg.id)} className="admin-btn admin-btn-small admin-btn-secondary">
+                          Marcar como leído
+                        </button>
+                      )}
+                      <button onClick={() => deleteMessage(msg.id)} className="admin-btn admin-btn-small admin-btn-danger">
+                        Eliminar
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         </div>
 

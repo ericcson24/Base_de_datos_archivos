@@ -1159,6 +1159,8 @@ router.get('/test', (req, res) => {
   });
 });
 
+const { sendResponse } = require('../utils/responseHandler');
+
 // Compartir archivo/carpeta
 router.post('/share', authenticate, async (req, res) => {
   try {
@@ -1166,18 +1168,30 @@ router.post('/share', authenticate, async (req, res) => {
     const owner = req.user.username;
 
     if (!itemPath || !targetUser) {
-      return res.status(400).json({ success: false, message: 'Faltan datos' });
+      return sendResponse(res, 400, { success: false }, {
+        title: 'Error',
+        message: 'Faltan datos para compartir',
+        type: 'error'
+      });
     }
 
     // Verificar que el usuario destino existe
     const userExists = await dbAsync.get("SELECT id FROM users WHERE username = ?", [targetUser]);
     if (!userExists) {
-      return res.status(404).json({ success: false, message: 'Usuario destino no encontrado' });
+      return sendResponse(res, 404, { success: false }, {
+        title: 'Usuario no encontrado',
+        message: `El usuario ${targetUser} no existe`,
+        type: 'error'
+      });
     }
 
     // Verificar que no se comparta con uno mismo
     if (targetUser === owner) {
-      return res.status(400).json({ success: false, message: 'No puedes compartir contigo mismo' });
+      return sendResponse(res, 400, { success: false }, {
+        title: 'Acción inválida',
+        message: 'No puedes compartir contigo mismo',
+        type: 'warning'
+      });
     }
 
     // Insertar en DB
@@ -1186,13 +1200,26 @@ router.post('/share', authenticate, async (req, res) => {
       [itemPath, owner, targetUser]
     );
 
-    res.json({ success: true, message: `Compartido con ${targetUser}` });
+    const itemName = path.basename(itemPath);
+    return sendResponse(res, 200, { success: true }, {
+      title: 'Documento Compartido',
+      message: `Has compartido "${itemName}" con ${targetUser}`,
+      type: 'success'
+    });
   } catch (error) {
     if (error.message && error.message.includes('UNIQUE constraint failed')) {
-       return res.json({ success: true, message: `Ya estaba compartido con ${req.body.username}` });
+       return sendResponse(res, 200, { success: true }, {
+         title: 'Ya compartido',
+         message: `Este elemento ya estaba compartido con ${req.body.username}`,
+         type: 'info'
+       });
     }
     console.error('Error sharing file:', error);
-    res.status(500).json({ success: false, message: 'Error al compartir' });
+    return sendResponse(res, 500, { success: false }, {
+      title: 'Error',
+      message: 'Error al compartir el archivo',
+      type: 'error'
+    });
   }
 });
 

@@ -14,9 +14,23 @@ export const useToast = () => {
 export const ToastProvider = ({ children }) => {
   const [toasts, setToasts] = useState([]);
 
-  const addToast = useCallback((message, type = 'info', duration = 3000) => {
+  const addToast = useCallback((messageOrObj, type = 'info', duration = 3000) => {
     const id = Date.now();
-    setToasts(prev => [...prev, { id, message, type, duration }]);
+    let toastData = {};
+
+    if (typeof messageOrObj === 'object' && messageOrObj !== null) {
+      toastData = {
+        id,
+        title: messageOrObj.title,
+        message: messageOrObj.message,
+        type: messageOrObj.type || type,
+        duration: messageOrObj.duration || duration
+      };
+    } else {
+      toastData = { id, message: messageOrObj, type, duration };
+    }
+
+    setToasts(prev => [...prev, toastData]);
   }, []);
 
   const removeToast = useCallback((id) => {

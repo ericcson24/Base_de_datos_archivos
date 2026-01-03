@@ -69,6 +69,8 @@ function convertFromSpainTime(dateStr, timeStr = null, isAllDay = false) {
   };
 }
 
+const { sendResponse } = require('../utils/responseHandler');
+
 // GET - Obtener todas las categorías de Outlook
 router.get('/categories', authenticate, async (req, res) => {
   try {
@@ -96,6 +98,8 @@ router.get('/categories', authenticate, async (req, res) => {
       hexColor: getOutlookCategoryColor(category.color)
     }));
 
+    // Notificar éxito en sincronización (opcional, puede ser ruidoso si se llama mucho)
+    // sendResponse(res, 200, formattedCategories, { title: 'Sincronización Exitosa', message: 'Categorías actualizadas', type: 'success' });
     res.json(formattedCategories);
 
   } catch (error) {
@@ -112,7 +116,12 @@ router.get('/categories', authenticate, async (req, res) => {
       } catch (dbError) {
         console.error('Error limpiando token:', dbError);
       }
-      return res.status(401).json({ error: 'REAUTH', message: 'Sesión de Microsoft inválida' });
+      
+      return sendResponse(res, 401, { error: 'REAUTH', message: 'Sesión de Microsoft inválida' }, {
+        title: 'Error Crítico',
+        message: 'Desincronización inesperada con Outlook. Por favor, vuelve a vincular tu cuenta.',
+        type: 'error'
+      });
     }
 
     if (error.statusCode === 401) {
@@ -207,7 +216,11 @@ router.post('/sync', authenticate, async (req, res) => {
     const user = await dbAsync.get("SELECT id, microsoft_access_token FROM users WHERE username = ?", [username]);
 
     if (!user || !user.microsoft_access_token) {
-      return res.status(400).json({ error: 'No vinculado con Microsoft' });
+      return sendResponse(res, 400, { error: 'No vinculado con Microsoft' }, {
+        title: 'No vinculado',
+        message: 'Debes vincular tu cuenta de Microsoft primero.',
+        type: 'warning'
+      });
     }
 
     const client = getAuthenticatedClient(user.microsoft_access_token);
@@ -263,7 +276,11 @@ router.post('/sync', authenticate, async (req, res) => {
         syncedCount++;
     }
 
-    res.json({ success: true, message: `Sincronizados ${syncedCount} eventos` });
+    return sendResponse(res, 200, { success: true, message: `Sincronizados ${syncedCount} eventos` }, {
+      title: 'Sincronización Exitosa',
+      message: `Se han sincronizado ${syncedCount} eventos con Outlook.`,
+      type: 'success'
+    });
 
   } catch (error) {
     console.error('Error syncing events:', error);
@@ -279,10 +296,18 @@ router.post('/sync', authenticate, async (req, res) => {
       } catch (dbError) {
         console.error('Error limpiando token:', dbError);
       }
-      return res.status(401).json({ error: 'REAUTH', message: 'Sesión de Microsoft inválida' });
+      return sendResponse(res, 401, { error: 'REAUTH', message: 'Sesión de Microsoft inválida' }, {
+        title: 'Error Crítico',
+        message: 'Desincronización inesperada con Outlook. Por favor, vuelve a vincular tu cuenta.',
+        type: 'error'
+      });
     }
 
-    res.status(500).json({ error: 'Error durante la sincronización' });
+    return sendResponse(res, 500, { error: 'Error durante la sincronización' }, {
+      title: 'Error de Sincronización',
+      message: 'No se pudieron sincronizar los eventos. Inténtalo más tarde.',
+      type: 'error'
+    });
   }
 });
 

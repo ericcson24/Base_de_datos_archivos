@@ -634,3 +634,46 @@
 .day-panel .fc-header-toolbar {
   display: none;
 }
+
+/* Timeline Header */
+.daily-timeline-header-sticky {
+  position: sticky;
+  left: 0;
+  z-index: 40;
+  margin-bottom: 0.5rem;
+}
+
+/* Category List */
+.category-view-all {
+  font-size: 0.8rem;
+}
+
+/* Connection Status Section */
+.connection-status-section {
+  margin-bottom: 10px;
+}
+
+.connection-status-container {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px;
+  background: rgba(0, 0, 0, 0.05);
+  border-radius: 6px;
+  font-size: 0.9rem;
+}
+
+[data-theme="dark"] .connection-status-container {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.connection-status-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.connection-status-text {
+  color: var(--cal-text);
+}
