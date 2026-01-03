@@ -32,6 +32,19 @@ const { dbAsync, initDb } = require('./database/db');
 // Initialize DB
 initDb();
 
+// Helper to verify token (supports both Base64 JSON and JWT)
+const verifyToken = (token) => {
+    if (!token) throw new Error('No token provided');
+    try {
+        // Try Base64 JSON first (current auth system)
+        const decoded = JSON.parse(Buffer.from(token, 'base64').toString());
+        return decoded;
+    } catch (e) {
+        // Fallback to JWT
+        return jwt.verify(token, JWT_SECRET);
+    }
+};
+
 // Helper to check if IP is private
 const isPrivateIP = (ip) => {
     // Handle IPv6 mapped IPv4
@@ -58,10 +71,12 @@ const isPrivateIP = (ip) => {
 app.get('/settings', async (req, res) => {
     try {
         const authHeader = req.headers.authorization;
+        console.log('RDP /settings Auth Header:', authHeader); // Debug log
+
         if (!authHeader) return res.status(401).json({ error: 'No token provided' });
         
         const token = authHeader.split(' ')[1];
-        const decoded = jwt.verify(token, JWT_SECRET);
+        const decoded = verifyToken(token);
         
         // Allow all users to read settings
         // if (decoded.role !== 'admin') {
@@ -94,7 +109,7 @@ app.post('/settings', async (req, res) => {
         if (!authHeader) return res.status(401).json({ error: 'No token provided' });
         
         const token = authHeader.split(' ')[1];
-        const decoded = jwt.verify(token, JWT_SECRET);
+        const decoded = verifyToken(token);
         
         if (decoded.role !== 'admin') {
             return res.status(403).json({ error: 'Admin access required' });
@@ -123,7 +138,7 @@ app.post('/connections/stop-all', async (req, res) => {
         if (!authHeader) return res.status(401).json({ error: 'No token provided' });
         
         const token = authHeader.split(' ')[1];
-        const decoded = jwt.verify(token, JWT_SECRET);
+        const decoded = verifyToken(token);
         
         if (decoded.role !== 'admin') {
             return res.status(403).json({ error: 'Admin access required' });
@@ -157,10 +172,14 @@ app.get('/connections', async (req, res) => {
     try {
         // Verify token
         const authHeader = req.headers.authorization;
+        console.log('RDP /connections Auth Header:', authHeader); // Debug log
+
         if (!authHeader) return res.status(401).json({ error: 'No token provided' });
         
         const token = authHeader.split(' ')[1];
-        const decoded = jwt.verify(token, JWT_SECRET);
+        console.log('RDP /connections Token:', token); // Debug log
+
+        const decoded = verifyToken(token);
         
         // Allow all authenticated users to list connections
         // if (decoded.role !== 'admin') {
@@ -181,7 +200,7 @@ app.post('/connections', async (req, res) => {
         if (!authHeader) return res.status(401).json({ error: 'No token provided' });
         
         const token = authHeader.split(' ')[1];
-        const decoded = jwt.verify(token, JWT_SECRET);
+        const decoded = verifyToken(token);
         
         if (decoded.role !== 'admin') {
             return res.status(403).json({ error: 'Admin access required' });
@@ -211,7 +230,7 @@ app.delete('/connections/:id', async (req, res) => {
         if (!authHeader) return res.status(401).json({ error: 'No token provided' });
         
         const token = authHeader.split(' ')[1];
-        const decoded = jwt.verify(token, JWT_SECRET);
+        const decoded = verifyToken(token);
         
         if (decoded.role !== 'admin') {
             return res.status(403).json({ error: 'Admin access required' });
@@ -271,7 +290,7 @@ const clientConnectionCallback = async (request, client, path) => {
     }
 
     try {
-        const decoded = jwt.verify(token, JWT_SECRET);
+        const decoded = verifyToken(token);
         console.log(`User ${decoded.username} connecting to RDP...`);
         
         if (!connectionId) {

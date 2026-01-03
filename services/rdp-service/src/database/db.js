@@ -44,12 +44,16 @@ const dbAsync = {
       // Hack for compatibility: SQLite returns lastID for INSERTs.
       // Postgres needs RETURNING id.
       if (pgSql.trim().toUpperCase().startsWith('INSERT') && !pgSql.toUpperCase().includes('RETURNING')) {
-         pgSql += ' RETURNING id';
+         const sqlWithReturning = pgSql + ' RETURNING id';
          try {
-             const res = await pool.query(pgSql, params);
+             const res = await pool.query(sqlWithReturning, params);
              return { lastID: res.rows[0]?.id, changes: res.rowCount };
          } catch (err) {
-             // If table doesn't have id or other error
+             // If table doesn't have id (code 42703), fall back to original query
+             if (err.code === '42703') {
+                 const res = await pool.query(pgSql, params);
+                 return { changes: res.rowCount };
+             }
              throw err;
          }
       }

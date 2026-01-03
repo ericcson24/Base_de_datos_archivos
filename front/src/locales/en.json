@@ -553,6 +553,27 @@
     "disconnected": "Disconnected",
     "error": "Connection Error",
     "sendCtrlAltDel": "Send Ctrl+Alt+Del",
-    "disconnect": "Disconnect"
+    "disconnect": "Disconnect",
+    "managerTitle": "Remote Connections",
+    "noConnections": "No connections configured",
+    "connectWeb": "Connect via Web",
+    "downloadRdp": "Download .rdp file",
+    "addConnection": "Add Connection",
+    "name": "Name",
+    "hostname": "Hostname/IP",
+    "port": "Port",
+    "username": "Username",
+    "password": "Password",
+    "serverSettings": "Server Settings",
+    "serverId": "Server ID",
+    "lanOnly": "LAN Only Mode",
+    "lanOnlyDesc": "Restrict to local network",
+    "maintenanceMode": "Maintenance Mode",
+    "maintenanceModeDesc": "Block new connections",
+    "stopAll": "Stop All Connections",
+    "stopAllConfirm": "Are you sure you want to stop all connections? This will enable maintenance mode.",
+    "stopAllSuccess": "All connections stopped (Maintenance Mode Enabled)",
+    "fetchError": "Failed to fetch connections",
+    "createError": "Failed to create connection"
   }
 }

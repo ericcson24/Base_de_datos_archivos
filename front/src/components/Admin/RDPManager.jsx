@@ -51,7 +51,7 @@ const RDPManager = () => {
                 const data = await response.json();
                 setConnections(data);
             } else {
-                throw new Error('Failed to fetch connections');
+                throw new Error(t('rdp.fetchError'));
             }
         } catch (error) {
             console.error(error);
@@ -87,7 +87,7 @@ const RDPManager = () => {
     };
 
     const stopAllConnections = async () => {
-        if (!window.confirm('Are you sure you want to stop all connections? This will enable maintenance mode.')) return;
+        if (!window.confirm(t('rdp.stopAllConfirm'))) return;
         try {
             const token = getAuthToken();
             const response = await fetch('/api/rdp/connections/stop-all', {
@@ -95,7 +95,7 @@ const RDPManager = () => {
                 headers: { 'Authorization': `Bearer ${token}` }
             });
             if (response.ok) {
-                addToast('All connections stopped (Maintenance Mode Enabled)', 'success');
+                addToast(t('rdp.stopAllSuccess'), 'success');
                 fetchSettings();
             }
         } catch (error) {
@@ -137,7 +137,7 @@ const RDPManager = () => {
                 });
                 fetchConnections();
             } else {
-                throw new Error('Failed to create connection');
+                throw new Error(t('rdp.createError'));
             }
         } catch (error) {
             addToast(error.message, 'error');
@@ -221,16 +221,16 @@ url:s:
 
             {/* Settings Panel */}
             <div className="rdp-settings-panel glassmorphism" style={{ marginBottom: '20px', padding: '15px' }}>
-                <h3>Server Settings</h3>
+                <h3>{t('rdp.serverSettings')}</h3>
                 <div className="settings-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '15px', marginTop: '10px' }}>
                     <div className="setting-item">
-                        <label style={{ display: 'block', marginBottom: '5px' }}>Server ID:</label>
+                        <label style={{ display: 'block', marginBottom: '5px' }}>{t('rdp.serverId')}:</label>
                         <div className="server-id-display" style={{ background: 'rgba(0,0,0,0.2)', padding: '5px 10px', borderRadius: '4px', display: 'inline-block' }}>
-                            <code style={{ fontSize: '1.2em', fontWeight: 'bold' }}>{settings.server_id || 'Loading...'}</code>
+                            <code style={{ fontSize: '1.2em', fontWeight: 'bold' }}>{settings.server_id || t('common.loading')}</code>
                         </div>
                     </div>
                     <div className="setting-item">
-                        <label style={{ display: 'block', marginBottom: '5px' }}>LAN Only Mode:</label>
+                        <label style={{ display: 'block', marginBottom: '5px' }}>{t('rdp.lanOnly')}:</label>
                         <label className="switch">
                             <input 
                                 type="checkbox" 
@@ -239,10 +239,10 @@ url:s:
                             />
                             <span className="slider round"></span>
                         </label>
-                        <small style={{ display: 'block', color: '#aaa', fontSize: '0.8em' }}>Restrict to local network</small>
+                        <small style={{ display: 'block', color: '#aaa', fontSize: '0.8em' }}>{t('rdp.lanOnlyDesc')}</small>
                     </div>
                     <div className="setting-item">
-                        <label style={{ display: 'block', marginBottom: '5px' }}>Maintenance Mode:</label>
+                        <label style={{ display: 'block', marginBottom: '5px' }}>{t('rdp.maintenanceMode')}:</label>
                         <label className="switch">
                             <input 
                                 type="checkbox" 
@@ -251,7 +251,7 @@ url:s:
                             />
                             <span className="slider round"></span>
                         </label>
-                        <small style={{ display: 'block', color: '#aaa', fontSize: '0.8em' }}>Block new connections</small>
+                        <small style={{ display: 'block', color: '#aaa', fontSize: '0.8em' }}>{t('rdp.maintenanceModeDesc')}</small>
                     </div>
                     <div className="setting-item" style={{ display: 'flex', alignItems: 'center' }}>
                         <button 
@@ -259,7 +259,7 @@ url:s:
                             onClick={stopAllConnections}
                             style={{ background: '#ff4444', color: 'white', border: 'none', padding: '8px 15px', borderRadius: '4px', cursor: 'pointer' }}
                         >
-                            🛑 Stop All Connections
+                            🛑 {t('rdp.stopAll')}
                         </button>
                     </div>
                 </div>

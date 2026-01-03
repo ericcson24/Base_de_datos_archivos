@@ -210,7 +210,7 @@ app.delete('/api/users/:id', requireAdmin, async (req, res) => {
 // Obtener logs
 app.get('/api/logs', requireAdmin, async (req, res) => {
   try {
-    const logs = await dbAsync.all("SELECT * FROM audit_logs ORDER BY created_at DESC LIMIT 100");
+    const logs = await dbAsync.all("SELECT * FROM audit_logs ORDER BY timestamp DESC LIMIT 100");
     res.json({ success: true, logs });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
