@@ -162,6 +162,12 @@ app.get('/list', authenticate, async (req, res) => {
       }
     }
 
+    // Filtering
+    const searchQuery = req.query.search;
+    if (searchQuery) {
+        files = files.filter(file => file.name.toLowerCase().includes(searchQuery.toLowerCase()));
+    }
+
     // Sorting
     const sortBy = req.query.sortBy;
     const order = req.query.order === 'desc' ? -1 : 1;

@@ -1264,21 +1264,6 @@ useEffect(() => {
                   }}
                 />
               ))}
-              
-              {/* Botón Ver todos rediseñado */}
-              <div 
-                className="recent-view-all"
-                onClick={() => {
-                  // TODO: Implementar vista completa de archivos recientes
-                  console.log(t('userPanel.viewAllRecent'));
-                }}
-                title={t('userPanel.viewAllRecent')}
-              >
-                <div className="recent-view-all-content">
-                  <div className="recent-view-all-icon"></div>
-                  <span>{t('userPanel.viewAll')}</span>
-                </div>
-              </div>
             </div>
           </div>
         )}
