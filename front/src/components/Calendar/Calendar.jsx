@@ -212,7 +212,14 @@ const Calendar = ({ user, onLogout, onBackToPanel, onBackToFolders, onThemeToggl
     }];
 
     try {
-      const response = await fetch('/api/events/categories', { credentials: 'include' });
+      const token = getAuthToken();
+      const headers = {};
+      if (token) headers['Authorization'] = `Bearer ${token}`;
+
+      const response = await fetch('/api/events/categories', { 
+        headers,
+        credentials: 'include' 
+      });
       if (response.ok) {
         const categoriesData = await response.json();
         // Ensure we have an array
@@ -279,7 +286,12 @@ const Calendar = ({ user, onLogout, onBackToPanel, onBackToFolders, onThemeToggl
         start = new Date(now.getFullYear() - 1, 0, 1);
         end = new Date(now.getFullYear() + 1, 11, 31);
       }
+      const token = getAuthToken();
+      const headers = {};
+      if (token) headers['Authorization'] = `Bearer ${token}`;
+
       const response = await fetch(`/api/events?start=${encodeURIComponent(start.toISOString())}&end=${encodeURIComponent(end.toISOString())}`, {
+        headers,
         credentials: 'include'
       });
       if (response.ok) {
@@ -391,9 +403,13 @@ const Calendar = ({ user, onLogout, onBackToPanel, onBackToFolders, onThemeToggl
 
   const updateEventDates = async (event, newStart, newEnd, revertFunc) => {
     try {
+      const token = getAuthToken();
+      const headers = { 'Content-Type': 'application/json' };
+      if (token) headers['Authorization'] = `Bearer ${token}`;
+
       const response = await fetch(`/api/events/${event.id}`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers,
         credentials: 'include',
         body: JSON.stringify({
           title: event.title,
@@ -585,9 +601,13 @@ const Calendar = ({ user, onLogout, onBackToPanel, onBackToFolders, onThemeToggl
               const url = mode === 'create' ? '/api/events' : `/api/events/${modalState.event.id}`;
               const method = mode === 'create' ? 'POST' : 'PUT';
               
+              const token = getAuthToken();
+              const headers = { 'Content-Type': 'application/json' };
+              if (token) headers['Authorization'] = `Bearer ${token}`;
+
               const response = await fetch(url, {
                 method,
-                headers: { 'Content-Type': 'application/json' },
+                headers,
                 credentials: 'include',
                 body: JSON.stringify(eventData)
               });
@@ -605,8 +625,13 @@ const Calendar = ({ user, onLogout, onBackToPanel, onBackToFolders, onThemeToggl
           }}
           onDelete={async (eventId) => {
             try {
+              const token = getAuthToken();
+              const headers = {};
+              if (token) headers['Authorization'] = `Bearer ${token}`;
+
               const response = await fetch(`/api/events/${eventId}`, {
                 method: 'DELETE',
+                headers,
                 credentials: 'include'
               });
               if (!response.ok) throw new Error('Error deleting event');

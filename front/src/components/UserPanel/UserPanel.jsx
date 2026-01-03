@@ -241,7 +241,7 @@ const loadFiles = useCallback(async () => {
     queryParams.append('sortBy', sortBy);
     queryParams.append('order', sortOrder);
 
-    const response = await fetch(`/api/files?${queryParams.toString()}`, {
+    const response = await fetch(`/api/files/list?${queryParams.toString()}`, {
       headers: {
         'Authorization': `Bearer ${getAuthToken()}`
       }

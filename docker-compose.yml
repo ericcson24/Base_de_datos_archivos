@@ -1,0 +1,169 @@
+services:
+  # --- Frontend (React) ---
+  frontend:
+    build: ./front
+    networks:
+      - app-network
+
+  # --- API Gateway ---
+  gateway:
+    build: ./gateway
+    ports:
+      - "80:80"
+    depends_on:
+      - frontend
+      - auth-service
+      - notification-service
+      - outlook-service
+      - file-service
+      - user-service
+      - admin-service
+      - email-service
+    networks:
+      - app-network
+
+  # --- Postgres Database (Production) ---
+  postgres:
+    image: postgres:15
+    environment:
+      POSTGRES_USER: ${DB_USER:-admin}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-admin123}
+      POSTGRES_DB: ${DB_NAME:-server_db}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./postgres-init:/docker-entrypoint-initdb.d
+    networks:
+      - app-network
+
+  # --- Auth Service (5001) ---
+  auth-service:
+    build: ./services/auth-service
+    environment:
+      - DB_TYPE=postgres
+      - DB_HOST=postgres
+      - DB_USER=${DB_USER:-admin}
+      - DB_PASSWORD=${DB_PASSWORD:-admin123}
+      - DB_NAME=${DB_NAME:-server_db}
+      - PORT=5001
+      - JWT_SECRET=${JWT_SECRET}
+      - MICROSOFT_CLIENT_ID=${MS_CLIENT_ID}
+      - MICROSOFT_CLIENT_SECRET=${MICROSOFT_CLIENT_SECRET}
+      - MICROSOFT_REDIRECT_URI=${MICROSOFT_REDIRECT_URI:-http://localhost/api/auth/microsoft/callback}
+      - DB_PATH=/data/server.db
+    volumes:
+      - ./database_storage:/data
+    networks:
+      - app-network
+
+  # --- Notification Service (5002) ---
+  notification-service:
+    build: ./services/notification-service
+    environment:
+      - PORT=5002
+      - JWT_SECRET=${JWT_SECRET}
+      - REDIS_HOST=redis
+    depends_on:
+      - redis
+    networks:
+      - app-network
+
+  # --- Outlook Service (5003) ---
+  outlook-service:
+    build: ./services/outlook-service
+    environment:
+      - DB_TYPE=postgres
+      - DB_HOST=postgres
+      - DB_USER=${DB_USER:-admin}
+      - DB_PASSWORD=${DB_PASSWORD:-admin123}
+      - DB_NAME=${DB_NAME:-server_db}
+      - PORT=5003
+      - JWT_SECRET=${JWT_SECRET}
+      - MS_CLIENT_ID=${MS_CLIENT_ID}
+      - DB_PATH=/data/server.db
+    volumes:
+      - ./database_storage:/data
+    networks:
+      - app-network
+
+  # --- File Service (5004) ---
+  file-service:
+    build: ./services/file-service
+    environment:
+      - DB_TYPE=postgres
+      - DB_HOST=postgres
+      - DB_USER=${DB_USER:-admin}
+      - DB_PASSWORD=${DB_PASSWORD:-admin123}
+      - DB_NAME=${DB_NAME:-server_db}
+      - PORT=5004
+      - JWT_SECRET=${JWT_SECRET}
+      - DB_PATH=/data/server.db
+      - UPLOAD_DIR=/app/uploads
+    volumes:
+      - ./database_storage:/data
+      - ../Datos:/app/uploads
+    networks:
+      - app-network
+
+  # --- User Service (5005) ---
+  user-service:
+    build: ./services/user-service
+    environment:
+      - DB_TYPE=postgres
+      - DB_HOST=postgres
+      - DB_USER=${DB_USER:-admin}
+      - DB_PASSWORD=${DB_PASSWORD:-admin123}
+      - DB_NAME=${DB_NAME:-server_db}
+      - PORT=5005
+      - JWT_SECRET=${JWT_SECRET}
+      - DB_PATH=/data/server.db
+    volumes:
+      - ./database_storage:/data
+    networks:
+      - app-network
+
+  # --- Admin Service (5006) ---
+  admin-service:
+    build: ./services/admin-service
+    environment:
+      - DB_TYPE=postgres
+      - DB_HOST=postgres
+      - DB_USER=${DB_USER:-admin}
+      - DB_PASSWORD=${DB_PASSWORD:-admin123}
+      - DB_NAME=${DB_NAME:-server_db}
+      - PORT=5006
+      - JWT_SECRET=${JWT_SECRET}
+      - DB_PATH=/data/server.db
+      - EMAIL_SERVICE_URL=http://email-service:5007
+    volumes:
+      - ./database_storage:/data
+    networks:
+      - app-network
+
+  # --- Email Service (5007) ---
+  email-service:
+    build: ./services/email-service
+    environment:
+      - PORT=5007
+      - SMTP_HOST=${SMTP_HOST}
+      - SMTP_PORT=${SMTP_PORT}
+      - SMTP_USER=${SMTP_USER}
+      - SMTP_PASS=${SMTP_PASS}
+    networks:
+      - app-network
+
+  # --- Redis (Message Broker) ---
+  redis:
+    image: redis:alpine
+    ports:
+      - "6379:6379"
+    networks:
+      - app-network
+
+volumes:
+  postgres_data:
+
+networks:
+  app-network:
+    driver: bridge

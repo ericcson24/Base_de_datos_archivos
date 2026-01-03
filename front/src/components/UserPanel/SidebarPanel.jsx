@@ -57,7 +57,7 @@ const SidebarPanel = ({ file, onClose, user }) => {
   const handleSave = async () => {
     try {
       const token = localStorage.getItem('auth_token') || user?.token || '';
-      const response = await fetch(`/api/files/${file.id}`, {
+      const response = await fetch(`/api/files/${file.id}/content`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
