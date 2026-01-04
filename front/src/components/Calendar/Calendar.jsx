@@ -4,6 +4,8 @@ import dayGridPlugin from '@fullcalendar/daygrid';
 import timeGridPlugin from '@fullcalendar/timegrid';
 import interactionPlugin from '@fullcalendar/interaction';
 import './Calendar.css';
+import './CalendarDesktop.css';
+import './CalendarMobile.css';
 import EventModal from '../Modals/EventModal';
 import SettingsModal from '../Modals/SettingsModal';
 import RDPConnectionModal from '../Modals/RDPConnectionModal';
@@ -149,8 +151,9 @@ const Calendar = ({ user, onLogout, onBackToPanel, onBackToFolders, onThemeToggl
   const [showSettingsModal, setShowSettingsModal] = useState(false);
   const [showRDPModal, setShowRDPModal] = useState(false);
   const [categories, setCategories] = useState([]);
+  // Initialize selectedCategories with a default value or empty set, but we'll populate it after loading categories
   const [selectedCategories, setSelectedCategories] = useState(new Set());
-  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(window.innerWidth > 768);
   const [events, setEvents] = useState([]);
   const [isLoadingEvents, setIsLoadingEvents] = useState(false);
   const isFetchingRef = useRef(false);
@@ -236,10 +239,18 @@ const Calendar = ({ user, onLogout, onBackToPanel, onBackToFolders, onThemeToggl
       } else {
         console.warn('Failed to load categories, using defaults');
         setCategories(defaultCategories);
+        // Ensure defaults are selected if nothing else is
+        if (selectedCategories.size === 0) {
+             setSelectedCategories(new Set(defaultCategories.map(cat => cat.name)));
+        }
       }
     } catch (error) {
       console.error('Error loading categories:', error);
       setCategories(defaultCategories);
+      // Ensure defaults are selected if nothing else is
+      if (selectedCategories.size === 0) {
+           setSelectedCategories(new Set(defaultCategories.map(cat => cat.name)));
+      }
     }
   }, [t]);
 
@@ -292,7 +303,7 @@ const Calendar = ({ user, onLogout, onBackToPanel, onBackToFolders, onThemeToggl
       const headers = {};
       if (token) headers['Authorization'] = `Bearer ${token}`;
 
-      const response = await fetch(`/api/events?start=${encodeURIComponent(start.toISOString())}&end=${encodeURIComponent(end.toISOString())}`, {
+      const response = await fetch(`/api/events/?start=${encodeURIComponent(start.toISOString())}&end=${encodeURIComponent(end.toISOString())}`, {
         headers,
         credentials: 'include'
       });
@@ -324,13 +335,17 @@ const Calendar = ({ user, onLogout, onBackToPanel, onBackToFolders, onThemeToggl
   };
 
   const filteredEvents = events.filter(event => {
-    if (categories.length === 0 || selectedCategories.size === 0) return true;
+    // If no categories are selected, show all events
+    if (selectedCategories.size === 0) return true;
     
     const eventCats = event.categories || event.extendedProps?.categories;
     
+    // If event has no categories, check if "No Category" is selected
     if (!eventCats || eventCats.length === 0) {
-      return selectedCategories.has(t('calendar.noCategory'));
+      return selectedCategories.has(t('calendar.noCategory')) || selectedCategories.has('no-category');
     }
+    
+    // Check if any of the event's categories are selected
     return eventCats.some(category => selectedCategories.has(category));
   }).map(event => {
     // Assign color based on the first category found
@@ -430,15 +445,41 @@ const Calendar = ({ user, onLogout, onBackToPanel, onBackToFolders, onThemeToggl
     }
   };
 
+  const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
+
   return (
     <div className="calendar-layout">
+      {/* Mobile Header */}
+      <div className="mobile-header">
+        <div className="logo-container">
+          <img src="/icons/nube.svg" alt="Logo" className="logo-icon" />
+          <span>{t('calendar.title')}</span>
+        </div>
+        <button className="hamburger-btn" onClick={() => setMobileSidebarOpen(!mobileSidebarOpen)}>
+          ☰
+        </button>
+      </div>
+
+      {/* Sidebar Overlay */}
+      <div 
+        className={`sidebar-overlay ${mobileSidebarOpen ? 'visible' : ''}`}
+        onClick={() => setMobileSidebarOpen(false)}
+      ></div>
+
       {/* Sidebar */}
-      <div className={`calendar-sidebar ${isSidebarOpen ? 'open' : ''}`}>
+      <div className={`calendar-sidebar ${isSidebarOpen ? 'open' : ''} ${mobileSidebarOpen ? 'open' : ''}`}>
         <div className="sidebar-header">
           <div className="logo-container">
             <img src="/icons/nube.svg" alt="Logo" className="logo-icon" />
             <span>{t('calendar.title')}</span>
           </div>
+          {/* Close button for mobile sidebar */}
+          <button 
+            className="mobile-close-btn" 
+            onClick={() => setMobileSidebarOpen(false)}
+          >
+            ✕
+          </button>
         </div>
 
         <div className="sidebar-content">

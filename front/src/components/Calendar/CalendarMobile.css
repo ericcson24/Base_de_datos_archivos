@@ -1,0 +1,111 @@
+
+/* =========================================
+   CALENDAR MOBILE RESPONSIVENESS
+   ========================================= */
+
+@media (max-width: 768px) {
+  :root {
+    --sidebar-width: 100%;
+    --header-height: 60px;
+  }
+
+  .calendar-layout {
+    flex-direction: column;
+  }
+
+  /* Sidebar Mobile Logic */
+  .calendar-sidebar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    height: 100vh;
+    width: 80%;
+    max-width: 300px;
+    transform: translateX(-100%);
+    transition: transform 0.3s ease;
+    z-index: 1000;
+    box-shadow: 2px 0 10px rgba(0,0,0,0.2);
+    margin-left: 0 !important; /* Override desktop toggle logic */
+  }
+
+  .calendar-sidebar.open {
+    transform: translateX(0);
+  }
+
+  /* Overlay */
+  .sidebar-overlay {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0,0,0,0.5);
+    z-index: 999;
+    backdrop-filter: blur(2px);
+  }
+
+  .sidebar-overlay.visible {
+    display: block;
+  }
+
+  /* Main Content */
+  .calendar-main {
+    width: 100%;
+    padding-top: 60px; /* Space for mobile header */
+  }
+
+  .main-header {
+    display: none; /* Hide desktop header */
+  }
+
+  /* Mobile Header */
+  .mobile-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.5rem 1rem;
+    height: 60px;
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    background: var(--sidebar-bg);
+    z-index: 900;
+    backdrop-filter: blur(10px);
+    border-bottom: 1px solid var(--cal-border);
+  }
+
+  .hamburger-btn {
+    background: none;
+    border: none;
+    font-size: 1.5rem;
+    color: var(--cal-text);
+    cursor: pointer;
+    padding: 0.5rem;
+  }
+
+  .mobile-close-btn {
+    display: block !important;
+    background: none;
+    border: none;
+    font-size: 1.5rem;
+    color: var(--cal-text);
+    cursor: pointer;
+    margin-left: auto;
+  }
+
+  /* Calendar View Adjustments */
+  .calendar-view {
+    padding: 0.5rem;
+  }
+
+  .fc-toolbar {
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+
+  .fc-toolbar-title {
+    font-size: 1.2rem !important;
+  }
+}

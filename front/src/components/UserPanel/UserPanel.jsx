@@ -23,6 +23,8 @@ import { useFetch } from '../../hooks/useFetch';
 import { useToast } from '../../context/ToastContext';
 import { useLanguage } from '../../context/LanguageContext';
 import './UserPanel.css';
+import './UserPanelDesktop.css';
+import './UserPanelMobile.css';
 
 const UserPanel = ({ user, onLogout, onBackToFolders, onThemeToggle, isDarkMode, onGoToCalendar }) => {
   console.log('UserPanel se está renderizando con user:', user);
@@ -837,18 +839,44 @@ useEffect(() => {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fileDragging]);
 
+  const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
+
   return (
     <div className="user-panel">
       {/* Background */}
       <div className="bg"></div>
 
+      {/* Mobile Header */}
+      <div className="mobile-header">
+        <div className="logo-container">
+          <img className="logo-img" src="/icons/nube.svg" alt="Nube" />
+          <span>{t('userPanel.personalCloud')}</span>
+        </div>
+        <button className="hamburger-btn" onClick={() => setMobileSidebarOpen(!mobileSidebarOpen)}>
+          ☰
+        </button>
+      </div>
+
+      {/* Sidebar Overlay */}
+      <div 
+        className={`sidebar-overlay ${mobileSidebarOpen ? 'visible' : ''}`}
+        onClick={() => setMobileSidebarOpen(false)}
+      ></div>
+
       {/* Sidebar */}
-      <div className="sidebar">
+      <div className={`sidebar ${mobileSidebarOpen ? 'open' : ''}`}>
         <div className="sidebar-header">
           <div className="logo-container">
             <img className="logo-img" src="/icons/nube.svg" alt="Nube" />
             <span>{t('userPanel.personalCloud')}</span>
           </div>
+          {/* Close button for mobile sidebar */}
+          <button 
+            className="mobile-close-btn" 
+            onClick={() => setMobileSidebarOpen(false)}
+          >
+            ✕
+          </button>
         </div>
 
         <div className="sidebar-content">
@@ -990,7 +1018,7 @@ useEffect(() => {
           onDragOver={handleDragOver}
           onDrop={handleDrop}
         >{/* Modern Search and Controls Bar - Moved outside file-grid */}
-        <div className="relative z-10 mb-6 w-full px-6 min-h-[5%]">
+        <div className="search-controls-wrapper relative z-10 mb-6 w-full px-6 min-h-[5%]">
           <div className="search-container flex items-center justify-between glassmorphism rounded-2xl p-4 shadow-lg border-gray-200/50 transition-all duration-300 hover:shadow-xl">
             {/* Search Section */}
             <div className="flex items-center space-x-3 flex-1 max-w-md">

@@ -1,0 +1,148 @@
+
+/* =========================================
+   MOBILE RESPONSIVENESS
+   ========================================= */
+
+@media (max-width: 768px) {
+  :root {
+    --sidebar-width: 100%; /* Sidebar takes full width on mobile when open */
+    --header-height: 60px;
+    --main-padding: 1rem;
+  }
+
+  .user-panel {
+    flex-direction: column;
+  }
+
+  /* Sidebar Mobile Logic */
+  .sidebar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    height: 100vh;
+    width: 80%; /* Slide out width */
+    max-width: 300px;
+    transform: translateX(-100%);
+    transition: transform 0.3s ease;
+    z-index: 1000;
+    box-shadow: 2px 0 10px rgba(0,0,0,0.2);
+  }
+
+  .sidebar.open {
+    transform: translateX(0);
+  }
+
+  /* Overlay for sidebar */
+  .sidebar-overlay {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0,0,0,0.5);
+    z-index: 999;
+    backdrop-filter: blur(2px);
+  }
+
+  .sidebar-overlay.visible {
+    display: block;
+  }
+
+  /* Main Panel Adjustments */
+  .main-panel {
+    width: 100%;
+    padding: 1rem;
+    padding-top: 70px; /* Space for mobile header */
+  }
+
+  /* Mobile Header (Hamburger) */
+  .mobile-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.5rem 1rem;
+    height: 60px;
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    background: var(--panel-bg);
+    z-index: 900;
+    backdrop-filter: blur(10px);
+    border-bottom: 1px solid var(--sidebar-border);
+  }
+
+  .hamburger-btn {
+    background: none;
+    border: none;
+    font-size: 1.5rem;
+    color: var(--text-color);
+    cursor: pointer;
+    padding: 0.5rem;
+  }
+
+  /* File Grid */
+  .file-grid {
+    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+    gap: 1rem;
+  }
+
+  .file-item {
+    padding: 0.5rem;
+  }
+
+  .file-preview {
+    height: 100px;
+  }
+
+  .file-icon-large {
+    font-size: 3rem;
+  }
+
+  /* Search Bar */
+  .search-container {
+    width: 100%;
+    margin-bottom: 1rem;
+  }
+  
+  .search-container.expanded {
+     width: 100%;
+  }
+
+  /* Fix for the specific div mentioned by user */
+  .search-controls-wrapper {
+    padding-left: 0 !important;
+    padding-right: 0 !important;
+    margin-bottom: 1rem !important;
+  }
+
+  /* Modals */
+  .modal-content {
+    width: 90%;
+    max-width: none;
+    margin: 1rem;
+    max-height: 90vh;
+    overflow-y: auto;
+  }
+
+  /* Hide desktop specific elements if needed */
+  .desktop-only {
+    display: none !important;
+  }
+  
+  .mobile-close-btn {
+    display: block !important;
+    background: none;
+    border: none;
+    font-size: 1.5rem;
+    color: var(--text-color);
+    cursor: pointer;
+    margin-left: auto;
+  }
+  
+  /* Adjust buttons in sidebar footer */
+  .sidebar-footer {
+    padding-bottom: 2rem; /* Extra space for bottom safe area */
+  }
+}

@@ -353,15 +353,19 @@ app.get('/microsoft/url', authenticate, (req, res) => {
   const clientId = process.env.MICROSOFT_CLIENT_ID || 'YOUR_CLIENT_ID';
   
   let redirectUri = process.env.MICROSOFT_REDIRECT_URI;
+  
   // Si no está configurado o es localhost, intentar construir desde la petición
   if (!redirectUri || redirectUri.includes('localhost')) {
       const host = req.get('host');
       if (host && !host.includes('localhost') && !host.includes('127.0.0.1')) {
-          const protocol = req.headers['x-forwarded-proto'] || 'http';
+          // Forzar HTTPS para dominios de producción
+          const protocol = 'https'; 
           redirectUri = `${protocol}://${host}/api/auth/microsoft/callback`;
       }
   }
   if (!redirectUri) redirectUri = 'http://localhost/api/auth/microsoft/callback';
+
+  console.log('[Auth] Generated Redirect URI:', redirectUri);
 
   const scope = 'user.read calendars.readwrite offline_access';
   
@@ -383,11 +387,14 @@ app.get('/microsoft/callback', async (req, res) => {
     if (!redirectUri || redirectUri.includes('localhost')) {
         const host = req.get('host');
         if (host && !host.includes('localhost') && !host.includes('127.0.0.1')) {
-            const protocol = req.headers['x-forwarded-proto'] || 'http';
+            // Forzar HTTPS para dominios de producción
+            const protocol = 'https';
             redirectUri = `${protocol}://${host}/api/auth/microsoft/callback`;
         }
     }
     if (!redirectUri) redirectUri = 'http://localhost/api/auth/microsoft/callback';
+
+    console.log('[Auth] Callback Redirect URI used:', redirectUri);
 
     const tokenResponse = await fetch('https://login.microsoftonline.com/common/oauth2/v2.0/token', {
       method: 'POST',
@@ -419,10 +426,24 @@ app.get('/microsoft/callback', async (req, res) => {
       [tokenData.access_token, tokenData.refresh_token, userData.mail || userData.userPrincipalName, userData.id, state]
     );
 
-    res.redirect('http://localhost/calendar?linked=true');
+    // Determine redirect URL
+    let baseUrl = 'http://localhost';
+    const host = req.get('host');
+    if (host && !host.includes('localhost') && !host.includes('127.0.0.1')) {
+        baseUrl = `https://${host}`;
+    }
+
+    res.redirect(`${baseUrl}/calendar?linked=true`);
   } catch (error) {
     console.error('Error linking Microsoft account:', error);
-    res.redirect('http://localhost/calendar?error=linking_failed');
+    
+    let baseUrl = 'http://localhost';
+    const host = req.get('host');
+    if (host && !host.includes('localhost') && !host.includes('127.0.0.1')) {
+        baseUrl = `https://${host}`;
+    }
+    
+    res.redirect(`${baseUrl}/calendar?error=linking_failed`);
   }
 });
 
