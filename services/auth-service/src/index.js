@@ -351,7 +351,18 @@ app.post('/unlink-microsoft', authenticate, async (req, res) => {
 
 app.get('/microsoft/url', authenticate, (req, res) => {
   const clientId = process.env.MICROSOFT_CLIENT_ID || 'YOUR_CLIENT_ID';
-  const redirectUri = process.env.MICROSOFT_REDIRECT_URI || 'http://localhost/api/auth/microsoft/callback';
+  
+  let redirectUri = process.env.MICROSOFT_REDIRECT_URI;
+  // Si no está configurado o es localhost, intentar construir desde la petición
+  if (!redirectUri || redirectUri.includes('localhost')) {
+      const host = req.get('host');
+      if (host && !host.includes('localhost') && !host.includes('127.0.0.1')) {
+          const protocol = req.headers['x-forwarded-proto'] || 'http';
+          redirectUri = `${protocol}://${host}/api/auth/microsoft/callback`;
+      }
+  }
+  if (!redirectUri) redirectUri = 'http://localhost/api/auth/microsoft/callback';
+
   const scope = 'user.read calendars.readwrite offline_access';
   
   const url = `https://login.microsoftonline.com/common/oauth2/v2.0/authorize?client_id=${clientId}&response_type=code&redirect_uri=${encodeURIComponent(redirectUri)}&response_mode=query&scope=${encodeURIComponent(scope)}&state=${req.user.username}`;
@@ -366,7 +377,17 @@ app.get('/microsoft/callback', async (req, res) => {
   try {
     const clientId = process.env.MICROSOFT_CLIENT_ID;
     const clientSecret = process.env.MICROSOFT_CLIENT_SECRET;
-    const redirectUri = process.env.MICROSOFT_REDIRECT_URI || 'http://localhost/api/auth/microsoft/callback';
+    
+    let redirectUri = process.env.MICROSOFT_REDIRECT_URI;
+    // Si no está configurado o es localhost, intentar construir desde la petición
+    if (!redirectUri || redirectUri.includes('localhost')) {
+        const host = req.get('host');
+        if (host && !host.includes('localhost') && !host.includes('127.0.0.1')) {
+            const protocol = req.headers['x-forwarded-proto'] || 'http';
+            redirectUri = `${protocol}://${host}/api/auth/microsoft/callback`;
+        }
+    }
+    if (!redirectUri) redirectUri = 'http://localhost/api/auth/microsoft/callback';
 
     const tokenResponse = await fetch('https://login.microsoftonline.com/common/oauth2/v2.0/token', {
       method: 'POST',

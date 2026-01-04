@@ -948,16 +948,18 @@ useEffect(() => {
           <button className="sidebar-btn" onClick={onBackToFolders}>
             {t('common.back')}
           </button>
-          <button className="sidebar-btn" onClick={() => {
-            if (onGoToCalendar) {
-              onGoToCalendar();
-            }
-          }}>
-            {t('userPanel.calendar')}
-          </button>
-          <button className="sidebar-btn" onClick={() => setShowRDPModal(true)}>
-            {t('userPanel.remoteDesktop')}
-          </button>
+          <div style={{ display: 'flex', gap: '10px' }}>
+            <button className="sidebar-btn" style={{ flex: 1, justifyContent: 'center', padding: '0.75rem 0.5rem' }} onClick={() => {
+              if (onGoToCalendar) {
+                onGoToCalendar();
+              }
+            }}>
+              {t('userPanel.calendar')}
+            </button>
+            <button className="sidebar-btn" style={{ flex: 1, justifyContent: 'center', padding: '0.75rem 0.5rem' }} onClick={() => setShowRDPModal(true)}>
+              {t('userPanel.remoteDesktop')}
+            </button>
+          </div>
           <button className="sidebar-btn" onClick={() => setShowSettingsModal(true)}>
             {t('userPanel.settings')}
           </button>

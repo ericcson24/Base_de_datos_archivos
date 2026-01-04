@@ -6,6 +6,7 @@ import interactionPlugin from '@fullcalendar/interaction';
 import './Calendar.css';
 import EventModal from '../Modals/EventModal';
 import SettingsModal from '../Modals/SettingsModal';
+import RDPConnectionModal from '../Modals/RDPConnectionModal';
 import DayPanel from './DayPanel';
 import { useToast } from '../../context/ToastContext';
 import { useLanguage } from '../../context/LanguageContext';
@@ -146,6 +147,7 @@ const Calendar = ({ user, onLogout, onBackToPanel, onBackToFolders, onThemeToggl
   const calendarRef = useRef(null);
   const { addToast } = useToast();
   const [showSettingsModal, setShowSettingsModal] = useState(false);
+  const [showRDPModal, setShowRDPModal] = useState(false);
   const [categories, setCategories] = useState([]);
   const [selectedCategories, setSelectedCategories] = useState(new Set());
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
@@ -486,9 +488,14 @@ const Calendar = ({ user, onLogout, onBackToPanel, onBackToFolders, onThemeToggl
           <button className="sidebar-btn" onClick={onBackToFolders}>
              {t('common.back')}
           </button>
-          <button className="sidebar-btn" onClick={onBackToPanel}>
-             {t('calendar.panel')}
-          </button>
+          <div style={{ display: 'flex', gap: '10px' }}>
+            <button className="sidebar-btn" style={{ flex: 1, justifyContent: 'center', padding: '0.75rem 0.5rem' }} onClick={onBackToPanel}>
+              {t('calendar.panel')}
+            </button>
+            <button className="sidebar-btn" style={{ flex: 1, justifyContent: 'center', padding: '0.75rem 0.5rem' }} onClick={() => setShowRDPModal(true)}>
+              {t('common.remoteDesktop')}
+            </button>
+          </div>
           <button className="sidebar-btn" onClick={() => setShowSettingsModal(true)}>
              {t('common.settings')}
           </button>
@@ -645,6 +652,13 @@ const Calendar = ({ user, onLogout, onBackToPanel, onBackToFolders, onThemeToggl
               addToast(t('calendar.errorDeletingEvent'), 'error');
             }
           }}
+        />
+      )}
+
+      {showRDPModal && (
+        <RDPConnectionModal 
+          isOpen={showRDPModal} 
+          onClose={() => setShowRDPModal(false)} 
         />
       )}
     </div>

@@ -63,6 +63,7 @@
     "logout": "Logout",
     "settings": "Settings",
     "calendar": "Calendar",
+    "remoteDesktop": "Remote Desktop",
     "remoteWork": "Remote Work",
     "aiComingSoon": "AI feature coming soon!\nQuery: {{query}}",
     "fileTooBig": "{{name}}: file too big (max 100MB)",

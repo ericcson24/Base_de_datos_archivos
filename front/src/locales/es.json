@@ -100,6 +100,7 @@
     "logout": "Cerrar Sesión",
     "settings": "Ajustes",
     "calendar": "Calendario",
+    "remoteDesktop": "Escritorio Remoto",
     "remoteWork": "Trabajar Remoto",
     "aiComingSoon": "¡Funcionalidad de IA próximamente disponible!\nConsulta: {{query}}",
     "fileTooBig": "{{name}}: archivo demasiado grande (máx. 100MB)",
