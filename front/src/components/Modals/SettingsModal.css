@@ -204,7 +204,7 @@
 }
 [data-theme="dark"] .settings-select {
   border-color: #4b5563;
-  background-color: #1e293b;
+  background-color: #1f1f1f;
   color: #ffffff;
 }
 
@@ -217,7 +217,7 @@
   border-radius: 0.5rem;
 }
 [data-theme="dark"] .settings-notification-row {
-  background-color: #334155;
+  background-color: #262626;
 }
 
 .settings-card-title {
@@ -283,7 +283,7 @@
   text-align: center;
 }
 [data-theme="dark"] .storage-card {
-  background-color: #334155;
+  background-color: #262626;
 }
 
 .storage-card-title {
@@ -345,7 +345,7 @@
   box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
 }
 [data-theme="dark"] .integration-card {
-  background-color: #1e293b;
+  background-color: #1f1f1f;
   border-color: #4b5563;
 }
 @media (min-width: 640px) {
@@ -484,113 +484,5 @@
   to { opacity: 1; }
 } 
 
-[data-theme="dark"] .integration-card {
-  background-color: #1e293b;
-  border-color: #4b5563;
-}
-@media (min-width: 640px) {
-  .integration-card {
-    flex-direction: row;
-    align-items: center;
-    justify-content: space-between;
-  }
-}
 
-.integration-info {
-  display: flex;
-  align-items: center;
-  gap: 1rem;
-  margin-bottom: 1rem;
-}
-@media (min-width: 640px) {
-  .integration-info {
-    margin-bottom: 0;
-  }
-}
-
-.integration-icon {
-  width: 3rem;
-  height: 3rem;
-  background-color: #dbeafe;
-  border-radius: 9999px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: #2563eb;
-  font-size: 1.5rem;
-}
-[data-theme="dark"] .integration-icon {
-  background-color: rgba(30, 58, 138, 0.3);
-  color: #60a5fa;
-}
-
-.integration-status {
-  display: flex;
-  align-items: center;
-  margin-top: 0.25rem;
-}
-
-.integration-status-dot {
-  position: relative;
-  display: flex;
-  height: 0.75rem;
-  width: 0.75rem;
-  margin-right: 0.5rem;
-}
-
-.integration-status-text {
-  font-size: 0.875rem;
-  font-weight: 700;
-  color: #16a34a;
-}
-[data-theme="dark"] .integration-status-text {
-  color: #4ade80;
-}
-
-.sync-info-box {
-  background-color: #eff6ff;
-  padding: 1rem;
-  border-radius: 0.5rem;
-  border: 1px solid #dbeafe;
-  margin-top: 1rem;
-  margin-bottom: 1rem;
-}
-[data-theme="dark"] .sync-info-box {
-  background-color: rgba(30, 58, 138, 0.2);
-  border-color: #1e40af;
-}
-
-.sync-info-title {
-  font-weight: 600;
-  color: #1e40af;
-  margin-bottom: 0.5rem;
-}
-[data-theme="dark"] .sync-info-title {
-  color: #93c5fd;
-}
-
-.sync-info-desc {
-  font-size: 0.875rem;
-  color: #2563eb;
-}
-[data-theme="dark"] .sync-info-desc {
-  color: #60a5fa;
-}
-
-.settings-footer {
-  margin-top: 2rem;
-  display: flex;
-  justify-content: flex-end;
-  gap: 0.75rem;
-  padding-top: 1rem;
-  border-top: 1px solid #e5e7eb;
-}
-[data-theme="dark"] .settings-footer {
-  border-top-color: #374151;
-}
-
-@keyframes fadeIn {
-  from { opacity: 0; }
-  to { opacity: 1; }
-}
 

@@ -131,8 +131,8 @@ app.post('/api/users', requireAdmin, async (req, res) => {
 
     // Crear usuario
     const result = await dbAsync.run(
-      "INSERT INTO users (username, role, email, created_at) VALUES (?, ?, ?, ?)",
-      [username, role, email, new Date().toISOString()]
+      "INSERT INTO users (username, role, created_at) VALUES (?, ?, ?)",
+      [username, role, new Date().toISOString()]
     );
     
     const userId = result.lastID;
@@ -140,7 +140,7 @@ app.post('/api/users', requireAdmin, async (req, res) => {
     // Crear credenciales
     const hashedPassword = await bcrypt.hash(password, 10);
     await dbAsync.run(
-      "INSERT INTO user_credentials (user_id, password_hash, last_updated) VALUES (?, ?, ?)",
+      "INSERT INTO user_credentials (user_id, password_hash, updated_at) VALUES (?, ?, ?)",
       [userId, hashedPassword, new Date().toISOString()]
     );
 
@@ -149,6 +149,32 @@ app.post('/api/users', requireAdmin, async (req, res) => {
     res.json({ success: true, userId });
   } catch (error) {
     console.error('Error creando usuario:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// Actualizar usuario (Rol y/o Contraseña)
+app.put('/api/users/:id', requireAdmin, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { role, password } = req.body;
+
+    if (role) {
+      await dbAsync.run("UPDATE users SET role = ? WHERE id = ?", [role, id]);
+    }
+
+    if (password) {
+      const hashedPassword = await bcrypt.hash(password, 10);
+      await dbAsync.run(
+        "UPDATE user_credentials SET password_hash = ?, updated_at = ? WHERE user_id = ?",
+        [hashedPassword, new Date().toISOString(), id]
+      );
+    }
+
+    await addLog('warning', `Usuario actualizado: ID ${id} (Rol: ${role || 'sin cambio'}, Pass: ${password ? 'cambiado' : 'sin cambio'})`, 'admin', req.user.username);
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Error actualizando usuario:', error);
     res.status(500).json({ success: false, message: error.message });
   }
 });
@@ -181,7 +207,7 @@ app.put('/api/users/:id/password', requireAdmin, async (req, res) => {
 
     const hashedPassword = await bcrypt.hash(password, 10);
     await dbAsync.run(
-      "UPDATE user_credentials SET password_hash = ?, last_updated = ? WHERE user_id = ?",
+      "UPDATE user_credentials SET password_hash = ?, updated_at = ? WHERE user_id = ?",
       [hashedPassword, new Date().toISOString(), id]
     );
 
@@ -261,7 +287,7 @@ app.get('/api/users', requireAdmin, async (req, res) => {
     
     const users = await dbAsync.all(`
       SELECT 
-        u.id, u.username, u.role, u.created_at,
+        u.id, u.username, u.role, u.created_at, u.deletion_scheduled_at,
         uc.is_locked, uc.last_login, uc.failed_attempts, uc.lockout_until
       FROM users u
       LEFT JOIN user_credentials uc ON u.id = uc.user_id
@@ -384,6 +410,61 @@ app.get('/api/inbox', requireAdmin, async (req, res) => {
     res.status(500).json({ success: false, message: error.message });
   }
 });
+
+// Programar eliminación de usuario
+app.post('/api/users/:id/schedule-deletion', requireAdmin, async (req, res) => {
+  try {
+    const { id } = req.params;
+    // 5 minutes from now
+    const scheduledTime = new Date(Date.now() + 5 * 60 * 1000).toISOString();
+    
+    await dbAsync.run("UPDATE users SET deletion_scheduled_at = ? WHERE id = ?", [scheduledTime, id]);
+    
+    await addLog('warning', `Eliminación programada para usuario ID ${id}`, 'admin', req.user.username);
+    res.json({ success: true, scheduledTime });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// Cancelar eliminación
+app.post('/api/users/:id/cancel-deletion', requireAdmin, async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    await dbAsync.run("UPDATE users SET deletion_scheduled_at = NULL WHERE id = ?", [id]);
+    
+    await addLog('info', `Eliminación cancelada para usuario ID ${id}`, 'admin', req.user.username);
+    res.json({ success: true });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// Background task: Check for expired deletions every minute
+setInterval(async () => {
+  try {
+    const now = new Date().toISOString();
+    const usersToDelete = await dbAsync.all("SELECT id, username FROM users WHERE deletion_scheduled_at IS NOT NULL AND deletion_scheduled_at <= ?", [now]);
+    
+    for (const user of usersToDelete) {
+      console.log(`Executing scheduled deletion for user ${user.username} (${user.id})`);
+      
+      // 1. Delete from group_members
+      await dbAsync.run("DELETE FROM group_members WHERE user_id = ?", [user.id]);
+      
+      // 2. Delete from user_credentials
+      await dbAsync.run("DELETE FROM user_credentials WHERE user_id = ?", [user.id]);
+      
+      // 3. Delete from users
+      await dbAsync.run("DELETE FROM users WHERE id = ?", [user.id]);
+      
+      await addLog('critical', `Usuario eliminado automáticamente (programado): ID ${user.id} (y sus membresías de grupo)`, 'system', 'system');
+    }
+  } catch (error) {
+    console.error('Error in deletion background task:', error);
+  }
+}, 60 * 1000); // Check every minute
 
 app.listen(PORT, () => {
   console.log(`Admin Service running on port ${PORT}`);

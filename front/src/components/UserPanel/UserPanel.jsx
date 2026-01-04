@@ -13,6 +13,7 @@ import RDPViewer from '../RDP/RDPViewer';
 import RDPConnectionModal from '../Modals/RDPConnectionModal';
 import SidebarPanel from './SidebarPanel';
 import FileItem from './FileItem';
+import NotificationCenter from '../Common/NotificationCenter';
 import { 
   getAuthToken, 
   downloadFile, 
@@ -1006,6 +1007,9 @@ useEffect(() => {
              currentView.startsWith('shared') ? t('userPanel.sharedFolder') :
              t('userPanel.files')}
           </h1>
+          <div style={{ marginLeft: 'auto', marginRight: '20px' }}>
+            <NotificationCenter />
+          </div>
         </div>
 
         {/* Contenedor flexible para file-grid y paneles */}

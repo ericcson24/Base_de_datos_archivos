@@ -175,15 +175,18 @@ app.get('/', authenticate, async (req, res) => {
     }
 
     // 3. Devolver eventos de la DB
-    let targetUserId = user.id;
+    let targetUserIds = [user.id];
     if ((user.role === 'admin' || user.role === 'boss') && req.query.userId) {
-        targetUserId = req.query.userId;
+        // Support comma-separated list of IDs
+        targetUserIds = req.query.userId.split(',').map(id => id.trim());
     }
     
-    console.log(`[DEBUG] Fetching events for user_id: ${targetUserId}`);
+    console.log(`[DEBUG] Fetching events for user_ids: ${targetUserIds.join(',')}`);
 
-    let query = 'SELECT * FROM calendar_events WHERE user_id = ?';
-    let params = [targetUserId];
+    // Construct query for multiple users
+    const placeholders = targetUserIds.map(() => '?').join(',');
+    let query = `SELECT * FROM calendar_events WHERE user_id IN (${placeholders})`;
+    let params = [...targetUserIds];
 
     const dbEvents = await dbAsync.all(query, params);
     console.log(`[DEBUG] Found ${dbEvents.length} events in DB`);
@@ -223,28 +226,62 @@ app.get('/', authenticate, async (req, res) => {
 
 app.get('/categories', authenticate, async (req, res) => {
   try {
-    const username = req.user.username;
-    const user = await dbAsync.get('SELECT microsoft_access_token FROM users WHERE username = ?', [username]);
+    let targetUsernames = [req.user.username];
 
-    if (!user || !user.microsoft_access_token) {
-      return res.json([]);
+    // Allow admin/boss to fetch categories for another user(s)
+    if ((req.user.role === 'admin' || req.user.role === 'boss') && req.query.userId) {
+      const ids = req.query.userId.split(',').map(id => id.trim()).filter(id => id);
+      if (ids.length > 0) {
+        // Create placeholders for SQL IN clause
+        const placeholders = ids.map(() => '?').join(',');
+        const users = await dbAsync.all(`SELECT username FROM users WHERE id IN (${placeholders})`, ids);
+        if (users && users.length > 0) {
+          targetUsernames = users.map(u => u.username);
+        }
+      }
     }
 
-    const client = getAuthenticatedClient(user.microsoft_access_token);
-    const categoriesResponse = await client.api('/me/outlook/masterCategories').get();
+    // Use a Map to merge categories by name, avoiding duplicates
+    const mergedCategories = new Map();
 
-    const formattedCategories = categoriesResponse.value.map(category => ({
-      id: category.id,
-      name: category.displayName,
-      color: category.color,
-      hexColor: getOutlookCategoryColor(category.color)
-    }));
+    for (const username of targetUsernames) {
+      try {
+        const user = await dbAsync.get('SELECT microsoft_access_token FROM users WHERE username = ?', [username]);
+        
+        if (!user || !user.microsoft_access_token) continue;
 
-    res.json(formattedCategories);
+        const client = getAuthenticatedClient(user.microsoft_access_token);
+        const categoriesResponse = await client.api('/me/outlook/masterCategories').get();
+
+        if (categoriesResponse.value) {
+          categoriesResponse.value.forEach(category => {
+            // If category doesn't exist in map, add it. 
+            // If it exists, we keep the first one found (arbitrary priority)
+            if (!mergedCategories.has(category.displayName)) {
+              mergedCategories.set(category.displayName, {
+                id: category.id,
+                name: category.displayName,
+                color: category.color,
+                hexColor: getOutlookCategoryColor(category.color)
+              });
+            }
+          });
+        }
+      } catch (err) {
+        console.error(`Error fetching categories for user ${username}:`, err.message);
+        // Continue to next user even if one fails
+      }
+    }
+
+    res.json(Array.from(mergedCategories.values()));
   } catch (error) {
     console.error('Error getting categories:', error);
+    // ... existing error handling ...
     if (error.code === 'InvalidAuthenticationToken') {
-       await dbAsync.run('UPDATE users SET microsoft_access_token = NULL WHERE username = ?', [req.user.username]);
+       // Only invalidate if it's the current user's token that failed
+       if (req.user.username === (await dbAsync.get('SELECT username FROM users WHERE microsoft_access_token IS NOT NULL AND username = ?', [req.user.username]))?.username) {
+          await dbAsync.run('UPDATE users SET microsoft_access_token = NULL WHERE username = ?', [req.user.username]);
+       }
        return sendResponse(res, 401, { error: 'REAUTH' });
     }
     res.status(500).json({ error: 'Error interno' });
@@ -501,6 +538,176 @@ app.get('/:id', authenticate, async (req, res) => {
     });
   } catch (error) {
     res.status(500).json({ error: 'Error obteniendo evento' });
+  }
+});
+
+// --- GROUP EVENTS ENDPOINT ---
+app.post('/group', authenticate, async (req, res) => {
+  try {
+    const { groupId, title, start, end, allDay, location, description, categories } = req.body;
+    
+    // 1. Get group members
+    const members = await dbAsync.all(`
+      SELECT u.id, u.username, u.microsoft_access_token 
+      FROM users u
+      JOIN group_members gm ON u.id = gm.user_id
+      WHERE gm.group_id = ?
+    `, [groupId]);
+
+    if (!members || members.length === 0) {
+      return res.status(400).json({ success: false, message: 'Group has no members' });
+    }
+
+    const results = { success: 0, failed: 0, details: [] };
+
+    // 2. Iterate and create events
+    for (const member of members) {
+      try {
+        if (!member.microsoft_access_token) {
+          results.failed++;
+          results.details.push({ user: member.username, error: 'Not linked to Outlook' });
+          continue;
+        }
+
+        const client = getAuthenticatedClient(member.microsoft_access_token);
+        
+        const newEvent = {
+          subject: `[Grupo] ${title}`, // Prefix to indicate group task
+          location: location ? { displayName: location } : null,
+          body: { contentType: 'text', content: description || '' },
+          categories: Array.isArray(categories) ? categories : (categories ? [categories] : [])
+        };
+
+        if (allDay) {
+          newEvent.isAllDay = true;
+          newEvent.start = { date: start.split('T')[0], timeZone: 'Europe/Madrid' };
+          newEvent.end = { date: end.split('T')[0], timeZone: 'Europe/Madrid' };
+        } else {
+          newEvent.isAllDay = false;
+          newEvent.start = { dateTime: start, timeZone: 'Europe/Madrid' };
+          newEvent.end = { dateTime: end, timeZone: 'Europe/Madrid' };
+        }
+
+        const createdEvent = await client.api('/me/events').post(newEvent);
+
+        // Save to DB
+        await dbAsync.run(`
+            INSERT INTO calendar_events (microsoft_id, user_id, subject, body_preview, start_time, end_time, is_all_day, location, web_link, categories, last_synced)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+        `, [
+            createdEvent.id, member.id, createdEvent.subject, createdEvent.bodyPreview,
+            createdEvent.start.dateTime, createdEvent.end.dateTime, createdEvent.isAllDay ? 1 : 0,
+            createdEvent.location?.displayName, createdEvent.webLink,
+            JSON.stringify(createdEvent.categories || [])
+        ]);
+
+        // Create Notification (Inbox)
+        try {
+          // We can insert directly into notifications table since we share the DB connection string/instance
+          // This is faster than calling user-service via HTTP
+          await dbAsync.run(`
+            INSERT INTO notifications (user_id, title, message, type, link) 
+            VALUES (?, ?, ?, ?, ?)
+          `, [
+            member.id,
+            'Nueva Tarea de Grupo',
+            `Se te ha asignado la tarea: ${title}`,
+            'task',
+            '/calendar'
+          ]);
+        } catch (notifError) {
+          console.error('Error creating notification:', notifError);
+        }
+
+        results.success++;
+      } catch (err) {
+        console.error(`Error creating event for ${member.username}:`, err);
+        results.failed++;
+        results.details.push({ user: member.username, error: err.message });
+      }
+    }
+
+    res.json({ success: true, results });
+
+  } catch (error) {
+    console.error('Error processing group event:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// --- ASSIGN TO USER ENDPOINT ---
+app.post('/assign-user', authenticate, async (req, res) => {
+  try {
+    const { targetUserId, title, start, end, allDay, location, description, categories } = req.body;
+    
+    // 1. Get target user
+    const targetUser = await dbAsync.get(`
+      SELECT id, username, microsoft_access_token 
+      FROM users 
+      WHERE id = ?
+    `, [targetUserId]);
+
+    if (!targetUser) {
+      return res.status(404).json({ success: false, message: 'User not found' });
+    }
+
+    if (!targetUser.microsoft_access_token) {
+      return res.status(400).json({ success: false, message: 'User not linked to Outlook' });
+    }
+
+    const client = getAuthenticatedClient(targetUser.microsoft_access_token);
+    
+    const newEvent = {
+      subject: `[Asignado] ${title}`, // Prefix to indicate assigned task
+      location: location ? { displayName: location } : null,
+      body: { contentType: 'text', content: description || '' },
+      categories: Array.isArray(categories) ? categories : (categories ? [categories] : [])
+    };
+
+    if (allDay) {
+      newEvent.isAllDay = true;
+      newEvent.start = { date: start.split('T')[0], timeZone: 'Europe/Madrid' };
+      newEvent.end = { date: end.split('T')[0], timeZone: 'Europe/Madrid' };
+    } else {
+      newEvent.isAllDay = false;
+      newEvent.start = { dateTime: start, timeZone: 'Europe/Madrid' };
+      newEvent.end = { dateTime: end, timeZone: 'Europe/Madrid' };
+    }
+
+    const createdEvent = await client.api('/me/events').post(newEvent);
+
+    // Save to DB
+    await dbAsync.run(`
+        INSERT INTO calendar_events (microsoft_id, user_id, subject, body_preview, start_time, end_time, is_all_day, location, web_link, categories, last_synced)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+    `, [
+        createdEvent.id, targetUser.id, createdEvent.subject, createdEvent.bodyPreview,
+        createdEvent.start.dateTime, createdEvent.end.dateTime, createdEvent.isAllDay ? 1 : 0,
+        createdEvent.location?.displayName, createdEvent.webLink,
+        JSON.stringify(createdEvent.categories || [])
+    ]);
+
+    // Create Notification (Inbox)
+    try {
+      await dbAsync.run(`
+        INSERT INTO notifications (user_id, title, message, type, link) 
+        VALUES (?, ?, ?, ?, ?)
+      `, [
+        targetUser.id,
+        'Nueva Tarea Asignada',
+        `Se te ha asignado la tarea: ${title}`,
+        'task',
+        '/calendar'
+      ]);
+    } catch (notifError) {
+      console.error('Error creating notification:', notifError);
+    }
+
+    res.json({ success: true, message: 'Event assigned successfully' });
+
+  } catch (error) {
+    console.error('Error assigning event to user:', error);
+    res.status(500).json({ error: 'Internal server error' });
   }
 });
 

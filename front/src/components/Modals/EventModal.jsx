@@ -12,11 +12,23 @@ const EventModal = ({
   onDelete,
   categories = [],
   isLoading = false,
-  selectedDates = null // Para modo create
+  selectedDates = null, // Para modo create
+  user, // Add user prop
+  initialAssignMode = 'me',
+  initialTargetUserId = '',
+  initialGroupId = ''
 }) => {
   const { t, language } = useLanguage();
   const [currentMode, setCurrentMode] = useState(mode);
   const [showLocationPicker, setShowLocationPicker] = useState(false);
+  
+  // Group Assignment State
+  const [groups, setGroups] = useState([]);
+  const [users, setUsers] = useState([]);
+  const [assignMode, setAssignMode] = useState(initialAssignMode); // 'me', 'group', 'user'
+  const [selectedGroupId, setSelectedGroupId] = useState(initialGroupId);
+  const [selectedUserId, setSelectedUserId] = useState(initialTargetUserId);
+
   const [formData, setFormData] = useState({
     title: '',
     start: '',
@@ -30,6 +42,46 @@ const EventModal = ({
 
   const [errors, setErrors] = useState({});
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+
+  // Update state when props change
+  useEffect(() => {
+    setAssignMode(initialAssignMode);
+  }, [initialAssignMode]);
+
+  useEffect(() => {
+    setSelectedUserId(initialTargetUserId);
+  }, [initialTargetUserId]);
+
+  useEffect(() => {
+    setSelectedGroupId(initialGroupId);
+  }, [initialGroupId]);
+
+  // Load groups and users for admin/boss
+  useEffect(() => {
+    if (user && (user.role === 'admin' || user.role === 'boss')) {
+      const token = localStorage.getItem('auth_token');
+      
+      // Fetch Groups
+      fetch('/api/users/groups', {
+        headers: { 'Authorization': `Bearer ${token}` }
+      })
+      .then(res => res.json())
+      .then(data => {
+        if (data.success) setGroups(data.groups);
+      })
+      .catch(err => console.error('Error loading groups:', err));
+
+      // Fetch Users
+      fetch('/api/users/users', {
+        headers: { 'Authorization': `Bearer ${token}` }
+      })
+      .then(res => res.json())
+      .then(data => {
+        if (data.success) setUsers(data.users);
+      })
+      .catch(err => console.error('Error loading users:', err));
+    }
+  }, [user]);
 
   // Helper to format date for datetime-local input (YYYY-MM-DDTHH:mm)
   const formatDateForInput = (date) => {
@@ -104,10 +156,14 @@ const EventModal = ({
         });
       }
       setCurrentMode(mode);
+      // Reset assignment state for create mode
+      setAssignMode(initialAssignMode);
+      setSelectedUserId(initialTargetUserId);
+      setSelectedGroupId('');
     }
     setErrors({});
     setShowDeleteConfirm(false);
-  }, [isOpen, event, mode, selectedDates]);
+  }, [isOpen, event, mode, selectedDates, initialAssignMode, initialTargetUserId]);
 
   const handleInputChange = (field, value) => {
     // Lógica especial para el cambio de "Todo el día"
@@ -207,7 +263,10 @@ const EventModal = ({
         ...formData,
         // Convert to proper format for API
         start: formData.allDay ? formData.start : formData.start + ':00',
-        end: formData.allDay ? formData.end : formData.end + ':00'
+        end: formData.allDay ? formData.end : formData.end + ':00',
+        assignMode,
+        groupId: selectedGroupId,
+        targetUserId: selectedUserId
       };
 
       await onSave(eventData, currentMode);
@@ -428,6 +487,84 @@ const EventModal = ({
                     </button>
                   </div>
                 </div>
+
+                {/* Assignment Section */}
+                {currentMode === 'create' && (user?.role === 'admin' || user?.role === 'boss') && (
+                  <div className="form-group" style={{ marginTop: '15px', borderTop: '1px solid var(--border-color)', paddingTop: '15px' }}>
+                    <label className="form-label" style={{ fontWeight: '600', color: 'var(--primary-color)' }}>
+                      {t('calendar.assignTo') || 'Asignar a:'}
+                    </label>
+                    
+                    <div style={{ display: 'flex', gap: '15px', marginBottom: '10px' }}>
+                      <label className="radio-label" style={{ display: 'flex', alignItems: 'center', gap: '5px', cursor: 'pointer' }}>
+                        <input
+                          type="radio"
+                          name="assignMode"
+                          value="me"
+                          checked={assignMode === 'me'}
+                          onChange={(e) => setAssignMode(e.target.value)}
+                        />
+                        {t('calendar.assignMe') || 'Mí mismo'}
+                      </label>
+                      <label className="radio-label" style={{ display: 'flex', alignItems: 'center', gap: '5px', cursor: 'pointer' }}>
+                        <input
+                          type="radio"
+                          name="assignMode"
+                          value="group"
+                          checked={assignMode === 'group'}
+                          onChange={(e) => setAssignMode(e.target.value)}
+                        />
+                        {t('calendar.assignGroup') || 'Grupo'}
+                      </label>
+                      <label className="radio-label" style={{ display: 'flex', alignItems: 'center', gap: '5px', cursor: 'pointer' }}>
+                        <input
+                          type="radio"
+                          name="assignMode"
+                          value="user"
+                          checked={assignMode === 'user'}
+                          onChange={(e) => setAssignMode(e.target.value)}
+                        />
+                        {t('calendar.assignUser') || 'Usuario'}
+                      </label>
+                    </div>
+                    
+                    {assignMode === 'group' && (
+                      <div style={{ marginTop: '10px', animation: 'fadeIn 0.3s' }}>
+                        <select
+                          className="form-input"
+                          value={selectedGroupId}
+                          onChange={(e) => setSelectedGroupId(e.target.value)}
+                        >
+                          <option value="">{t('calendar.selectGroupPlaceholder') || 'Seleccionar Grupo...'}</option>
+                          {groups.map(g => (
+                            <option key={g.id} value={g.id}>{g.name} ({g.memberCount || 0} miembros)</option>
+                          ))}
+                        </select>
+                        <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginTop: '5px' }}>
+                          {t('calendar.groupEventNote') || 'Se creará un evento en el calendario de cada miembro del grupo.'}
+                        </p>
+                      </div>
+                    )}
+
+                    {assignMode === 'user' && (
+                      <div style={{ marginTop: '10px', animation: 'fadeIn 0.3s' }}>
+                        <select
+                          className="form-input"
+                          value={selectedUserId}
+                          onChange={(e) => setSelectedUserId(e.target.value)}
+                        >
+                          <option value="">{t('calendar.selectUserPlaceholder') || 'Seleccionar Usuario...'}</option>
+                          {users.map(u => (
+                            <option key={u.id} value={u.id}>{u.username} ({u.role})</option>
+                          ))}
+                        </select>
+                        <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginTop: '5px' }}>
+                          {t('calendar.userEventNote') || 'Se creará un evento en el calendario de este usuario.'}
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                )}
 
                 <div className="form-group">
                   <label className="form-label">{t('calendar.description')}</label>

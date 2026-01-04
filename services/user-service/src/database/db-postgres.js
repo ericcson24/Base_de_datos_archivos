@@ -104,8 +104,18 @@ const initDatabase = async () => {
             microsoft_id TEXT,
             microsoft_email TEXT,
             microsoft_access_token TEXT,
-            microsoft_refresh_token TEXT
+            microsoft_refresh_token TEXT,
+            deletion_scheduled_at TIMESTAMP
         )`);
+
+        // Add deletion_scheduled_at column if it doesn't exist
+        try {
+            await client.query('ALTER TABLE users ADD COLUMN deletion_scheduled_at TIMESTAMP');
+            console.log('Added deletion_scheduled_at column to users table');
+        } catch (e) {
+            // Ignore error if column already exists
+            // console.log('Column deletion_scheduled_at likely already exists');
+        }
 
         // User Credentials
         await client.query(`CREATE TABLE IF NOT EXISTS user_credentials (
@@ -186,6 +196,19 @@ const initDatabase = async () => {
             FOREIGN KEY(user_id) REFERENCES users(id)
         )`);
 
+        // Notifications (Inbox)
+        await client.query(`CREATE TABLE IF NOT EXISTS notifications (
+            id SERIAL PRIMARY KEY,
+            user_id INTEGER NOT NULL,
+            title TEXT NOT NULL,
+            message TEXT,
+            type TEXT DEFAULT 'info',
+            is_read BOOLEAN DEFAULT FALSE,
+            link TEXT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY(user_id) REFERENCES users(id)
+        )`);
+
         // Calendar Events
         await client.query(`CREATE TABLE IF NOT EXISTS calendar_events (
             id SERIAL PRIMARY KEY,
@@ -223,6 +246,19 @@ const initDatabase = async () => {
             shared_with_username TEXT NOT NULL,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             UNIQUE(path, owner_username, shared_with_username)
+        )`);
+
+        // Notifications
+        await client.query(`CREATE TABLE IF NOT EXISTS notifications (
+            id SERIAL PRIMARY KEY,
+            user_id INTEGER NOT NULL,
+            title TEXT NOT NULL,
+            message TEXT NOT NULL,
+            type TEXT DEFAULT 'info',
+            link TEXT,
+            is_read BOOLEAN DEFAULT FALSE,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
         )`);
 
         // Default Admin

@@ -9,6 +9,7 @@ import './CalendarMobile.css';
 import EventModal from '../Modals/EventModal';
 import SettingsModal from '../Modals/SettingsModal';
 import RDPConnectionModal from '../Modals/RDPConnectionModal';
+import NotificationCenter from '../Common/NotificationCenter';
 import DayPanel from './DayPanel';
 import { useToast } from '../../context/ToastContext';
 import { useLanguage } from '../../context/LanguageContext';
@@ -162,6 +163,73 @@ const Calendar = ({ user, onLogout, onBackToPanel, onBackToFolders, onThemeToggl
   const [selectedDay, setSelectedDay] = useState(null);
   const [isDayPanelOpen, setIsDayPanelOpen] = useState(false);
 
+  // Admin View State
+  const [users, setUsers] = useState([]);
+  const [groups, setGroups] = useState([]);
+  const [viewUserId, setViewUserId] = useState('');
+  const [selectedGroupId, setSelectedGroupId] = useState(''); // For "View All" group context
+  const [calendarViewMode, setCalendarViewMode] = useState('mine'); // 'mine' or 'others'
+  const [expandedGroups, setExpandedGroups] = useState({}); // { groupId: boolean }
+
+  useEffect(() => {
+    if (user.role === 'admin' || user.role === 'boss') {
+      const fetchData = async () => {
+        try {
+          const token = getAuthToken();
+          const headers = {};
+          if (token) headers['Authorization'] = `Bearer ${token}`;
+          
+          // Fetch Users
+          const usersRes = await fetch('/api/users/users', { headers });
+          if (usersRes.ok) {
+            const data = await usersRes.json();
+            if (data.success) setUsers(data.users);
+          }
+
+          // Fetch Groups
+          const groupsRes = await fetch('/api/users/groups', { headers });
+          if (groupsRes.ok) {
+            const data = await groupsRes.json();
+            if (data.success) {
+              // Fetch members for each group
+              const groupsWithMembers = await Promise.all(data.groups.map(async (group) => {
+                const membersRes = await fetch(`/api/users/groups/${group.id}/members`, { headers });
+                const membersData = await membersRes.json();
+                return { ...group, members: membersData.success ? membersData.members : [] };
+              }));
+              setGroups(groupsWithMembers);
+            }
+          }
+        } catch (e) {
+          console.error('Error fetching admin data:', e);
+        }
+      };
+      fetchData();
+    }
+  }, [user.role]);
+
+  const toggleGroup = (groupId) => {
+    setExpandedGroups(prev => ({
+      ...prev,
+      [groupId]: !prev[groupId]
+    }));
+  };
+
+  const handleUserSelect = (targetUserId) => {
+    setViewUserId(targetUserId);
+    setSelectedGroupId(''); // Clear group selection when selecting specific user
+  };
+
+  const handleGroupSelect = (group) => {
+    if (!group.members || group.members.length === 0) {
+      addToast(t('calendar.noMembersInGroup') || 'El grupo no tiene miembros', 'warning');
+      return;
+    }
+    const memberIds = group.members.map(m => m.id).join(',');
+    setViewUserId(memberIds);
+    setSelectedGroupId(group.id);
+  };
+
   const [modalState, setModalState] = useState({
     isOpen: false,
     mode: 'view',
@@ -221,7 +289,14 @@ const Calendar = ({ user, onLogout, onBackToPanel, onBackToFolders, onThemeToggl
       const headers = {};
       if (token) headers['Authorization'] = `Bearer ${token}`;
 
-      const response = await fetch('/api/events/categories', { 
+      // If viewing a specific user, try to fetch their categories
+      let url = '/api/events/categories';
+      // Fetch specific user categories if viewing a SINGLE user OR a group (comma separated)
+      if (viewUserId) {
+        url += `?userId=${viewUserId}`;
+      }
+
+      const response = await fetch(url, { 
         headers,
         credentials: 'include' 
       });
@@ -232,14 +307,12 @@ const Calendar = ({ user, onLogout, onBackToPanel, onBackToFolders, onThemeToggl
         const allCategories = [...safeCategoriesData, ...defaultCategories];
         setCategories(allCategories);
         
-        // Update selected categories if it's the first load
-        if (selectedCategories.size === 0) {
-            setSelectedCategories(new Set(allCategories.map(cat => cat.name)));
-        }
+        // Update selected categories if it's the first load OR if we switched users
+        // We want to select all by default when switching contexts
+        setSelectedCategories(new Set(allCategories.map(cat => cat.name)));
       } else {
         console.warn('Failed to load categories, using defaults');
         setCategories(defaultCategories);
-        // Ensure defaults are selected if nothing else is
         if (selectedCategories.size === 0) {
              setSelectedCategories(new Set(defaultCategories.map(cat => cat.name)));
         }
@@ -247,12 +320,11 @@ const Calendar = ({ user, onLogout, onBackToPanel, onBackToFolders, onThemeToggl
     } catch (error) {
       console.error('Error loading categories:', error);
       setCategories(defaultCategories);
-      // Ensure defaults are selected if nothing else is
       if (selectedCategories.size === 0) {
            setSelectedCategories(new Set(defaultCategories.map(cat => cat.name)));
       }
     }
-  }, [t]);
+  }, [t, viewUserId]); // Add viewUserId dependency
 
   // Effect to sync categories from events (Fallback)
   useEffect(() => {
@@ -303,7 +375,12 @@ const Calendar = ({ user, onLogout, onBackToPanel, onBackToFolders, onThemeToggl
       const headers = {};
       if (token) headers['Authorization'] = `Bearer ${token}`;
 
-      const response = await fetch(`/api/events/?start=${encodeURIComponent(start.toISOString())}&end=${encodeURIComponent(end.toISOString())}`, {
+      let url = `/api/events/?start=${encodeURIComponent(start.toISOString())}&end=${encodeURIComponent(end.toISOString())}`;
+      if (viewUserId) {
+        url += `&userId=${viewUserId}`;
+      }
+
+      const response = await fetch(url, {
         headers,
         credentials: 'include'
       });
@@ -317,7 +394,7 @@ const Calendar = ({ user, onLogout, onBackToPanel, onBackToFolders, onThemeToggl
       setIsLoadingEvents(false);
       isFetchingRef.current = false;
     }
-  }, []);
+  }, [viewUserId]);
 
   useEffect(() => {
     loadCategories();
@@ -487,6 +564,132 @@ const Calendar = ({ user, onLogout, onBackToPanel, onBackToFolders, onThemeToggl
             <span>+</span> {t('calendar.newEvent')}
           </button>
 
+          {(user.role === 'admin' || user.role === 'boss') && (
+            <div className="sidebar-section">
+              <div className="section-title">{t('calendar.viewCalendar') || 'Ver Calendario'}</div>
+              
+              <div className="calendar-view-toggle" style={{ display: 'flex', marginBottom: '10px', background: 'var(--cal-surface)', borderRadius: '6px', padding: '2px', border: '1px solid var(--cal-border)' }}>
+                <button 
+                  style={{ 
+                    flex: 1, 
+                    padding: '6px', 
+                    border: 'none', 
+                    background: calendarViewMode === 'mine' ? 'var(--primary-color)' : 'transparent', 
+                    color: calendarViewMode === 'mine' ? '#fff' : 'var(--cal-text)',
+                    borderRadius: '4px',
+                    cursor: 'pointer',
+                    fontSize: '0.85rem'
+                  }}
+                  onClick={() => {
+                    setCalendarViewMode('mine');
+                    setViewUserId('');
+                  }}
+                >
+                  {t('calendar.myCalendar') || 'Mi Calendario'}
+                </button>
+                <button 
+                  style={{ 
+                    flex: 1, 
+                    padding: '6px', 
+                    border: 'none', 
+                    background: calendarViewMode === 'others' ? 'var(--primary-color)' : 'transparent', 
+                    color: calendarViewMode === 'others' ? '#fff' : 'var(--cal-text)',
+                    borderRadius: '4px',
+                    cursor: 'pointer',
+                    fontSize: '0.85rem'
+                  }}
+                  onClick={() => setCalendarViewMode('others')}
+                >
+                  {t('calendar.teamCalendars') || 'Equipos'}
+                </button>
+              </div>
+
+              {calendarViewMode === 'others' && (
+                <div className="groups-list" style={{ maxHeight: '300px', overflowY: 'auto' }}>
+                  {groups.map(group => (
+                    <div key={group.id} className="group-accordion-item" style={{ marginBottom: '5px' }}>
+                      <div 
+                        className="group-header" 
+                        onClick={() => toggleGroup(group.id)}
+                        style={{ 
+                          padding: '8px', 
+                          background: 'var(--cal-surface)', 
+                          border: '1px solid var(--cal-border)',
+                          borderRadius: '4px',
+                          cursor: 'pointer',
+                          display: 'flex',
+                          justifyContent: 'space-between',
+                          alignItems: 'center',
+                          fontSize: '0.9rem',
+                          fontWeight: '500'
+                        }}
+                      >
+                        <span>{group.name}</span>
+                        <span>{expandedGroups[group.id] ? '▼' : '▶'}</span>
+                      </div>
+                      
+                      {expandedGroups[group.id] && (
+                        <div className="group-members" style={{ paddingLeft: '10px', marginTop: '5px', borderLeft: '2px solid var(--border-color)' }}>
+                          {/* "View All" Button */}
+                          <button 
+                            className="view-all-btn"
+                            style={{ 
+                              width: '100%', 
+                              textAlign: 'left', 
+                              padding: '6px', 
+                              background: selectedGroupId === group.id ? 'var(--primary-color-light)' : 'transparent', 
+                              border: 'none', 
+                              color: selectedGroupId === group.id ? 'var(--primary-color)' : 'var(--cal-text)',
+                              cursor: 'pointer',
+                              fontSize: '0.85rem',
+                              fontStyle: 'italic',
+                              fontWeight: selectedGroupId === group.id ? 'bold' : 'normal'
+                            }}
+                            onClick={() => handleGroupSelect(group)}
+                          >
+                            {t('calendar.viewAllSchedules') || 'Ver todos los horarios'}
+                          </button>
+
+                          {group.members && group.members.map(member => (
+                            <div 
+                              key={member.id} 
+                              className={`member-item ${viewUserId === member.id ? 'selected' : ''}`}
+                              onClick={() => handleUserSelect(member.id)}
+                              style={{
+                                padding: '6px 8px',
+                                cursor: 'pointer',
+                                borderRadius: '4px',
+                                background: viewUserId === member.id ? 'var(--primary-color-light)' : 'transparent',
+                                color: viewUserId === member.id ? 'var(--primary-color)' : 'var(--cal-text)',
+                                fontSize: '0.9rem',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '8px'
+                              }}
+                            >
+                               <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: viewUserId === member.id ? 'var(--primary-color)' : '#ccc' }}></div>
+                               {member.username}
+                            </div>
+                          ))}
+                          {(!group.members || group.members.length === 0) && (
+                            <div style={{ padding: '5px', fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
+                              {t('calendar.noMembers') || 'Sin miembros'}
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                  {groups.length === 0 && (
+                    <div style={{ padding: '10px', textAlign: 'center', color: 'var(--text-secondary)' }}>
+                      {t('calendar.noGroups') || 'No hay grupos disponibles'}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+
           <div className="sidebar-section">
             <div className="section-title">{t('calendar.categories')}</div>
             <div className="category-list">
@@ -544,6 +747,16 @@ const Calendar = ({ user, onLogout, onBackToPanel, onBackToFolders, onThemeToggl
 
       {/* Main Content */}
       <div className="calendar-main">
+        <div style={{ 
+          display: 'flex', 
+          justifyContent: 'flex-end', 
+          padding: '10px 20px', 
+          background: 'var(--bg-secondary)',
+          borderBottom: '1px solid var(--border-color)'
+        }}>
+          <NotificationCenter />
+        </div>
+
         {!microsoftStatus.linked && (
           <div className="bg-red-50 dark:bg-red-900/20 border-l-4 border-red-500 p-4 m-4 rounded shadow-sm flex justify-between items-center">
             <div className="flex items-center">
@@ -640,12 +853,37 @@ const Calendar = ({ user, onLogout, onBackToPanel, onBackToFolders, onThemeToggl
             setModalState({ ...modalState, isOpen: false });
             calendarRef.current?.getApi()?.unselect(); // Clear selection when modal closes
           }}
+          user={user}
+          initialAssignMode={selectedGroupId ? 'group' : (viewUserId ? 'user' : 'me')}
+          initialTargetUserId={viewUserId}
+          initialGroupId={selectedGroupId}
           onSave={async (eventData, mode) => {
             try {
-              // Add trailing slash to ensure nginx matches the location block correctly
-              const url = mode === 'create' ? '/api/events/' : `/api/events/${modalState.event.id}`;
-              const method = mode === 'create' ? 'POST' : 'PUT';
+              let url = mode === 'create' ? '/api/events/' : `/api/events/${modalState.event.id}`;
+              let method = mode === 'create' ? 'POST' : 'PUT';
               
+              // Handle Group Assignment
+              if (eventData.assignMode === 'group' && eventData.groupId) {
+                url = '/api/events/group';
+                method = 'POST';
+              }
+
+              // Handle User Assignment
+              if (eventData.assignMode === 'user' && eventData.targetUserId) {
+                url = '/api/events/assign-user';
+                method = 'POST';
+              }
+
+              // Append "Created by" if assigning to others (only on create)
+              if (mode === 'create' && (eventData.assignMode === 'group' || eventData.assignMode === 'user')) {
+                 const createdByText = `\n\n(Tarea creada por ${user.username})`;
+                 if (eventData.description) {
+                    eventData.description += createdByText;
+                 } else {
+                    eventData.description = createdByText.trim();
+                 }
+              }
+
               const token = getAuthToken();
               const headers = { 'Content-Type': 'application/json' };
               if (token) headers['Authorization'] = `Bearer ${token}`;
@@ -657,15 +895,30 @@ const Calendar = ({ user, onLogout, onBackToPanel, onBackToFolders, onThemeToggl
                 body: JSON.stringify(eventData)
               });
 
-              if (!response.ok) throw new Error('Error saving event');
+              if (!response.ok) {
+                const errData = await response.json().catch(() => ({}));
+                throw new Error(errData.message || 'Error saving event');
+              }
               
+              const result = await response.json();
+
               setModalState({ ...modalState, isOpen: false });
               calendarRef.current?.getApi()?.unselect(); // Clear selection
               loadEvents();
-              addToast(mode === 'create' ? t('calendar.eventCreated') : t('calendar.eventUpdated'), 'success');
+              
+              if (eventData.assignMode === 'group') {
+                 addToast(t('calendar.groupEventCreated', { 
+                   success: result.results?.success || 0, 
+                   failed: result.results?.failed || 0 
+                 }) || `Event assigned to group: ${result.results?.success} success, ${result.results?.failed} failed`, 'success');
+              } else if (eventData.assignMode === 'user') {
+                 addToast(t('calendar.userEventCreated') || 'Evento asignado al usuario correctamente', 'success');
+              } else {
+                 addToast(mode === 'create' ? t('calendar.eventCreated') : t('calendar.eventUpdated'), 'success');
+              }
             } catch (error) {
               console.error('Error saving event:', error);
-              addToast(t('calendar.errorSavingEvent'), 'error');
+              addToast(error.message || t('calendar.errorSavingEvent'), 'error');
             }
           }}
           onDelete={async (eventId) => {

@@ -1,6 +1,9 @@
 ﻿import React, { useState, useEffect } from 'react';
 import SettingsModal from '../Modals/SettingsModal';
+import DeleteConfirmationModal from '../Modals/DeleteConfirmationModal';
 import RDPManager from './RDPManager';
+import GroupManager from './GroupManager';
+import NotificationCenter from '../Common/NotificationCenter';
 import { useLanguage } from '../../context/LanguageContext';
 import './AdminPanel.css';
 
@@ -23,10 +26,18 @@ const AdminPanel = ({ user, onLogout, onBackToFolders, onThemeToggle, isDarkMode
   // UI States
   const [showAddUserModal, setShowAddUserModal] = useState(false);
   const [newUser, setNewUser] = useState({ username: '', password: '', role: 'user' });
+  const [showEditUserModal, setShowEditUserModal] = useState(false);
+  const [editingUser, setEditingUser] = useState(null);
   const [alert, setAlert] = useState({ show: false, type: '', message: '' });
+  
+  // Delete Modal State
+  const [deleteModal, setDeleteModal] = useState({ isOpen: false, user: null });
+  const [currentTime, setCurrentTime] = useState(Date.now());
 
   useEffect(() => {
     loadInitialData();
+    const timer = setInterval(() => setCurrentTime(Date.now()), 1000);
+    return () => clearInterval(timer);
   }, []);
 
   const loadInitialData = async () => {
@@ -127,16 +138,111 @@ const AdminPanel = ({ user, onLogout, onBackToFolders, onThemeToggle, isDarkMode
     }
   };
 
-  const handleDeleteUser = async (userId) => {
-    if (!window.confirm('¿Estás seguro?')) return;
+  const handleDeleteUser = (userId) => {
+    // Deprecated in favor of confirmDeleteUser
+    const user = users.find(u => u.id === userId);
+    if (user) confirmDeleteUser(user);
+  };
+
+  const confirmDeleteUser = (user) => {
+    setDeleteModal({ isOpen: true, user });
+  };
+
+  const handleScheduleDelete = async () => {
+    if (!deleteModal.user) return;
     try {
-      const res = await fetchWithAuth(`/admin/api/users/${userId}`, { method: 'DELETE' });
+      const res = await fetchWithAuth(`/admin/api/users/${deleteModal.user.id}/schedule-deletion`, { method: 'POST' });
       const data = await res.json();
       if (data.success) {
+        showAlert('success', 'Eliminación programada');
         loadUsers();
-        showAlert('success', 'Usuario eliminado');
+      } else {
+        showAlert('error', data.message);
       }
-    } catch (e) { showAlert('error', 'Error al eliminar'); }
+    } catch (e) {
+      showAlert('error', 'Error de conexión');
+    } finally {
+      setDeleteModal({ isOpen: false, user: null });
+    }
+  };
+
+  const handleCancelDelete = async (userId) => {
+    try {
+      const res = await fetchWithAuth(`/admin/api/users/${userId}/cancel-deletion`, { method: 'POST' });
+      const data = await res.json();
+      if (data.success) {
+        showAlert('success', 'Eliminación cancelada');
+        loadUsers();
+      }
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  const getRemainingTime = (scheduledTime) => {
+    if (!scheduledTime) return '';
+    const end = new Date(scheduledTime).getTime();
+    const diff = end - currentTime;
+    if (diff <= 0) return 'Procesando...';
+    const minutes = Math.floor(diff / 60000);
+    const seconds = Math.floor((diff % 60000) / 1000);
+    return `${minutes}:${seconds.toString().padStart(2, '0')}`;
+  };
+
+  const openEditModal = (user) => {
+    setEditingUser({ ...user, password: '' });
+    setShowEditUserModal(true);
+  };
+
+  const handleUpdateUser = async (e) => {
+    e.preventDefault();
+    try {
+      const payload = {
+        role: editingUser.role
+      };
+      if (editingUser.password) {
+        payload.password = editingUser.password;
+      }
+
+      const res = await fetchWithAuth(`/admin/api/users/${editingUser.id}`, {
+        method: 'PUT',
+        body: JSON.stringify(payload)
+      });
+      const data = await res.json();
+      
+      if (data.success) {
+        setShowEditUserModal(false);
+        setEditingUser(null);
+        loadUsers();
+        showAlert('success', 'Usuario actualizado correctamente');
+      } else {
+        showAlert('error', data.message || 'Error al actualizar usuario');
+      }
+    } catch (error) {
+      console.error('Error updating user:', error);
+      showAlert('error', 'Error de conexión al actualizar usuario');
+    }
+  };
+
+  const handleLockUser = async (userId, currentStatus) => {
+    try {
+      const newStatus = !currentStatus;
+      const res = await fetchWithAuth(`/admin/api/users/${userId}/lock`, {
+        method: 'POST',
+        body: JSON.stringify({ locked: newStatus })
+      });
+      const data = await res.json();
+      
+      if (data.success) {
+        loadUsers();
+        showAlert('success', `Usuario ${newStatus ? 'bloqueado' : 'desbloqueado'} correctamente`);
+      } else {
+        showAlert('error', data.message || 'Error al cambiar estado del usuario');
+      }
+    } catch (error) {
+      console.error('Error locking user:', error);
+      showAlert('error', 'Error de conexión');
+    }
   };
 
   const showAlert = (type, message) => {
@@ -168,6 +274,12 @@ const AdminPanel = ({ user, onLogout, onBackToFolders, onThemeToggle, isDarkMode
           onClick={() => setActiveTab('users')}
         >
           <span></span> Usuarios
+        </button>
+        <button 
+          className={`admin-nav-item ${activeTab === 'groups' ? 'active' : ''}`}
+          onClick={() => setActiveTab('groups')}
+        >
+          <span></span> Grupos
         </button>
         <button 
           className={`admin-nav-item ${activeTab === 'system' ? 'active' : ''}`}
@@ -217,7 +329,11 @@ const AdminPanel = ({ user, onLogout, onBackToFolders, onThemeToggle, isDarkMode
     </div>
   );
 
-  const renderUsers = () => (
+  const renderUsers = () => {
+    const activeUsers = users.filter(u => !u.deletion_scheduled_at);
+    const pendingUsers = users.filter(u => u.deletion_scheduled_at);
+
+    return (
     <div className="admin-card">
       <div className="admin-card-header">
         <h2 className="admin-card-title">Gestión de Usuarios</h2>
@@ -225,6 +341,40 @@ const AdminPanel = ({ user, onLogout, onBackToFolders, onThemeToggle, isDarkMode
           + Nuevo Usuario
         </button>
       </div>
+
+      {pendingUsers.length > 0 && (
+        <div className="pending-deletions-section">
+          <h3 className="section-subtitle" style={{ color: '#ff4d4f', marginTop: '1rem', marginBottom: '1rem' }}>
+            ⚠️ Eliminaciones Pendientes
+          </h3>
+          <table className="admin-table" style={{ border: '1px solid #ff4d4f', marginBottom: '2rem' }}>
+            <thead>
+              <tr>
+                <th>Usuario</th>
+                <th>Tiempo Restante</th>
+                <th>Acciones</th>
+              </tr>
+            </thead>
+            <tbody>
+              {pendingUsers.map(u => (
+                <tr key={u.id} style={{ backgroundColor: 'rgba(255, 77, 79, 0.1)' }}>
+                  <td style={{ color: '#ff4d4f', fontWeight: 'bold' }}>{u.username}</td>
+                  <td style={{ fontWeight: 'bold', color: '#ff4d4f' }}>
+                    {getRemainingTime(u.deletion_scheduled_at)}
+                  </td>
+                  <td>
+                    <button className="admin-btn admin-btn-secondary admin-btn-small" onClick={() => handleCancelDelete(u.id)}>
+                      Cancelar Eliminación
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      <h3 className="section-subtitle" style={{ marginBottom: '1rem' }}>Usuarios Activos</h3>
       <table className="admin-table">
         <thead>
           <tr>
@@ -235,7 +385,7 @@ const AdminPanel = ({ user, onLogout, onBackToFolders, onThemeToggle, isDarkMode
           </tr>
         </thead>
         <tbody>
-          {users.map(u => (
+          {activeUsers.map(u => (
             <tr key={u.id}>
               <td>{u.username}</td>
               <td><span className="status-badge">{u.role}</span></td>
@@ -245,7 +395,13 @@ const AdminPanel = ({ user, onLogout, onBackToFolders, onThemeToggle, isDarkMode
                 </span>
               </td>
               <td>
-                <button className="admin-btn admin-btn-secondary admin-btn-small" onClick={() => handleDeleteUser(u.id)}>
+                <button className="admin-btn admin-btn-secondary admin-btn-small" onClick={() => openEditModal(u)} style={{ marginRight: '5px' }}>
+                  Editar
+                </button>
+                <button className="admin-btn admin-btn-secondary admin-btn-small" onClick={() => handleLockUser(u.id, u.is_locked)} style={{ marginRight: '5px' }}>
+                  {u.is_locked ? 'Desbloquear' : 'Bloquear'}
+                </button>
+                <button className="admin-btn admin-btn-secondary admin-btn-small" onClick={() => confirmDeleteUser(u)}>
                   Eliminar
                 </button>
               </td>
@@ -255,6 +411,7 @@ const AdminPanel = ({ user, onLogout, onBackToFolders, onThemeToggle, isDarkMode
       </table>
     </div>
   );
+  };
 
   const renderSystem = () => (
     <div className="admin-grid">
@@ -307,11 +464,15 @@ const AdminPanel = ({ user, onLogout, onBackToFolders, onThemeToggle, isDarkMode
             {activeTab === 'dashboard' && 'Panel de Control'}
             {activeTab === 'rdp' && 'Gestor RDP'}
             {activeTab === 'users' && 'Usuarios'}
+            {activeTab === 'groups' && 'Gestión de Grupos'}
             {activeTab === 'system' && 'Sistema'}
             {activeTab === 'logs' && 'Registros'}
           </h1>
-          <div className="admin-user-profile">
-            <span>Hola, {user.username}</span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
+            <NotificationCenter />
+            <div className="admin-user-profile">
+              <span>Hola, {user.username}</span>
+            </div>
           </div>
         </header>
 
@@ -324,6 +485,7 @@ const AdminPanel = ({ user, onLogout, onBackToFolders, onThemeToggle, isDarkMode
         {activeTab === 'dashboard' && renderDashboard()}
         {activeTab === 'rdp' && <RDPManager />}
         {activeTab === 'users' && renderUsers()}
+        {activeTab === 'groups' && <GroupManager />}
         {activeTab === 'system' && renderSystem()}
         {activeTab === 'logs' && renderLogs()}
       </main>
@@ -334,6 +496,15 @@ const AdminPanel = ({ user, onLogout, onBackToFolders, onThemeToggle, isDarkMode
           user={user}
           onThemeToggle={onThemeToggle}
           isDarkMode={isDarkMode}
+        />
+      )}
+
+      {deleteModal.isOpen && (
+        <DeleteConfirmationModal
+          isOpen={deleteModal.isOpen}
+          userName={deleteModal.user?.username}
+          onClose={() => setDeleteModal({ isOpen: false, user: null })}
+          onConfirm={handleScheduleDelete}
         />
       )}
 
@@ -373,10 +544,51 @@ const AdminPanel = ({ user, onLogout, onBackToFolders, onThemeToggle, isDarkMode
                     onChange={e => setNewUser({...newUser, role: e.target.value})}
                   >
                     <option value="user">Usuario</option>
+                    <option value="boss">Jefe</option>
                     <option value="admin">Administrador</option>
+                    <option value="guest">Invitado (Sin Grupos)</option>
                   </select>
                 </div>
                 <button type="submit" className="admin-btn admin-btn-primary">Crear Usuario</button>
+              </form>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showEditUserModal && editingUser && (
+        <div className="admin-modal" onClick={() => setShowEditUserModal(false)}>
+          <div className="admin-modal-content" onClick={e => e.stopPropagation()}>
+            <div className="admin-modal-header">
+              <h3>Editar Usuario: {editingUser.username}</h3>
+              <button className="admin-modal-close" onClick={() => setShowEditUserModal(false)}>&times;</button>
+            </div>
+            <div className="admin-modal-body">
+              <form onSubmit={handleUpdateUser}>
+                <div className="admin-form-group">
+                  <label className="admin-form-label">Nueva Contraseña (Opcional)</label>
+                  <input 
+                    className="admin-input"
+                    type="password"
+                    value={editingUser.password}
+                    onChange={e => setEditingUser({...editingUser, password: e.target.value})}
+                    placeholder="Dejar en blanco para mantener"
+                  />
+                </div>
+                <div className="admin-form-group">
+                  <label className="admin-form-label">Rol</label>
+                  <select 
+                    className="admin-input"
+                    value={editingUser.role}
+                    onChange={e => setEditingUser({...editingUser, role: e.target.value})}
+                  >
+                    <option value="user">Usuario</option>
+                    <option value="boss">Jefe</option>
+                    <option value="admin">Administrador</option>
+                    <option value="guest">Invitado (Sin Grupos)</option>
+                  </select>
+                </div>
+                <button type="submit" className="admin-btn admin-btn-primary">Guardar Cambios</button>
               </form>
             </div>
           </div>

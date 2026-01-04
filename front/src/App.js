@@ -351,8 +351,57 @@ function App() {
   // Si está logueado y es administrador en vista admin
   if (currentView === 'admin' && user && user.role === 'admin') {
     return (
-      <div className="App">
-        <AdminPanel
+      <NotificationProvider 
+        user={user}
+        onNavigate={(path) => {
+          if (path === '/calendar') {
+            setCurrentView('calendar');
+            window.history.pushState(null, '', '/calendar');
+          } else if (path === '/admin') {
+            setCurrentView('admin');
+            window.history.pushState(null, '', '/admin');
+          } else if (path === '/panel') {
+            setCurrentView('panel');
+            window.history.pushState(null, '', '/panel');
+          }
+        }}
+      >
+        <div className="App">
+          <AdminPanel
+            user={user}
+            onLogout={handleLogout}
+            onBackToFolders={() => {
+              setCurrentView('folders');
+              window.history.pushState(null, '', '/folders');
+            }}
+            onThemeToggle={toggleTheme}
+            isDarkMode={isDarkMode}
+          />
+        </div>
+      </NotificationProvider>
+    );
+  }
+
+  // Si está logueado y en vista de panel
+  if (currentView === 'panel' && user) {
+    console.log('Renderizando UserPanel con user:', user, 'currentView:', currentView);
+    return (
+      <NotificationProvider 
+        user={user}
+        onNavigate={(path) => {
+          if (path === '/calendar') {
+            setCurrentView('calendar');
+            window.history.pushState(null, '', '/calendar');
+          } else if (path === '/admin') {
+            setCurrentView('admin');
+            window.history.pushState(null, '', '/admin');
+          } else if (path === '/panel') {
+            setCurrentView('panel');
+            window.history.pushState(null, '', '/panel');
+          }
+        }}
+      >
+        <UserPanel
           user={user}
           onLogout={handleLogout}
           onBackToFolders={() => {
@@ -361,52 +410,70 @@ function App() {
           }}
           onThemeToggle={toggleTheme}
           isDarkMode={isDarkMode}
+          onGoToCalendar={() => {
+            setCurrentView('calendar');
+            window.history.pushState(null, '', '/calendar');
+          }}
+          onUserUpdate={handleUserUpdate}
         />
-      </div>
+      </NotificationProvider>
     );
-  }
-
-  // Si está logueado y en vista de panel
-  if (currentView === 'panel' && user) {
-    console.log('Renderizando UserPanel con user:', user, 'currentView:', currentView);
-    return <UserPanel
-      user={user}
-      onLogout={handleLogout}
-      onBackToFolders={() => {
-        setCurrentView('folders');
-        window.history.pushState(null, '', '/folders');
-      }}
-      onThemeToggle={toggleTheme}
-      isDarkMode={isDarkMode}
-      onGoToCalendar={() => {
-        setCurrentView('calendar');
-        window.history.pushState(null, '', '/calendar');
-      }}
-    />;
   }
 
   // Si está logueado y en vista de calendario
   if (currentView === 'calendar' && user) {
-    return <Calendar
-      user={user}
-      onLogout={handleLogout}
-      onBackToPanel={() => {
-        setCurrentView('panel');
-        window.history.pushState(null, '', '/panel');
-      }}
-      onBackToFolders={() => {
-        setCurrentView('folders');
-        window.history.pushState(null, '', '/folders');
-      }}
-      onThemeToggle={toggleTheme}
-      isDarkMode={isDarkMode}
-    />;
+    return (
+      <NotificationProvider 
+        user={user}
+        onNavigate={(path) => {
+          if (path === '/calendar') {
+            setCurrentView('calendar');
+            window.history.pushState(null, '', '/calendar');
+          } else if (path === '/admin') {
+            setCurrentView('admin');
+            window.history.pushState(null, '', '/admin');
+          } else if (path === '/panel') {
+            setCurrentView('panel');
+            window.history.pushState(null, '', '/panel');
+          }
+        }}
+      >
+        <Calendar
+          user={user}
+          onLogout={handleLogout}
+          onBackToPanel={() => {
+            setCurrentView('panel');
+            window.history.pushState(null, '', '/panel');
+          }}
+          onBackToFolders={() => {
+            setCurrentView('folders');
+            window.history.pushState(null, '', '/folders');
+          }}
+          onThemeToggle={toggleTheme}
+          isDarkMode={isDarkMode}
+        />
+      </NotificationProvider>
+    );
   }
 
   // Fallback - agregar debug
   console.log('Fallback render - isLoggedIn:', isLoggedIn, 'currentView:', currentView, 'user:', user);
   return (
-    <NotificationProvider user={user}>
+    <NotificationProvider 
+      user={user}
+      onNavigate={(path) => {
+        if (path === '/calendar') {
+          setCurrentView('calendar');
+          window.history.pushState(null, '', '/calendar');
+        } else if (path === '/admin') {
+          setCurrentView('admin');
+          window.history.pushState(null, '', '/admin');
+        } else if (path === '/panel') {
+          setCurrentView('panel');
+          window.history.pushState(null, '', '/panel');
+        }
+      }}
+    >
     <div className="App">
       {/* <div style={{ padding: '20px', background: 'red', color: 'white' }}>
         <h2>DEBUG INFO:</h2>

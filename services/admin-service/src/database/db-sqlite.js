@@ -61,6 +61,11 @@ function initDatabase() {
       });
     });
 
+    // Migración para añadir columna de borrado programado a users
+    db.run(`ALTER TABLE users ADD COLUMN deletion_scheduled_at DATETIME`, (err) => {
+      if (err && !err.message.includes('duplicate column name')) {}
+    });
+
     // 2.1 Tabla de Configuración de Seguridad (Email de recuperación encriptado)
     db.run(`CREATE TABLE IF NOT EXISTS security_settings (
       id INTEGER PRIMARY KEY AUTOINCREMENT,

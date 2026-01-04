@@ -1,37 +1,46 @@
 import React from 'react';
 import { useLanguage } from '../../context/LanguageContext';
+import './DeleteConfirmationModal.css';
 
-const DeleteConfirmationModal = ({ 
-  isOpen, 
-  onClose, 
-  onConfirm, 
-  itemName 
-}) => {
+const DeleteConfirmationModal = ({ isOpen, onClose, onConfirm, userName }) => {
   const { t } = useLanguage();
 
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black/50 dark:bg-black/70 flex items-center justify-center z-50" onClick={onClose}>
-      <div className="glassmorphism-modal dark:bg-slate-800 rounded-lg shadow-xl border-gray-200 dark:border-slate-600 p-6 w-full max-w-md mx-4" onClick={(e) => e.stopPropagation()}>
-        <h3 className="text-lg font-semibold text-gray-900 dark:text-slate-100 mb-4">{t('common.confirmDelete')}</h3>
+    <div className="delete-confirmation-overlay" onClick={onClose}>
+      <div className="delete-confirmation-modal" onClick={(e) => e.stopPropagation()}>
+        <div className="delete-confirmation-header">
+          <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <path d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+          </svg>
+          <h2>{t('admin.deleteUser') || 'Eliminar Usuario'}</h2>
+        </div>
         
-        <p className="text-gray-700 dark:text-gray-300 mb-6">
-          {t('userPanel.confirmDelete', { name: itemName })}
-        </p>
+        <div className="delete-confirmation-content">
+          <p>
+            {t('admin.deleteConfirmationMessage', { name: userName }) || 
+             `¿Estás seguro de que deseas eliminar al usuario "${userName}"?`}
+          </p>
+          
+          <div className="delete-warning-box">
+            <strong>{t('admin.warning') || 'Advertencia'}:</strong>
+            <p>
+              {t('admin.deleteWarningDetail') || 
+               'Esta acción programará la eliminación de todos los datos del usuario (archivos, eventos, correos). Tienes 5 minutos para cancelar esta operación.'}
+            </p>
+          </div>
+        </div>
 
-        <div className="flex justify-end space-x-3">
-          <button 
-            onClick={onClose}
-            className="px-4 py-2 text-gray-600 dark:text-slate-300 hover:bg-gray-100 dark:hover:bg-slate-700 rounded-lg transition-colors duration-200"
-          >
-            {t('common.cancel')}
+        <div className="delete-confirmation-actions">
+          <button className="btn-cancel" onClick={onClose}>
+            {t('common.cancel') || 'Cancelar'}
           </button>
-          <button 
-            onClick={onConfirm}
-            className="px-4 py-2 bg-red-500 hover:bg-red-600 text-white rounded-lg transition-colors duration-200"
-          >
-            {t('common.delete')}
+          <button className="btn-delete-confirm" onClick={onConfirm}>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+            </svg>
+            {t('admin.confirmDelete') || 'Programar Eliminación'}
           </button>
         </div>
       </div>

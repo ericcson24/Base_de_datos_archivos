@@ -54,6 +54,7 @@ services:
       - DB_PATH=/data/server.db
     volumes:
       - ./database_storage:/data
+      - ./uploads:/app/uploads
     networks:
       - app-network
 
