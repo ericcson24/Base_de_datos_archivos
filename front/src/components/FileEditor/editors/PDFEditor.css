@@ -12,3 +12,19 @@
   border-radius: 8px;
   overflow: hidden;
 }
+
+.pdf-iframe {
+  width: 800px;
+}
+
+.pdf-transform-container {
+  transform-origin: center top;
+}
+
+.annotation-item {
+  position: absolute;
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 14px;
+  font-weight: bold;
+}

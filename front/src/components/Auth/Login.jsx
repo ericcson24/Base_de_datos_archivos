@@ -117,28 +117,11 @@ const Login = ({ onLogin, onSwitchToRegister, onThemeToggle, isDarkMode }) => {
   return (
     <div className="login-container">
       {/* Theme & Language Controls */}
-      <div style={{
-        position: 'absolute',
-        top: '1rem',
-        right: '1rem',
-        zIndex: 1000,
-        display: 'flex',
-        gap: '10px',
-        alignItems: 'center'
-      }}>
+      <div className="login-controls">
         <select 
           value={language} 
           onChange={(e) => changeLanguage(e.target.value)}
           className="language-select"
-          style={{
-            padding: '5px 10px',
-            borderRadius: '20px',
-            border: '1px solid var(--border-color)',
-            background: 'var(--bg-secondary)',
-            color: 'var(--text-primary)',
-            cursor: 'pointer',
-            outline: 'none'
-          }}
         >
           <option value="es">Español</option>
           <option value="en">English</option>
@@ -162,9 +145,9 @@ const Login = ({ onLogin, onSwitchToRegister, onThemeToggle, isDarkMode }) => {
         {isRecovering ? (
           <form onSubmit={handleRecovery} className="login-form">
             {recoveryMessage ? (
-              <div className="success-message" style={{ padding: '1rem', backgroundColor: 'rgba(0, 255, 0, 0.1)', borderRadius: '8px', marginBottom: '1rem', color: isDarkMode ? '#4ade80' : '#15803d' }}>
+              <div className="success-message">
                 {recoveryMessage}
-                <div style={{ marginTop: '1rem' }}>
+                <div className="success-message-actions">
                   <Button
                     type="button"
                     variant="secondary"
@@ -252,11 +235,10 @@ const Login = ({ onLogin, onSwitchToRegister, onThemeToggle, isDarkMode }) => {
               autoComplete="current-password"
             />
 
-            <div style={{ textAlign: 'right', marginBottom: '1rem' }}>
+            <div className="forgot-password-container">
               <button
                 type="button"
-                className="link-button"
-                style={{ fontSize: '0.85rem' }}
+                className="link-button forgot-password-btn"
                 onClick={() => {
                   setIsRecovering(true);
                   setErrors({});

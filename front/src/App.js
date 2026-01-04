@@ -313,7 +313,7 @@ function App() {
   // Si está cargando, mostrar loading
   if (isLoading) {
     return (
-      <div className="App" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>
+      <div className="App app-loading-container">
         <div>Cargando...</div>
       </div>
     );

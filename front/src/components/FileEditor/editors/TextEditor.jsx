@@ -185,12 +185,10 @@ const TextEditor = ({ content, file }) => {
           ref={textareaRef}
           value={text}
           onChange={(e) => setText(e.target.value)}
-          className="flex-1 p-4 bg-transparent border-none outline-none resize-none font-mono text-gray-800 dark:text-gray-200"
+          className={`flex-1 p-4 bg-transparent border-none outline-none resize-none font-mono text-gray-800 dark:text-gray-200 text-editor-textarea ${wordWrap ? 'wrap' : ''}`}
           style={{
             fontSize: `${fontSize}px`,
-            lineHeight: `${lineHeight}em`,
-            whiteSpace: wordWrap ? 'pre-wrap' : 'pre',
-            overflowWrap: wordWrap ? 'break-word' : 'normal'
+            lineHeight: `${lineHeight}em`
           }}
           spellCheck={false}
         />

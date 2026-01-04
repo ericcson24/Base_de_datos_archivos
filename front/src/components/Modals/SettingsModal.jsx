@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from 'react';
-import FrostedContainer from '../Common/FrostedContainer';
 import Button from '../Common/Button';
 import Input from '../Common/Input';
 import { getAuthToken } from '../../utils/fileUtils';
@@ -285,63 +284,63 @@ const SettingsModal = ({ onClose, user, onThemeToggle, isDarkMode, initialTab = 
 
   return (
     <div className="modal-overlay" onClick={onClose}>
-      <div className="modal-content settings-modal w-full max-w-2xl" onClick={e => e.stopPropagation()}>
-        <div className="flex justify-between items-center mb-6">
-          <h2 className="text-2xl font-bold text-gray-800 dark:text-white">{t('settings.title')}</h2>
-          <button onClick={onClose} className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200">
+      <div className="modal-content settings-modal" onClick={e => e.stopPropagation()}>
+        <div className="settings-header">
+          <h2 className="settings-title">{t('settings.title')}</h2>
+          <button onClick={onClose} className="settings-close-btn">
             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
             </svg>
           </button>
         </div>
 
-        <div className="flex space-x-4 mb-6 border-b border-gray-200 dark:border-gray-700">
+        <div className="settings-tabs">
           <button
-            className={`pb-2 px-4 font-medium transition-colors ${activeTab === 'general' ? 'text-blue-600 border-b-2 border-blue-600' : 'text-gray-500 hover:text-gray-700 dark:text-gray-400'}`}
+            className={`settings-tab ${activeTab === 'general' ? 'active' : ''}`}
             onClick={() => setActiveTab('general')}
           >
             {t('settings.general')}
           </button>
           {settings.role === 'admin' && (
             <button
-              className={`pb-2 px-4 font-medium transition-colors ${activeTab === 'security' ? 'text-blue-600 border-b-2 border-blue-600' : 'text-gray-500 hover:text-gray-700 dark:text-gray-400'}`}
+              className={`settings-tab ${activeTab === 'security' ? 'active' : ''}`}
               onClick={() => setActiveTab('security')}
             >
               {t('settings.security')}
             </button>
           )}
           <button
-            className={`pb-2 px-4 font-medium transition-colors ${activeTab === 'storage' ? 'text-blue-600 border-b-2 border-blue-600' : 'text-gray-500 hover:text-gray-700 dark:text-gray-400'}`}
+            className={`settings-tab ${activeTab === 'storage' ? 'active' : ''}`}
             onClick={() => setActiveTab('storage')}
           >
             {t('settings.storage')}
           </button>
           <button
-            className={`pb-2 px-4 font-medium transition-colors ${activeTab === 'integrations' ? 'text-blue-600 border-b-2 border-blue-600' : 'text-gray-500 hover:text-gray-700 dark:text-gray-400'}`}
+            className={`settings-tab ${activeTab === 'integrations' ? 'active' : ''}`}
             onClick={() => setActiveTab('integrations')}
           >
             {t('settings.integrations')}
           </button>
         </div>
         
-        <div className="space-y-6 max-h-[60vh] overflow-y-auto pr-2">
+        <div className="settings-content">
           {activeTab === 'general' && (
-            <div className="space-y-6">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{t('settings.avatar')}</label>
-                <div className="flex items-center gap-4 mb-4">
-                  <div className="relative">
+            <div className="settings-section">
+              <div className="mb-6">
+                <label className="settings-label">{t('settings.avatar')}</label>
+                <div className="settings-avatar-container">
+                  <div className="settings-avatar-wrapper">
                     <img 
                       src={settings.avatarUrl || `https://ui-avatars.com/api/?name=${settings.username}&background=random`} 
                       alt={t('settings.currentAvatar')} 
-                      className="w-20 h-20 rounded-full object-cover border-4 border-white shadow-lg"
+                      className="settings-avatar-img"
                       onError={(e) => {
                         e.target.onerror = null; 
                         e.target.src = `https://ui-avatars.com/api/?name=${settings.username}&background=random`;
                       }}
                     />
                     <button 
-                      className="absolute bottom-0 right-0 bg-blue-600 text-white p-1.5 rounded-full hover:bg-blue-700 transition-colors shadow-md"
+                      className="settings-avatar-edit-btn"
                       onClick={() => setShowAvatarSelector(!showAvatarSelector)}
                       title={t('settings.changeAvatar')}
                     >
@@ -356,15 +355,15 @@ const SettingsModal = ({ onClose, user, onThemeToggle, isDarkMode, initialTab = 
                 </div>
                 
                 {showAvatarSelector && (
-                  <div className="avatar-selector-container animate-fade-in mt-4 p-4 bg-gray-50 dark:bg-slate-700/50 rounded-xl border border-gray-200 dark:border-slate-600">
+                  <div className="avatar-selector-container">
                     <div className="mb-4">
-                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">{t('settings.uploadAvatar')}</label>
+                      <label className="settings-label">{t('settings.uploadAvatar')}</label>
                       <div className="flex items-center gap-2">
                         <input
                           type="file"
                           accept="image/*"
                           onChange={handleAvatarUpload}
-                          className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 dark:file:bg-blue-900/30 dark:file:text-blue-300"
+                          className="avatar-upload-input"
                           disabled={uploadingAvatar}
                         />
                         <Button variant="secondary" onClick={handleAvatarDelete} disabled={deletingAvatar || uploadingAvatar}>
@@ -376,7 +375,7 @@ const SettingsModal = ({ onClose, user, onThemeToggle, isDarkMode, initialTab = 
                     
                     <div className="border-t border-gray-200 dark:border-slate-600 my-4"></div>
                     
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">{t('settings.defaultAvatars')}</label>
+                    <label className="settings-label mb-2">{t('settings.defaultAvatars')}</label>
                     <div className="avatar-selector">
                       {defaultAvatars.map((url, index) => (
                         <div 
@@ -395,8 +394,8 @@ const SettingsModal = ({ onClose, user, onThemeToggle, isDarkMode, initialTab = 
                 )}
               </div>
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{t('settings.username')}</label>
+              <div className="mb-6">
+                <label className="settings-label">{t('settings.username')}</label>
                 <Input
                   value={settings.username}
                   disabled={true}
@@ -405,12 +404,12 @@ const SettingsModal = ({ onClose, user, onThemeToggle, isDarkMode, initialTab = 
                 <p className="text-xs text-gray-500 mt-1">{t('settings.usernameLocked')}</p>
               </div>
               
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{t('settings.language')}</label>
+              <div className="mb-6">
+                <label className="settings-label">{t('settings.language')}</label>
                 <select
                   value={settings.language}
                   onChange={(e) => setSettings({ ...settings, language: e.target.value })}
-                  className="w-full p-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-slate-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 outline-none transition-all"
+                  className="settings-select"
                 >
                   <option value="es">Español</option>
                   <option value="en">English</option>
@@ -418,10 +417,10 @@ const SettingsModal = ({ onClose, user, onThemeToggle, isDarkMode, initialTab = 
                 </select>
               </div>
 
-              <div className="flex items-center justify-between p-4 bg-gray-50 dark:bg-slate-700 rounded-lg">
+              <div className="settings-notification-row mb-6">
                 <div>
-                  <h4 className="font-medium text-gray-900 dark:text-white">{t('settings.notifications')}</h4>
-                  <p className="text-sm text-gray-500 dark:text-gray-400">{t('settings.notificationsDesc')}</p>
+                  <h4 className="settings-card-title">{t('settings.notifications')}</h4>
+                  <p className="settings-card-desc">{t('settings.notificationsDesc')}</p>
                 </div>
                 <label className="relative inline-flex items-center cursor-pointer">
                   <input
@@ -435,24 +434,24 @@ const SettingsModal = ({ onClose, user, onThemeToggle, isDarkMode, initialTab = 
               </div>
               {/* Tema */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">{t('settings.theme')}</label>
-                <div className="flex space-x-4">
+                <label className="settings-label mb-2">{t('settings.theme')}</label>
+                <div className="theme-options">
                   <button
                     onClick={() => setSettings({ ...settings, theme: 'light' })}
-                    className={`flex-1 p-3 rounded-lg border-2 transition-all ${settings.theme === 'light' ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20' : 'border-gray-200 dark:border-gray-700'}`}
+                    className={`theme-btn ${settings.theme === 'light' ? 'active' : ''}`}
                   >
-                    <div className="flex items-center justify-center space-x-2">
+                    <div className="theme-btn-content">
                       <span>☀️</span>
-                      <span className="text-gray-900 dark:text-white">{t('common.theme.light')}</span>
+                      <span className="theme-btn-text">{t('common.theme.light')}</span>
                     </div>
                   </button>
                   <button
                     onClick={() => setSettings({ ...settings, theme: 'dark' })}
-                    className={`flex-1 p-3 rounded-lg border-2 transition-all ${settings.theme === 'dark' ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20' : 'border-gray-200 dark:border-gray-700'}`}
+                    className={`theme-btn ${settings.theme === 'dark' ? 'active' : ''}`}
                   >
-                    <div className="flex items-center justify-center space-x-2">
+                    <div className="theme-btn-content">
                       <span>🌙</span>
-                      <span className="text-gray-900 dark:text-white">{t('common.theme.dark')}</span>
+                      <span className="theme-btn-text">{t('common.theme.dark')}</span>
                     </div>
                   </button>
                 </div>
@@ -461,10 +460,10 @@ const SettingsModal = ({ onClose, user, onThemeToggle, isDarkMode, initialTab = 
           )}
           
           {activeTab === 'security' && (
-            <div className="space-y-4">
-              <h3 className="text-lg font-medium text-gray-900 dark:text-white">{t('settings.changePassword')}</h3>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{t('settings.newPassword')}</label>
+            <div className="settings-section">
+              <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-4">{t('settings.changePassword')}</h3>
+              <div className="mb-4">
+                <label className="settings-label">{t('settings.newPassword')}</label>
                 <Input
                   type="password"
                   value={newPassword}
@@ -474,7 +473,7 @@ const SettingsModal = ({ onClose, user, onThemeToggle, isDarkMode, initialTab = 
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{t('settings.confirmPassword')}</label>
+                <label className="settings-label">{t('settings.confirmPassword')}</label>
                 <Input
                   type="password"
                   value={confirmPassword}
@@ -487,11 +486,11 @@ const SettingsModal = ({ onClose, user, onThemeToggle, isDarkMode, initialTab = 
           )}
           
           {activeTab === 'storage' && (
-            <div className="space-y-6">
-              <div className="bg-gray-50 dark:bg-slate-700 p-6 rounded-xl text-center">
+            <div className="settings-section">
+              <div className="storage-card">
                 <div className="text-4xl mb-2">☁️</div>
-                <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-1">{t('settings.storage')}</h3>
-                <p className="text-gray-500 dark:text-gray-400 mb-6">{t('settings.manageStorage')}</p>
+                <h3 className="storage-card-title">{t('settings.storage')}</h3>
+                <p className="storage-card-desc">{t('settings.manageStorage')}</p>
                 
                 <div className="relative pt-1">
                   <div className="flex mb-2 items-center justify-between">
@@ -506,10 +505,10 @@ const SettingsModal = ({ onClose, user, onThemeToggle, isDarkMode, initialTab = 
                       </span>
                     </div>
                   </div>
-                  <div className="overflow-hidden h-2 mb-4 text-xs flex rounded bg-blue-200">
-                    <div style={{ width: `${(settings.storageUsed / settings.storageLimit) * 100}%` }} className="shadow-none flex flex-col text-center whitespace-nowrap text-white justify-center bg-blue-500"></div>
+                  <div className="storage-progress-bg">
+                    <div style={{ width: `${(settings.storageUsed / settings.storageLimit) * 100}%` }} className="storage-progress-fill"></div>
                   </div>
-                  <div className="flex justify-between text-sm text-gray-600 dark:text-gray-300">
+                  <div className="storage-stats">
                     <span>{t('settings.used', { size: formatBytes(settings.storageUsed) })}</span>
                     <span>{t('settings.total', { size: formatBytes(settings.storageLimit) })}</span>
                   </div>
@@ -519,25 +518,25 @@ const SettingsModal = ({ onClose, user, onThemeToggle, isDarkMode, initialTab = 
           )}
 
           {activeTab === 'integrations' && (
-            <div className="space-y-6">
-              <div className="bg-gray-50 dark:bg-slate-700 p-6 rounded-xl">
-                <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-4">{t('settings.microsoftAccount')}</h3>
+            <div className="settings-section">
+              <div className="storage-card">
+                <h3 className="storage-card-title mb-4">{t('settings.microsoftAccount')}</h3>
                 
                 {settings.microsoftLinked ? (
                   <div className="space-y-4">
-                    <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-4 bg-white dark:bg-slate-800 rounded-lg border border-gray-200 dark:border-gray-600 shadow-sm">
-                      <div className="flex items-center space-x-4 mb-4 sm:mb-0">
-                        <div className="w-12 h-12 bg-blue-100 dark:bg-blue-900/30 rounded-full flex items-center justify-center text-blue-600 dark:text-blue-400 text-2xl">
+                    <div className="integration-card">
+                      <div className="integration-info">
+                        <div className="integration-icon">
                           📧
                         </div>
                         <div>
-                          <p className="font-bold text-gray-900 dark:text-white text-lg">{settings.microsoftEmail}</p>
-                          <div className="flex items-center mt-1">
-                            <span className="relative flex h-3 w-3 mr-2">
+                          <p className="integration-email">{settings.microsoftEmail}</p>
+                          <div className="integration-status">
+                            <span className="integration-status-dot">
                               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
                               <span className="relative inline-flex rounded-full h-3 w-3 bg-green-500"></span>
                             </span>
-                            <p className="text-sm text-green-600 dark:text-green-400 font-bold">
+                            <p className="integration-status-text">
                               {t('settings.linkedActive')}
                             </p>
                           </div>
@@ -558,9 +557,9 @@ const SettingsModal = ({ onClose, user, onThemeToggle, isDarkMode, initialTab = 
                       </Button>
                     </div>
 
-                    <div className="bg-blue-50 dark:bg-blue-900/20 p-4 rounded-lg border border-blue-100 dark:border-blue-800">
-                        <h4 className="font-semibold text-blue-800 dark:text-blue-300 mb-2">{t('settings.syncInfoTitle')}</h4>
-                        <p className="text-sm text-blue-600 dark:text-blue-400">
+                    <div className="sync-info-box">
+                        <h4 className="sync-info-title">{t('settings.syncInfoTitle')}</h4>
+                        <p className="sync-info-desc">
                             {t('settings.syncInfoDesc')}
                         </p>
                     </div>
@@ -579,8 +578,8 @@ const SettingsModal = ({ onClose, user, onThemeToggle, isDarkMode, initialTab = 
                     <div className="w-16 h-16 bg-gray-200 dark:bg-gray-600 rounded-full flex items-center justify-center text-3xl mx-auto mb-4 text-gray-500 dark:text-gray-400">
                         📅
                     </div>
-                    <h4 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">{t('settings.connectCalendar')}</h4>
-                    <p className="text-gray-600 dark:text-gray-300 mb-6 max-w-md mx-auto">
+                    <h4 className="connect-calendar-title">{t('settings.connectCalendar')}</h4>
+                    <p className="connect-calendar-desc">
                       {t('settings.connectCalendarDesc')}
                     </p>
                     <Button variant="primary" onClick={handleLinkMicrosoft} className="px-8 py-3 text-lg">
@@ -596,7 +595,7 @@ const SettingsModal = ({ onClose, user, onThemeToggle, isDarkMode, initialTab = 
           )}
         </div>
 
-        <div className="mt-8 flex justify-end space-x-3 pt-4 border-t border-gray-200 dark:border-gray-700">
+        <div className="settings-footer">
           <Button variant="secondary" onClick={onClose}>
             {t('common.cancel')}
           </Button>

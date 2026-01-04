@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import mammoth from 'mammoth';
 import { getFileType, getFileIcon, canPreview, getAuthenticatedPreviewUrl, formatFileSize, downloadFile, getAuthToken } from '../../utils/fileUtils';
 import { useLanguage } from '../../context/LanguageContext';
+import './FileViewerModal.css';
 
 const WordFileViewer = ({ fileId, fileName, onLoad, onError }) => {
   const [content, setContent] = useState('');
@@ -133,7 +134,7 @@ const FileViewerModal = ({ file, onClose, user }) => {
                 setError(t('fileViewer.errorImage'));
                 setLoading(false);
               }}
-              style={{ maxWidth: '100%', maxHeight: '70vh', objectFit: 'contain' }}
+              className="preview-image"
             />
           </div>
         );
@@ -148,7 +149,7 @@ const FileViewerModal = ({ file, onClose, user }) => {
                 setError(t('fileViewer.errorVideo'));
                 setLoading(false);
               }}
-              style={{ maxWidth: '100%', maxHeight: '70vh' }}
+              className="preview-video"
             >
               <source src={authenticatedUrl} />
               {t('fileViewer.videoNotSupported')}
@@ -166,7 +167,7 @@ const FileViewerModal = ({ file, onClose, user }) => {
                 setError(t('fileViewer.errorPdf'));
                 setLoading(false);
               }}
-              style={{ width: '100%', height: '70vh', border: 'none' }}
+              className="preview-iframe"
               title={file.name}
             />
           </div>

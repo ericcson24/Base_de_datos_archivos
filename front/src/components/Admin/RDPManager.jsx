@@ -220,15 +220,15 @@ url:s:
             </div>
 
             {/* Global Access Info */}
-            <div className="rdp-info-box glassmorphism" style={{ marginBottom: '20px', padding: '15px', background: 'rgba(76, 175, 80, 0.1)', borderLeft: '4px solid #4caf50' }}>
-                <h4 style={{ margin: '0 0 10px 0' }}>🌍 {t('rdp.globalAccess')}</h4>
-                <p style={{ margin: '0', fontSize: '0.9em' }}>{t('rdp.globalAccessDesc')}</p>
+            <div className="rdp-info-box glassmorphism rdp-info-box-global">
+                <h4 className="rdp-info-box-title">🌍 {t('rdp.globalAccess')}</h4>
+                <p className="rdp-info-box-desc">{t('rdp.globalAccessDesc')}</p>
             </div>
 
             {/* Settings Panel (Hidden by default or simplified) */}
             {/* <div className="rdp-settings-panel glassmorphism" ... > ... </div> */}
             
-            <h3 style={{ marginTop: '30px' }}>{t('rdp.savedConnections') || 'Saved Connections'}</h3>
+            <h3 className="rdp-saved-connections-title">{t('rdp.savedConnections') || 'Saved Connections'}</h3>
 
             {loading ? (
                 <div className="loading">{t('common.loading')}</div>
@@ -256,10 +256,9 @@ url:s:
                                         🌐 Connect
                                     </button>
                                     <button 
-                                        className="connect-btn secondary"
+                                        className="connect-btn secondary rdp-download-btn"
                                         onClick={() => handleDownloadRdp(conn)}
                                         title={t('rdp.downloadRdp') || 'Download .rdp file'}
-                                        style={{ background: 'var(--admin-secondary-color)', marginLeft: '5px' }}
                                     >
                                         ⬇️ RDP
                                     </button>

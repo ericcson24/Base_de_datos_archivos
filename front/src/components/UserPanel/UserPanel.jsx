@@ -976,15 +976,15 @@ useEffect(() => {
           <button className="sidebar-btn" onClick={onBackToFolders}>
             {t('common.back')}
           </button>
-          <div style={{ display: 'flex', gap: '10px' }}>
-            <button className="sidebar-btn" style={{ flex: 1, justifyContent: 'center', padding: '0.75rem 0.5rem' }} onClick={() => {
+          <div className="sidebar-footer-actions">
+            <button className="sidebar-btn sidebar-btn-action" onClick={() => {
               if (onGoToCalendar) {
                 onGoToCalendar();
               }
             }}>
               {t('userPanel.calendar')}
             </button>
-            <button className="sidebar-btn" style={{ flex: 1, justifyContent: 'center', padding: '0.75rem 0.5rem' }} onClick={() => setShowRDPModal(true)}>
+            <button className="sidebar-btn sidebar-btn-action" onClick={() => setShowRDPModal(true)}>
               {t('userPanel.remoteDesktop')}
             </button>
           </div>
@@ -1058,12 +1058,11 @@ useEffect(() => {
     onKeyPress={(e) => e.key === 'Enter' && e.target.blur()}
     onBlur={() => setIsSearchExpanded(false)}
     autoFocus={isSearchExpanded}
-    className={`search-input absolute left-0 w-full h-full bg-transparent border-none outline-none text-[14px] flex items-center px-9 transition-all duration-300 ease-in-out ${
+    className={`search-input absolute left-0 w-full h-full bg-transparent border-none outline-none text-[14px] flex items-center px-9 transition-all duration-300 ease-in-out search-input-reset ${
       isSearchExpanded
         ? 'opacity-100 translate-x-0 cursor-text'
         : 'opacity-0 -translate-x-5 pointer-events-none'
     }`}
-    style={{ outline: 'none', boxShadow: 'none' }}
   />
 
   {/* Botón limpiar */}
@@ -1130,12 +1129,11 @@ useEffect(() => {
                   }}
                   onBlur={() => setIsAIExpanded(false)}
                   autoFocus={isAIExpanded}
-                  className={`absolute left-0 w-full h-full bg-transparent border-none outline-none text-[14px] flex items-center px-8 transition-all duration-300 ease-in-out ${
+                  className={`absolute left-0 w-full h-full bg-transparent border-none outline-none text-[14px] flex items-center px-8 transition-all duration-300 ease-in-out search-input-reset ${
                     isAIExpanded
                       ? 'opacity-100 translate-x-0 cursor-text'
                       : 'opacity-0 -translate-x-5 pointer-events-none'
                   }`}
-                  style={{ outline: 'none', boxShadow: 'none' }}
                 />
 
                 {isAIExpanded && aiQuery && (
@@ -1451,7 +1449,7 @@ useEffect(() => {
         type="file"
         id="fileInput"
         multiple
-        style={{ display: 'none' }}
+        className="hidden-input"
         onChange={(e) => {
           handleFileUpload(Array.from(e.target.files));
           e.target.value = ''; // Reset input
@@ -1462,7 +1460,7 @@ useEffect(() => {
         id="folderInput"
         webkitdirectory=""
         multiple
-        style={{ display: 'none' }}
+        className="hidden-input"
         onChange={(e) => {
           handleFolderUpload(Array.from(e.target.files));
           e.target.value = ''; // Reset input

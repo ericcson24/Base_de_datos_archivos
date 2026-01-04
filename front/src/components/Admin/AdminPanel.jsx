@@ -189,7 +189,7 @@ const AdminPanel = ({ user, onLogout, onBackToFolders, onThemeToggle, isDarkMode
         <button className="admin-nav-item" onClick={onBackToFolders}>
           <span></span> Mis Archivos
         </button>
-        <button className="admin-nav-item" onClick={onLogout} style={{ color: '#ff3b30' }}>
+        <button className="admin-nav-item logout-btn" onClick={onLogout}>
           <span></span> Cerrar Sesión
         </button>
       </div>

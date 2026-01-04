@@ -44,6 +44,13 @@
     color: #333;
 }
 
+.close-modal-btn {
+    border: none;
+    background: none;
+    font-size: 1.5rem;
+    cursor: pointer;
+}
+
 .picker-search {
     padding: 16px;
     display: flex;
@@ -94,6 +101,11 @@
     flex: 1;
     position: relative;
     background: #eee;
+}
+
+.map-view {
+    height: 100%;
+    width: 100%;
 }
 
 .picker-footer {

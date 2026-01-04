@@ -512,11 +512,7 @@ const Calendar = ({ user, onLogout, onBackToPanel, onBackToFolders, onThemeToggl
              <div className="section-title connection-status-section">{t('calendar.connectionStatus')}</div>
              <div className="connection-status-container">
                 <div 
-                  className="connection-status-dot"
-                  style={{
-                    backgroundColor: microsoftStatus.linked ? '#10B981' : '#EF4444',
-                    boxShadow: microsoftStatus.linked ? '0 0 5px #10B981' : 'none'
-                  }}
+                  className={`connection-status-dot ${microsoftStatus.linked ? 'connected' : 'disconnected'}`}
                 ></div>
                 <span className="connection-status-text">
                   {microsoftStatus.linked ? t('calendar.connected') : t('calendar.disconnected')}
@@ -529,11 +525,11 @@ const Calendar = ({ user, onLogout, onBackToPanel, onBackToFolders, onThemeToggl
           <button className="sidebar-btn" onClick={onBackToFolders}>
              {t('common.back')}
           </button>
-          <div style={{ display: 'flex', gap: '10px' }}>
-            <button className="sidebar-btn" style={{ flex: 1, justifyContent: 'center', padding: '0.75rem 0.5rem' }} onClick={onBackToPanel}>
+          <div className="sidebar-footer-actions">
+            <button className="sidebar-btn sidebar-btn-action" onClick={onBackToPanel}>
               {t('calendar.panel')}
             </button>
-            <button className="sidebar-btn" style={{ flex: 1, justifyContent: 'center', padding: '0.75rem 0.5rem' }} onClick={() => setShowRDPModal(true)}>
+            <button className="sidebar-btn sidebar-btn-action" onClick={() => setShowRDPModal(true)}>
               {t('common.remoteDesktop')}
             </button>
           </div>

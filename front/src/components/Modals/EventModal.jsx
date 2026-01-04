@@ -342,8 +342,7 @@ const EventModal = ({
                             key={index} 
                             className="category-tag"
                             style={{ 
-                              backgroundColor: getCategoryColor(categoryName),
-                              color: '#fff' // Asumimos texto blanco para contraste
+                              backgroundColor: getCategoryColor(categoryName)
                             }}
                           >
                             {categoryName}
@@ -411,21 +410,19 @@ const EventModal = ({
 
                 <div className="form-group">
                   <label className="form-label">{t('calendar.location')}</label>
-                  <div style={{ display: 'flex', gap: '8px' }}>
+                  <div className="location-input-container">
                     <input
                       type="text"
-                      className="form-input"
+                      className="form-input location-input"
                       value={formData.location}
                       onChange={(e) => handleInputChange('location', e.target.value)}
                       placeholder={t('calendar.locationPlaceholder')}
-                      style={{ flex: 1 }}
                     />
                     <button 
                       type="button"
-                      className="btn btn-secondary"
+                      className="btn btn-secondary location-picker-btn"
                       onClick={() => setShowLocationPicker(true)}
                       title={t('calendar.searchMap')}
-                      style={{ padding: '0 12px' }}
                     >
                       📍
                     </button>
@@ -464,8 +461,7 @@ const EventModal = ({
                         style={{
                           '--cat-color': cat.hexColor || cat.color,
                           backgroundColor: formData.categories.includes(cat.name) ? (cat.hexColor || cat.color) : 'transparent',
-                          borderColor: cat.hexColor || cat.color,
-                          color: formData.categories.includes(cat.name) ? '#fff' : 'var(--cal-text)'
+                          borderColor: cat.hexColor || cat.color
                         }}
                         onClick={() => toggleCategory(cat.name)}
                       >

@@ -82,7 +82,7 @@ const LocationPickerModal = ({ isOpen, onClose, onSelect, initialLocation }) => 
       <div className="location-picker-modal">
         <div className="picker-header">
             <h3>{t('calendar.selectLocation')}</h3>
-            <button onClick={onClose} className="close-modal" style={{border:'none', background:'none', fontSize:'1.5rem', cursor:'pointer'}}>&times;</button>
+            <button onClick={onClose} className="close-modal-btn">&times;</button>
         </div>
         
         <div className="picker-search">
@@ -109,7 +109,7 @@ const LocationPickerModal = ({ isOpen, onClose, onSelect, initialLocation }) => 
         )}
 
         <div className="map-container">
-            <MapContainer center={position || [40.416, -3.703]} zoom={13} style={{ height: '100%', width: '100%' }}>
+            <MapContainer center={position || [40.416, -3.703]} zoom={13} className="map-view">
                 <TileLayer
                     url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
                     attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'

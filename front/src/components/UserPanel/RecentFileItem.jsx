@@ -75,7 +75,7 @@ const RecentFileItem = ({ file, isDarkMode, onFileClick }) => {
               </video>
             )}
             {/* Fallback icon */}
-            <div className="file-fallback-icon" style={{ display: 'none' }}>
+            <div className="file-fallback-icon fallback-icon-hidden">
               {getFileIcon(file.name)}
             </div>
           </div>

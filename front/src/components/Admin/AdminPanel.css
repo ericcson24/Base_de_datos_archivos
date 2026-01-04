@@ -99,7 +99,9 @@
   background: var(--admin-text-dark);
   color: black;
 }
-
+.admin-nav-item.logout-btn {
+  color: #ff3b30;
+}
 .admin-sidebar-footer {
   margin-top: auto;
   padding-top: 20px;

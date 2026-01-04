@@ -271,7 +271,7 @@ const FileItem = ({ item, onFolderClick, onDelete, onRename, onMove, onView, onH
                     title={item.name}
                   />
                 )}
-                <div className="file-icon absolute inset-0 flex items-center justify-center bg-gray-100 rounded-lg" style={{ display: 'none' }}>
+                <div className="file-icon absolute inset-0 flex items-center justify-center bg-gray-100 rounded-lg fallback-icon-hidden">
                   {getFileIcon(item.name)}
                 </div>
               </>
@@ -367,7 +367,7 @@ const FileItem = ({ item, onFolderClick, onDelete, onRename, onMove, onView, onH
                     title={item.name}
                   />
                 )}
-                <div className="file-icon" style={{ display: 'none' }}>
+                <div className="file-icon fallback-icon-hidden">
                   {getFileIcon(item.name)}
                 </div>
               </>

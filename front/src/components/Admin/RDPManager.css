@@ -99,6 +99,32 @@
     gap: 12px;
 }
 
+.rdp-info-box-global {
+    margin-bottom: 20px;
+    padding: 15px;
+    background: rgba(76, 175, 80, 0.1);
+    border-left: 4px solid #4caf50;
+}
+
+.rdp-info-box-title {
+    margin: 0 0 10px 0;
+}
+
+.rdp-info-box-desc {
+    margin: 0;
+    font-size: 0.9em;
+}
+
+.rdp-saved-connections-title {
+    margin-top: 30px;
+}
+
+.rdp-download-btn {
+    background: var(--admin-secondary-color);
+    margin-left: 5px;
+}
+
+
 .connect-btn {
     flex: 1;
     background: #fff;
