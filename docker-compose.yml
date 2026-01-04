@@ -182,6 +182,16 @@ services:
     networks:
       - app-network
 
+  # --- Cloudflare Tunnel (Global Access) ---
+  tunnel:
+    image: cloudflare/cloudflared:latest
+    command: tunnel run
+    environment:
+      - TUNNEL_TOKEN=${TUNNEL_TOKEN}
+    restart: unless-stopped
+    networks:
+      - app-network
+
 volumes:
   postgres_data:
 

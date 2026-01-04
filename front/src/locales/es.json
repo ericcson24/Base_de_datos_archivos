@@ -68,6 +68,14 @@
     "lanOnlyDesc": "Restringir a red local",
     "maintenanceMode": "Modo Mantenimiento",
     "maintenanceModeDesc": "Bloquear nuevas conexiones",
+    "globalAccess": "Acceso Global",
+    "globalAccessDesc": "Para acceder a este panel desde fuera de casa sin abrir puertos, configura el Token de Cloudflare en el archivo .env del servidor. Consulta GLOBAL_ACCESS.md para más detalles.",
+    "quickConnect": "Conexión Rápida",
+    "quickConnectDesc": "Introduce la IP y credenciales para conectarte inmediatamente a cualquier equipo de la red.",
+    "connect": "Conectar",
+    "savedConnections": "Conexiones Guardadas",
+    "addDevice": "Añadir Dispositivo a la Red",
+    "createDevice": "Crear Dispositivo",
     "stopAll": "Detener Todas las Conexiones",
     "stopAllConfirm": "¿Estás seguro de que quieres detener todas las conexiones? Esto activará el modo mantenimiento.",
     "stopAllSuccess": "Todas las conexiones detenidas (Modo Mantenimiento Activado)",
@@ -575,13 +583,5 @@
     "from": "de {{owner}}",
     "shared": "Compartido",
     "by": "por {{owner}}"
-  },
-  "rdp": {
-    "connecting": "Conectando al Escritorio Remoto...",
-    "connected": "Conectado",
-    "disconnected": "Desconectado",
-    "error": "Error de conexión",
-    "sendCtrlAltDel": "Enviar Ctrl+Alt+Supr",
-    "disconnect": "Desconectar"
   }
 }

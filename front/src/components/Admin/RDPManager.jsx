@@ -219,51 +219,16 @@ url:s:
                 </button>
             </div>
 
-            {/* Settings Panel */}
-            <div className="rdp-settings-panel glassmorphism" style={{ marginBottom: '20px', padding: '15px' }}>
-                <h3>{t('rdp.serverSettings')}</h3>
-                <div className="settings-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '15px', marginTop: '10px' }}>
-                    <div className="setting-item">
-                        <label style={{ display: 'block', marginBottom: '5px' }}>{t('rdp.serverId')}:</label>
-                        <div className="server-id-display" style={{ background: 'rgba(0,0,0,0.2)', padding: '5px 10px', borderRadius: '4px', display: 'inline-block' }}>
-                            <code style={{ fontSize: '1.2em', fontWeight: 'bold' }}>{settings.server_id || t('common.loading')}</code>
-                        </div>
-                    </div>
-                    <div className="setting-item">
-                        <label style={{ display: 'block', marginBottom: '5px' }}>{t('rdp.lanOnly')}:</label>
-                        <label className="switch">
-                            <input 
-                                type="checkbox" 
-                                checked={settings.lan_only === 'true'} 
-                                onChange={(e) => updateSetting('lan_only', e.target.checked)}
-                            />
-                            <span className="slider round"></span>
-                        </label>
-                        <small style={{ display: 'block', color: '#aaa', fontSize: '0.8em' }}>{t('rdp.lanOnlyDesc')}</small>
-                    </div>
-                    <div className="setting-item">
-                        <label style={{ display: 'block', marginBottom: '5px' }}>{t('rdp.maintenanceMode')}:</label>
-                        <label className="switch">
-                            <input 
-                                type="checkbox" 
-                                checked={settings.maintenance_mode === 'true'} 
-                                onChange={(e) => updateSetting('maintenance_mode', e.target.checked)}
-                            />
-                            <span className="slider round"></span>
-                        </label>
-                        <small style={{ display: 'block', color: '#aaa', fontSize: '0.8em' }}>{t('rdp.maintenanceModeDesc')}</small>
-                    </div>
-                    <div className="setting-item" style={{ display: 'flex', alignItems: 'center' }}>
-                        <button 
-                            className="stop-all-btn" 
-                            onClick={stopAllConnections}
-                            style={{ background: '#ff4444', color: 'white', border: 'none', padding: '8px 15px', borderRadius: '4px', cursor: 'pointer' }}
-                        >
-                            🛑 {t('rdp.stopAll')}
-                        </button>
-                    </div>
-                </div>
+            {/* Global Access Info */}
+            <div className="rdp-info-box glassmorphism" style={{ marginBottom: '20px', padding: '15px', background: 'rgba(76, 175, 80, 0.1)', borderLeft: '4px solid #4caf50' }}>
+                <h4 style={{ margin: '0 0 10px 0' }}>🌍 {t('rdp.globalAccess')}</h4>
+                <p style={{ margin: '0', fontSize: '0.9em' }}>{t('rdp.globalAccessDesc')}</p>
             </div>
+
+            {/* Settings Panel (Hidden by default or simplified) */}
+            {/* <div className="rdp-settings-panel glassmorphism" ... > ... </div> */}
+            
+            <h3 style={{ marginTop: '30px' }}>{t('rdp.savedConnections') || 'Saved Connections'}</h3>
 
             {loading ? (
                 <div className="loading">{t('common.loading')}</div>
@@ -279,7 +244,7 @@ url:s:
                                     <span className="protocol-badge">{conn.protocol}</span>
                                 </div>
                                 <div className="rdp-card-body">
-                                    <p><strong>Host:</strong> {conn.hostname}:{conn.port}</p>
+                                    <p><strong>IP:</strong> {conn.virtual_ip || conn.hostname}</p>
                                     <p><strong>User:</strong> {conn.username || '-'}</p>
                                 </div>
                                 <div className="rdp-card-actions">
@@ -288,7 +253,7 @@ url:s:
                                         onClick={() => handleConnect(conn)}
                                         title={t('rdp.connectWeb') || 'Connect via Web'}
                                     >
-                                        🌐 Web
+                                        🌐 Connect
                                     </button>
                                     <button 
                                         className="connect-btn secondary"
@@ -315,10 +280,10 @@ url:s:
             {showAddModal && (
                 <div className="modal-overlay">
                     <div className="modal-content glassmorphism-modal">
-                        <h3>{t('rdp.addConnection') || 'Add Connection'}</h3>
+                        <h3>{t('rdp.addDevice') || 'Add Device to Network'}</h3>
                         <form onSubmit={handleSubmit}>
                             <div className="form-group">
-                                <label>{t('rdp.name') || 'Name'}</label>
+                                <label>{t('rdp.name') || 'Device Name'}</label>
                                 <input 
                                     type="text" 
                                     name="name" 
@@ -326,11 +291,12 @@ url:s:
                                     onChange={handleInputChange} 
                                     required 
                                     className="glassmorphism-input"
+                                    placeholder="e.g. My Laptop"
                                 />
                             </div>
                             <div className="form-row">
                                 <div className="form-group">
-                                    <label>{t('rdp.hostname') || 'Hostname/IP'}</label>
+                                    <label>{t('rdp.hostname') || 'Device IP (Local)'}</label>
                                     <input 
                                         type="text" 
                                         name="hostname" 
@@ -338,21 +304,23 @@ url:s:
                                         onChange={handleInputChange} 
                                         required 
                                         className="glassmorphism-input"
+                                        placeholder="e.g. 192.168.1.50"
                                     />
                                 </div>
                                 <div className="form-group small">
-                                    <label>{t('rdp.port') || 'Port'}</label>
+                                    <label>{t('rdp.port') || 'RDP Port'}</label>
                                     <input 
                                         type="number" 
                                         name="port" 
                                         value={formData.port} 
                                         onChange={handleInputChange} 
                                         className="glassmorphism-input"
+                                        placeholder="3389"
                                     />
                                 </div>
                             </div>
                             <div className="form-group">
-                                <label>{t('rdp.username') || 'Username'}</label>
+                                <label>{t('rdp.username') || 'Windows Username'}</label>
                                 <input 
                                     type="text" 
                                     name="username" 
@@ -362,7 +330,7 @@ url:s:
                                 />
                             </div>
                             <div className="form-group">
-                                <label>{t('rdp.password') || 'Password'}</label>
+                                <label>{t('rdp.password') || 'Windows Password'}</label>
                                 <input 
                                     type="password" 
                                     name="password" 
@@ -376,7 +344,7 @@ url:s:
                                     {t('common.cancel')}
                                 </button>
                                 <button type="submit" className="primary">
-                                    {t('common.save')}
+                                    {t('rdp.createDevice') || 'Create Device'}
                                 </button>
                             </div>
                         </form>

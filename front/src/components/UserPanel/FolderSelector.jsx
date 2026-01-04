@@ -16,7 +16,8 @@ const FolderSelector = ({ user, onSelectFolder, onLogout, onThemeToggle, isDarkM
   };
 
   const handleRemoteWork = () => {
-    window.location.href = '/trabajar_remoto';
+    // window.location.href = '/trabajar_remoto';
+    onSelectFolder('remote');
   };
 
   const handleCalendar = () => {

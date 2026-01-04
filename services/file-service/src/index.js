@@ -462,12 +462,7 @@ app.get('/recent', authenticate, async (req, res) => {
         if (log.action === 'FILE_EDIT') {
              const match = log.details.match(/Editado archivo: (.+)/);
              if (match) {
-                 try {
-                    // Try to decode if it looks like base64, otherwise use as is
-                    // The log might contain the raw path or base64
-                    // In previous code we assumed base64 but let's be safe
-                    filePath = Buffer.from(match[1], 'base64').toString();
-                 } catch (e) { filePath = match[1]; }
+                 filePath = match[1];
              }
         } else if (log.action === 'CREATE_FILE') {
              const match = log.details.match(/Creado archivo: (.+)/);

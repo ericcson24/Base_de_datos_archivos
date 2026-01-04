@@ -172,21 +172,12 @@ app.get('/connections', async (req, res) => {
     try {
         // Verify token
         const authHeader = req.headers.authorization;
-        console.log('RDP /connections Auth Header:', authHeader); // Debug log
-
         if (!authHeader) return res.status(401).json({ error: 'No token provided' });
         
         const token = authHeader.split(' ')[1];
-        console.log('RDP /connections Token:', token); // Debug log
-
         const decoded = verifyToken(token);
         
-        // Allow all authenticated users to list connections
-        // if (decoded.role !== 'admin') {
-        //     return res.status(403).json({ error: 'Admin access required' });
-        // }
-
-        const connections = await dbAsync.all('SELECT id, name, hostname, port, username, protocol, created_at FROM rdp_connections ORDER BY name ASC');
+        const connections = await dbAsync.all('SELECT id, name, hostname, port, username, protocol, virtual_ip, created_at FROM rdp_connections ORDER BY name ASC');
         res.json(connections);
     } catch (error) {
         console.error('Error fetching connections:', error);
@@ -208,16 +199,27 @@ app.post('/connections', async (req, res) => {
 
         const { name, hostname, port, username, password, protocol } = req.body;
         
-        if (!name || !hostname) {
-            return res.status(400).json({ error: 'Name and Hostname are required' });
+        if (!hostname) {
+            return res.status(400).json({ error: 'Hostname/IP is required' });
         }
 
+        // Auto-assign Virtual IP (Mock logic: 10.10.10.x)
+        // Find the highest IP currently assigned
+        const lastIpRow = await dbAsync.get('SELECT virtual_ip FROM rdp_connections WHERE virtual_ip LIKE \'10.10.10.%\' ORDER BY id DESC LIMIT 1');
+        let nextOctet = 2;
+        if (lastIpRow && lastIpRow.virtual_ip) {
+            const parts = lastIpRow.virtual_ip.split('.');
+            nextOctet = parseInt(parts[3]) + 1;
+        }
+        const virtual_ip = `10.10.10.${nextOctet}`;
+        
+        // We store the REAL hostname for connection, but assign a virtual_ip for display
         await dbAsync.run(
-            'INSERT INTO rdp_connections (name, hostname, port, username, password, protocol) VALUES (?, ?, ?, ?, ?, ?)',
-            [name, hostname, port || 3389, username, password, protocol || 'rdp']
+            'INSERT INTO rdp_connections (name, hostname, port, username, password, protocol, virtual_ip) VALUES (?, ?, ?, ?, ?, ?, ?)',
+            [name, hostname, port || 3389, username, password, protocol || 'rdp', virtual_ip]
         );
 
-        res.json({ success: true });
+        res.json({ success: true, virtual_ip });
     } catch (error) {
         console.error('Error creating connection:', error);
         res.status(500).json({ error: error.message });

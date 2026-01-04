@@ -72,7 +72,8 @@ const initDb = async () => {
   try {
     console.log('Initializing RDP Database...');
     
-    // Create rdp_connections table
+    // Create rdp_connections table (Modified for VPN-like behavior)
+    // We keep 'hostname' but it will now store the Virtual IP
     await pool.query(`
       CREATE TABLE IF NOT EXISTS rdp_connections (
         id SERIAL PRIMARY KEY,
@@ -82,9 +83,19 @@ const initDb = async () => {
         username VARCHAR(255),
         password VARCHAR(255),
         protocol VARCHAR(50) DEFAULT 'rdp',
+        virtual_ip VARCHAR(50),
+        public_key VARCHAR(255),
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       )
     `);
+
+    // Ensure virtual_ip column exists (migration)
+    try {
+        await pool.query(`ALTER TABLE rdp_connections ADD COLUMN IF NOT EXISTS virtual_ip VARCHAR(50)`);
+        await pool.query(`ALTER TABLE rdp_connections ADD COLUMN IF NOT EXISTS public_key VARCHAR(255)`);
+    } catch (e) {
+        // Ignore if exists
+    }
 
     // Create rdp_settings table
     await pool.query(`

@@ -598,7 +598,8 @@ const Calendar = ({ user, onLogout, onBackToPanel, onBackToFolders, onThemeToggl
           }}
           onSave={async (eventData, mode) => {
             try {
-              const url = mode === 'create' ? '/api/events' : `/api/events/${modalState.event.id}`;
+              // Add trailing slash to ensure nginx matches the location block correctly
+              const url = mode === 'create' ? '/api/events/' : `/api/events/${modalState.event.id}`;
               const method = mode === 'create' ? 'POST' : 'PUT';
               
               const token = getAuthToken();
