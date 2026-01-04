@@ -4,6 +4,7 @@ import UserPanel from './components/UserPanel/UserPanel';
 import AdminPanel from './components/Admin/AdminPanel';
 import FolderSelector from './components/UserPanel/FolderSelector';
 import Calendar from './components/Calendar/Calendar';
+import { NotificationProvider } from './context/NotificationContext';
 import './App.css';
 
 // Utility functions for cookie management
@@ -52,6 +53,10 @@ function App() {
   // Función para toggle del tema
   const toggleTheme = () => {
     setIsDarkMode(!isDarkMode);
+  };
+
+  const handleUserUpdate = (updatedFields) => {
+    setUser(prev => ({ ...prev, ...updatedFields }));
   };
 
   // Verificar si hay token guardado al cargar la app
@@ -401,6 +406,7 @@ function App() {
   // Fallback - agregar debug
   console.log('Fallback render - isLoggedIn:', isLoggedIn, 'currentView:', currentView, 'user:', user);
   return (
+    <NotificationProvider user={user}>
     <div className="App">
       {/* <div style={{ padding: '20px', background: 'red', color: 'white' }}>
         <h2>DEBUG INFO:</h2>
@@ -441,6 +447,7 @@ function App() {
               setCurrentView('calendar');
               window.history.pushState(null, '', '/calendar');
             }}
+            onUserUpdate={handleUserUpdate}
           />
         ) : (
           <FolderSelector 
@@ -459,6 +466,7 @@ function App() {
         <Login onLogin={handleLogin} onThemeToggle={toggleTheme} isDarkMode={isDarkMode} />
       )}
     </div>
+    </NotificationProvider>
   );
 }
 

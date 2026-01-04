@@ -8,22 +8,22 @@ import { useLanguage } from '../../context/LanguageContext';
 import { useFetch } from '../../hooks/useFetch';
 import './SettingsModal.css';
 
-const SettingsModal = ({ onClose, user, onThemeToggle, isDarkMode, initialTab = 'general' }) => {
+const SettingsModal = ({ onClose, user, onThemeToggle, isDarkMode, initialTab = 'general', onUserUpdate }) => {
   const { addToast } = useToast();
   const fetchWithNotify = useFetch();
-  const { t, changeLanguage } = useLanguage();
+  const { t, changeLanguage, language: currentLanguage } = useLanguage();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [syncing, setSyncing] = useState(false);
   const [settings, setSettings] = useState({
-    username: '',
-    role: '',
-    avatarUrl: '',
-    theme: 'light',
-    language: 'es',
-    notifications: true,
-    storageUsed: 0,
-    storageLimit: 1024 * 1024 * 1024, // 1GB default
+    username: user?.username || '',
+    role: user?.role || '',
+    avatarUrl: user?.avatarUrl || '',
+    theme: isDarkMode ? 'dark' : 'light',
+    language: currentLanguage || 'es',
+    notifications: user?.notifications ?? true,
+    storageUsed: user?.storageUsed || 0,
+    storageLimit: user?.storageLimit || 1024 * 1024 * 1024, // 1GB default
     microsoftAccount: null // { email: '...', name: '...' }
   });
   const [newPassword, setNewPassword] = useState('');
@@ -89,6 +89,10 @@ const SettingsModal = ({ onClose, user, onThemeToggle, isDarkMode, initialTab = 
       const data = await response.json();
       if (data.success) {
         setSettings({ ...settings, avatarUrl: data.avatarUrl });
+        // Actualizar estado global inmediatamente
+        if (onUserUpdate) {
+          onUserUpdate({ avatarUrl: data.avatarUrl });
+        }
         // Notification handled by backend
         setShowAvatarSelector(false);
       }
@@ -112,6 +116,9 @@ const SettingsModal = ({ onClose, user, onThemeToggle, isDarkMode, initialTab = 
       const data = await response.json();
       if (response.ok && data.success) {
         setSettings({ ...settings, avatarUrl: null });
+        if (onUserUpdate) {
+          onUserUpdate({ avatarUrl: null });
+        }
         addToast(t('settings.avatarDeleted'), 'success');
         setShowAvatarSelector(false);
       } else {
@@ -136,7 +143,15 @@ const SettingsModal = ({ onClose, user, onThemeToggle, isDarkMode, initialTab = 
       if (response.ok) {
         const data = await response.json();
         if (data.success) {
-          setSettings(data.settings);
+          setSettings(prev => ({
+            ...prev,
+            ...data.settings,
+            // Mantener el estado visual actual para evitar inconsistencias
+            theme: isDarkMode ? 'dark' : 'light',
+            language: currentLanguage,
+            // Asegurar que notifications sea booleano
+            notifications: data.settings.notifications === undefined ? true : !!data.settings.notifications
+          }));
         }
       }
     } catch (error) {
@@ -170,6 +185,16 @@ const SettingsModal = ({ onClose, user, onThemeToggle, isDarkMode, initialTab = 
       });
 
       if (response.ok) {
+        // Actualizar estado global del usuario
+        if (onUserUpdate) {
+          onUserUpdate({
+            avatarUrl: settings.avatarUrl,
+            notifications: settings.notifications,
+            language: settings.language,
+            theme: settings.theme
+          });
+        }
+
         // Si cambió el tema, aplicar
         if ((settings.theme === 'dark' && !isDarkMode) || (settings.theme === 'light' && isDarkMode)) {
           onThemeToggle();
@@ -310,6 +335,10 @@ const SettingsModal = ({ onClose, user, onThemeToggle, isDarkMode, initialTab = 
                       src={settings.avatarUrl || `https://ui-avatars.com/api/?name=${settings.username}&background=random`} 
                       alt={t('settings.currentAvatar')} 
                       className="w-20 h-20 rounded-full object-cover border-4 border-white shadow-lg"
+                      onError={(e) => {
+                        e.target.onerror = null; 
+                        e.target.src = `https://ui-avatars.com/api/?name=${settings.username}&background=random`;
+                      }}
                     />
                     <button 
                       className="absolute bottom-0 right-0 bg-blue-600 text-white p-1.5 rounded-full hover:bg-blue-700 transition-colors shadow-md"

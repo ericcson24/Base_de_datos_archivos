@@ -7,10 +7,42 @@ const path = require('path');
 const axios = require('axios');
 const { dbAsync } = require('./database/db');
 const { encrypt, decrypt } = require('./utils/cryptoUtils');
+const multer = require('multer');
+const fs = require('fs');
 
 const app = express();
 const PORT = process.env.PORT || 5001;
 const EMAIL_SERVICE_URL = process.env.EMAIL_SERVICE_URL || 'http://email-service:5007';
+
+// Ensure uploads directory exists
+const uploadDir = path.join(__dirname, '../uploads');
+if (!fs.existsSync(uploadDir)) {
+    fs.mkdirSync(uploadDir, { recursive: true });
+}
+
+// Configure Multer
+const storage = multer.diskStorage({
+    destination: function (req, file, cb) {
+        cb(null, uploadDir)
+    },
+    filename: function (req, file, cb) {
+        const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9)
+        const ext = path.extname(file.originalname);
+        cb(null, 'avatar-' + uniqueSuffix + ext)
+    }
+});
+
+const upload = multer({ 
+    storage: storage,
+    limits: { fileSize: 5 * 1024 * 1024 }, // 5MB limit
+    fileFilter: (req, file, cb) => {
+        if (file.mimetype.startsWith('image/')) {
+            cb(null, true);
+        } else {
+            cb(new Error('Not an image! Please upload an image.'), false);
+        }
+    }
+});
 
 // Middleware
 app.use(cors({
@@ -19,6 +51,7 @@ app.use(cors({
 }));
 app.use(express.json());
 app.use(cookieParser());
+app.use('/uploads', express.static(uploadDir));
 
 // Helper to send email via Email Service
 async function sendEmail(to, subject, html) {
@@ -445,6 +478,48 @@ app.get('/microsoft/callback', async (req, res) => {
     
     res.redirect(`${baseUrl}/calendar?error=linking_failed`);
   }
+});
+
+// Avatar endpoints
+app.post('/avatar', authenticate, upload.single('avatar'), async (req, res) => {
+    try {
+        if (!req.file) {
+            return res.status(400).json({ success: false, message: 'No file uploaded' });
+        }
+
+        // Construct URL. Since we serve /uploads at /api/auth/uploads via gateway mapping
+        // We need to return the full path that the frontend can use.
+        // Gateway maps /api/auth/ -> auth-service:5001/
+        // So auth-service:5001/uploads/file.png -> /api/auth/uploads/file.png
+        const avatarUrl = `/api/auth/uploads/${req.file.filename}`;
+        const username = req.user.username;
+
+        // Update user in DB
+        await dbAsync.run('UPDATE users SET avatar_url = ? WHERE username = ?', [avatarUrl, username]);
+
+        res.json({ success: true, avatarUrl: avatarUrl });
+    } catch (error) {
+        console.error('Error uploading avatar:', error);
+        res.status(500).json({ success: false, message: 'Error uploading avatar' });
+    }
+});
+
+app.delete('/avatar', authenticate, async (req, res) => {
+    try {
+        const username = req.user.username;
+        // Optional: Delete file from disk if we want to be clean
+        // For now just clear DB
+        await dbAsync.run('UPDATE users SET avatar_url = NULL WHERE username = ?', [username]);
+        res.json({ success: true });
+    } catch (error) {
+        res.status(500).json({ success: false, message: 'Error deleting avatar' });
+    }
+});
+
+app.get('/avatars', async (req, res) => {
+    // Return list of default avatars if any
+    // For now return empty to let frontend use dicebear
+    res.json({ success: true, avatars: [] });
 });
 
 app.get('/', (req, res) => {

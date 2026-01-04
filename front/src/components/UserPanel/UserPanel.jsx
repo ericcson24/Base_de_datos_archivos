@@ -26,7 +26,7 @@ import './UserPanel.css';
 import './UserPanelDesktop.css';
 import './UserPanelMobile.css';
 
-const UserPanel = ({ user, onLogout, onBackToFolders, onThemeToggle, isDarkMode, onGoToCalendar }) => {
+const UserPanel = ({ user, onLogout, onBackToFolders, onThemeToggle, isDarkMode, onGoToCalendar, onUserUpdate }) => {
   console.log('UserPanel se está renderizando con user:', user);
   const { addToast } = useToast();
   const fetchWithNotify = useFetch();
@@ -1512,6 +1512,7 @@ useEffect(() => {
           onThemeToggle={onThemeToggle}
           isDarkMode={isDarkMode}
           initialTab={settingsInitialTab}
+          onUserUpdate={onUserUpdate}
         />
       )}
 
