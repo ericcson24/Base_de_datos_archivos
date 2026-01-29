@@ -86,14 +86,14 @@ const FileEditorPanel = ({ file, onClose, position, zIndex, onBringToFront, pane
           const blob = await response.blob();
           console.log('📦 [FileEditorPanel] Blob created:', blob.size, blob.type);
           
-          // Allow empty Word files (they can be edited)
-          if (blob.size === 0 && fileType !== 'word') {
+          // Allow empty Word, Excel, and PowerPoint files (they can be edited)
+          if (blob.size === 0 && !['word', 'excel', 'powerpoint'].includes(fileType)) {
              console.error('❌ [FileEditorPanel] Blob is empty');
              throw new Error(t('fileEditor.emptyFile'));
           }
           
-          if (blob.size === 0 && fileType === 'word') {
-             console.log('📝 [FileEditorPanel] Empty Word file - will allow editing');
+          if (blob.size === 0 && ['word', 'excel', 'powerpoint'].includes(fileType)) {
+             console.log('📝 [FileEditorPanel] Empty file - will allow editing');
           }
           
           // Check if blob is actually an error page (HTML/JSON)

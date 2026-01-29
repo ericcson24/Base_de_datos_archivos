@@ -491,7 +491,9 @@
     "saveError": "Error al guardar el archivo",
     "loading": "Cargando hoja de cálculo...",
     "saving": "Guardando...",
-    "save": "Guardar"
+    "save": "Guardar",
+    "cannotDeleteLastSheet": "No puedes eliminar la última hoja",
+    "enterSheetName": "Nombre de la hoja:"
   },
   "wordEditor": {
     "docNotSupported": "El formato .doc (Word 97-2003) no es soportado. Por favor, convierte el archivo a .docx o descárgalo para verlo.",
