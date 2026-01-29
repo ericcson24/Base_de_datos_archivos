@@ -7,7 +7,7 @@ SELECT setval(pg_get_serial_sequence('users', 'id'), COALESCE(MAX(id), 1)) FROM 
 
 INSERT INTO user_credentials ("user_id", "password_hash", "last_login", "failed_attempts", "is_locked", "updated_at", "lockout_until", "reset_token", "reset_token_expires") VALUES (1, '$2b$10$5IE8x47lLaCcZ4HCbboBgukqwWe9crpoc9p4nbnmyuVDhnWe2smV6', '2025-12-31 20:36:01', 0, FALSE, '2025-12-31 19:36:20', NULL, NULL, NULL) ON CONFLICT DO NOTHING;
 INSERT INTO user_credentials ("user_id", "password_hash", "last_login", "failed_attempts", "is_locked", "updated_at", "lockout_until", "reset_token", "reset_token_expires") VALUES (2, '$2b$10$ILqCVObCGgk2o7LnXkyCEu9UlVJgh71Bd9N2kGlyiz5b3rOIi0n9.', '2025-12-31 20:36:21', 0, FALSE, '2025-12-31 19:36:20', NULL, NULL, NULL) ON CONFLICT DO NOTHING;
-SELECT setval(pg_get_serial_sequence('user_credentials', 'id'), COALESCE(MAX(id), 1)) FROM user_credentials;
+-- user_credentials has user_id as PRIMARY KEY, not id, so no sequence to update
 
 INSERT INTO security_settings ("id", "user_id", "recovery_email_enc", "recovery_email_iv") VALUES (1, 1, NULL, NULL) ON CONFLICT DO NOTHING;
 SELECT setval(pg_get_serial_sequence('security_settings', 'id'), COALESCE(MAX(id), 1)) FROM security_settings;

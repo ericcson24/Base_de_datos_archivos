@@ -1,92 +1,333 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import mammoth from 'mammoth';
+import ReactQuill from 'react-quill';
+import 'react-quill/dist/quill.snow.css';
 import { useLanguage } from '../../../context/LanguageContext';
-import { downloadFile } from '../../../utils/fileUtils';
+import { useToast } from '../../../context/ToastContext';
 import './WordEditor.css';
 
-const WordEditor = ({ fileUrl, fileBlob, file }) => {
+const WordEditor = ({ fileUrl, fileBlob, file, onClose, onFileSaved }) => {
   const { t } = useLanguage();
+  const { addToast } = useToast();
   const [content, setContent] = useState('');
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
+  const [isEditing, setIsEditing] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const quillRef = useRef(null);
 
   const loadDocument = useCallback(async () => {
     try {
       setLoading(true);
       
-      // Check for .doc extension
       if (file.name.toLowerCase().endsWith('.doc')) {
-        setError(t('wordEditor.docNotSupported'));
+        addToast(t('wordEditor.docNotSupported'), 'error', 5000);
         setLoading(false);
         return;
       }
 
       let arrayBuffer;
+      let isEmpty = false;
 
       if (fileBlob) {
-        console.log('📄 [WordEditor] Loading from blob, size:', fileBlob.size);
+        console.log('[WordEditor] Loading from blob, size:', fileBlob.size);
         if (fileBlob.size === 0) {
-          throw new Error(t('wordEditor.emptyFile'));
+          console.log('[WordEditor] Empty file - starting in edit mode');
+          isEmpty = true;
+        } else {
+          arrayBuffer = await fileBlob.arrayBuffer();
+          if (arrayBuffer.byteLength === 0) isEmpty = true;
         }
-        arrayBuffer = await fileBlob.arrayBuffer();
       } else if (fileUrl) {
-        console.log('📄 [WordEditor] Loading from URL');
-        const response = await fetch(fileUrl);
-        if (!response.ok) throw new Error(t('wordEditor.downloadError'));
-        arrayBuffer = await response.arrayBuffer();
+        console.log('[WordEditor] Loading from URL:', fileUrl);
+        const token = localStorage.getItem('token');
+        const response = await fetch(fileUrl, {
+          headers: token ? { 'Authorization': `Bearer ${token}` } : {}
+        });
+        
+        if (!response.ok) {
+          console.error('[WordEditor] Fetch failed:', response.status);
+          isEmpty = true;
+        } else {
+          arrayBuffer = await response.arrayBuffer();
+          if (arrayBuffer.byteLength === 0) isEmpty = true;
+        }
       } else {
+        isEmpty = true;
+      }
+
+      if (isEmpty) {
+        console.log('[WordEditor] Empty document - enabling edit mode');
+        setContent('<p><br></p>');
+        setIsEditing(true);
+        addToast(t('wordEditor.emptyDocumentWarning'), 'info', 5000);
+        setLoading(false);
         return;
       }
-      
-      const result = await mammoth.convertToHtml({ arrayBuffer: arrayBuffer });
-      
-      if (!result.value) {
-        console.warn('Mammoth returned empty content');
-        if (result.messages.length > 0) {
-           console.warn('Mammoth messages:', result.messages);
+
+      // Primero intentar leer como HTML (más rápido y evita errores de Mammoth)
+      try {
+        const htmlText = new TextDecoder().decode(arrayBuffer);
+        
+        // Verificar si es HTML completo
+        if (htmlText && htmlText.includes('<!DOCTYPE html>')) {
+          console.log('[WordEditor] File is HTML format, extracting body content');
+          const parser = new DOMParser();
+          const doc = parser.parseFromString(htmlText, 'text/html');
+          const bodyContent = doc.body.innerHTML;
+          if (bodyContent && bodyContent.trim().length > 0) {
+            setContent(bodyContent);
+            setLoading(false);
+            return;
+          }
         }
-        // Don't error out, just show empty or warning
-        setContent(`<div class="alert alert-warning">${t('wordEditor.emptyContent')}</div>`);
-      } else {
-        setContent(result.value);
+        
+        // Verificar si es formato MHT (usado por html-docx-js antiguo)
+        if (htmlText.includes('Content-Type: text/html')) {
+          console.log('[WordEditor] Detected MHT format, extracting content');
+          const lines = htmlText.split('\n');
+          let inHtmlSection = false;
+          let htmlContent = '';
+          
+          for (let i = 0; i < lines.length; i++) {
+            const line = lines[i];
+            
+            if (line.includes('Content-Type: text/html')) {
+              inHtmlSection = true;
+              i += 3;
+              continue;
+            }
+            
+            if (inHtmlSection && line.startsWith('------=mht')) {
+              break;
+            }
+            
+            if (inHtmlSection) {
+              htmlContent += line + '\n';
+            }
+          }
+          
+          if (htmlContent.trim().length > 0) {
+            htmlContent = htmlContent.replace(/=\r?\n/g, '');
+            console.log('[WordEditor] Extracted MHT content');
+            setContent(htmlContent);
+            setLoading(false);
+            return;
+          }
+        }
+      } catch (htmlErr) {
+        console.log('[WordEditor] Not HTML format, trying Mammoth');
+      }
+
+      // Si no es HTML, intentar con Mammoth (archivos .docx reales)
+      try {
+        const result = await mammoth.convertToHtml({ arrayBuffer });
+        
+        if (result.value && result.value.trim().length > 0) {
+          setContent(result.value);
+        } else {
+          console.log('[WordEditor] Mammoth returned empty content');
+          setContent('<p><br></p>');
+          setIsEditing(true);
+          addToast(t('wordEditor.emptyDocumentWarning'), 'info', 5000);
+        }
+      } catch (mammothErr) {
+        console.error('[WordEditor] Mammoth error:', mammothErr);
+        setContent('<p><br></p>');
+        setIsEditing(true);
+        addToast(t('wordEditor.docxReadError'), 'error', 5000);
       }
       
-      if (result.messages.length > 0) {
-        console.log('Mammoth messages:', result.messages);
-      }
     } catch (err) {
-      console.error('Error loading Word document:', err);
-      setError(`${t('wordEditor.loadErrorGeneric')}${err.message}`);
+      console.error('[WordEditor] Error loading document:', err);
+      setContent('<p><br></p>');
+      setIsEditing(true);
+      addToast(t('wordEditor.loadErrorFallback'), 'warning', 5000);
     } finally {
       setLoading(false);
     }
-  }, [file.name, fileBlob, fileUrl]);
+  }, [file.name, fileBlob, fileUrl, t, addToast]);
 
   useEffect(() => {
     loadDocument();
   }, [loadDocument]);
 
-  if (loading) return <div className="flex items-center justify-center h-full">{t('wordEditor.loading')}</div>;
-  if (error) return <div className="flex items-center justify-center h-full text-red-500">{error}</div>;
+  const handleEdit = () => {
+    setIsEditing(true);
+  };
+
+  const handleCancel = () => {
+    setIsEditing(false);
+    loadDocument();
+  };
+
+  const handleSave = async () => {
+    try {
+      setIsSaving(true);
+      
+      const token = sessionStorage.getItem('auth_token') || localStorage.getItem('auth_token');
+      if (!token) {
+        addToast(t('wordEditor.noToken'), 'error');
+        return;
+      }
+
+      const htmlContent = content;
+      
+      const fullHtml = `
+        <!DOCTYPE html>
+        <html>
+          <head>
+            <meta charset="UTF-8">
+            <title>${file.name}</title>
+            <style>
+              body { 
+                font-family: Calibri, Arial, sans-serif; 
+                color: #000000 !important;
+                background: white;
+                line-height: 1.5;
+                margin: 1in;
+              }
+              p, h1, h2, h3, h4, h5, h6, span, div, td, th, li {
+                color: #000000 !important;
+              }
+              table { 
+                border-collapse: collapse; 
+                width: 100%; 
+              }
+              td, th { 
+                border: 1px solid #000; 
+                padding: 8px; 
+                color: #000000 !important;
+              }
+            </style>
+          </head>
+          <body>
+            ${htmlContent}
+          </body>
+        </html>
+      `;
+
+      // Guardar como HTML (Word puede abrir HTML con extensión .docx)
+      const htmlBlob = new Blob([fullHtml], { 
+        type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' 
+      });
+
+      const formData = new FormData();
+      formData.append('file', htmlBlob, file.name);
+
+      const response = await fetch(`/api/files/${file.id}`, {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        },
+        body: formData
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      addToast(t('wordEditor.saveSuccess'), 'success');
+      setIsEditing(false);
+      
+      // Llamar al callback para actualizar la lista de archivos
+      console.log('[WordEditor] Save successful, calling onFileSaved callback');
+      if (onFileSaved) {
+        console.log('[WordEditor] Executing onFileSaved callback');
+        onFileSaved();
+      } else {
+        console.warn('[WordEditor] No onFileSaved callback provided');
+      }
+      
+    } catch (error) {
+      console.error('[WordEditor] Save error:', error);
+      addToast(t('wordEditor.saveError'), 'error');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const modules = {
+    toolbar: [
+      [{ 'header': [1, 2, 3, false] }],
+      ['bold', 'italic', 'underline', 'strike'],
+      [{ 'list': 'ordered'}, { 'list': 'bullet' }],
+      [{ 'align': [] }],
+      [{ 'color': [] }, { 'background': [] }],
+      ['link'],
+      ['clean']
+    ]
+  };
+
+  const formats = [
+    'header',
+    'bold', 'italic', 'underline', 'strike',
+    'list', 'bullet',
+    'align',
+    'color', 'background',
+    'link'
+  ];
+
+  if (loading) {
+    return (
+      <div className="word-editor-container">
+        <div className="word-loading">
+          <div className="spinner"></div>
+          <p>{t('wordEditor.loading')}</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <div className="word-editor">
+    <div className="word-editor-container">
       <div className="word-toolbar">
-        <button 
-          onClick={() => downloadFile(file.id, file.name, t)}
-          className="px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-700 text-sm flex items-center"
-        >
-          ⬇️ {t('wordEditor.download')}
-        </button>
-        <span className="text-sm text-gray-500 ml-2">{file.name}</span>
-        <span className="text-xs text-orange-500 ml-auto">{t('wordEditor.readMode')}</span>
+        <div className="word-toolbar-left">
+          <h3>{file.name}</h3>
+        </div>
+        <div className="word-toolbar-right">
+          {!isEditing ? (
+            <button className="btn-edit" onClick={handleEdit}>
+              ✏️ {t('common.edit')}
+            </button>
+          ) : (
+            <>
+              <button 
+                className="btn-cancel" 
+                onClick={handleCancel}
+                disabled={isSaving}
+              >
+                {t('common.cancel')}
+              </button>
+              <button 
+                className="btn-save" 
+                onClick={handleSave}
+                disabled={isSaving}
+              >
+                {isSaving ? t('excelEditor.saving') : `💾 ${t('common.save')}`}
+              </button>
+            </>
+          )}
+        </div>
       </div>
 
-      <div className="word-content-container">
-        <div 
-          className="word-page"
-          dangerouslySetInnerHTML={{ __html: content }}
-        />
+      <div className="word-content">
+        {isEditing ? (
+          <ReactQuill
+            ref={quillRef}
+            theme="snow"
+            value={content}
+            onChange={setContent}
+            modules={modules}
+            formats={formats}
+            placeholder={t('wordEditor.emptyDocumentMessage')}
+            style={{ height: 'calc(100% - 42px)' }}
+          />
+        ) : (
+          <div 
+            className="word-preview"
+            dangerouslySetInnerHTML={{ __html: content }}
+          />
+        )}
       </div>
     </div>
   );

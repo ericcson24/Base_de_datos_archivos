@@ -1,0 +1,8 @@
+tunnel: 4c804487-8c50-4564-97ba-14cb9d48e2fd
+
+ingress:
+  - hostname: proyectonube.xyz
+    service: http://gateway:80
+  - hostname: www.proyectonube.xyz
+    service: http://gateway:80
+  - service: http_status:404

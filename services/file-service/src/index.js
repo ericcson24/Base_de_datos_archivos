@@ -87,6 +87,12 @@ const upload = multer({
   limits: { fileSize: 100 * 1024 * 1024 }
 });
 
+// Configuración de multer para actualización de archivos (usa carpeta temporal)
+const uploadTemp = multer({ 
+  dest: '/tmp/uploads',
+  limits: { fileSize: 100 * 1024 * 1024 }
+});
+
 // --- Rutas ---
 
 app.get('/', (req, res) => {
@@ -236,12 +242,28 @@ app.get('/download/:fileId', authenticate, async (req, res) => {
 // Crear archivo vacío
 app.post('/create', authenticate, async (req, res) => {
   try {
-    const { name, path: relativePath } = req.body;
+    const { name, path: relativePath, type } = req.body;
     const username = req.user.username;
     
     if (!name) return res.status(400).json({ success: false, message: 'Nombre requerido' });
 
-    const fullPath = path.join(UPLOAD_DIR, username, relativePath || '', name);
+    // Agregar extensión automáticamente según el tipo si no la tiene
+    let fileName = name;
+    const extensionMap = {
+      'word': '.docx',
+      'excel': '.xlsx',
+      'powerpoint': '.pptx',
+      'text': '.txt'
+    };
+
+    if (type && extensionMap[type]) {
+      const ext = extensionMap[type];
+      if (!fileName.toLowerCase().endsWith(ext)) {
+        fileName += ext;
+      }
+    }
+
+    const fullPath = path.join(UPLOAD_DIR, username, relativePath || '', fileName);
     
     try {
         await fs.access(fullPath);
@@ -249,14 +271,14 @@ app.post('/create', authenticate, async (req, res) => {
     } catch (e) {}
 
     await fs.writeFile(fullPath, '');
-    await logAction(username, 'CREATE_FILE', `Creado archivo: ${name}`);
+    await logAction(username, 'CREATE_FILE', `Creado archivo: ${fileName}`);
 
     res.json({
       success: true,
       message: 'Archivo creado',
       file: {
-        name: name,
-        path: path.join(relativePath || '', name),
+        name: fileName,
+        path: path.join(relativePath || '', fileName),
         type: 'file',
         size: 0,
         modified: new Date()
@@ -397,6 +419,52 @@ app.put('/:fileId/content', authenticate, async (req, res) => {
   }
 });
 
+// Update complete file (replace with new file upload)
+app.put('/:fileId', authenticate, uploadTemp.single('file'), async (req, res) => {
+  try {
+    const { fileId } = req.params;
+    console.log('[PUT] File update request:', fileId, 'User:', req.user.username);
+    
+    if (!req.file) {
+      console.log('[PUT] No file uploaded');
+      return res.status(400).json({ success: false, message: 'No file uploaded' });
+    }
+
+    console.log('[PUT] File received:', req.file.originalname, 'Size:', req.file.size);
+
+    const filePath = Buffer.from(fileId, 'base64').toString();
+    const fullPath = path.join(UPLOAD_DIR, req.user.username, filePath);
+
+    if (!fullPath.startsWith(path.join(UPLOAD_DIR, req.user.username))) {
+      return res.status(403).json({ success: false, message: 'Access denied' });
+    }
+
+    // Eliminar archivo existente si existe
+    try {
+      await fs.unlink(fullPath);
+    } catch (unlinkErr) {
+      // Si no existe, no pasa nada
+      if (unlinkErr.code !== 'ENOENT') {
+        console.warn('Warning unlinking old file:', unlinkErr);
+      }
+    }
+
+    // Copiar el archivo nuevo (no podemos usar rename entre diferentes filesystems)
+    console.log('[PUT] Copying file from', req.file.path, 'to', fullPath);
+    await fs.copyFile(req.file.path, fullPath);
+    
+    // Eliminar el archivo temporal
+    await fs.unlink(req.file.path);
+    console.log('[PUT] File saved successfully');
+
+    await logAction(req.user.username, 'FILE_EDIT', `Updated file: ${filePath}`);
+    res.json({ success: true, message: 'File updated successfully' });
+  } catch (error) {
+    console.error('Error updating file:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
 // Preview / Ver contenido
 app.get('/preview/:fileId', authenticate, async (req, res) => {
   try {
@@ -404,11 +472,13 @@ app.get('/preview/:fileId', authenticate, async (req, res) => {
     let filePath;
     try {
         filePath = Buffer.from(fileId, 'base64').toString();
+        console.log('[PREVIEW] Decoded file path:', filePath);
     } catch (e) {
         return res.status(400).json({ success: false, message: 'ID inválido' });
     }
 
     const fullPath = path.join(UPLOAD_DIR, req.user.username, filePath);
+    console.log('[PREVIEW] Full path:', fullPath);
     
     if (!fullPath.startsWith(path.join(UPLOAD_DIR, req.user.username))) {
         return res.status(403).json({ success: false, message: 'Acceso denegado' });

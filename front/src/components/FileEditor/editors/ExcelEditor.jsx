@@ -4,7 +4,7 @@ import { useLanguage } from '../../../context/LanguageContext';
 import { getAuthToken } from '../../../utils/fileUtils';
 import './ExcelEditor.css';
 
-const ExcelEditor = ({ fileUrl, fileBlob, file, onClose }) => {
+const ExcelEditor = ({ fileUrl, fileBlob, file, onClose, onFileSaved }) => {
   const { t } = useLanguage();
   const [workbook, setWorkbook] = useState(null);
   const [activeSheet, setActiveSheet] = useState('');
@@ -81,7 +81,7 @@ const ExcelEditor = ({ fileUrl, fileBlob, file, onClose }) => {
 
   const handleSave = async () => {
     try {
-      const token = getAuthToken();
+      const token = sessionStorage.getItem('auth_token') || localStorage.getItem('auth_token') || getAuthToken();
       if (!token) {
         alert(t('excelEditor.noSession'));
         return;
@@ -93,39 +93,36 @@ const ExcelEditor = ({ fileUrl, fileBlob, file, onClose }) => {
       const newSheet = XLSX.utils.aoa_to_sheet(data);
       workbook.Sheets[activeSheet] = newSheet;
 
-      // Generar archivo
+      // Generar archivo Excel
       const wbout = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' });
       const blob = new Blob([wbout], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
 
-      // Subir
+      // Usar el nuevo endpoint PUT para actualizar el archivo
       const formData = new FormData();
       formData.append('file', blob, file.name);
-      formData.append('path', file.path.substring(0, file.path.lastIndexOf('/'))); // Parent folder path
-      
-      // Usamos el endpoint de upload existente, que sobrescribirá si el nombre es igual
-      // Pero necesitamos asegurarnos de que vaya a la ruta correcta.
-      // El endpoint /api/files/upload espera 'path' como la carpeta destino.
-      
-      // Extraer el directorio del path del archivo
-      const pathParts = file.path.split('/');
-      pathParts.pop(); // Quitar nombre de archivo
-      const dirPath = pathParts.join('/');
 
-      const uploadFormData = new FormData();
-      uploadFormData.append('files', blob, file.name);
-      uploadFormData.append('path', dirPath);
-
-      const response = await fetch('/api/files/upload', {
-        method: 'POST',
+      const response = await fetch(`/api/files/${file.id}`, {
+        method: 'PUT',
         headers: {
-          'Authorization': `Bearer ${getAuthToken()}`
+          'Authorization': `Bearer ${token}`
         },
-        body: uploadFormData
+        body: formData
       });
 
-      if (!response.ok) throw new Error(t('excelEditor.saveError'));
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
 
       alert(t('excelEditor.saveSuccess'));
+      
+      // Llamar al callback para actualizar la lista de archivos
+      console.log('[ExcelEditor] Save successful, calling onFileSaved callback');
+      if (onFileSaved) {
+        console.log('[ExcelEditor] Executing onFileSaved callback');
+        onFileSaved();
+      } else {
+        console.warn('[ExcelEditor] No onFileSaved callback provided');
+      }
     } catch (err) {
       console.error('Error saving Excel file:', err);
       alert(t('excelEditor.saveError'));

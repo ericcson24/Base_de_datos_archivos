@@ -7,6 +7,7 @@ import AudioPlayer from './editors/AudioPlayer';
 import ZipViewer from './editors/ZipViewer';
 import ExcelEditor from './editors/ExcelEditor';
 import WordEditor from './editors/WordEditor';
+import PowerPointEditor from './editors/PowerPointEditor';
 import { downloadFile, getAuthToken } from '../../utils/fileUtils';
 import { useLanguage } from '../../context/LanguageContext';
 import './FileEditorPanel.css';
@@ -25,7 +26,7 @@ const getFileType = (filename) => {
   return 'unsupported';
 };
 
-const FileEditorPanel = ({ file, onClose, position, zIndex, onBringToFront, panelId, isInline = false }) => {
+const FileEditorPanel = ({ file, onClose, position, zIndex, onBringToFront, panelId, isInline = false, onFileSaved }) => {
   const { t } = useLanguage();
   const [size, setSize] = useState({ width: 800, height: 600 });
   const [pos, setPos] = useState(position || { x: 100, y: 100 });
@@ -85,13 +86,18 @@ const FileEditorPanel = ({ file, onClose, position, zIndex, onBringToFront, pane
           const blob = await response.blob();
           console.log('📦 [FileEditorPanel] Blob created:', blob.size, blob.type);
           
-          if (blob.size === 0) {
+          // Allow empty Word files (they can be edited)
+          if (blob.size === 0 && fileType !== 'word') {
              console.error('❌ [FileEditorPanel] Blob is empty');
              throw new Error(t('fileEditor.emptyFile'));
           }
           
+          if (blob.size === 0 && fileType === 'word') {
+             console.log('📝 [FileEditorPanel] Empty Word file - will allow editing');
+          }
+          
           // Check if blob is actually an error page (HTML/JSON)
-          if (blob.type.includes('text/html') || blob.type.includes('application/json')) {
+          if (blob.size > 0 && (blob.type.includes('text/html') || blob.type.includes('application/json'))) {
              console.warn('⚠️ [FileEditorPanel] Blob type is suspicious for binary file:', blob.type);
              // Try to read as text to see if it's an error
              const text = await blob.text();
@@ -284,34 +290,11 @@ const FileEditorPanel = ({ file, onClose, position, zIndex, onBringToFront, pane
       case 'zip':
         return <ZipViewer file={fileBlob} fileUrl={fileUrl} onClose={onClose} />;
       case 'word':
-        return <WordEditor fileBlob={fileBlob} fileUrl={fileUrl} file={file} onClose={onClose} />;
+        return <WordEditor fileBlob={fileBlob} fileUrl={fileUrl} file={file} onClose={onClose} onFileSaved={onFileSaved} />;
       case 'excel':
-        return <ExcelEditor fileBlob={fileBlob} fileUrl={fileUrl} file={file} onClose={onClose} />;
+        return <ExcelEditor fileBlob={fileBlob} fileUrl={fileUrl} file={file} onClose={onClose} onFileSaved={onFileSaved} />;
       case 'powerpoint':
-        return (
-          <div className="flex items-center justify-center h-full text-gray-500 bg-gray-50 dark:bg-gray-900">
-            <div className="text-center p-8 bg-white dark:bg-gray-800 rounded-xl shadow-lg max-w-md">
-              <div className="text-6xl mb-4">
-                📽️
-              </div>
-              <h3 className="text-xl font-bold mb-2 text-gray-800 dark:text-white">
-                {t('fileEditor.presentation')}
-              </h3>
-              <p className="mb-6 text-gray-600 dark:text-gray-300">
-                {t('fileEditor.presentationDesc')}
-              </p>
-              <button
-                onClick={() => downloadFile(file.id, file.name, t)}
-                className="px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors flex items-center justify-center mx-auto space-x-2"
-              >
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-                </svg>
-                <span>{t('fileEditor.downloadToEdit')}</span>
-              </button>
-            </div>
-          </div>
-        );
+        return <PowerPointEditor fileBlob={fileBlob} fileUrl={fileUrl} file={file} onClose={onClose} onFileSaved={onFileSaved} />;
       default:
         return (
           <div className="flex items-center justify-center h-full text-gray-500">

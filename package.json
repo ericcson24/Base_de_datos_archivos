@@ -1,0 +1,34 @@
+{
+  "name": "base-de-datos-archivos",
+  "version": "1.0.0",
+  "description": "Sistema de gestión de archivos con microservicios",
+  "scripts": {
+    "start": "docker compose up --build",
+    "stop": "docker compose down",
+    "restart": "docker compose restart",
+    "logs": "docker compose logs -f",
+    "clean": "docker compose down -v",
+    "dev:front": "cd front && npm start",
+    "dev:auth": "cd services/auth-service && npm start",
+    "dev:file": "cd services/file-service && npm start",
+    "dev:user": "cd services/user-service && npm start",
+    "dev:admin": "cd services/admin-service && npm start",
+    "dev:email": "cd services/email-service && npm start",
+    "dev:notification": "cd services/notification-service && npm start",
+    "dev:outlook": "cd services/outlook-service && npm start",
+    "install:all": "npm run install:front && npm run install:services",
+    "install:front": "cd front && npm install",
+    "install:services": "cd services/auth-service && npm install && cd ../file-service && npm install && cd ../user-service && npm install && cd ../admin-service && npm install && cd ../email-service && npm install && cd ../notification-service && npm install && cd ../outlook-service && npm install"
+  },
+  "keywords": [
+    "microservices",
+    "docker",
+    "react",
+    "node"
+  ],
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "concurrently": "^9.1.2"
+  }
+}

@@ -30,7 +30,7 @@ services:
       POSTGRES_PASSWORD: ${DB_PASSWORD:-admin123}
       POSTGRES_DB: ${DB_NAME:-server_db}
     ports:
-      - "5432:5432"
+      - "5433:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./postgres-init:/docker-entrypoint-initdb.d
@@ -186,12 +186,16 @@ services:
   # --- Cloudflare Tunnel (Global Access) ---
   tunnel:
     image: cloudflare/cloudflared:latest
-    command: tunnel run
+    command: tunnel --config /etc/cloudflared/config.yml run
     environment:
       - TUNNEL_TOKEN=${TUNNEL_TOKEN}
+    volumes:
+      - ./cloudflared-config.yml:/etc/cloudflared/config.yml:ro
     restart: unless-stopped
     networks:
       - app-network
+    depends_on:
+      - gateway
 
 volumes:
   postgres_data:

@@ -153,8 +153,13 @@ const UserPanel = ({ user, onLogout, onBackToFolders, onThemeToggle, isDarkMode,
     let totalSize = 0;
 
     for (let file of files) {
+      // Validar tamaño máximo
       if (file.size > maxFileSize) {
         invalidFiles.push(t('userPanel.fileTooBig', { name: file.name }));
+      }
+      // Validar que el archivo no esté vacío
+      if (file.size === 0) {
+        invalidFiles.push(t('userPanel.fileEmpty', { name: file.name }));
       }
       totalSize += file.size;
     }
@@ -214,6 +219,7 @@ const UserPanel = ({ user, onLogout, onBackToFolders, onThemeToggle, isDarkMode,
 
 const loadFiles = useCallback(async () => {
   try {
+    console.log('[UserPanel] loadFiles() called - starting file list refresh');
     setLoading(true);
     
     if (currentView === 'shared' && currentPath.length === 0) {
@@ -258,6 +264,7 @@ const loadFiles = useCallback(async () => {
       }
     });
     const data = await response.json();
+    console.log('[UserPanel] Files loaded:', data.files?.length || 0, 'files');
     setFiles(data.files || []);
     setStorageUsed(data.storageUsed || 0);
   } catch (error) {
@@ -1427,6 +1434,10 @@ useEffect(() => {
                   panelId={panel.id}
                   onClose={() => closeEditorPanel(panel.id)}
                   onBringToFront={() => bringPanelToFront(panel.id)}
+                  onFileSaved={() => {
+                    console.log('File saved, reloading files...');
+                    loadFiles();
+                  }}
                   isInline={true}
                 />
               </div>
