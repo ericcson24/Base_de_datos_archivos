@@ -18,7 +18,8 @@ import {
   getAuthToken, 
   downloadFile, 
   formatFileSize, 
-  canPreview
+  canPreview,
+  canEdit
 } from '../../utils/fileUtils';
 import { useFetch } from '../../hooks/useFetch';
 import { useToast } from '../../context/ToastContext';
@@ -74,6 +75,18 @@ const UserPanel = ({ user, onLogout, onBackToFolders, onThemeToggle, isDarkMode,
         addToast(t('userPanel.microsoftLinkedSuccess'), 'success');
       }
     }
+  }, []);
+
+  // Listener para abrir editor desde el modal
+  useEffect(() => {
+    const handleOpenEditor = (event) => {
+      openEditorPanel(event.detail);
+    };
+
+    window.addEventListener('openEditorPanel', handleOpenEditor);
+    return () => {
+      window.removeEventListener('openEditorPanel', handleOpenEditor);
+    };
   }, []);
 
   // Estados para viewer y hover
@@ -729,7 +742,10 @@ useEffect(() => {
   };
 
   const handleFileLeave = () => {
-    setHoveredFile(null);
+    // Añadir un pequeño delay para evitar bugs de hover
+    setTimeout(() => {
+      setHoveredFile(null);
+    }, 100);
   };
 
   const handleDragEnter = useCallback((e) => {
@@ -788,6 +804,9 @@ useEffect(() => {
       return;
     }
 
+    // NUEVO: Cerrar todos los paneles anteriores (solo un panel a la vez)
+    // Esto asegura que solo haya un editor abierto a la vez
+    
     // Crear nuevo panel
     const newZIndex = highestZIndex + 1;
     const newPanel = {
@@ -800,7 +819,8 @@ useEffect(() => {
       zIndex: newZIndex
     };
 
-    setEditorPanels([...editorPanels, newPanel]);
+    // Reemplazar todos los paneles con solo el nuevo panel
+    setEditorPanels([newPanel]);
     setNextPanelId(nextPanelId + 1);
     setHighestZIndex(newZIndex);
   };
@@ -1303,7 +1323,8 @@ useEffect(() => {
                   onFileClick={(file) => {
                     if (file.type === 'folder') {
                       navigateToFolder(file.name);
-                    } else if (canPreview(file.name)) {
+                    } else if (canEdit(file.name) || canPreview(file.name)) {
+                      // Abrir archivos de Office y previsualizable en el visor modal
                       openFileViewer(file);
                     } else {
                       downloadFile(file.id, file.name, t);

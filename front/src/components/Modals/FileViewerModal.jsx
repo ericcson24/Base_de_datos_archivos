@@ -1,8 +1,84 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import mammoth from 'mammoth';
-import { getFileType, getFileIcon, canPreview, getAuthenticatedPreviewUrl, formatFileSize, downloadFile, getAuthToken } from '../../utils/fileUtils';
+import { getFileType, getFileIcon, canPreview, canEdit, getAuthenticatedPreviewUrl, formatFileSize, downloadFile, getAuthToken } from '../../utils/fileUtils';
 import { useLanguage } from '../../context/LanguageContext';
+import { useToast } from '../../context/ToastContext';
+import WordEditor from '../FileEditor/editors/WordEditor';
+import ExcelEditor from '../FileEditor/editors/ExcelEditor';
+import PowerPointEditor from '../FileEditor/editors/PowerPointEditor';
 import './FileViewerModal.css';
+
+// Wrapper para Excel con modo de solo lectura inicial
+const ExcelViewerWrapper = ({ file, onFileSaved }) => {
+  const [isEditing, setIsEditing] = useState(false);
+  const { t } = useLanguage();
+
+  if (!isEditing) {
+    return (
+      <div className="viewer-content office-viewer flex flex-col items-center justify-center h-full p-8">
+        <div className="text-6xl mb-4">📊</div>
+        <h3 className="text-xl font-semibold mb-2 text-gray-900 dark:text-slate-100">{file.name}</h3>
+        <p className="text-gray-600 dark:text-gray-400 text-center mb-6">
+          {t('fileViewer.clickToEditExcel')}
+        </p>
+        <button 
+          onClick={() => setIsEditing(true)}
+          className="px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors shadow-lg flex items-center"
+        >
+          <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+          </svg>
+          {t('fileViewer.enableEditing')}
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <ExcelEditor 
+      file={file}
+      fileUrl={`/api/files/preview/${file.id}?token=${encodeURIComponent(getAuthToken())}`}
+      onClose={() => {}}
+      onFileSaved={onFileSaved}
+    />
+  );
+};
+
+// Wrapper para PowerPoint con modo de solo lectura inicial
+const PowerPointViewerWrapper = ({ file, onFileSaved }) => {
+  const [isEditing, setIsEditing] = useState(false);
+  const { t } = useLanguage();
+
+  if (!isEditing) {
+    return (
+      <div className="viewer-content office-viewer flex flex-col items-center justify-center h-full p-8">
+        <div className="text-6xl mb-4">📽️</div>
+        <h3 className="text-xl font-semibold mb-2 text-gray-900 dark:text-slate-100">{file.name}</h3>
+        <p className="text-gray-600 dark:text-gray-400 text-center mb-6">
+          {t('fileViewer.clickToEditPowerPoint')}
+        </p>
+        <button 
+          onClick={() => setIsEditing(true)}
+          className="px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors shadow-lg flex items-center"
+        >
+          <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+          </svg>
+          {t('fileViewer.enableEditing')}
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <PowerPointEditor 
+      file={file}
+      fileUrl={`/api/files/preview/${file.id}?token=${encodeURIComponent(getAuthToken())}`}
+      onClose={() => {}}
+      onFileSaved={onFileSaved}
+    />
+  );
+};
 
 const WordFileViewer = ({ fileId, fileName, onLoad, onError }) => {
   const [content, setContent] = useState('');
@@ -75,15 +151,17 @@ const TextFileViewer = ({ fileId, fileName, onLoad, onError }) => {
 };
 
 const FileViewerModal = ({ file, onClose, user }) => {
-  const [loading, setLoading] = useState(true);
+  const fileType = getFileType(file.name);
+  // Word y archivos de Office se manejan internamente, no necesitan loading inicial
+  const [loading, setLoading] = useState(fileType !== 'word' && fileType !== 'text');
   const [error, setError] = useState(null);
   const [authenticatedUrl, setAuthenticatedUrl] = useState(null);
-  const fileType = getFileType(file.name);
   const { t } = useLanguage();
+  const { addToast } = useToast();
 
   const loadAuthenticatedPreview = useCallback(async () => {
-    // Permitir preview para word aunque canPreview diga false
-    if (!canPreview(file.name) && fileType !== 'word') {
+    // Permitir preview para word, excel y powerpoint aunque canPreview diga false
+    if (!canPreview(file.name) && !canEdit(file.name)) {
       setLoading(false);
       return;
     }
@@ -100,20 +178,23 @@ const FileViewerModal = ({ file, onClose, user }) => {
       setError(t('fileViewer.errorLoading'));
       setLoading(false);
     }
-  }, [file.id, file.name, fileType, t]);
+  }, [file.id, file.name, fileType, t, canEdit, canPreview]);
 
   useEffect(() => {
-    setLoading(true);
+    // Solo mostrar loading para archivos que necesitan URL autenticada
+    if (fileType !== 'word' && fileType !== 'text') {
+      setLoading(true);
+    }
     setError(null);
     loadAuthenticatedPreview();
-  }, [file, loadAuthenticatedPreview]);
+  }, [file, loadAuthenticatedPreview, fileType]);
 
   const handleDownload = () => {
     downloadFile(file.id, file.name, t);
   };
 
   const renderFileContent = () => {
-    if (!authenticatedUrl && canPreview(file.name)) {
+    if (!authenticatedUrl && (canPreview(file.name) || canEdit(file.name)) && fileType !== 'word') {
       return (
         <div className="viewer-content loading">
           <div className="loading-spinner"></div>
@@ -175,42 +256,39 @@ const FileViewerModal = ({ file, onClose, user }) => {
 
       case 'word':
         return (
-          <WordFileViewer
-            fileId={file.id}
-            fileName={file.name}
-            onLoad={() => setLoading(false)}
-            onError={(err) => {
-              setError(err);
-              setLoading(false);
-            }}
-          />
+          <div className="w-full h-full">
+            <WordEditor 
+              file={file}
+              fileUrl={`/api/files/preview/${file.id}?token=${encodeURIComponent(getAuthToken())}`}
+              onClose={() => {}} 
+              onFileSaved={() => {
+                addToast(t('fileViewer.fileSaved'), 'success');
+              }}
+            />
+          </div>
         );
 
       case 'excel':
-      case 'powerpoint':
-        // Usar Google Docs Viewer para archivos de Office
-        // Nota: Esto requiere que el servidor sea accesible públicamente.
-        // Como estamos en localhost, esto no funcionará directamente.
-        // En un entorno real, authenticatedUrl debería ser una URL pública.
-        // Para localhost, mostraremos un mensaje amigable.
         return (
-          <div className="viewer-content office-viewer flex flex-col items-center justify-center h-full p-8">
-            <div className="text-6xl mb-4">{getFileIcon(file.name)}</div>
-            <h3 className="text-xl font-semibold mb-2">{t('fileViewer.previewNotAvailable')}</h3>
-            <p className="text-gray-600 dark:text-gray-400 text-center mb-6">
-              {t('fileViewer.officeRequirement')}
-              <br />
-              {t('fileViewer.downloadToView')}
-            </p>
-            <button 
-              onClick={handleDownload}
-              className="px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors shadow-lg flex items-center"
-            >
-              <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-              </svg>
-              {t('fileViewer.downloadButton')}
-            </button>
+          <div className="w-full h-full">
+            <ExcelViewerWrapper 
+              file={file}
+              onFileSaved={() => {
+                addToast(t('fileViewer.fileSaved'), 'success');
+              }}
+            />
+          </div>
+        );
+
+      case 'powerpoint':
+        return (
+          <div className="w-full h-full">
+            <PowerPointViewerWrapper 
+              file={file}
+              onFileSaved={() => {
+                addToast(t('fileViewer.fileSaved'), 'success');
+              }}
+            />
           </div>
         );
 
@@ -241,9 +319,17 @@ const FileViewerModal = ({ file, onClose, user }) => {
     }
   };
 
+  // Determinar si es un archivo de Office para ajustar el tamaño del modal
+  const isOfficeFile = ['word', 'excel', 'powerpoint'].includes(fileType);
+
   return (
     <div className="fixed inset-0 bg-black/50 dark:bg-black/70 flex items-center justify-center z-50" onClick={onClose}>
-      <div className="glassmorphism-modal dark:bg-slate-800 rounded-lg shadow-2xl border-gray-200 dark:border-slate-600 w-full max-w-4xl mx-4 max-h-[90vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
+      <div 
+        className={`glassmorphism-modal dark:bg-slate-800 rounded-lg shadow-2xl border-gray-200 dark:border-slate-600 mx-4 flex flex-col ${
+          isOfficeFile ? 'w-full max-w-7xl h-[95vh]' : 'w-full max-w-4xl max-h-[90vh]'
+        }`} 
+        onClick={(e) => e.stopPropagation()}
+      >
         <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-slate-600">
           <h3 className="text-lg font-semibold text-gray-900 dark:text-slate-100 truncate">{file.name}</h3>
           <div className="flex items-center space-x-2">
@@ -260,7 +346,7 @@ const FileViewerModal = ({ file, onClose, user }) => {
           </div>
         </div>
 
-        <div className="flex-1 overflow-y-auto p-4">
+        <div className={`flex-1 overflow-hidden ${isOfficeFile ? 'p-0' : 'p-4 overflow-y-auto'}`}>
           {loading && (
             <div className="flex flex-col items-center justify-center py-16">
               <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mb-4"></div>
