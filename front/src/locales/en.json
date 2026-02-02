@@ -232,6 +232,7 @@
   "calendar": {
     "title": "Calendar",
     "today": "Today",
+    "aiAssistant": "AI Assistant",
     "month": "Month",
     "week": "Week",
     "day": "Day",

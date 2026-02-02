@@ -269,6 +269,7 @@
   "calendar": {
     "title": "Calendario",
     "today": "Hoy",
+    "aiAssistant": "Asistente IA",
     "month": "Mes",
     "week": "Semana",
     "day": "Día",
@@ -672,6 +673,8 @@
     "relevantFiles": "Archivos Relevantes",
     "open": "Abrir",
     "download": "Descargar",
-    "noFilesFound": "No se encontraron archivos relacionados."
+    "noFilesFound": "No se encontraron archivos relacionados.",
+    "foundIn": "Encontrado en:",
+    "viewInContext": "Ver en documento"
   }
 }

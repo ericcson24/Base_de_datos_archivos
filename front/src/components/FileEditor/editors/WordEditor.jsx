@@ -2,11 +2,12 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import mammoth from 'mammoth';
 import ReactQuill from 'react-quill';
 import 'react-quill/dist/quill.snow.css';
+import { getAuthToken } from '../../../utils/fileUtils';
 import { useLanguage } from '../../../context/LanguageContext';
 import { useToast } from '../../../context/ToastContext';
 import './WordEditor.css';
 
-const WordEditor = ({ fileUrl, fileBlob, file, onClose, onFileSaved }) => {
+const WordEditor = ({ fileUrl, fileBlob, file, onClose, onFileSaved, highlightText }) => {
   const { t } = useLanguage();
   const { addToast } = useToast();
   const [content, setContent] = useState('');
@@ -39,7 +40,7 @@ const WordEditor = ({ fileUrl, fileBlob, file, onClose, onFileSaved }) => {
         }
       } else if (fileUrl) {
         console.log('[WordEditor] Loading from URL:', fileUrl);
-        const token = localStorage.getItem('token');
+        const token = getAuthToken();
         const response = await fetch(fileUrl, {
           headers: token ? { 'Authorization': `Bearer ${token}` } : {}
         });
@@ -75,7 +76,12 @@ const WordEditor = ({ fileUrl, fileBlob, file, onClose, onFileSaved }) => {
           const doc = parser.parseFromString(htmlText, 'text/html');
           const bodyContent = doc.body.innerHTML;
           if (bodyContent && bodyContent.trim().length > 0) {
-            setContent(bodyContent);
+            let processingContent = bodyContent;
+             if (highlightText && highlightText.length > 2) {
+               const regex = new RegExp(`(${highlightText.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'gi');
+               processingContent = processingContent.replace(regex, '<span style="background-color: yellow; color: black; font-weight: bold;">$1</span>');
+            }
+            setContent(processingContent);
             setLoading(false);
             return;
           }
@@ -123,7 +129,13 @@ const WordEditor = ({ fileUrl, fileBlob, file, onClose, onFileSaved }) => {
         const result = await mammoth.convertToHtml({ arrayBuffer });
         
         if (result.value && result.value.trim().length > 0) {
-          setContent(result.value);
+          let processingContent = result.value;
+          // Apply highlighting if props provided
+          if (highlightText && highlightText.length > 2) {
+               const regex = new RegExp(`(${highlightText.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'gi');
+               processingContent = processingContent.replace(regex, '<span style="background-color: yellow; color: black; font-weight: bold;">$1</span>');
+          }
+          setContent(processingContent);
         } else {
           console.log('[WordEditor] Mammoth returned empty content');
           setContent('<p><br></p>');

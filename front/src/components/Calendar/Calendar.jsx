@@ -567,16 +567,10 @@ const Calendar = ({ user, onLogout, onBackToPanel, onBackToFolders, onThemeToggl
           </button>
           
           <button 
-            className="create-event-btn ai-btn" 
-            style={{ 
-              marginTop: '10px', 
-              background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-              border: 'none',
-              boxShadow: '0 4px 15px rgba(118, 75, 162, 0.3)'
-            }}
+            className="create-event-btn" 
             onClick={() => setShowAIModal(true)}
           >
-            <span style={{ marginRight: '8px' }}>✨</span> {t('calendar.aiAssistant') || 'Asistente IA'}
+            <span style={{ marginRight: '8px' }}>✨</span> {t('calendar.aiAssistant')}
           </button>
 
           {(user.role === 'admin' || user.role === 'boss') && (

@@ -45,8 +45,20 @@ class AutoSyncService {
         return;
       }
 
-      // Obtener todos los usuarios
-      const users = await this.db.all('SELECT id, username FROM users');
+      // Obtener todos los usuarios (Compatible Postgres: db.query en lugar de db.all)
+      let users = [];
+      try {
+        if (this.db.query) {
+             const res = await this.db.query('SELECT id, username FROM users');
+             users = res.rows;
+        } else {
+             // Fallback sqlite
+             users = await this.db.all('SELECT id, username FROM users');
+        }
+      } catch (err) {
+         console.error('Error fetching users:', err);
+         return;
+      }
       
       let totalSynced = 0;
       let totalUpdated = 0;
@@ -147,29 +159,47 @@ class AutoSyncService {
   async syncFile(userId, fileInfo) {
     try {
       // Verificar si el archivo ya existe
-      const existing = await this.db.get(
-        'SELECT id, physical_path, size FROM files WHERE owner_id = ? AND name = ?',
-        [userId, fileInfo.name]
-      );
+      let existing = null;
+      const querySelect = 'SELECT id, physical_path, size FROM files WHERE owner_id = $1 AND name = $2';
+      
+      if (this.db.query) { // Postgres
+          const res = await this.db.query(querySelect, [userId, fileInfo.name]);
+          existing = res.rows[0];
+      } else { // SQLite
+          existing = await this.db.get('SELECT id, physical_path, size FROM files WHERE owner_id = ? AND name = ?', [userId, fileInfo.name]);
+      }
 
       if (existing) {
         // Actualizar si cambió el tamaño o la ruta
         if (existing.physical_path !== fileInfo.physicalPath || existing.size !== fileInfo.size) {
-          await this.db.run(
-            'UPDATE files SET physical_path = ?, size = ?, mime_type = ? WHERE id = ?',
-            [fileInfo.physicalPath, fileInfo.size, fileInfo.mimeType, existing.id]
-          );
+          if (this.db.query) {
+             await this.db.query('UPDATE files SET physical_path = $1, size = $2, mime_type = $3 WHERE id = $4',
+                [fileInfo.physicalPath, fileInfo.size, fileInfo.mimeType, existing.id]
+             );
+          } else {
+             await this.db.run('UPDATE files SET physical_path = ?, size = ?, mime_type = ? WHERE id = ?',
+                [fileInfo.physicalPath, fileInfo.size, fileInfo.mimeType, existing.id]
+             );
+          }
           return { added: false, updated: true };
         }
         return { added: false, updated: false };
       }
 
       // Insertar nuevo archivo
-      await this.db.run(
-        `INSERT INTO files (name, physical_path, size, mime_type, owner_id, created_at)
-         VALUES (?, ?, ?, ?, ?, datetime('now'))`,
-        [fileInfo.name, fileInfo.physicalPath, fileInfo.size, fileInfo.mimeType, userId]
-      );
+      if (this.db.query) {
+          await this.db.query(
+            `INSERT INTO files (name, physical_path, size, mime_type, owner_id, created_at)
+             VALUES ($1, $2, $3, $4, $5, NOW())`,
+            [fileInfo.name, fileInfo.physicalPath, fileInfo.size, fileInfo.mimeType, userId]
+          );
+      } else {
+          await this.db.run(
+            `INSERT INTO files (name, physical_path, size, mime_type, owner_id, created_at)
+             VALUES (?, ?, ?, ?, ?, datetime('now'))`,
+            [fileInfo.name, fileInfo.physicalPath, fileInfo.size, fileInfo.mimeType, userId]
+          );
+      }
 
       return { added: true, updated: false };
 

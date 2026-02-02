@@ -6,7 +6,7 @@ const path = require('path');
 const fs = require('fs').promises;
 const fsSync = require('fs');
 const { dbAsync } = require('./database/db');
-const { syncDiskToDb } = require('./utils/syncDiskToDb');
+// const { syncDiskToDb } = require('./utils/syncDiskToDb');
 
 const app = express();
 const PORT = process.env.PORT || 5004;
@@ -18,9 +18,9 @@ if (!fsSync.existsSync(UPLOAD_DIR)){
 }
 
 // Initial Sync Scanning (Windows Server style)
-setTimeout(() => {
-    syncDiskToDb(UPLOAD_DIR).catch(err => console.error('Sync failed:', err));
-}, 5000); // Wait 5s for DB to be ready
+// setTimeout(() => {
+//    syncDiskToDb(UPLOAD_DIR).catch(err => console.error('Sync failed:', err));
+// }, 5000); // Wait 5s for DB to be ready
 
 app.use(cors({
   origin: true,
@@ -144,12 +144,32 @@ app.get('/list', authenticate, async (req, res) => {
     }
 
     const items = await fs.readdir(targetDir, { withFileTypes: true });
+    
+    // FETCH SHARED STATUS
+    let sharedPaths = new Set();
+    // Only check if we are viewing our own files (user is owner)
+    if (!owner || owner === username) {
+        try {
+             const shares = await dbAsync.all('SELECT path FROM shared_files WHERE owner_username = ?', [username]);
+             if (shares) {
+                shares.forEach(s => sharedPaths.add(s.path));
+             }
+        } catch (e) {
+             console.error('Error fetching shared status:', e);
+        }
+    }
+
     console.log(`[DEBUG] Found ${items.length} items`);
     let files = [];
 
     for (const item of items) {
       const fullPath = path.join(targetDir, item.name);
       const relativePath = path.join(requestedPath, item.name);
+      
+      // Check shared status (normalize paths)
+      const normalizedPath = relativePath.replace(/\\/g, '/');
+      const winPath = relativePath.replace(/\//g, '\\');
+      const isShared = sharedPaths.has(normalizedPath) || sharedPaths.has(winPath) || sharedPaths.has(relativePath);
 
       if (item.isDirectory()) {
         files.push({
@@ -158,7 +178,9 @@ app.get('/list', authenticate, async (req, res) => {
           type: 'folder',
           size: 0,
           modified: (await fs.stat(fullPath)).mtime,
-          path: relativePath
+          path: relativePath,
+          shared: isShared,
+          owner: owner || username
         });
       } else {
         const stats = await fs.stat(fullPath);
@@ -169,7 +191,9 @@ app.get('/list', authenticate, async (req, res) => {
           size: stats.size,
           modified: stats.mtime,
           path: relativePath,
-          extension: path.extname(item.name).toLowerCase()
+          extension: path.extname(item.name).toLowerCase(),
+          shared: isShared,
+          owner: owner || username
         });
       }
     }
@@ -581,9 +605,43 @@ app.get('/recent', authenticate, async (req, res) => {
   }
 });
 
-// Shared with me (Stub)
+// Shared with me
 app.get('/shared-with-me', authenticate, async (req, res) => {
-    res.json({ success: true, files: [] });
+    try {
+        const username = req.user.username;
+        const sharedFiles = await dbAsync.all(
+            'SELECT * FROM shared_files WHERE shared_with_username = ?',
+            [username]
+        );
+        
+        const files = [];
+        for (const share of sharedFiles) {
+             const fullPath = path.join(UPLOAD_DIR, share.owner_username, share.path);
+             try {
+                 const stats = await fs.stat(fullPath);
+                 // We use a prefix for ID to identify shared files in download/preview
+                 const idString = `shared:${share.owner_username}:${share.path}`;
+                 
+                 files.push({
+                    id: Buffer.from(idString).toString('base64'),
+                    name: path.basename(share.path),
+                    type: stats.isDirectory() ? 'folder' : 'file',
+                    size: stats.size,
+                    modified: stats.mtime,
+                    path: share.path,
+                    owner: share.owner_username,
+                    shared: true,
+                    extension: path.extname(share.path).toLowerCase()
+                 });
+             } catch (e) {
+                 // File might have been deleted, ignore
+             }
+        }
+        res.json({ success: true, files });
+    } catch (error) {
+         console.error('Error listing shared:', error);
+         res.status(500).json({ success: false, message: error.message });
+    }
 });
 
 // Shared folders (Stub)
@@ -591,9 +649,49 @@ app.get('/shared-folders', authenticate, async (req, res) => {
     res.json({ success: true, files: [] });
 });
 
-// Share (Stub)
+// Share
 app.post('/share', authenticate, async (req, res) => {
-    res.json({ success: true, message: 'Compartido (Simulado)' });
+  try {
+    const { path: filePath, username: targetUsername } = req.body;
+    const ownerUsername = req.user.username;
+
+    if (!filePath || !targetUsername) {
+      return res.status(400).json({ success: false, message: 'Faltan datos' });
+    }
+
+    if (ownerUsername === targetUsername) {
+        return res.status(400).json({ success: false, message: 'No puedes compartir contigo mismo' });
+    }
+
+    // Verify target user exists
+    const user = await dbAsync.get('SELECT id FROM users WHERE username = ?', [targetUsername]);
+    if (!user) {
+        return res.status(404).json({ success: false, message: 'Usuario destino no encontrado' });
+    }
+    
+    // Verify file exists
+    try {
+        await fs.access(path.join(UPLOAD_DIR, ownerUsername, filePath));
+    } catch {
+        return res.status(404).json({ success: false, message: 'Archivo no encontrado' });
+    }
+
+    // Insert into DB
+    // Check if dbAsync handles Postgres or SQLite differences?
+    // It seems dbAsync.run handles it.
+    await dbAsync.run(
+        'INSERT INTO shared_files (path, owner_username, shared_with_username) VALUES (?, ?, ?) ON CONFLICT DO NOTHING',
+        [filePath, ownerUsername, targetUsername]
+    );
+
+    // Also Log
+    await logAction(ownerUsername, 'FILE_SHARE', `Compartido ${filePath} con ${targetUsername}`);
+
+    res.json({ success: true, message: `Compartido con ${targetUsername}` });
+  } catch (error) {
+    console.error('Error sharing:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
 });
 
 // Duplicate
@@ -650,6 +748,13 @@ app.post('/upload-folder', authenticate, upload.single('file'), async (req, res)
     }
 });
 
-app.listen(PORT, () => {
-  console.log(`File Service running on port ${PORT}`);
+const AutoSyncService = require('./autoSync');
+
+// Iniciar servicio de sincronización automática
+console.log(' Inicializando AutoSyncService...');
+const syncService = new AutoSyncService(dbAsync, UPLOAD_DIR);
+syncService.start();
+
+app.listen(PORT, '0.0.0.0', () => {
+    console.log(`File Service running on port ${PORT}`);
 });

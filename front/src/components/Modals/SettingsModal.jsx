@@ -32,11 +32,35 @@ const SettingsModal = ({ onClose, user, onThemeToggle, isDarkMode, initialTab = 
   const [defaultAvatars, setDefaultAvatars] = useState([]);
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
   const [deletingAvatar, setDeletingAvatar] = useState(false);
+  const [aiStatus, setAiStatus] = useState(null);
 
   useEffect(() => {
     fetchSettings();
     fetchDefaultAvatars();
   }, []);
+
+  useEffect(() => {
+    let interval;
+    if (activeTab === 'ia') {
+      const fetchAiStatus = async () => {
+        try {
+          const response = await fetch('/api/ai/indexing-status', {
+             headers: { 'Authorization': `Bearer ${getAuthToken()}` }
+          });
+          if (response.ok) {
+            const data = await response.json();
+            setAiStatus(data);
+          }
+        } catch (error) {
+          console.error('Error fetching AI status', error);
+        }
+      };
+
+      fetchAiStatus();
+      interval = setInterval(fetchAiStatus, 1000); 
+    }
+    return () => clearInterval(interval);
+  }, [activeTab]);
 
   const fetchDefaultAvatars = async () => {
     try {
@@ -321,6 +345,12 @@ const SettingsModal = ({ onClose, user, onThemeToggle, isDarkMode, initialTab = 
           >
             {t('settings.integrations')}
           </button>
+          <button
+            className={`settings-tab ${activeTab === 'ia' ? 'active' : ''}`}
+            onClick={() => setActiveTab('ia')}
+          >
+            IA
+          </button>
         </div>
         
         <div className="settings-content">
@@ -590,6 +620,79 @@ const SettingsModal = ({ onClose, user, onThemeToggle, isDarkMode, initialTab = 
                     </p>
                   </div>
                 )}
+              </div>
+            </div>
+          )}
+
+          {activeTab === 'ia' && (
+            <div className="settings-section">
+              <div className="storage-card !text-left">
+                 <h3 className="storage-card-title text-center">Estado de Indexación IA</h3>
+                 <p className="storage-card-desc mb-6 text-center">
+                    Visualiza el progreso de construcción de tu nodo personal de conocimiento. 
+                    El sistema detecta automáticamente nuevos documentos y actualiza tu grafo de conocimiento.
+                 </p>
+                 
+                 {!aiStatus ? (
+                    <div className="p-8 text-center text-gray-500">
+                        <svg className="animate-spin h-8 w-8 mx-auto mb-2 text-blue-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                        Cargando estado...
+                    </div>
+                 ) : (
+                    <div className="space-y-6">
+                        {/* Estado General */}
+                        <div className="bg-white dark:bg-slate-700/50 p-4 rounded-lg border border-gray-200 dark:border-slate-600 shadow-sm">
+                            <div className="flex justify-between items-center mb-2">
+                                <span className="font-medium text-gray-700 dark:text-gray-200">Estado del Nodo</span>
+                                <span className={`px-2 py-1 rounded text-xs font-semibold ${
+                                    aiStatus.progress && aiStatus.progress.state === 'indexing' 
+                                    ? 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300' 
+                                    : 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300'
+                                }`}>
+                                    {aiStatus.progress && aiStatus.progress.state === 'indexing' ? 'CONSTRUYENDO' : 'ACTIVO'}
+                                </span>
+                            </div>
+                            <div className="text-sm text-gray-500 dark:text-gray-400 flex justify-between">
+                                <span>Archivos en nodo:</span>
+                                <span className="font-mono">{aiStatus.fileCount}</span>
+                            </div>
+                        </div>
+
+                        {/* Contenido en Progreso */}
+                        {aiStatus.progress && aiStatus.progress.state === 'indexing' ? (
+                            <div className="bg-white dark:bg-slate-700/50 p-4 rounded-lg border border-gray-200 dark:border-slate-600 shadow-sm animate-pulse">
+                                <div className="flex justify-between text-sm mb-2 text-gray-600 dark:text-gray-300">
+                                    <span>Construyendo conocimiento...</span>
+                                    <span>{aiStatus.progress.percent}%</span>
+                                </div>
+                                <div className="w-full bg-gray-200 rounded-full h-2.5 dark:bg-slate-600 mb-4 overflow-hidden">
+                                    <div className="bg-blue-600 h-2.5 rounded-full transition-all duration-300 ease-out" 
+                                         style={{ width: `${aiStatus.progress.percent}%` }}></div>
+                                </div>
+                                
+                                <div className="bg-gray-100 dark:bg-slate-900 p-3 rounded text-xs font-mono text-gray-600 dark:text-gray-400 overflow-hidden text-ellipsis whitespace-nowrap border border-gray-200 dark:border-slate-700">
+                                    <span className="text-blue-500 mr-2">➜</span>
+                                    {aiStatus.progress.currentFile || 'Iniciando proceso...'}
+                                </div>
+                                
+                                {aiStatus.progress.timeRemaining && (
+                                    <div className="mt-2 text-xs text-gray-400 text-right">
+                                        Tiempo estimado: ~{aiStatus.progress.timeRemaining}s
+                                    </div>
+                                )}
+                            </div>
+                        ) : (
+                             <div className="text-center py-6 text-gray-500 dark:text-gray-400 border-t border-gray-100 dark:border-slate-700 pt-6">
+                                <div className="text-4xl mb-3 opacity-80">🧠</div>
+                                <p className="text-sm">El nodo está sincronizado.</p>
+                                <p className="text-xs mt-1 opacity-70">Listo para detectar nuevos documentos.</p>
+                             </div>
+                        )}
+                    </div>
+                 )}
               </div>
             </div>
           )}
