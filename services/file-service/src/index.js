@@ -6,6 +6,7 @@ const path = require('path');
 const fs = require('fs').promises;
 const fsSync = require('fs');
 const { dbAsync } = require('./database/db');
+const { syncDiskToDb } = require('./utils/syncDiskToDb');
 
 const app = express();
 const PORT = process.env.PORT || 5004;
@@ -15,6 +16,11 @@ const UPLOAD_DIR = process.env.UPLOAD_DIR || path.join(__dirname, 'uploads');
 if (!fsSync.existsSync(UPLOAD_DIR)){
     fsSync.mkdirSync(UPLOAD_DIR, { recursive: true });
 }
+
+// Initial Sync Scanning (Windows Server style)
+setTimeout(() => {
+    syncDiskToDb(UPLOAD_DIR).catch(err => console.error('Sync failed:', err));
+}, 5000); // Wait 5s for DB to be ready
 
 app.use(cors({
   origin: true,

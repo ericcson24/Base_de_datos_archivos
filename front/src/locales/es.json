@@ -664,5 +664,14 @@
     "from": "de {{owner}}",
     "shared": "Compartido",
     "by": "por {{owner}}"
+  },
+  "aiResults": {
+    "title": "Resultados de Búsqueda IA",
+    "aiResponse": "Respuesta de la IA",
+    "sources": "Fuentes Utilizadas",
+    "relevantFiles": "Archivos Relevantes",
+    "open": "Abrir",
+    "download": "Descargar",
+    "noFilesFound": "No se encontraron archivos relacionados."
   }
 }

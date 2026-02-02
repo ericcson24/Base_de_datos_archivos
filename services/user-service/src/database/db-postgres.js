@@ -89,7 +89,7 @@ const initDatabase = async () => {
     }
 
     try {
-        await client.query('BEGIN');
+        // await client.query('BEGIN');
 
         // Users
         await client.query(`CREATE TABLE IF NOT EXISTS users (
@@ -108,14 +108,7 @@ const initDatabase = async () => {
             deletion_scheduled_at TIMESTAMP
         )`);
 
-        // Add deletion_scheduled_at column if it doesn't exist
-        try {
-            await client.query('ALTER TABLE users ADD COLUMN deletion_scheduled_at TIMESTAMP');
-            console.log('Added deletion_scheduled_at column to users table');
-        } catch (e) {
-            // Ignore error if column already exists
-            // console.log('Column deletion_scheduled_at likely already exists');
-        }
+
 
         // User Credentials
         await client.query(`CREATE TABLE IF NOT EXISTS user_credentials (
@@ -196,19 +189,6 @@ const initDatabase = async () => {
             FOREIGN KEY(user_id) REFERENCES users(id)
         )`);
 
-        // Notifications (Inbox)
-        await client.query(`CREATE TABLE IF NOT EXISTS notifications (
-            id SERIAL PRIMARY KEY,
-            user_id INTEGER NOT NULL,
-            title TEXT NOT NULL,
-            message TEXT,
-            type TEXT DEFAULT 'info',
-            is_read BOOLEAN DEFAULT FALSE,
-            link TEXT,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            FOREIGN KEY(user_id) REFERENCES users(id)
-        )`);
-
         // Calendar Events
         await client.query(`CREATE TABLE IF NOT EXISTS calendar_events (
             id SERIAL PRIMARY KEY,
@@ -274,10 +254,18 @@ const initDatabase = async () => {
              console.log('Admin user created in Postgres');
         }
 
-        await client.query('COMMIT');
+        // await client.query('COMMIT');
+
+        // Add deletion_scheduled_at column if it doesn't exist (Runs outside transaction)
+        try {
+             await client.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS deletion_scheduled_at TIMESTAMP');
+             console.log('Added deletion_scheduled_at column to users table');
+        } catch (e) {
+             console.log('Column check/creation failed:', e.message);
+        }
         console.log('Postgres Database Initialized');
     } catch (e) {
-        await client.query('ROLLBACK');
+        // await client.query('ROLLBACK');
         console.error('Error initializing Postgres DB:', e);
     } finally {
         client.release();

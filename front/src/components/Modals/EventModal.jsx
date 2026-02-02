@@ -259,11 +259,23 @@ const EventModal = ({
     if (!validateForm()) return;
 
     try {
+      let finalStart = formData.start;
+      let finalEnd = formData.end;
+
+      // Fix timezone issue: Convert local input time to ISO UTC
+      if (!formData.allDay) {
+          if (formData.start && formData.start.includes('T')) {
+              finalStart = new Date(formData.start).toISOString();
+          }
+          if (formData.end && formData.end.includes('T')) {
+              finalEnd = new Date(formData.end).toISOString();
+          }
+      }
+
       const eventData = {
         ...formData,
-        // Convert to proper format for API
-        start: formData.allDay ? formData.start : formData.start + ':00',
-        end: formData.allDay ? formData.end : formData.end + ':00',
+        start: finalStart,
+        end: finalEnd,
         assignMode,
         groupId: selectedGroupId,
         targetUserId: selectedUserId

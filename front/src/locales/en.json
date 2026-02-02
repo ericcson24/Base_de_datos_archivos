@@ -637,5 +637,14 @@
     "stopAllSuccess": "All connections stopped (Maintenance Mode Enabled)",
     "fetchError": "Failed to fetch connections",
     "createError": "Failed to create connection"
+  },
+  "aiResults": {
+    "title": "AI Search Results",
+    "aiResponse": "AI Response",
+    "sources": "Sources Used",
+    "relevantFiles": "Relevant Files",
+    "open": "Open",
+    "download": "Download",
+    "noFilesFound": "No related files found."
   }
 }

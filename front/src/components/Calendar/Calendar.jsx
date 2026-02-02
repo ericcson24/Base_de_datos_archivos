@@ -7,6 +7,7 @@ import './Calendar.css';
 import './CalendarDesktop.css';
 import './CalendarMobile.css';
 import EventModal from '../Modals/EventModal';
+import AITaskModal from '../Modals/AITaskModal';
 import SettingsModal from '../Modals/SettingsModal';
 import RDPConnectionModal from '../Modals/RDPConnectionModal';
 import NotificationCenter from '../Common/NotificationCenter';
@@ -151,6 +152,7 @@ const Calendar = ({ user, onLogout, onBackToPanel, onBackToFolders, onThemeToggl
   const { addToast } = useToast();
   const [showSettingsModal, setShowSettingsModal] = useState(false);
   const [showRDPModal, setShowRDPModal] = useState(false);
+  const [showAIModal, setShowAIModal] = useState(false);
   const [categories, setCategories] = useState([]);
   // Initialize selectedCategories with a default value or empty set, but we'll populate it after loading categories
   const [selectedCategories, setSelectedCategories] = useState(new Set());
@@ -563,6 +565,19 @@ const Calendar = ({ user, onLogout, onBackToPanel, onBackToFolders, onThemeToggl
           <button className="create-event-btn" onClick={() => setModalState({ isOpen: true, mode: 'create', selectedDates: { start: new Date(), end: new Date(), allDay: true } })}>
             <span>+</span> {t('calendar.newEvent')}
           </button>
+          
+          <button 
+            className="create-event-btn ai-btn" 
+            style={{ 
+              marginTop: '10px', 
+              background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+              border: 'none',
+              boxShadow: '0 4px 15px rgba(118, 75, 162, 0.3)'
+            }}
+            onClick={() => setShowAIModal(true)}
+          >
+            <span style={{ marginRight: '8px' }}>✨</span> {t('calendar.aiAssistant') || 'Asistente IA'}
+          </button>
 
           {(user.role === 'admin' || user.role === 'boss') && (
             <div className="sidebar-section">
@@ -789,6 +804,7 @@ const Calendar = ({ user, onLogout, onBackToPanel, onBackToFolders, onThemeToggl
               plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin]}
               initialView="dayGridMonth"
               locale={language}
+              firstDay={1}
               headerToolbar={{
                 left: 'prev,next today',
                 center: 'title',
@@ -949,6 +965,15 @@ const Calendar = ({ user, onLogout, onBackToPanel, onBackToFolders, onThemeToggl
         <RDPConnectionModal 
           isOpen={showRDPModal} 
           onClose={() => setShowRDPModal(false)} 
+        />
+      )}
+
+      {showAIModal && (
+        <AITaskModal
+          isOpen={showAIModal}
+          onClose={() => setShowAIModal(false)}
+          onTaskCreated={() => loadEvents()}
+          user={user}
         />
       )}
     </div>

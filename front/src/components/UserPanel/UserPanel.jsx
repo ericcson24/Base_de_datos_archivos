@@ -11,6 +11,7 @@ import DeleteConfirmationModal from '../Modals/DeleteConfirmationModal';
 import SettingsModal from '../Modals/SettingsModal';
 import RDPViewer from '../RDP/RDPViewer';
 import RDPConnectionModal from '../Modals/RDPConnectionModal';
+import AIResultsModal from '../Modals/AIResultsModal';
 import SidebarPanel from './SidebarPanel';
 import FileItem from './FileItem';
 import NotificationCenter from '../Common/NotificationCenter';
@@ -124,6 +125,8 @@ const UserPanel = ({ user, onLogout, onBackToFolders, onThemeToggle, isDarkMode,
   const [recentFiles, setRecentFiles] = useState([]);
   const [isAIExpanded, setIsAIExpanded] = useState(false);
   const [aiQuery, setAIQuery] = useState('');
+  const [showAIResults, setShowAIResults] = useState(false);
+  const [aiResultsData, setAIResultsData] = useState(null);
   const [showRecentSection, setShowRecentSection] = useState(true);
 
   // Función para toggle del tema
@@ -153,10 +156,36 @@ const UserPanel = ({ user, onLogout, onBackToFolders, onThemeToggle, isDarkMode,
     if (!aiQuery.trim()) return;
     
     console.log('Consulta IA:', aiQuery);
-    addToast(t('userPanel.aiComingSoon', { query: aiQuery }), 'info');
     
-    setAIQuery('');
-    setIsAIExpanded(false);
+    try {
+      const token = localStorage.getItem('auth_token');
+      // Usar el endpoint real de búsqueda de AI
+      const response = await fetch('/api/ai/search', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ query: aiQuery })
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        if (data.success) {
+           setAIResultsData(data);
+           setShowAIResults(true);
+           setAIQuery('');
+           setIsAIExpanded(false);
+        } else {
+           addToast(data.response || 'No se encontraron resultados', 'info');
+        }
+      } else {
+        addToast('Error al conectar con el servicio de IA', 'error');
+      }
+    } catch (error) {
+      console.error('Error AI search:', error);
+      addToast('Error al procesar la consulta', 'error');
+    }
   };
 
   const validateFiles = (files) => {
@@ -1536,6 +1565,15 @@ useEffect(() => {
         onClose={() => setShowShareModal(false)}
         onShare={handleShareItem}
         item={shareItem}
+      />
+
+      {/* AI Results Modal */}
+      <AIResultsModal 
+        isOpen={showAIResults}
+        onClose={() => setShowAIResults(false)}
+        results={aiResultsData}
+        onOpenFile={(file) => openFileViewer(file)}
+        onDownloadFile={(file) => downloadFile(file.id, file.name, t)}
       />
 
       {/* Settings Modal */}

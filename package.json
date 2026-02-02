@@ -1,7 +1,7 @@
 {
   "name": "base-de-datos-archivos",
   "version": "1.0.0",
-  "description": "Sistema de gestión de archivos con microservicios",
+  "description": "Sistema de gesti\u00f3n de archivos con microservicios",
   "scripts": {
     "start": "docker compose up --build",
     "stop": "docker compose down",
@@ -28,6 +28,11 @@
   ],
   "author": "",
   "license": "ISC",
+  "dependencies": {
+    "dotenv": "^17.2.3",
+    "guacamole-common-js": "^1.5.0",
+    "pg": "^8.16.3"
+  },
   "devDependencies": {
     "concurrently": "^9.1.2"
   }

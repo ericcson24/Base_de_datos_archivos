@@ -31,7 +31,7 @@ export const NotificationProvider = ({ children, user, onNavigate }) => {
     
     try {
       const token = localStorage.getItem('auth_token');
-      const response = await fetch('/api/users/notifications', {
+      const response = await fetch('/api/notifications/', {
         headers: {
           'Authorization': `Bearer ${token}`
         }
@@ -52,7 +52,7 @@ export const NotificationProvider = ({ children, user, onNavigate }) => {
   const markAsRead = async (id) => {
     try {
       const token = localStorage.getItem('auth_token');
-      const response = await fetch(`/api/users/notifications/${id}/read`, {
+      const response = await fetch(`/api/notifications/${id}/read`, {
         method: 'PUT',
         headers: {
           'Authorization': `Bearer ${token}`
@@ -73,7 +73,7 @@ export const NotificationProvider = ({ children, user, onNavigate }) => {
   const markAllAsRead = async () => {
     try {
       const token = localStorage.getItem('auth_token');
-      const response = await fetch('/api/users/notifications/read-all', {
+      const response = await fetch('/api/notifications/read-all', {
         method: 'PUT',
         headers: {
           'Authorization': `Bearer ${token}`
