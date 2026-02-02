@@ -95,7 +95,7 @@ const AITaskModal = ({ isOpen, onClose, onTaskCreated, user }) => {
   if (!isOpen) return null;
 
   return (
-    <div className="modal-overlay" onClick={onClose}>
+    <div className="modal-overlay">
       <FrostedContainer 
         variant="modal" 
         className="ai-task-modal"

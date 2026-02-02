@@ -711,6 +711,207 @@ app.post('/assign-user', authenticate, async (req, res) => {
   }
 });
 
+
+// NEW ENDPOINT: Create Event (AI/Manual)
+app.post('/events', authenticate, async (req, res) => {
+  try {
+    const { subject, body, startTime, endTime, location, isAllDay } = req.body;
+    const username = req.user.username;
+
+    if (!subject || !startTime || !endTime) {
+      return res.status(400).json({ error: 'Missing required fields' });
+    }
+
+    const user = await dbAsync.get('SELECT id, microsoft_access_token FROM users WHERE username = ?', [username]);
+    if (!user) return res.status(404).json({ error: 'User not found' });
+
+    let microsoftId = null;
+    let webLink = null;
+    let syncError = null;
+
+    // 1. Create in Outlook if linked
+    if (user.microsoft_access_token) {
+      try {
+        const client = getAuthenticatedClient(user.microsoft_access_token);
+        const newEvent = {
+          subject,
+          body: {
+            contentType: 'Text',
+            content: body || ''
+          },
+          start: {
+              dateTime: startTime, // Expecting ISO string e.g. "2023-10-27T10:00:00Z"
+              timeZone: 'UTC'
+          },
+          end: {
+              dateTime: endTime,
+              timeZone: 'UTC'
+          },
+          location: { displayName: location || '' },
+          isAllDay: !!isAllDay
+        };
+
+        const result = await client.api('/me/events').post(newEvent);
+        microsoftId = result.id;
+        webLink = result.webLink;
+        console.log(`[OUTLOOK] Event created in Cloud: ${microsoftId}`);
+      } catch (e) {
+        console.error('[OUTLOOK] Creation failed:', e.message);
+        syncError = e.message;
+        
+         // Auto-Disconnect if token is garbage
+        if (e.statusCode === 401 || (e.message && e.message.includes('JWT is not well formed'))) {
+             try {
+                console.log(`[OUTLOOK] Invalidating token for user ${username}`);
+                await dbAsync.run('UPDATE users SET microsoft_access_token = NULL WHERE username = ?', [username]);
+                syncError = "Tu sesión de Outlook ha caducado. Vuelve a vincular tu cuenta.";
+             } catch (dbErr) {}
+        }
+      }
+    }
+
+    // 2. Save Local
+    const eventId = microsoftId || `local_${Date.now()}_${Math.random().toString(36).substr(2,9)}`;
+    
+    // Check if duplicate (unlikely for new, but good practice)
+    await dbAsync.run(`
+        INSERT INTO calendar_events (
+            microsoft_id, user_id, subject, body_preview, 
+            start_time, end_time, is_all_day, location, 
+            web_link, last_synced, created_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+    `, [
+        eventId,
+        user.id,
+        subject,
+        body || '',
+        startTime,
+        endTime,
+        isAllDay ? 1 : 0,
+        location || null,
+        webLink || null
+    ]);
+
+    res.json({ 
+        success: true, 
+        microsoftId: eventId,
+        syncedToCloud: !!microsoftId,
+        syncError: syncError
+    });
+
+  } catch (error) {
+    console.error('Error in POST /events:', error);
+    res.status(500).json({ error: 'Internal Server Error' });
+  }
+});
+
+// NEW ENDPOINT: Update Event
+app.patch('/events/:id', authenticate, async (req, res) => {
+  try {
+    const { id } = req.params; // Can be local ID or Microsoft ID
+    const { subject, body, startTime, endTime, location, isAllDay } = req.body;
+    const username = req.user.username;
+
+    // Get event to see if it has MS ID
+    // We look up by microsoft_id OR local ID depending on what's passed.
+    // However, the AI will likely find the event in DB first.
+    // Let's assume ID passed is DB PRIMARY ID or Microsoft ID? 
+    // To be safe, try to find in DB first.
+    
+    // We only support updating "my" events or if Admin.
+    const user = await dbAsync.get('SELECT id, microsoft_access_token FROM users WHERE username = ?', [username]);
+    
+    // Check if event exists
+    // Attempt to find by ID (int) or Microsoft ID (string)
+    let event = await dbAsync.get('SELECT * FROM calendar_events WHERE id = ? AND user_id = ?', [id, user.id]);
+    if (!event) {
+        event = await dbAsync.get('SELECT * FROM calendar_events WHERE microsoft_id = ? AND user_id = ?', [id, user.id]);
+    }
+
+    if (!event) return res.status(404).json({ error: 'Event not found or not owned' });
+
+    // Update Outlook
+    if (event.microsoft_id && user.microsoft_access_token) {
+        try {
+            const client = getAuthenticatedClient(user.microsoft_access_token);
+            const updateEvent = {};
+            if (subject) updateEvent.subject = subject;
+            if (body) updateEvent.body = { contentType: 'Text', content: body };
+            if (startTime) updateEvent.start = { dateTime: startTime, timeZone: 'UTC' };
+            if (endTime) updateEvent.end = { dateTime: endTime, timeZone: 'UTC' };
+            if (location) updateEvent.location = { displayName: location };
+            if (isAllDay !== undefined) updateEvent.isAllDay = isAllDay;
+
+            await client.api(`/me/events/${event.microsoft_id}`).patch(updateEvent);
+            console.log(`[OUTLOOK] Event updated in Cloud: ${event.microsoft_id}`);
+        } catch (e) {
+            console.error('[OUTLOOK] Update failed:', e.message);
+        }
+    }
+
+    // Update Local DB
+    // Simple dynamic update builder
+    let sets = [];
+    let vals = [];
+    if (subject) { sets.push('subject = ?'); vals.push(subject); }
+    if (body) { sets.push('body_preview = ?'); vals.push(body); } // simplified
+    if (startTime) { sets.push('start_time = ?'); vals.push(startTime); }
+    if (endTime) { sets.push('end_time = ?'); vals.push(endTime); }
+    if (location) { sets.push('location = ?'); vals.push(location); }
+    if (isAllDay !== undefined) { sets.push('is_all_day = ?'); vals.push(isAllDay ? 1 : 0); }
+    
+    if (sets.length > 0) {
+        sets.push('last_synced = CURRENT_TIMESTAMP');
+        // Add ID at end
+        vals.push(event.id); 
+        await dbAsync.run(`UPDATE calendar_events SET ${sets.join(', ')} WHERE id = ?`, vals);
+    }
+
+    res.json({ success: true, message: 'Updated' });
+
+  } catch (error) {
+    console.error('Error in PATCH /events:', error);
+    res.status(500).json({ error: 'Error updating' });
+  }
+});
+
+// NEW ENDPOINT: Delete Event
+app.delete('/events/:id', authenticate, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const username = req.user.username;
+    const user = await dbAsync.get('SELECT id, microsoft_access_token FROM users WHERE username = ?', [username]);
+
+    // Find event
+    let event = await dbAsync.get('SELECT * FROM calendar_events WHERE id = ? AND user_id = ?', [id, user.id]);
+    if (!event) {
+        event = await dbAsync.get('SELECT * FROM calendar_events WHERE microsoft_id = ? AND user_id = ?', [id, user.id]);
+    }
+
+    if (!event) return res.status(404).json({ error: 'Event not found' });
+
+    // Delete from Outlook
+    if (event.microsoft_id && user.microsoft_access_token) {
+        try {
+             const client = getAuthenticatedClient(user.microsoft_access_token);
+             await client.api(`/me/events/${event.microsoft_id}`).delete();
+             console.log(`[OUTLOOK] Event deleted in Cloud: ${event.microsoft_id}`);
+        } catch (e) {
+             console.error('[OUTLOOK] Delete failed (maybe already deleted):', e.message);
+        }
+    }
+
+    // Delete Local
+    await dbAsync.run('DELETE FROM calendar_events WHERE id = ?', [event.id]);
+    res.json({ success: true, message: 'Deleted' });
+
+  } catch (error) {
+    console.error('Error in DELETE /events:', error);
+    res.status(500).json({ error: 'Error deleting' });
+  }
+});
+
 app.listen(PORT, () => {
+
   console.log(`Outlook Service running on port ${PORT}`);
 });
