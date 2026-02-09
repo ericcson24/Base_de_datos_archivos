@@ -15,11 +15,6 @@ const FolderSelector = ({ user, onSelectFolder, onLogout, onThemeToggle, isDarkM
     onSelectFolder(tipo);
   };
 
-  const handleRemoteWork = () => {
-    // window.location.href = '/trabajar_remoto';
-    onSelectFolder('remote');
-  };
-
   const handleCalendar = () => {
     if (onGoToCalendar) {
       onGoToCalendar();
@@ -71,7 +66,10 @@ const FolderSelector = ({ user, onSelectFolder, onLogout, onThemeToggle, isDarkM
 
           <Button
             variant="frosted"
-            onClick={handleRemoteWork}
+            onClick={() => {
+               window.history.pushState(null, '', '/remote');
+               onSelectFolder('remote');
+            }}
             className="option-btn"
           >
             💻 {t('userPanel.remoteWork')}

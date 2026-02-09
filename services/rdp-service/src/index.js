@@ -29,8 +29,20 @@ const guacOptions = {
 
 const { dbAsync, initDb } = require('./database/db');
 
-// Initialize DB
-initDb();
+// Initialize DB and start server
+(async () => {
+    try {
+        await initDb();
+        console.log('Database initialized successfully');
+        
+        server.listen(PORT, () => {
+            console.log(`RDP Service listening on port ${PORT}`);
+        });
+    } catch (err) {
+        console.error('Failed to initialize database:', err);
+        process.exit(1);
+    }
+})();
 
 // Helper to verify token (supports both Base64 JSON and JWT)
 const verifyToken = (token) => {
@@ -83,16 +95,16 @@ app.get('/settings', async (req, res) => {
         //     return res.status(403).json({ error: 'Admin access required' });
         // }
 
-        const settings = await dbAsync.all('SELECT key, value FROM rdp_settings');
+        const settings = await dbAsync.all('SELECT setting_key, setting_value FROM rdp_settings');
         const settingsMap = settings.reduce((acc, curr) => {
-            acc[curr.key] = curr.value;
+            acc[curr.setting_key] = curr.setting_value;
             return acc;
         }, {});
 
         // Generate server_id if not exists
         if (!settingsMap.server_id) {
             const newId = Math.floor(100000 + Math.random() * 900000).toString();
-            await dbAsync.run('INSERT INTO rdp_settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = ?', ['server_id', newId, newId]);
+            await dbAsync.run('INSERT INTO rdp_settings (setting_key, setting_value) VALUES (?, ?) ON CONFLICT(setting_key) DO UPDATE SET setting_value = ?', ['server_id', newId, newId]);
             settingsMap.server_id = newId;
         }
 
@@ -118,16 +130,53 @@ app.post('/settings', async (req, res) => {
         const { lan_only, maintenance_mode } = req.body;
         
         if (lan_only !== undefined) {
-            await dbAsync.run('INSERT INTO rdp_settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = ?', ['lan_only', String(lan_only), String(lan_only)]);
+            await dbAsync.run('INSERT INTO rdp_settings (setting_key, setting_value) VALUES (?, ?) ON CONFLICT(setting_key) DO UPDATE SET setting_value = ?', ['lan_only', String(lan_only), String(lan_only)]);
         }
         
         if (maintenance_mode !== undefined) {
-            await dbAsync.run('INSERT INTO rdp_settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = ?', ['maintenance_mode', String(maintenance_mode), String(maintenance_mode)]);
+            await dbAsync.run('INSERT INTO rdp_settings (setting_key, setting_value) VALUES (?, ?) ON CONFLICT(setting_key) DO UPDATE SET setting_value = ?', ['maintenance_mode', String(maintenance_mode), String(maintenance_mode)]);
         }
 
         res.json({ success: true });
     } catch (error) {
         console.error('Error updating settings:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+app.post('/initialize-default', async (req, res) => {
+    try {
+        const authHeader = req.headers.authorization;
+        if (!authHeader) return res.status(401).json({ error: 'No token provided' });
+        
+        // Ensure only one connection exists - the System Default
+        const existing = await dbAsync.get('SELECT * FROM rdp_connections LIMIT 1');
+        
+        if (existing) {
+            return res.json({ success: true, connection: existing });
+        }
+
+        // Create Default
+        // Assuming host.docker.internal for Windows environments or a sane default
+        const defaultConn = {
+            name: 'System Desktop',
+            hostname: 'host.docker.internal',
+            port: 3389,
+            username: 'Administrator',
+            password: '',
+            protocol: 'rdp',
+            virtual_ip: '10.10.10.2'
+        };
+
+        const result = await dbAsync.run(
+            'INSERT INTO rdp_connections (name, hostname, port, username, password, protocol, virtual_ip) VALUES (?, ?, ?, ?, ?, ?, ?)',
+            [defaultConn.name, defaultConn.hostname, defaultConn.port, defaultConn.username, defaultConn.password, defaultConn.protocol, defaultConn.virtual_ip]
+        );
+
+        res.json({ success: true, connection: { ...defaultConn, id: result.lastID } });
+
+    } catch (error) {
+        console.error('Error initializing default:', error);
         res.status(500).json({ error: error.message });
     }
 });
@@ -145,7 +194,7 @@ app.post('/connections/stop-all', async (req, res) => {
         }
 
         // Enable maintenance mode to prevent new connections
-        await dbAsync.run('INSERT INTO rdp_settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = ?', ['maintenance_mode', 'true', 'true']);
+        await dbAsync.run('INSERT INTO rdp_settings (setting_key, setting_value) VALUES (?, ?) ON CONFLICT(setting_key) DO UPDATE SET setting_value = ?', ['maintenance_mode', 'true', 'true']);
         
         // In a real scenario with GuacamoleLite, we might need to restart the process 
         // or track sockets to close them. For now, we just set maintenance mode.
@@ -249,8 +298,8 @@ app.delete('/connections/:id', async (req, res) => {
 const clientConnectionCallback = async (request, client, path) => {
     // Check settings first
     try {
-        const settingsRows = await dbAsync.all('SELECT key, value FROM rdp_settings');
-        const settings = settingsRows.reduce((acc, curr) => { acc[curr.key] = curr.value; return acc; }, {});
+        const settingsRows = await dbAsync.all('SELECT setting_key, setting_value FROM rdp_settings');
+        const settings = settingsRows.reduce((acc, curr) => { acc[curr.setting_key] = curr.setting_value; return acc; }, {});
         
         if (settings.maintenance_mode === 'true') {
             console.error('Connection rejected: Maintenance mode is on');
@@ -378,6 +427,7 @@ app.post('/connect', (req, res) => {
     res.json({ success: true, token });
 });
 
-server.listen(PORT, () => {
-    console.log(`RDP Service listening on port ${PORT}`);
-});
+// Remove the old server.listen at the bottom since we moved it inside the async function
+// server.listen(PORT, () => {
+//     console.log(`RDP Service listening on port ${PORT}`);
+// });

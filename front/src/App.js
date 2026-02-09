@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import Login from './components/Auth/Login';
 import UserPanel from './components/UserPanel/UserPanel';
 import AdminPanel from './components/Admin/AdminPanel';
+import RemotePage from './components/Remote/RemotePage';
 import FolderSelector from './components/UserPanel/FolderSelector';
 import Calendar from './components/Calendar/Calendar';
 import { NotificationProvider } from './context/NotificationContext';
@@ -26,6 +27,7 @@ const deleteCookie = (name) => {
 };
 
 function App() {
+  console.log('APP V2 LOADED - DEBUG MODE');
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [user, setUser] = useState(null);
   const [currentView, setCurrentView] = useState('login'); // 'login', 'folders', 'panel', 'calendar', 'admin'
@@ -118,6 +120,8 @@ function App() {
             setCurrentView('admin');
           } else if (currentPath === '/folders') {
             setCurrentView('folders');
+          } else if (currentPath === '/remote') {
+            setCurrentView('remote');
           } else {
             // Redirigir según el rol del usuario si está autenticado
             if (role === 'admin') {
@@ -180,6 +184,8 @@ function App() {
           setCurrentView('calendar');
         } else if (currentPath === '/panel') {
           setCurrentView('panel');
+        } else if (currentPath === '/remote') {
+          setCurrentView('remote');
         } else if (currentPath === '/admin' && user.role === 'admin') {
           setCurrentView('admin');
         } else if (currentPath === '/folders') {
@@ -269,6 +275,11 @@ function App() {
 
   const handleSelectFolder = (tipo) => {
     // Aquí puedes manejar la selección de carpeta
+    if (tipo === 'remote') {
+      setCurrentView('remote');
+      window.history.pushState(null, '', '/remote');
+      return;
+    }
     // Por ahora, simplemente vamos al panel
     setCurrentView('panel');
     window.history.pushState(null, '', '/panel');
@@ -382,8 +393,8 @@ function App() {
     );
   }
 
-  // Si está logueado y en vista de panel
-  if (currentView === 'panel' && user) {
+  // Si está logueado y en vista de panel o remote
+  if ((currentView === 'panel' || currentView === 'remote') && user) {
     console.log('Renderizando UserPanel con user:', user, 'currentView:', currentView);
     return (
       <NotificationProvider 
@@ -398,11 +409,15 @@ function App() {
           } else if (path === '/panel') {
             setCurrentView('panel');
             window.history.pushState(null, '', '/panel');
+          } else if (path === '/remote') {
+            setCurrentView('remote');
+            window.history.pushState(null, '', '/remote');
           }
         }}
       >
         <UserPanel
           user={user}
+          initialView={currentView}
           onLogout={handleLogout}
           onBackToFolders={() => {
             setCurrentView('folders');
@@ -471,6 +486,9 @@ function App() {
         } else if (path === '/panel') {
           setCurrentView('panel');
           window.history.pushState(null, '', '/panel');
+        } else if (path === '/remote') {
+          setCurrentView('remote');
+          window.history.pushState(null, '', '/remote');
         }
       }}
     >
@@ -500,9 +518,18 @@ function App() {
             onThemeToggle={toggleTheme}
             isDarkMode={isDarkMode}
           />
-        ) : currentView === 'panel' ? (
+        ) : currentView === 'remote' ? (
+            <RemotePage 
+                user={user}
+                onGoBack={() => {
+                    setCurrentView('folders');
+                    window.history.pushState(null, '', '/folders');
+                }}
+            />
+        ) : (currentView === 'panel') ? (
           <UserPanel 
             user={user} 
+            initialView={currentView}
             onLogout={handleLogout} 
             onBackToFolders={() => {
               setCurrentView('folders');

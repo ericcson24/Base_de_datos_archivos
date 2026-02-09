@@ -1,8 +1,8 @@
 ﻿import React, { useState, useEffect } from 'react';
 import SettingsModal from '../Modals/SettingsModal';
 import DeleteConfirmationModal from '../Modals/DeleteConfirmationModal';
-import RDPManager from './RDPManager';
 import GroupManager from './GroupManager';
+import RDPManager from './RDPManager';
 import NotificationCenter from '../Common/NotificationCenter';
 import { useLanguage } from '../../context/LanguageContext';
 import './AdminPanel.css';
@@ -264,12 +264,6 @@ const AdminPanel = ({ user, onLogout, onBackToFolders, onThemeToggle, isDarkMode
           <span></span> Dashboard
         </button>
         <button 
-          className={`admin-nav-item ${activeTab === 'rdp' ? 'active' : ''}`}
-          onClick={() => setActiveTab('rdp')}
-        >
-          <span></span> RDP Manager
-        </button>
-        <button 
           className={`admin-nav-item ${activeTab === 'users' ? 'active' : ''}`}
           onClick={() => setActiveTab('users')}
         >
@@ -292,6 +286,12 @@ const AdminPanel = ({ user, onLogout, onBackToFolders, onThemeToggle, isDarkMode
           onClick={() => setActiveTab('logs')}
         >
           <span></span> Logs
+        </button>
+        <button 
+          className={`admin-nav-item ${activeTab === 'rdp' ? 'active' : ''}`}
+          onClick={() => setActiveTab('rdp')}
+        >
+          <span></span> Escritorio Remoto
         </button>
       </nav>
       <div className="admin-sidebar-footer">
@@ -462,11 +462,11 @@ const AdminPanel = ({ user, onLogout, onBackToFolders, onThemeToggle, isDarkMode
         <header className="admin-header">
           <h1 className="admin-title">
             {activeTab === 'dashboard' && 'Panel de Control'}
-            {activeTab === 'rdp' && 'Gestor RDP'}
             {activeTab === 'users' && 'Usuarios'}
             {activeTab === 'groups' && 'Gestión de Grupos'}
             {activeTab === 'system' && 'Sistema'}
             {activeTab === 'logs' && 'Registros'}
+            {activeTab === 'rdp' && 'Administración RDP'}
           </h1>
           <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
             <NotificationCenter />
@@ -483,11 +483,11 @@ const AdminPanel = ({ user, onLogout, onBackToFolders, onThemeToggle, isDarkMode
         )}
 
         {activeTab === 'dashboard' && renderDashboard()}
-        {activeTab === 'rdp' && <RDPManager />}
         {activeTab === 'users' && renderUsers()}
         {activeTab === 'groups' && <GroupManager />}
         {activeTab === 'system' && renderSystem()}
         {activeTab === 'logs' && renderLogs()}
+        {activeTab === 'rdp' && <RDPManager />}
       </main>
 
       {showSettingsModal && (

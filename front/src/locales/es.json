@@ -46,6 +46,7 @@
     "remoteDesktop": "Escritorio Remoto"
   },
   "rdp": {
+    "connectTitle": "Conexión a Escritorio Remoto",
     "connecting": "Conectando al Escritorio Remoto...",
     "connected": "Conectado",
     "disconnected": "Desconectado",

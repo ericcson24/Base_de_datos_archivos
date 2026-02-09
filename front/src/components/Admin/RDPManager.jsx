@@ -8,20 +8,11 @@ import './RDPManager.css';
 const RDPManager = () => {
     const { t } = useLanguage();
     const { addToast } = useToast();
-    const [connections, setConnections] = useState([]);
     const [settings, setSettings] = useState({ lan_only: 'false', server_id: '', maintenance_mode: 'false' });
     const [loading, setLoading] = useState(true);
-    const [showAddModal, setShowAddModal] = useState(false);
     const [activeConnection, setActiveConnection] = useState(null);
-    
-    const [formData, setFormData] = useState({
-        name: '',
-        hostname: '',
-        port: 3389,
-        username: '',
-        password: '',
-        protocol: 'rdp'
-    });
+    const [defaultConnection, setDefaultConnection] = useState(null);
+    const [isChecking, setIsChecking] = useState(false);
 
     const fetchSettings = async () => {
         try {
@@ -38,35 +29,32 @@ const RDPManager = () => {
         }
     };
 
-    const fetchConnections = async () => {
+    const initializeDefault = async () => {
+        setIsChecking(true);
         try {
             const token = getAuthToken();
-            const response = await fetch('/api/rdp/connections', {
-                headers: {
-                    'Authorization': `Bearer ${token}`
-                }
+            const response = await fetch('/api/rdp/initialize-default', {
+                method: 'POST',
+                headers: { 'Authorization': `Bearer ${token}` }
             });
-            
             if (response.ok) {
                 const data = await response.json();
-                setConnections(data);
-            } else {
-                throw new Error(t('rdp.fetchError'));
+                setDefaultConnection(data.connection);
             }
         } catch (error) {
-            console.error(error);
-            addToast(t('common.error'), 'error');
+            console.error("Failed to init", error);
         } finally {
+            setIsChecking(false);
             setLoading(false);
         }
     };
 
     useEffect(() => {
-        fetchConnections();
         fetchSettings();
+        initializeDefault();
     }, []);
 
-    const updateSetting = async (key, value) => {
+    const toggleService = async (newState) => {
         try {
             const token = getAuthToken();
             const response = await fetch('/api/rdp/settings', {
@@ -75,289 +63,175 @@ const RDPManager = () => {
                     'Content-Type': 'application/json',
                     'Authorization': `Bearer ${token}`
                 },
-                body: JSON.stringify({ [key]: value })
+                body: JSON.stringify({ maintenance_mode: String(!newState) }) 
             });
             if (response.ok) {
-                setSettings(prev => ({ ...prev, [key]: String(value) }));
-                addToast(t('common.success'), 'success');
+                setSettings(prev => ({ ...prev, maintenance_mode: String(!newState) }));
+                addToast(newState ? t('rdp.serviceStarted') || 'Service Started' : t('rdp.serviceStopped') || 'Service Stopped', 'success');
             }
         } catch (error) {
             addToast(t('common.error'), 'error');
         }
     };
 
-    const stopAllConnections = async () => {
-        if (!window.confirm(t('rdp.stopAllConfirm'))) return;
+    const handleRestart = async () => {
+        if (!window.confirm(t('rdp.restartConfirm') || 'Restart RDP Service? This will disconnect active users.')) return;
         try {
             const token = getAuthToken();
-            const response = await fetch('/api/rdp/connections/stop-all', {
+            await fetch('/api/rdp/connections/stop-all', {
                 method: 'POST',
                 headers: { 'Authorization': `Bearer ${token}` }
             });
-            if (response.ok) {
-                addToast(t('rdp.stopAllSuccess'), 'success');
-                fetchSettings();
-            }
-        } catch (error) {
-            addToast(t('common.error'), 'error');
-        }
-    };
-
-    const handleInputChange = (e) => {
-        const { name, value } = e.target;
-        setFormData(prev => ({
-            ...prev,
-            [name]: value
-        }));
-    };
-
-    const handleSubmit = async (e) => {
-        e.preventDefault();
-        try {
-            const token = getAuthToken();
-            const response = await fetch('/api/rdp/connections', {
+            // Re-enable
+            await fetch('/api/rdp/settings', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                     'Authorization': `Bearer ${token}`
                 },
-                body: JSON.stringify(formData)
+                body: JSON.stringify({ maintenance_mode: 'false' }) 
             });
-
-            if (response.ok) {
-                addToast(t('common.success'), 'success');
-                setShowAddModal(false);
-                setFormData({
-                    name: '',
-                    hostname: '',
-                    port: 3389,
-                    username: '',
-                    password: '',
-                    protocol: 'rdp'
-                });
-                fetchConnections();
-            } else {
-                throw new Error(t('rdp.createError'));
-            }
-        } catch (error) {
-            addToast(error.message, 'error');
-        }
-    };
-
-    const handleDelete = async (id) => {
-        if (!window.confirm(t('common.deleteConfirm'))) return;
-        
-        try {
-            const token = getAuthToken();
-            const response = await fetch(`/api/rdp/connections/${id}`, {
-                method: 'DELETE',
-                headers: {
-                    'Authorization': `Bearer ${token}`
-                }
-            });
-
-            if (response.ok) {
-                addToast(t('common.success'), 'success');
-                fetchConnections();
-            }
+            
+            addToast(t('rdp.restartSuccess') || 'Service Restarted', 'success');
+            fetchSettings();
         } catch (error) {
             addToast(t('common.error'), 'error');
         }
     };
 
-    const handleConnect = (connection) => {
-        setActiveConnection(connection);
+    const handleConnect = () => {
+        if (!defaultConnection) return;
+        setActiveConnection(defaultConnection);
     };
 
-    const handleDownloadRdp = (conn) => {
-        const content = `full address:s:${conn.hostname}:${conn.port}
+    const handleDownloadRdp = () => {
+         if (!defaultConnection) return;
+         const conn = defaultConnection;
+         
+         const content = `full address:s:${conn.hostname}:${conn.port}
 username:s:${conn.username || ''}
 prompt for credentials:i:1
 administrative session:i:1
 screen mode id:i:2
-use multimon:i:0
-desktopwidth:i:1920
-desktopheight:i:1080
 session bpp:i:32
-winposstr:s:0,3,0,0,800,600
-compression:i:1
-keyboardhook:i:2
-audiocapturemode:i:0
-videoplaybackmode:i:1
-connection type:i:7
-networkautodetect:i:1
-bandwidthautodetect:i:1
-displayconnectionbar:i:1
-enableworkspacereconnect:i:0
-disable wallpaper:i:0
-allow font smoothing:i:0
-allow desktop composition:i:0
-disable full window drag:i:1
-disable menu anims:i:1
-disable themes:i:0
-disable cursor setting:i:0
-bitmapcachepersistenable:i:1
-url:s:
 `;
         const blob = new Blob([content], { type: 'application/x-rdp' });
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
-        a.download = `${conn.name.replace(/\s+/g, '_')}.rdp`;
+        a.download = `Private_Desktop.rdp`;
         document.body.appendChild(a);
         a.click();
         document.body.removeChild(a);
         URL.revokeObjectURL(url);
     };
 
+    const isRunning = settings.maintenance_mode !== 'true';
+
     return (
         <div className="rdp-manager-container">
-            <div className="rdp-header">
-                <h2>{t('rdp.managerTitle') || 'Remote Connections'}</h2>
-                <button className="rdp-add-btn" onClick={() => setShowAddModal(true)}>
-                    + {t('common.create')}
-                </button>
-            </div>
-
-            {/* Global Access Info */}
-            <div className="rdp-info-box glassmorphism rdp-info-box-global">
-                <h4 className="rdp-info-box-title">🌍 {t('rdp.globalAccess')}</h4>
-                <p className="rdp-info-box-desc">{t('rdp.globalAccessDesc')}</p>
-            </div>
-
-            {/* Settings Panel (Hidden by default or simplified) */}
-            {/* <div className="rdp-settings-panel glassmorphism" ... > ... </div> */}
-            
-            <h3 className="rdp-saved-connections-title">{t('rdp.savedConnections') || 'Saved Connections'}</h3>
-
-            {loading ? (
-                <div className="loading">{t('common.loading')}</div>
+            {activeConnection ? (
+                <div className="rdp-viewer-wrapper">
+                    <button className="back-btn" onClick={() => setActiveConnection(null)}>← {t('common.back')}</button>
+                    <RDPViewer 
+                        connectionId={activeConnection.id} 
+                        token={getAuthToken()}
+                    />
+                </div>
             ) : (
-                <div className="rdp-grid">
-                    {connections.length === 0 ? (
-                        <p className="no-connections">{t('rdp.noConnections') || 'No connections configured'}</p>
-                    ) : (
-                        connections.map(conn => (
-                            <div key={conn.id} className="rdp-card glassmorphism">
-                                <div className="rdp-card-header">
-                                    <h3>{conn.name}</h3>
-                                    <span className="protocol-badge">{conn.protocol}</span>
-                                </div>
-                                <div className="rdp-card-body">
-                                    <p><strong>IP:</strong> {conn.virtual_ip || conn.hostname}</p>
-                                    <p><strong>User:</strong> {conn.username || '-'}</p>
-                                </div>
-                                <div className="rdp-card-actions">
-                                    <button 
-                                        className="connect-btn"
-                                        onClick={() => handleConnect(conn)}
-                                        title={t('rdp.connectWeb') || 'Connect via Web'}
-                                    >
-                                        🌐 Connect
-                                    </button>
-                                    <button 
-                                        className="connect-btn secondary rdp-download-btn"
-                                        onClick={() => handleDownloadRdp(conn)}
-                                        title={t('rdp.downloadRdp') || 'Download .rdp file'}
-                                    >
-                                        ⬇️ RDP
-                                    </button>
-                                    <button 
-                                        className="delete-btn"
-                                        onClick={() => handleDelete(conn.id)}
-                                    >
-                                        🗑️
-                                    </button>
-                                </div>
-                            </div>
-                        ))
-                    )}
-                </div>
-            )}
-
-            {/* Add Modal */}
-            {showAddModal && (
-                <div className="modal-overlay">
-                    <div className="modal-content glassmorphism-modal">
-                        <h3>{t('rdp.addDevice') || 'Add Device to Network'}</h3>
-                        <form onSubmit={handleSubmit}>
-                            <div className="form-group">
-                                <label>{t('rdp.name') || 'Device Name'}</label>
-                                <input 
-                                    type="text" 
-                                    name="name" 
-                                    value={formData.name} 
-                                    onChange={handleInputChange} 
-                                    required 
-                                    className="glassmorphism-input"
-                                    placeholder="e.g. My Laptop"
-                                />
-                            </div>
-                            <div className="form-row">
-                                <div className="form-group">
-                                    <label>{t('rdp.hostname') || 'Device IP (Local)'}</label>
-                                    <input 
-                                        type="text" 
-                                        name="hostname" 
-                                        value={formData.hostname} 
-                                        onChange={handleInputChange} 
-                                        required 
-                                        className="glassmorphism-input"
-                                        placeholder="e.g. 192.168.1.50"
-                                    />
-                                </div>
-                                <div className="form-group small">
-                                    <label>{t('rdp.port') || 'RDP Port'}</label>
-                                    <input 
-                                        type="number" 
-                                        name="port" 
-                                        value={formData.port} 
-                                        onChange={handleInputChange} 
-                                        className="glassmorphism-input"
-                                        placeholder="3389"
-                                    />
-                                </div>
-                            </div>
-                            <div className="form-group">
-                                <label>{t('rdp.username') || 'Windows Username'}</label>
-                                <input 
-                                    type="text" 
-                                    name="username" 
-                                    value={formData.username} 
-                                    onChange={handleInputChange} 
-                                    className="glassmorphism-input"
-                                />
-                            </div>
-                            <div className="form-group">
-                                <label>{t('rdp.password') || 'Windows Password'}</label>
-                                <input 
-                                    type="password" 
-                                    name="password" 
-                                    value={formData.password} 
-                                    onChange={handleInputChange} 
-                                    className="glassmorphism-input"
-                                />
-                            </div>
-                            <div className="modal-actions">
-                                <button type="button" onClick={() => setShowAddModal(false)}>
-                                    {t('common.cancel')}
-                                </button>
-                                <button type="submit" className="primary">
-                                    {t('rdp.createDevice') || 'Create Device'}
-                                </button>
-                            </div>
-                        </form>
+                <>
+                    <div className="rdp-header">
+                        <h2>{t('rdp.managerTitle') || 'Private Desktop Manager'}</h2>
                     </div>
-                </div>
-            )}
 
-            {/* RDP Viewer Overlay */}
-            {activeConnection && (
-                <RDPViewer 
-                    connectionToken={getAuthToken()}
-                    connectionId={activeConnection.id}
-                    onClose={() => setActiveConnection(null)}
-                />
+                    <div className="rdp-dashboard-grid">
+                        {/* Status Card */}
+                        <div className={`rdp-status-card glassmorphism ${isRunning ? 'status-active' : 'status-stopped'}`}>
+                            <div className="status-indicator-large">
+                                <div className="indicator-dot"></div>
+                                <span className="status-text">{isRunning ? (t('rdp.running') || 'RUNNING') : (t('rdp.stopped') || 'STOPPED')}</span>
+                            </div>
+                            <div className="status-actions">
+                                <button 
+                                    className={`action-btn ${isRunning ? 'btn-stop' : 'btn-start'}`}
+                                    onClick={() => toggleService(!isRunning)}
+                                >
+                                    {isRunning ? (t('rdp.stop') || 'STOP') : (t('rdp.start') || 'START')}
+                                </button>
+                                <button 
+                                    className="action-btn btn-restart"
+                                    onClick={handleRestart}
+                                    disabled={!isRunning}
+                                >
+                                    ↺ {t('rdp.restart') || 'RESTART'}
+                                </button>
+                            </div>
+                        </div>
+
+                        {/* Connection Card */}
+                        <div className="rdp-connection-card glassmorphism">
+                            <h3>{t('rdp.access') || 'Access Methods'}</h3>
+                            {loading ? <p>Loading...</p> : (
+                                <div className="access-methods">
+                                    <div className="method-row">
+                                        <div className="method-info">
+                                            <h4>Web Access</h4>
+                                            <p>Connect directly securely in browser</p>
+                                        </div>
+                                        <button 
+                                            className="connect-btn primary"
+                                            onClick={handleConnect}
+                                            disabled={!isRunning}
+                                        >
+                                            🌐 {t('rdp.connect') || 'Connect'}
+                                        </button>
+                                    </div>
+                                    <div className="method-row">
+                                        <div className="method-info">
+                                            <h4>Native Client</h4>
+                                            <p>Download configuration for RDP client</p>
+                                        </div>
+                                        <button 
+                                            className="connect-btn secondary"
+                                            onClick={handleDownloadRdp}
+                                            disabled={!isRunning}
+                                        >
+                                            ⬇️ .RDP
+                                        </button>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                        
+                        {/* Info Card */}
+                         <div className="rdp-info-card glassmorphism">
+                            <h4>ℹ️ Info</h4>
+                            <p><strong>Server ID:</strong> {settings.server_id}</p>
+                            <p><strong>Host:</strong> {defaultConnection?.hostname || 'System'}</p>
+                             <div className="setting-toggle-row small">
+                                <label className="switch">
+                                    <input 
+                                        type="checkbox" 
+                                        checked={settings.lan_only === 'true'}
+                                        onChange={(e) => {
+                                             const val = e.target.checked;
+                                              fetch('/api/rdp/settings', {
+                                                method: 'POST',
+                                                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${getAuthToken()}` },
+                                                 body: JSON.stringify({ lan_only: String(val) })
+                                              }).then(() => {
+                                                  setSettings(prev => ({...prev, lan_only: String(val)}));
+                                              });
+                                        }}
+                                    />
+                                    <span className="slider round"></span>
+                                </label>
+                                <span className="setting-label-small">{t('rdp.lanOnly') || 'LAN Only'}</span>
+                            </div>
+                        </div>
+
+                    </div>
+                </>
             )}
         </div>
     );

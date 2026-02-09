@@ -603,6 +603,7 @@
     "by": "by {{owner}}"
   },
   "rdp": {
+    "connectTitle": "Remote Desktop Connection",
     "connecting": "Connecting to Remote Desktop...",
     "connected": "Connected",
     "disconnected": "Disconnected",

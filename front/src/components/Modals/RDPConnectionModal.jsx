@@ -59,7 +59,28 @@ const RDPConnectionModal = ({ onClose, onConnect }) => {
                             <h4>Available Connections</h4>
                             <div className="connections-list">
                                 {connections.length === 0 ? (
-                                    <p className="no-data">No connections available.</p>
+                                    <div className="no-data-container">
+                                        <p className="no-data">No connections available.</p>
+                                        <button 
+                                            className="initialize-btn"
+                                            onClick={async () => {
+                                                try {
+                                                    const token = getAuthToken();
+                                                    await fetch('/api/rdp/initialize-default', {
+                                                        method: 'POST',
+                                                        headers: { 'Authorization': `Bearer ${token}` }
+                                                    });
+                                                    // Reload
+                                                    const res = await fetch('/api/rdp/connections', { headers: { 'Authorization': `Bearer ${token}` } });
+                                                    if (res.ok) setConnections(await res.json());
+                                                } catch (e) {
+                                                    console.error(e);
+                                                }
+                                            }}
+                                        >
+                                            Initialize Default Connection
+                                        </button>
+                                    </div>
                                 ) : (
                                     connections.map(conn => (
                                         <div key={conn.id} className="connection-item" onClick={() => onConnect(conn.id)}>

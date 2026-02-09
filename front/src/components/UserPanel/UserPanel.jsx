@@ -76,6 +76,11 @@ const UserPanel = ({ user, onLogout, onBackToFolders, onThemeToggle, isDarkMode,
         addToast(t('userPanel.microsoftLinkedSuccess'), 'success');
       }
     }
+    
+    // Check for initialView prop
+    // if (initialView === 'remote') {
+    //   setShowRDPModal(true);
+    // }
   }, []);
 
   // Listener para abrir editor desde el modal
@@ -1066,8 +1071,13 @@ useEffect(() => {
             }}>
               {t('userPanel.calendar')}
             </button>
-            <button className="sidebar-btn sidebar-btn-action" onClick={() => setShowRDPModal(true)}>
-              {t('userPanel.remoteDesktop')}
+            <button className="sidebar-btn sidebar-btn-action" onClick={() => {
+                   window.history.pushState(null, '', '/remote');
+                   // Manually trigger navigation
+                   const navEvent = new PopStateEvent('popstate');
+                   window.dispatchEvent(navEvent);
+            }}>
+              Remote Desktop (V2)
             </button>
           </div>
           <button className="sidebar-btn" onClick={() => setShowSettingsModal(true)}>
@@ -1646,7 +1656,7 @@ useEffect(() => {
         />
       )}
 
-      {/* RDP Connection Modal */}
+      {/* RDP Connection Modal (Deprecated in favor of /remote page but kept for backward compatibility if triggered internally) */}
       {showRDPModal && (
         <RDPConnectionModal
             onClose={() => setShowRDPModal(false)}
