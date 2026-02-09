@@ -541,6 +541,10 @@ function App() {
               setCurrentView('calendar');
               window.history.pushState(null, '', '/calendar');
             }}
+            onGoToRemote={() => {
+              setCurrentView('remote');
+              window.history.pushState(null, '', '/remote');
+            }}
             onUserUpdate={handleUserUpdate}
           />
         ) : (

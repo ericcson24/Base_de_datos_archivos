@@ -201,6 +201,8 @@ services:
     image: guacamole/guacd
     networks:
       - app-network
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
 
   # --- Redis (Message Broker) ---
   redis:

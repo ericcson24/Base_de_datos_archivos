@@ -1,0 +1,75 @@
+
+> outlook-service@1.0.0 start
+> node src/index.js
+
+Initializing Database with type: postgres
+Outlook Service running on port 5003
+Postgres Database Initialized
+[DEBUG] Fetching events for user_ids: 1
+[DEBUG] Found 6 events in DB
+[DEBUG] Fetching events for user_ids: 1
+[DEBUG] Found 5 events in DB
+[DEBUG] Fetching events for user_ids: 1
+[DEBUG] Found 7 events in DB
+[DEBUG] Fetching events for user_ids: 1
+[DEBUG] Found 6 events in DB
+[DEBUG] Fetching events for user_ids: 1
+[DEBUG] Found 7 events in DB
+[DEBUG] Fetching events for user_ids: 1
+[DEBUG] Found 6 events in DB
+[DEBUG] Fetching events for user_ids: 1
+[DEBUG] Found 7 events in DB
+[DEBUG] Fetching events for user_ids: 1
+[DEBUG] Found 6 events in DB
+[DEBUG] Fetching events for user_ids: 1
+[DEBUG] Found 7 events in DB
+[DEBUG] Fetching events for user_ids: 1
+[DEBUG] Found 6 events in DB
+[DEBUG] Fetching events for user_ids: 1
+[DEBUG] Found 7 events in DB
+[DEBUG] Fetching events for user_ids: 1
+[DEBUG] Found 6 events in DB
+[DEBUG] Fetching events for user_ids: 1
+[DEBUG] Found 7 events in DB
+[DEBUG] Fetching events for user_ids: 1
+[DEBUG] Found 7 events in DB
+[DEBUG] Fetching events for user_ids: 1
+[DEBUG] Found 6 events in DB
+[DEBUG] Fetching events for user_ids: 1
+[DEBUG] Found 7 events in DB
+[DEBUG] Fetching events for user_ids: 1
+[DEBUG] Found 7 events in DB
+[DEBUG] Fetching events for user_ids: 1
+[DEBUG] Found 6 events in DB
+[DEBUG] Fetching events for user_ids: 1
+[DEBUG] Found 7 events in DB
+[DEBUG] Fetching events for user_ids: 1
+[DEBUG] Found 6 events in DB
+[DEBUG] Fetching events for user_ids: 1
+[DEBUG] Found 7 events in DB
+[DEBUG] Fetching events for user_ids: 1
+[DEBUG] Found 7 events in DB
+[DEBUG] Fetching events for user_ids: 1
+[DEBUG] Found 7 events in DB
+[DEBUG] Fetching events for user_ids: 1
+[DEBUG] Found 6 events in DB
+[DEBUG] Fetching events for user_ids: 1
+[DEBUG] Found 7 events in DB
+[DEBUG] Fetching events for user_ids: 1
+[DEBUG] Found 6 events in DB
+[DEBUG] Fetching events for user_ids: 1
+[DEBUG] Found 8 events in DB
+[DEBUG] Fetching events for user_ids: 1
+[DEBUG] Found 7 events in DB
+[DEBUG] Fetching events for user_ids: 1
+[DEBUG] Found 8 events in DB
+[DEBUG] Fetching events for user_ids: 1
+[DEBUG] Found 7 events in DB
+[DEBUG] Fetching events for user_ids: 1
+[DEBUG] Found 8 events in DB
+[DEBUG] Fetching events for user_ids: 1
+[DEBUG] Found 8 events in DB
+[DEBUG] Fetching events for user_ids: 1
+[DEBUG] Found 8 events in DB
+[DEBUG] Fetching events for user_ids: 1
+[DEBUG] Found 8 events in DB

@@ -39,7 +39,7 @@ class DualNodeIndexing {
       this.performUpdate(false);
     }, 30000);
 
-    console.log('✅ Incremental Indexing iniciado');
+    console.log('Incremental Indexing iniciado');
   }
 
   /**
@@ -48,7 +48,7 @@ class DualNodeIndexing {
    */
   async performUpdate(fullRebuild = false) {
     if (this.isUpdating) {
-        console.log('⚠️ Indexing already in progress, skipping cycle.');
+        console.log('Indexing already in progress, skipping cycle.');
         return;
     }
 
@@ -60,7 +60,7 @@ class DualNodeIndexing {
         let targetUsers = [];
 
         if (fullRebuild) {
-            console.log('🔄 Ejecutando re-indexación COMPLETA...');
+            console.log('Running FULL re-indexing...');
             const result = await db.query('SELECT DISTINCT owner_id FROM files WHERE owner_id IS NOT NULL');
             targetUsers = result.rows.map(r => r.owner_id);
         } else {
@@ -76,7 +76,7 @@ class DualNodeIndexing {
             targetUsers = result.rows.map(r => r.owner_id);
             
             if (targetUsers.length > 0) {
-                console.log(`📝 Detectados cambios para ${targetUsers.length} usuarios.`);
+                console.log(`Detected changes for ${targetUsers.length} users.`);
             }
         }
 
@@ -90,7 +90,7 @@ class DualNodeIndexing {
         this.indexState.lastUpdate = now;
 
     } catch (error) {
-        console.error('❌ Error en ciclo de indexación:', error);
+        console.error('Error en ciclo de indexación:', error);
     } finally {
         this.isUpdating = false;
         this.indexState.secondaryBuilding = false;

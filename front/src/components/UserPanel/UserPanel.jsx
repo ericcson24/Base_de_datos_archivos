@@ -29,7 +29,7 @@ import './UserPanel.css';
 import './UserPanelDesktop.css';
 import './UserPanelMobile.css';
 
-const UserPanel = ({ user, onLogout, onBackToFolders, onThemeToggle, isDarkMode, onGoToCalendar, onUserUpdate }) => {
+const UserPanel = ({ user, onLogout, onBackToFolders, onThemeToggle, isDarkMode, onGoToCalendar, onGoToRemote, onUserUpdate }) => {
   console.log('UserPanel se está renderizando con user:', user);
   const { addToast } = useToast();
   const fetchWithNotify = useFetch();
@@ -1072,10 +1072,7 @@ useEffect(() => {
               {t('userPanel.calendar')}
             </button>
             <button className="sidebar-btn sidebar-btn-action" onClick={() => {
-                   window.history.pushState(null, '', '/remote');
-                   // Manually trigger navigation
-                   const navEvent = new PopStateEvent('popstate');
-                   window.dispatchEvent(navEvent);
+                   if (onGoToRemote) onGoToRemote();
             }}>
               Remote Desktop (V2)
             </button>

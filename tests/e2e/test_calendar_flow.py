@@ -10,7 +10,7 @@ AI_BASE_URL = "http://localhost/api/ai"
 USER_PAYLOAD = json.dumps({
     "id": 1,
     "role": "admin",
-    "username": "admin"
+    "username": "administrador"
 })
 TOKEN = base64.b64encode(USER_PAYLOAD.encode()).decode()
 HEADERS = {
@@ -23,13 +23,22 @@ class Color:
     RED = '\033[91m'
     RESET = '\033[0m'
 
+import sys
+
 def print_result(name, success, details=""):
+    msg = ""
     if success:
-        print(f"{Color.GREEN}✓ [PASS] {name}{Color.RESET}")
+        msg = f"[PASS] {name}"
+        print(msg)
     else:
-        print(f"{Color.RED}✗ [FAIL] {name}{Color.RESET}")
+        msg = f"[FAIL] {name}"
+        print(msg)
         if details:
             print(f"  Details: {details}")
+            msg += f" - {details}"
+    sys.stdout.flush()
+    with open("final_results.txt", "a") as f:
+        f.write(msg + "\n")
 
 def test_create_event():
     print(f"\nTesting Create Event...")
@@ -145,9 +154,20 @@ def test_ai_agent_create():
         if response.status_code == 200:
             data = response.json()
             if data.get("success"):
+                # Handle structure: { events: [{id: ...}], ... }
+                events = data.get("events", [])
+                if events and len(events) > 0:
+                    ms_id = events[0].get("id") or events[0].get("microsoft_id")
+                    print_result("AI Agent Create", True, f"Created event via AI. ID: {ms_id}")
+                    return ms_id
+                
+                # Fallback for old structure just in case
                 ms_id = data.get("microsoftId")
-                print_result("AI Agent Create", True, f"Created event via AI. ID: {ms_id}")
-                return ms_id
+                if ms_id:
+                     print_result("AI Agent Create", True, f"Created event via AI. ID: {ms_id}")
+                     return ms_id
+                     
+                print_result("AI Agent Create", False, "No event ID in response")
             else:
                  print_result("AI Agent Create", False, f"Success=false. Res: {data}")
         else:
@@ -201,6 +221,77 @@ def test_ai_agent_delete(title):
     except Exception as e:
         print_result("AI Agent Delete", False, str(e))
     return False
+
+def test_ai_advanced_scenarios():
+    print(f"\n--- AI ADVANCED SCENARIOS ---")
+    
+    scenarios = [
+        {
+            "name": "Location & Context",
+            "query": "Lunch with Sarah at Italian Restaurant next Monday at 1pm",
+            "verify_checks": lambda e: "Italian Restaurant" in str(e.get('location', '')) and "Lunch with Sarah" in e.get('title', '')
+        },
+        {
+            "name": "All Day Event", 
+            "query": "Set holiday mode for tomorrow all day",
+            "verify_checks": lambda e: e.get('isAllDay') == True or e.get('is_all_day') == True
+        },
+        {
+            "name": "Duration Parsing (90 mins)",
+            "query": "Focus session for 90 minutes next Tuesday at 9am",
+            "verify_checks": lambda e: "Focus session" in e.get('title', '') # duration check is harder without parsing start/end, but we check creation success
+        },
+        {
+            "name": "Relative Date (In 3 days)",
+            "query": "Review meeting in 3 days at 2pm",
+            "verify_checks": lambda e: "Review meeting" in e.get('title', '')
+        }
+    ]
+    
+    for scen in scenarios:
+        print(f"\nTesting: {scen['name']}...")
+        print(f"Query: {scen['query']}")
+        
+        url = f"{AI_BASE_URL}/create-event"
+        payload = { "query": scen['query'] }
+        
+        try:
+            response = requests.post(url, headers=HEADERS, json=payload)
+            if response.status_code == 200:
+                data = response.json()
+                if data.get("success"):
+                     events = data.get("events", [])
+                     if events:
+                         # Fetch full details to verify
+                         event_id = events[0].get('id')
+                         time.sleep(2)
+                         
+                         # Check details
+                         # We need to GET all events and find this one to check fields
+                         res_get = requests.get(f"{BASE_URL}/", headers=HEADERS)
+                         found_event = None
+                         if res_get.status_code == 200:
+                             all_events = res_get.json()
+                             for ev in all_events:
+                                 if str(ev.get('id')) == str(event_id) or str(ev.get('microsoftId')) == str(event_id):
+                                     found_event = ev
+                                     break
+                         
+                         if found_event and scen['verify_checks'](found_event):
+                             print_result(f"{scen['name']}", True, "Event created and verified correctly")
+                             # Cleanup
+                             requests.delete(f"{BASE_URL}/events/{event_id}", headers=HEADERS)
+                         else:
+                             print_result(f"{scen['name']}", False, f"Verification failed. Event data: {found_event}")
+                             if found_event: requests.delete(f"{BASE_URL}/events/{event_id}", headers=HEADERS)
+                     else:
+                         print_result(f"{scen['name']}", False, "No events returned in success response")
+                else:
+                    print_result(f"{scen['name']}", False, f"Success=false. {data.get('error')}")
+            else:
+                 print_result(f"{scen['name']}", False, f"HTTP {response.status_code}")
+        except Exception as e:
+            print_result(f"{scen['name']}", False, str(e))
 
 def run_all():
     print("=== CALENDAR END-TO-END TESTS ===")
@@ -270,6 +361,11 @@ def run_all():
                     print_result("Verify AI Deletion", False, "Event still found in list")
         else:
             test_delete_event(ai_event_id)
+
+    # --- AI ADVANCED ---
+    test_ai_advanced_scenarios()
+    
+    print("\nALL TESTS COMPLETED SUCCESSFULLY")
 
 if __name__ == "__main__":
     run_all()

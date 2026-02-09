@@ -1,0 +1,14 @@
+[PASS] Create Event
+[PASS] Get Events List
+[PASS] Update Event
+[PASS] Delete Event
+[PASS] Verify Deletion
+[PASS] AI Agent Create
+[PASS] Get Events List
+[PASS] AI Agent Update
+[PASS] AI Agent Delete
+[FAIL] Verify AI Deletion - Event still found in list
+[PASS] Location & Context
+[FAIL] All Day Event - Verification failed. Event data: {'id': 'local_1770669104800_uowgwt2a3', 'title': 'Holiday Mode', 'start': '2026-09-02T22:00:00.000Z', 'end': '2026-09-03T22:00:00.000Z', 'allDay': True, 'location': None, 'preview': '', 'url': None, 'categories': [], 'source': 'database'}
+[PASS] Duration Parsing (90 mins)
+[PASS] Relative Date (In 3 days)

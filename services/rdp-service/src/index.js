@@ -156,6 +156,9 @@ app.post('/initialize-default', async (req, res) => {
             return res.json({ success: true, connection: existing });
         }
 
+        const token = authHeader.split(' ')[1];
+        const decoded = verifyToken(token); // To get user ID
+
         // Create Default
         // Assuming host.docker.internal for Windows environments or a sane default
         const defaultConn = {
@@ -168,9 +171,11 @@ app.post('/initialize-default', async (req, res) => {
             virtual_ip: '10.10.10.2'
         };
 
+        const randomServerId = Math.floor(100000 + Math.random() * 900000).toString();
+
         const result = await dbAsync.run(
-            'INSERT INTO rdp_connections (name, hostname, port, username, password, protocol, virtual_ip) VALUES (?, ?, ?, ?, ?, ?, ?)',
-            [defaultConn.name, defaultConn.hostname, defaultConn.port, defaultConn.username, defaultConn.password, defaultConn.protocol, defaultConn.virtual_ip]
+            'INSERT INTO rdp_connections (user_id, server_id, name, hostname, port, username, password, protocol, virtual_ip) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+            [decoded.id || 1, randomServerId, defaultConn.name, defaultConn.hostname, defaultConn.port, defaultConn.username, defaultConn.password, defaultConn.protocol, defaultConn.virtual_ip]
         );
 
         res.json({ success: true, connection: { ...defaultConn, id: result.lastID } });
@@ -261,11 +266,12 @@ app.post('/connections', async (req, res) => {
             nextOctet = parseInt(parts[3]) + 1;
         }
         const virtual_ip = `10.10.10.${nextOctet}`;
-        
+        const randomServerId = Math.floor(100000 + Math.random() * 900000).toString();
+
         // We store the REAL hostname for connection, but assign a virtual_ip for display
         await dbAsync.run(
-            'INSERT INTO rdp_connections (name, hostname, port, username, password, protocol, virtual_ip) VALUES (?, ?, ?, ?, ?, ?, ?)',
-            [name, hostname, port || 3389, username, password, protocol || 'rdp', virtual_ip]
+            'INSERT INTO rdp_connections (user_id, server_id, name, hostname, port, username, password, protocol, virtual_ip) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+            [decoded.id || 1, randomServerId, name, hostname, port || 3389, username, password, protocol || 'rdp', virtual_ip]
         );
 
         res.json({ success: true, virtual_ip });

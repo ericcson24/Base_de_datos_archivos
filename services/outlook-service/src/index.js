@@ -822,8 +822,15 @@ app.patch('/events/:id', authenticate, async (req, res) => {
     const user = await dbAsync.get('SELECT id, microsoft_access_token FROM users WHERE username = ?', [username]);
     
     // Check if event exists
-    // Attempt to find by ID (int) or Microsoft ID (string)
-    let event = await dbAsync.get('SELECT * FROM calendar_events WHERE id = ? AND user_id = ?', [id, user.id]);
+    let event = null;
+    
+    // If id is numeric, try searching by local ID first
+    if (!isNaN(id)) {
+        try {
+            event = await dbAsync.get('SELECT * FROM calendar_events WHERE id = ? AND user_id = ?', [id, user.id]);
+        } catch (e) { /* Ignore type errors */ }
+    }
+    
     if (!event) {
         event = await dbAsync.get('SELECT * FROM calendar_events WHERE microsoft_id = ? AND user_id = ?', [id, user.id]);
     }
@@ -883,7 +890,13 @@ app.delete('/events/:id', authenticate, async (req, res) => {
     const user = await dbAsync.get('SELECT id, microsoft_access_token FROM users WHERE username = ?', [username]);
 
     // Find event
-    let event = await dbAsync.get('SELECT * FROM calendar_events WHERE id = ? AND user_id = ?', [id, user.id]);
+    let event = null;
+    if (!isNaN(id)) {
+        try {
+            event = await dbAsync.get('SELECT * FROM calendar_events WHERE id = ? AND user_id = ?', [id, user.id]);
+        } catch (e) { /* Ignore */ }
+    }
+
     if (!event) {
         event = await dbAsync.get('SELECT * FROM calendar_events WHERE microsoft_id = ? AND user_id = ?', [id, user.id]);
     }
