@@ -85,6 +85,36 @@
   --clear-btn-hover-text: #666;
 }
 
+.sidebar-footer-actions {
+  display: flex;
+  gap: 10px;
+}
+
+.sidebar-btn-action {
+  flex: 1;
+  justify-content: center;
+  padding: 0.75rem 0.5rem;
+}
+
+.search-input-reset {
+  outline: none;
+  box-shadow: none;
+}
+
+.hidden-input {
+  display: none;
+}
+
+.fallback-icon-hidden {
+  display: none;
+}
+
+/* Fix for fallback icon showing on top of previews */
+.file-icon.fallback-icon-hidden,
+.file-fallback-icon.fallback-icon-hidden {
+  display: none;
+}
+
 /* Dark theme */
 [data-theme="dark"] {
   --bg-gradient: linear-gradient(135deg, #0a0a0a 0%, #1a1a1a 100%);
@@ -622,23 +652,38 @@ body {
 }
 
 .panel-header {
-  height: 70px; /* Match Calendar header height */
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 0; /* Removed margin */
-  padding: 0 2rem 0 0; /* Removed left padding */
-  background: var(--sidebar-bg); /* Match Calendar header bg */
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
-  border-radius: 0; /* Remove border radius */
-  box-shadow: none; /* Remove shadow */
-  border-bottom: 1px solid var(--sidebar-border);
+  gap: 1rem;
+}
+
+.main-panel > .panel-header {
+  margin: 0 0 1rem;
+  padding: 14px 18px;
+  background: linear-gradient(120deg, rgba(255, 255, 255, 0.88), rgba(255, 255, 255, 0.72));
+  border: 1px solid var(--sidebar-border);
+  border-radius: 16px;
+  box-shadow: var(--shadow);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  transition: box-shadow 0.25s ease, transform 0.25s ease;
+}
+
+[data-theme="dark"] .main-panel > .panel-header {
+  background: linear-gradient(120deg, rgba(32, 32, 40, 0.9), rgba(22, 22, 30, 0.82));
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.35);
+}
+
+.main-panel > .panel-header:hover {
+  box-shadow: var(--shadow-hover);
+  transform: translateY(-2px);
 }
 
 .panel-title {
-  font-size: 1.2rem; /* Match Calendar title size */
-  font-weight: 600;
+  font-size: 1.25rem;
+  font-weight: 700;
   color: var(--text-color);
   margin: 0;
 }
@@ -671,7 +716,7 @@ body {
   display: flex;
   flex-direction: row;
   gap: 1rem;
-  overflow: hidden;
+  overflow: visible;
   position: relative;
   height: 100%;
   padding: 0; /* Clean padding */
@@ -685,7 +730,7 @@ body {
   flex-direction: column;
   align-items: stretch;
   gap: 0.5rem;
-  overflow-y: auto;
+  overflow: visible;
   border-radius: 0.5rem;
   padding: 0.5rem;
   color: var(--text-color);
@@ -938,18 +983,7 @@ input[type="text"]:focus {
   position: relative;
 }
 
-.panel-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 1rem;
-}
-
-.panel-title {
-  font-size: 1.5rem;
-  font-weight: 600;
-  color: var(--text-color);
-}
+/* Panel header styles moved above to avoid duplicate definitions */
 
 /* UPLOAD PROGRESS */
 .upload-progress {
@@ -1531,8 +1565,35 @@ input[type="text"]:focus {
   background: var(--control-bg);
   border: 1px solid var(--control-border);
   color: var(--control-text);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  box-shadow: var(--shadow);
+  border-radius: 14px;
+  overflow: visible;
+  transition: box-shadow 0.2s ease, transform 0.2s ease, border-color 0.2s ease;
+}
+
+.search-container:hover {
+  box-shadow: var(--shadow-hover);
+  border-color: rgba(66, 133, 244, 0.22);
+  transform: translateY(-1px);
+}
+
+/* Softer glass effect for search shell in light mode */
+.search-container.glassmorphism {
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.92), rgba(255, 255, 255, 0.78));
+  border: 1px solid var(--sidebar-border);
+  box-shadow: var(--shadow);
+}
+
+[data-theme="dark"] .search-container.glassmorphism {
+  background: linear-gradient(135deg, rgba(35, 35, 45, 0.95), rgba(25, 25, 35, 0.9));
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  box-shadow: 0 20px 55px rgba(0, 0, 0, 0.35);
+}
+
+.search-container.glassmorphism:hover {
+  box-shadow: var(--shadow-hover);
 }
 
 .search-input {
@@ -2260,18 +2321,25 @@ input[type="text"]:focus {
 /* Estilos para archivos recientes - Rediseño elegante */
 .recent-files-section {
   margin: 0 0 16px 0;
-  background: var(--file-grid-bg);
+  background: var(--panel-bg);
   border: 1px solid var(--sidebar-border);
-  border-radius: 12px;
+  border-radius: 16px;
   overflow: hidden;
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
-  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.35);
-  transition: all 0.3s ease;
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+  box-shadow: var(--shadow);
+  transition: box-shadow 0.25s ease, transform 0.25s ease, border-color 0.25s ease;
 }
 
 .recent-files-section:hover {
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.12);
+  box-shadow: var(--shadow-hover);
+  transform: translateY(-2px);
+  border-color: rgba(66, 133, 244, 0.18);
+}
+
+[data-theme="dark"] .recent-files-section {
+  border-color: rgba(255, 255, 255, 0.1);
+  box-shadow: 0 22px 60px rgba(0, 0, 0, 0.4);
 }
 
 .recent-files-header {

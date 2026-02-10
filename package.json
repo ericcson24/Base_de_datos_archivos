@@ -1,16 +1,39 @@
 {
-  "name": "codigo_servidor",
+  "name": "base-de-datos-archivos",
   "version": "1.0.0",
-  "description": "Sistema de nube distribuible con autenticación y gestión de archivos",
+  "description": "Sistema de gesti\u00f3n de archivos con microservicios",
   "scripts": {
-    "start": "concurrently \"npm run server\" \"npm run client\"",
-    "server": "cd back && npm start",
-    "client": "cd front && npm start",
-    "install-all": "npm install && cd front && npm install && cd back && npm install",
-    "dev": "concurrently \"npm run server:dev\" \"npm run client\"",
-    "server:dev": "cd back && npm run dev"
+    "start": "docker compose up --build",
+    "stop": "docker compose down",
+    "restart": "docker compose restart",
+    "logs": "docker compose logs -f",
+    "clean": "docker compose down -v",
+    "dev:front": "cd front && npm start",
+    "dev:auth": "cd services/auth-service && npm start",
+    "dev:file": "cd services/file-service && npm start",
+    "dev:user": "cd services/user-service && npm start",
+    "dev:admin": "cd services/admin-service && npm start",
+    "dev:email": "cd services/email-service && npm start",
+    "dev:notification": "cd services/notification-service && npm start",
+    "dev:outlook": "cd services/outlook-service && npm start",
+    "install:all": "npm run install:front && npm run install:services",
+    "install:front": "cd front && npm install",
+    "install:services": "cd services/auth-service && npm install && cd ../file-service && npm install && cd ../user-service && npm install && cd ../admin-service && npm install && cd ../email-service && npm install && cd ../notification-service && npm install && cd ../outlook-service && npm install"
+  },
+  "keywords": [
+    "microservices",
+    "docker",
+    "react",
+    "node"
+  ],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "dotenv": "^17.2.3",
+    "guacamole-common-js": "^1.5.0",
+    "pg": "^8.16.3"
   },
   "devDependencies": {
-    "concurrently": "^9.2.1"
+    "concurrently": "^9.1.2"
   }
 }

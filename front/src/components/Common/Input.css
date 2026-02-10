@@ -129,25 +129,23 @@
 }
 
 /* Dark theme support */
-@media (prefers-color-scheme: dark) {
-  .input-field {
-    background: rgba(0, 0, 0, 0.1);
-    border-color: rgba(255, 255, 255, 0.1);
-    color: #fff;
-  }
+[data-theme="dark"] .input-field {
+  background: rgba(0, 0, 0, 0.1);
+  border-color: rgba(255, 255, 255, 0.1);
+  color: #fff;
+}
 
-  .input-field:focus {
-    background: rgba(0, 0, 0, 0.2);
-    border-color: #667eea;
-  }
+[data-theme="dark"] .input-field:focus {
+  background: rgba(0, 0, 0, 0.2);
+  border-color: #667eea;
+}
 
-  .input-field::placeholder {
-    color: #ccc;
-  }
+[data-theme="dark"] .input-field::placeholder {
+  color: #ccc;
+}
 
-  .input-icon {
-    color: #ccc;
-  }
+[data-theme="dark"] .input-icon {
+  color: #ccc;
 }
 
 /* Responsive adjustments */

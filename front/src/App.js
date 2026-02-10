@@ -2,8 +2,10 @@ import React, { useState, useEffect } from 'react';
 import Login from './components/Auth/Login';
 import UserPanel from './components/UserPanel/UserPanel';
 import AdminPanel from './components/Admin/AdminPanel';
+import RemotePage from './components/Remote/RemotePage';
 import FolderSelector from './components/UserPanel/FolderSelector';
 import Calendar from './components/Calendar/Calendar';
+import { NotificationProvider } from './context/NotificationContext';
 import './App.css';
 
 // Utility functions for cookie management
@@ -25,6 +27,7 @@ const deleteCookie = (name) => {
 };
 
 function App() {
+  console.log('APP V2 LOADED - DEBUG MODE');
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [user, setUser] = useState(null);
   const [currentView, setCurrentView] = useState('login'); // 'login', 'folders', 'panel', 'calendar', 'admin'
@@ -52,6 +55,10 @@ function App() {
   // Función para toggle del tema
   const toggleTheme = () => {
     setIsDarkMode(!isDarkMode);
+  };
+
+  const handleUserUpdate = (updatedFields) => {
+    setUser(prev => ({ ...prev, ...updatedFields }));
   };
 
   // Verificar si hay token guardado al cargar la app
@@ -83,6 +90,10 @@ function App() {
             token: storedToken || data.token 
           };
           
+          // Normalizar rol
+          const role = (userWithToken.role || '').toLowerCase();
+          userWithToken.role = role;
+          
           setUser(userWithToken);
           setIsLoggedIn(true);
           
@@ -92,7 +103,15 @@ function App() {
           }
           
           // Detectar ruta actual y cambiar currentView
-          const currentPath = window.location.pathname;
+          let currentPath = window.location.pathname;
+          
+          // Normalizar ruta (eliminar slash final si existe)
+          if (currentPath.endsWith('/') && currentPath.length > 1) {
+            currentPath = currentPath.slice(0, -1);
+            // Actualizar URL visualmente sin recargar
+            window.history.replaceState(null, '', currentPath);
+          }
+          
           if (currentPath === '/calendar') {
             setCurrentView('calendar');
           } else if (currentPath === '/panel') {
@@ -101,14 +120,16 @@ function App() {
             setCurrentView('admin');
           } else if (currentPath === '/folders') {
             setCurrentView('folders');
+          } else if (currentPath === '/remote') {
+            setCurrentView('remote');
           } else {
             // Redirigir según el rol del usuario si está autenticado
-            if (userWithToken.role === 'admin') {
+            if (role === 'admin') {
               setCurrentView('admin');
-              window.history.pushState(null, '', '/admin');
+              window.history.replaceState(null, '', '/admin');
             } else {
               setCurrentView('folders');
-              window.history.pushState(null, '', '/folders');
+              window.history.replaceState(null, '', '/folders');
             }
           }
         } else {
@@ -153,12 +174,18 @@ function App() {
   // Detectar cambios en la ruta del navegador
   useEffect(() => {
     const handleLocationChange = () => {
-      const currentPath = window.location.pathname;
+      let currentPath = window.location.pathname;
+      if (currentPath.endsWith('/') && currentPath.length > 1) {
+        currentPath = currentPath.slice(0, -1);
+      }
+
       if (isLoggedIn && user) {
         if (currentPath === '/calendar') {
           setCurrentView('calendar');
         } else if (currentPath === '/panel') {
           setCurrentView('panel');
+        } else if (currentPath === '/remote') {
+          setCurrentView('remote');
         } else if (currentPath === '/admin' && user.role === 'admin') {
           setCurrentView('admin');
         } else if (currentPath === '/folders') {
@@ -196,8 +223,13 @@ function App() {
         // Intentar obtener el mensaje de error del servidor
         try {
           const errorData = await response.json();
-          throw new Error(errorData.message || `Error HTTP ${response.status}`);
+          const error = new Error(errorData.message || `Error HTTP ${response.status}`);
+          error.code = errorData.errorCode; // Adjuntar código de error
+          throw error;
         } catch (jsonError) {
+          // Si ya es el error que lanzamos arriba, relanzarlo
+          if (jsonError.code) throw jsonError;
+          
           // Si no hay JSON válido en la respuesta de error, usar el status
           throw new Error(`Error del servidor: ${response.status} ${response.statusText}`);
         }
@@ -210,11 +242,17 @@ function App() {
           ...data.user,
           token: data.token
         };
+        
+        // Normalizar rol para evitar problemas de mayúsculas/minúsculas
+        const role = (userWithToken.role || '').toLowerCase();
+        // Asegurarnos de que el rol en el estado esté normalizado
+        userWithToken.role = role;
+
         setUser(userWithToken);
         setIsLoggedIn(true);
         
         // Verificar si es administrador y redirigir apropiadamente
-        if (userWithToken.role === 'admin') {
+        if (role === 'admin') {
           setCurrentView('admin');
           window.history.pushState(null, '', '/admin');
           console.log('Login exitoso como administrador:', data);
@@ -237,6 +275,11 @@ function App() {
 
   const handleSelectFolder = (tipo) => {
     // Aquí puedes manejar la selección de carpeta
+    if (tipo === 'remote') {
+      setCurrentView('remote');
+      window.history.pushState(null, '', '/remote');
+      return;
+    }
     // Por ahora, simplemente vamos al panel
     setCurrentView('panel');
     window.history.pushState(null, '', '/panel');
@@ -281,7 +324,7 @@ function App() {
   // Si está cargando, mostrar loading
   if (isLoading) {
     return (
-      <div className="App" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>
+      <div className="App app-loading-container">
         <div>Cargando...</div>
       </div>
     );
@@ -319,9 +362,62 @@ function App() {
   // Si está logueado y es administrador en vista admin
   if (currentView === 'admin' && user && user.role === 'admin') {
     return (
-      <div className="App">
-        <AdminPanel
+      <NotificationProvider 
+        user={user}
+        onNavigate={(path) => {
+          if (path === '/calendar') {
+            setCurrentView('calendar');
+            window.history.pushState(null, '', '/calendar');
+          } else if (path === '/admin') {
+            setCurrentView('admin');
+            window.history.pushState(null, '', '/admin');
+          } else if (path === '/panel') {
+            setCurrentView('panel');
+            window.history.pushState(null, '', '/panel');
+          }
+        }}
+      >
+        <div className="App">
+          <AdminPanel
+            user={user}
+            onLogout={handleLogout}
+            onBackToFolders={() => {
+              setCurrentView('folders');
+              window.history.pushState(null, '', '/folders');
+            }}
+            onThemeToggle={toggleTheme}
+            isDarkMode={isDarkMode}
+          />
+        </div>
+      </NotificationProvider>
+    );
+  }
+
+  // Si está logueado y en vista de panel o remote
+  if ((currentView === 'panel' || currentView === 'remote') && user) {
+    console.log('Renderizando UserPanel con user:', user, 'currentView:', currentView);
+    return (
+      <NotificationProvider 
+        user={user}
+        onNavigate={(path) => {
+          if (path === '/calendar') {
+            setCurrentView('calendar');
+            window.history.pushState(null, '', '/calendar');
+          } else if (path === '/admin') {
+            setCurrentView('admin');
+            window.history.pushState(null, '', '/admin');
+          } else if (path === '/panel') {
+            setCurrentView('panel');
+            window.history.pushState(null, '', '/panel');
+          } else if (path === '/remote') {
+            setCurrentView('remote');
+            window.history.pushState(null, '', '/remote');
+          }
+        }}
+      >
+        <UserPanel
           user={user}
+          initialView={currentView}
           onLogout={handleLogout}
           onBackToFolders={() => {
             setCurrentView('folders');
@@ -329,51 +425,73 @@ function App() {
           }}
           onThemeToggle={toggleTheme}
           isDarkMode={isDarkMode}
+          onGoToCalendar={() => {
+            setCurrentView('calendar');
+            window.history.pushState(null, '', '/calendar');
+          }}
+          onUserUpdate={handleUserUpdate}
         />
-      </div>
+      </NotificationProvider>
     );
-  }
-
-  // Si está logueado y en vista de panel
-  if (currentView === 'panel' && user) {
-    console.log('Renderizando UserPanel con user:', user, 'currentView:', currentView);
-    return <UserPanel
-      user={user}
-      onLogout={handleLogout}
-      onBackToFolders={() => {
-        setCurrentView('folders');
-        window.history.pushState(null, '', '/folders');
-      }}
-      onThemeToggle={toggleTheme}
-      isDarkMode={isDarkMode}
-      onGoToCalendar={() => {
-        setCurrentView('calendar');
-        window.history.pushState(null, '', '/calendar');
-      }}
-    />;
   }
 
   // Si está logueado y en vista de calendario
   if (currentView === 'calendar' && user) {
-    return <Calendar
-      user={user}
-      onLogout={handleLogout}
-      onBackToPanel={() => {
-        setCurrentView('panel');
-        window.history.pushState(null, '', '/panel');
-      }}
-      onBackToFolders={() => {
-        setCurrentView('folders');
-        window.history.pushState(null, '', '/folders');
-      }}
-      onThemeToggle={toggleTheme}
-      isDarkMode={isDarkMode}
-    />;
+    return (
+      <NotificationProvider 
+        user={user}
+        onNavigate={(path) => {
+          if (path === '/calendar') {
+            setCurrentView('calendar');
+            window.history.pushState(null, '', '/calendar');
+          } else if (path === '/admin') {
+            setCurrentView('admin');
+            window.history.pushState(null, '', '/admin');
+          } else if (path === '/panel') {
+            setCurrentView('panel');
+            window.history.pushState(null, '', '/panel');
+          }
+        }}
+      >
+        <Calendar
+          user={user}
+          onLogout={handleLogout}
+          onBackToPanel={() => {
+            setCurrentView('panel');
+            window.history.pushState(null, '', '/panel');
+          }}
+          onBackToFolders={() => {
+            setCurrentView('folders');
+            window.history.pushState(null, '', '/folders');
+          }}
+          onThemeToggle={toggleTheme}
+          isDarkMode={isDarkMode}
+        />
+      </NotificationProvider>
+    );
   }
 
   // Fallback - agregar debug
   console.log('Fallback render - isLoggedIn:', isLoggedIn, 'currentView:', currentView, 'user:', user);
   return (
+    <NotificationProvider 
+      user={user}
+      onNavigate={(path) => {
+        if (path === '/calendar') {
+          setCurrentView('calendar');
+          window.history.pushState(null, '', '/calendar');
+        } else if (path === '/admin') {
+          setCurrentView('admin');
+          window.history.pushState(null, '', '/admin');
+        } else if (path === '/panel') {
+          setCurrentView('panel');
+          window.history.pushState(null, '', '/panel');
+        } else if (path === '/remote') {
+          setCurrentView('remote');
+          window.history.pushState(null, '', '/remote');
+        }
+      }}
+    >
     <div className="App">
       {/* <div style={{ padding: '20px', background: 'red', color: 'white' }}>
         <h2>DEBUG INFO:</h2>
@@ -400,9 +518,18 @@ function App() {
             onThemeToggle={toggleTheme}
             isDarkMode={isDarkMode}
           />
-        ) : currentView === 'panel' ? (
+        ) : currentView === 'remote' ? (
+            <RemotePage 
+                user={user}
+                onGoBack={() => {
+                    setCurrentView('folders');
+                    window.history.pushState(null, '', '/folders');
+                }}
+            />
+        ) : (currentView === 'panel') ? (
           <UserPanel 
             user={user} 
+            initialView={currentView}
             onLogout={handleLogout} 
             onBackToFolders={() => {
               setCurrentView('folders');
@@ -414,6 +541,11 @@ function App() {
               setCurrentView('calendar');
               window.history.pushState(null, '', '/calendar');
             }}
+            onGoToRemote={() => {
+              setCurrentView('remote');
+              window.history.pushState(null, '', '/remote');
+            }}
+            onUserUpdate={handleUserUpdate}
           />
         ) : (
           <FolderSelector 
@@ -432,6 +564,7 @@ function App() {
         <Login onLogin={handleLogin} onThemeToggle={toggleTheme} isDarkMode={isDarkMode} />
       )}
     </div>
+    </NotificationProvider>
   );
 }
 

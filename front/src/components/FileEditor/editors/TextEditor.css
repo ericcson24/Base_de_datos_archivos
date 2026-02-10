@@ -20,6 +20,16 @@ textarea:focus {
   outline: none;
 }
 
+.text-editor-textarea {
+  white-space: pre;
+  overflow-wrap: normal;
+}
+
+.text-editor-textarea.wrap {
+  white-space: pre-wrap;
+  overflow-wrap: break-word;
+}
+
 .btn-primary:disabled {
   opacity: 0.5;
   cursor: not-allowed;

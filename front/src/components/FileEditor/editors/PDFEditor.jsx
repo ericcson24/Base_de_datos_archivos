@@ -119,11 +119,10 @@ const PDFEditor = ({ fileUrl, file }) => {
 
       {/* PDF Viewer */}
       <div className="flex-1 overflow-auto bg-gray-100 dark:bg-gray-900 flex items-center justify-center p-4">
-        <div className="relative" style={{ transform: `scale(${scale})`, transformOrigin: 'center top' }}>
+        <div className="relative pdf-transform-container" style={{ transform: `scale(${scale})` }}>
           <iframe
             src={`${fileUrl}#page=${currentPage}`}
-            className="w-full h-[800px] shadow-2xl rounded-lg border-4 border-white dark:border-gray-800"
-            style={{ width: '800px' }}
+            className="w-full h-[800px] shadow-2xl rounded-lg border-4 border-white dark:border-gray-800 pdf-iframe"
             title={file.name}
           />
           
@@ -134,16 +133,12 @@ const PDFEditor = ({ fileUrl, file }) => {
               .map((annotation, idx) => (
                 <div
                   key={idx}
-                  className="absolute"
+                  className="annotation-item"
                   style={{
                     left: `${annotation.x}px`,
                     top: `${annotation.y}px`,
                     color: annotation.type === 'text' ? drawColor : 'transparent',
                     backgroundColor: annotation.type === 'highlight' ? `${drawColor}40` : 'transparent',
-                    padding: '4px 8px',
-                    borderRadius: '4px',
-                    fontSize: '14px',
-                    fontWeight: 'bold'
                   }}
                 >
                   {annotation.content}

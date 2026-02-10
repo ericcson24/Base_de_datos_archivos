@@ -1,0 +1,146 @@
+.rdp-modal-content {
+    max-width: 500px;
+    width: 90%;
+}
+
+.rdp-selection-container {
+    margin: 20px 0;
+}
+
+.server-info-box {
+    background: rgba(255, 255, 255, 0.1);
+    padding: 15px;
+    border-radius: 8px;
+    margin-bottom: 20px;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.info-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 10px;
+}
+
+.server-id {
+    background: rgba(0, 0, 0, 0.3);
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-family: monospace;
+    font-size: 1.1em;
+    letter-spacing: 1px;
+}
+
+.status-badge {
+    display: inline-block;
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 0.85em;
+    font-weight: bold;
+    margin-right: 10px;
+}
+
+.status-badge.lan-only {
+    background: rgba(33, 150, 243, 0.2);
+    color: #64b5f6;
+    border: 1px solid rgba(33, 150, 243, 0.3);
+}
+
+.status-badge.maintenance {
+    background: rgba(244, 67, 54, 0.2);
+    color: #e57373;
+    border: 1px solid rgba(244, 67, 54, 0.3);
+}
+
+.connections-list-wrapper h4 {
+    margin-bottom: 10px;
+    opacity: 0.8;
+}
+
+.connections-list {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    max-height: 300px;
+    overflow-y: auto;
+}
+
+.connection-item {
+    display: flex;
+    align-items: center;
+    padding: 12px;
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.2s;
+    border: 1px solid transparent;
+}
+
+.connection-item:hover {
+    background: rgba(255, 255, 255, 0.1);
+    border-color: rgba(255, 255, 255, 0.2);
+    transform: translateY(-1px);
+}
+
+.conn-icon {
+    font-size: 1.5em;
+    margin-right: 15px;
+}
+
+.conn-details {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+}
+
+.conn-name {
+    font-weight: bold;
+}
+
+.conn-host {
+    font-size: 0.8em;
+    opacity: 0.7;
+}
+
+.connect-btn-small {
+    background: var(--button-primary-bg, #2196f3);
+    color: white;
+    border: none;
+    padding: 6px 12px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 0.9em;
+}
+
+.no-data {
+    text-align: center;
+    padding: 20px;
+    opacity: 0.6;
+    font-style: italic;
+    margin-bottom: 0;
+}
+
+.no-data-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 15px;
+    padding: 20px;
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 8px;
+}
+
+.initialize-btn {
+    padding: 8px 16px;
+    background: #4caf50;
+    color: white;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 0.9em;
+    transition: background 0.2s;
+}
+
+.initialize-btn:hover {
+    background: #388e3c;
+}

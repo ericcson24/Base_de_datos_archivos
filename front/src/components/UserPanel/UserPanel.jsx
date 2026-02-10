@@ -7,22 +7,32 @@ import CreateFolderModal from '../Modals/CreateFolderModal';
 import RenameModal from '../Modals/RenameModal';
 import MoveModal from '../Modals/MoveModal';
 import ShareModal from '../Modals/ShareModal';
+import DeleteConfirmationModal from '../Modals/DeleteConfirmationModal';
 import SettingsModal from '../Modals/SettingsModal';
+import RDPViewer from '../RDP/RDPViewer';
+import RDPConnectionModal from '../Modals/RDPConnectionModal';
+import AIResultsModal from '../Modals/AIResultsModal';
 import SidebarPanel from './SidebarPanel';
 import FileItem from './FileItem';
+import NotificationCenter from '../Common/NotificationCenter';
 import { 
   getAuthToken, 
   downloadFile, 
   formatFileSize, 
-  canPreview
+  canPreview,
+  canEdit
 } from '../../utils/fileUtils';
+import { useFetch } from '../../hooks/useFetch';
 import { useToast } from '../../context/ToastContext';
 import { useLanguage } from '../../context/LanguageContext';
 import './UserPanel.css';
+import './UserPanelDesktop.css';
+import './UserPanelMobile.css';
 
-const UserPanel = ({ user, onLogout, onBackToFolders, onThemeToggle, isDarkMode, onGoToCalendar }) => {
+const UserPanel = ({ user, onLogout, onBackToFolders, onThemeToggle, isDarkMode, onGoToCalendar, onGoToRemote, onUserUpdate }) => {
   console.log('UserPanel se está renderizando con user:', user);
   const { addToast } = useToast();
+  const fetchWithNotify = useFetch();
   const { t } = useLanguage();
 
   const [files, setFiles] = useState([]);
@@ -45,6 +55,11 @@ const UserPanel = ({ user, onLogout, onBackToFolders, onThemeToggle, isDarkMode,
   const [shareItem, setShareItem] = useState(null);
   const [showSettingsModal, setShowSettingsModal] = useState(false);
   const [settingsInitialTab, setSettingsInitialTab] = useState('general');
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [itemToDelete, setItemToDelete] = useState(null);
+  const [showRDPViewer, setShowRDPViewer] = useState(false);
+  const [showRDPModal, setShowRDPModal] = useState(false);
+  const [rdpConnectionId, setRdpConnectionId] = useState(null);
 
   // Check for URL parameters on mount
   useEffect(() => {
@@ -57,10 +72,27 @@ const UserPanel = ({ user, onLogout, onBackToFolders, onThemeToggle, isDarkMode,
       if (params.get('status') === 'success') {
         // Clean URL
         window.history.replaceState({}, document.title, window.location.pathname);
-        // Show success message (could be a toast, for now alert is fine or handled in modal)
-        alert(t('userPanel.microsoftLinkedSuccess'));
+        // Show success message
+        addToast(t('userPanel.microsoftLinkedSuccess'), 'success');
       }
     }
+    
+    // Check for initialView prop
+    // if (initialView === 'remote') {
+    //   setShowRDPModal(true);
+    // }
+  }, []);
+
+  // Listener para abrir editor desde el modal
+  useEffect(() => {
+    const handleOpenEditor = (event) => {
+      openEditorPanel(event.detail);
+    };
+
+    window.addEventListener('openEditorPanel', handleOpenEditor);
+    return () => {
+      window.removeEventListener('openEditorPanel', handleOpenEditor);
+    };
   }, []);
 
   // Estados para viewer y hover
@@ -98,7 +130,34 @@ const UserPanel = ({ user, onLogout, onBackToFolders, onThemeToggle, isDarkMode,
   const [recentFiles, setRecentFiles] = useState([]);
   const [isAIExpanded, setIsAIExpanded] = useState(false);
   const [aiQuery, setAIQuery] = useState('');
+  const [showAIResults, setShowAIResults] = useState(false);
+  const [aiResultsData, setAIResultsData] = useState(null);
   const [showRecentSection, setShowRecentSection] = useState(true);
+  const [indexingStatus, setIndexingStatus] = useState(null);
+
+  // Check indexing status when AI is expanded
+  useEffect(() => {
+    if (!isAIExpanded) return;
+
+    const checkStatus = async () => {
+      try {
+        const token = localStorage.getItem('auth_token');
+        const res = await fetch('/api/ai/indexing-status', {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        if (res.ok) {
+          const data = await res.json();
+          setIndexingStatus(data);
+        }
+      } catch (err) {
+        console.error('Error checking indexing status:', err);
+      }
+    };
+
+    checkStatus();
+    const interval = setInterval(checkStatus, 3000);
+    return () => clearInterval(interval);
+  }, [isAIExpanded]);
 
   // Función para toggle del tema
   const toggleTheme = () => {
@@ -127,10 +186,36 @@ const UserPanel = ({ user, onLogout, onBackToFolders, onThemeToggle, isDarkMode,
     if (!aiQuery.trim()) return;
     
     console.log('Consulta IA:', aiQuery);
-    alert(t('userPanel.aiComingSoon', { query: aiQuery }));
     
-    setAIQuery('');
-    setIsAIExpanded(false);
+    try {
+      const token = localStorage.getItem('auth_token');
+      // Usar el endpoint real de búsqueda de AI
+      const response = await fetch('/api/ai/search', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ query: aiQuery })
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        if (data.success) {
+           setAIResultsData(data);
+           setShowAIResults(true);
+           setAIQuery('');
+           setIsAIExpanded(false);
+        } else {
+           addToast(data.response || 'No se encontraron resultados', 'info');
+        }
+      } else {
+        addToast('Error al conectar con el servicio de IA', 'error');
+      }
+    } catch (error) {
+      console.error('Error AI search:', error);
+      addToast('Error al procesar la consulta', 'error');
+    }
   };
 
   const validateFiles = (files) => {
@@ -140,8 +225,13 @@ const UserPanel = ({ user, onLogout, onBackToFolders, onThemeToggle, isDarkMode,
     let totalSize = 0;
 
     for (let file of files) {
+      // Validar tamaño máximo
       if (file.size > maxFileSize) {
         invalidFiles.push(t('userPanel.fileTooBig', { name: file.name }));
+      }
+      // Validar que el archivo no esté vacío
+      if (file.size === 0) {
+        invalidFiles.push(t('userPanel.fileEmpty', { name: file.name }));
       }
       totalSize += file.size;
     }
@@ -201,6 +291,7 @@ const UserPanel = ({ user, onLogout, onBackToFolders, onThemeToggle, isDarkMode,
 
 const loadFiles = useCallback(async () => {
   try {
+    console.log('[UserPanel] loadFiles() called - starting file list refresh');
     setLoading(true);
     
     if (currentView === 'shared' && currentPath.length === 0) {
@@ -239,12 +330,13 @@ const loadFiles = useCallback(async () => {
     queryParams.append('sortBy', sortBy);
     queryParams.append('order', sortOrder);
 
-    const response = await fetch(`/api/files?${queryParams.toString()}`, {
+    const response = await fetch(`/api/files/list?${queryParams.toString()}`, {
       headers: {
         'Authorization': `Bearer ${getAuthToken()}`
       }
     });
     const data = await response.json();
+    console.log('[UserPanel] Files loaded:', data.files?.length || 0, 'files');
     setFiles(data.files || []);
     setStorageUsed(data.storageUsed || 0);
   } catch (error) {
@@ -300,7 +392,7 @@ useEffect(() => {
     // Validar archivos
     const validationErrors = validateFiles(files);
     if (validationErrors.length > 0) {
-      alert(t('userPanel.validationErrors') + '\n' + validationErrors.join('\n'));
+      addToast(t('userPanel.validationErrors') + '\n' + validationErrors.join('\n'), 'error');
       return;
     }
 
@@ -334,6 +426,7 @@ useEffect(() => {
       console.log('Upload result:', result);
       
       setUploadProgress({ status: 'success', message: t('userPanel.uploadSuccess', { count: files.length }) });
+      addToast(t('userPanel.uploadSuccess', { count: files.length }), 'success');
       
       // Recargar archivos y recientes después de subir
       loadFiles();
@@ -345,6 +438,7 @@ useEffect(() => {
     } catch (error) {
       console.error('Error uploading files:', error);
       setUploadProgress({ status: 'error', message: t('userPanel.uploadError', { error: error.message }) });
+      addToast(t('userPanel.uploadError', { error: error.message }), 'error');
       
       // Limpiar mensaje de error después de 5 segundos
       setTimeout(() => setUploadProgress(null), 5000);
@@ -357,7 +451,7 @@ useEffect(() => {
     // Validar archivos
     const validationErrors = validateFiles(files);
     if (validationErrors.length > 0) {
-      alert(t('userPanel.validationErrors') + '\n' + validationErrors.join('\n'));
+      addToast(t('userPanel.validationErrors') + '\n' + validationErrors.join('\n'), 'error');
       return;
     }
 
@@ -500,14 +594,16 @@ useEffect(() => {
     }
   };
 
-  const handleDeleteItem = async (item) => {
-    // eslint-disable-next-line no-restricted-globals
-    if (!confirm(t('userPanel.confirmDelete', { name: item.name }))) {
-      return;
-    }
+  const handleDeleteItem = (item) => {
+    setItemToDelete(item);
+    setShowDeleteModal(true);
+  };
+
+  const executeDelete = async () => {
+    if (!itemToDelete) return;
 
     try {
-      const response = await fetch(`/api/files/${encodeURIComponent(item.id)}`, {
+      const response = await fetch(`/api/files/${encodeURIComponent(itemToDelete.id)}`, {
         method: 'DELETE',
         headers: {
           'Authorization': `Bearer ${getAuthToken()}`
@@ -518,6 +614,7 @@ useEffect(() => {
       
       if (result.success) {
         loadFiles(); // Recargar archivos
+        loadRecentFiles(); // Recargar recientes
         addToast(t('userPanel.itemDeletedSuccess'), 'success');
       } else {
         addToast(t('userPanel.errorDeleting') + ': ' + result.message, 'error');
@@ -525,6 +622,9 @@ useEffect(() => {
     } catch (error) {
       console.error('Error deleting item:', error);
       addToast(t('userPanel.errorDeleting'), 'error');
+    } finally {
+      setShowDeleteModal(false);
+      setItemToDelete(null);
     }
   };
 
@@ -617,7 +717,7 @@ useEffect(() => {
 
   const handleShareItem = async (item, targetUsername) => {
     try {
-      const response = await fetch('/api/files/share', {
+      const response = await fetchWithNotify('/api/files/share', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -632,7 +732,7 @@ useEffect(() => {
       const result = await response.json();
       
       if (result.success) {
-        addToast(result.message, 'success');
+        // Notification handled by backend
       } else {
         throw new Error(result.message);
       }
@@ -701,7 +801,10 @@ useEffect(() => {
   };
 
   const handleFileLeave = () => {
-    setHoveredFile(null);
+    // Añadir un pequeño delay para evitar bugs de hover
+    setTimeout(() => {
+      setHoveredFile(null);
+    }, 100);
   };
 
   const handleDragEnter = useCallback((e) => {
@@ -760,6 +863,9 @@ useEffect(() => {
       return;
     }
 
+    // NUEVO: Cerrar todos los paneles anteriores (solo un panel a la vez)
+    // Esto asegura que solo haya un editor abierto a la vez
+    
     // Crear nuevo panel
     const newZIndex = highestZIndex + 1;
     const newPanel = {
@@ -772,7 +878,8 @@ useEffect(() => {
       zIndex: newZIndex
     };
 
-    setEditorPanels([...editorPanels, newPanel]);
+    // Reemplazar todos los paneles con solo el nuevo panel
+    setEditorPanels([newPanel]);
     setNextPanelId(nextPanelId + 1);
     setHighestZIndex(newZIndex);
   };
@@ -819,18 +926,44 @@ useEffect(() => {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fileDragging]);
 
+  const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
+
   return (
     <div className="user-panel">
       {/* Background */}
       <div className="bg"></div>
 
+      {/* Mobile Header */}
+      <div className="mobile-header">
+        <div className="logo-container">
+          <img className="logo-img" src="/icons/nube.svg" alt="Nube" />
+          <span>{t('userPanel.personalCloud')}</span>
+        </div>
+        <button className="hamburger-btn" onClick={() => setMobileSidebarOpen(!mobileSidebarOpen)}>
+          ☰
+        </button>
+      </div>
+
+      {/* Sidebar Overlay */}
+      <div 
+        className={`sidebar-overlay ${mobileSidebarOpen ? 'visible' : ''}`}
+        onClick={() => setMobileSidebarOpen(false)}
+      ></div>
+
       {/* Sidebar */}
-      <div className="sidebar">
+      <div className={`sidebar ${mobileSidebarOpen ? 'open' : ''}`}>
         <div className="sidebar-header">
           <div className="logo-container">
             <img className="logo-img" src="/icons/nube.svg" alt="Nube" />
             <span>{t('userPanel.personalCloud')}</span>
           </div>
+          {/* Close button for mobile sidebar */}
+          <button 
+            className="mobile-close-btn" 
+            onClick={() => setMobileSidebarOpen(false)}
+          >
+            ✕
+          </button>
         </div>
 
         <div className="sidebar-content">
@@ -930,13 +1063,20 @@ useEffect(() => {
           <button className="sidebar-btn" onClick={onBackToFolders}>
             {t('common.back')}
           </button>
-          <button className="sidebar-btn" onClick={() => {
-            if (onGoToCalendar) {
-              onGoToCalendar();
-            }
-          }}>
-            {t('userPanel.calendar')}
-          </button>
+          <div className="sidebar-footer-actions">
+            <button className="sidebar-btn sidebar-btn-action" onClick={() => {
+              if (onGoToCalendar) {
+                onGoToCalendar();
+              }
+            }}>
+              {t('userPanel.calendar')}
+            </button>
+            <button className="sidebar-btn sidebar-btn-action" onClick={() => {
+                   if (onGoToRemote) onGoToRemote();
+            }}>
+              Remote Desktop (V2)
+            </button>
+          </div>
           <button className="sidebar-btn" onClick={() => setShowSettingsModal(true)}>
             {t('userPanel.settings')}
           </button>
@@ -955,6 +1095,9 @@ useEffect(() => {
              currentView.startsWith('shared') ? t('userPanel.sharedFolder') :
              t('userPanel.files')}
           </h1>
+          <div style={{ marginLeft: 'auto', marginRight: '20px' }}>
+            <NotificationCenter />
+          </div>
         </div>
 
         {/* Contenedor flexible para file-grid y paneles */}
@@ -967,7 +1110,7 @@ useEffect(() => {
           onDragOver={handleDragOver}
           onDrop={handleDrop}
         >{/* Modern Search and Controls Bar - Moved outside file-grid */}
-        <div className="relative z-10 mb-6 w-full px-6 min-h-[5%]">
+        <div className="search-controls-wrapper relative z-10 mb-6 w-full px-6 min-h-[5%]">
           <div className="search-container flex items-center justify-between glassmorphism rounded-2xl p-4 shadow-lg border-gray-200/50 transition-all duration-300 hover:shadow-xl">
             {/* Search Section */}
             <div className="flex items-center space-x-3 flex-1 max-w-md">
@@ -975,7 +1118,7 @@ useEffect(() => {
   role="search"
   onClick={() => setIsSearchExpanded(true)}
   className={`search-container relative flex items-center overflow-hidden transition-all duration-300 ease-in-out border cursor-text ${isSearchExpanded
-    ? 'w-72 h-9 rounded-lg shadow-md pl-3 pr-8 justify-start'
+    ? 'w-80 h-11 rounded-xl shadow-lg pl-3 pr-10 justify-start'
     : 'w-12 h-12 rounded-full justify-center'
   }`}
 >
@@ -1005,14 +1148,12 @@ useEffect(() => {
     value={searchQuery}
     onChange={handleSearch}
     onKeyPress={(e) => e.key === 'Enter' && e.target.blur()}
-    onBlur={() => setIsSearchExpanded(false)}
     autoFocus={isSearchExpanded}
-    className={`search-input absolute left-0 w-full h-full bg-transparent border-none outline-none text-[14px] flex items-center px-8 transition-all duration-300 ease-in-out ${
+    className={`search-input absolute left-0 w-full h-full bg-transparent border-none outline-none text-[14px] flex items-center pl-10 pr-10 transition-all duration-300 ease-in-out search-input-reset ${
       isSearchExpanded
         ? 'opacity-100 translate-x-0 cursor-text'
         : 'opacity-0 -translate-x-5 pointer-events-none'
     }`}
-    style={{ outline: 'none', boxShadow: 'none' }}
   />
 
   {/* Botón limpiar */}
@@ -1022,11 +1163,11 @@ useEffect(() => {
         e.stopPropagation(); // evita cerrar el buscador
         setSearchQuery('');
       }}
-      className="search-clear-btn absolute right-3 flex items-center justify-center w-5 h-5 rounded-full transition-colors duration-200"
+      className="search-clear-btn absolute right-3 flex items-center justify-center w-6 h-6 rounded-full transition-colors duration-200"
       title={t('userPanel.clearSearch')}
     >
       <svg
-        className="w-3.5 h-3.5"
+        className="w-4 h-4"
         fill="none"
         stroke="currentColor"
         viewBox="0 0 24 24"
@@ -1044,73 +1185,89 @@ useEffect(() => {
 
 
 
-              {/* Botón IA */}
+              {/* Botón IA REFACTORIZADO para igualar diseño del buscador */}
               <div
-                role="button"
+                role="search"
                 onClick={() => setIsAIExpanded(true)}
-                className={`ai-container relative flex items-center overflow-hidden transition-all duration-300 ease-in-out border cursor-text ${isAIExpanded
-                  ? 'w-72 h-9 rounded-lg shadow-md pl-3 pr-8 justify-start'
-                  : 'w-12 h-12 rounded-full justify-center'
+                className={`relative flex items-center overflow-hidden transition-all duration-300 ease-in-out border cursor-pointer ${isAIExpanded
+                  // Estilo expandido (igual que Search)
+                  ? 'w-80 h-11 rounded-xl shadow-lg border-gray-200 justify-start pl-3 pr-10'
+                  // Estilo colapsado
+                  : 'w-12 h-12 rounded-full justify-center border-transparent'
                 }`}
                 title={t('userPanel.aiChatbotTitle')}
               >
-                <svg
-                  className={`transition-all duration-300 ease-in-out ${
-                    isAIExpanded
-                      ? 'w-4 h-4 mr-2 opacity-70 translate-x-0'
-                      : 'w-5 h-5 opacity-100'
-                  }`}
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
-                </svg>
-
-                <input
-                  type="text"
-                  placeholder={t('userPanel.aiPlaceholder')}
-                  value={aiQuery}
-                  onChange={handleAISearch}
-                  onKeyPress={(e) => {
-                    if (e.key === 'Enter') {
-                      submitAIQuery();
-                    }
-                  }}
-                  onBlur={() => setIsAIExpanded(false)}
-                  autoFocus={isAIExpanded}
-                  className={`absolute left-0 w-full h-full bg-transparent border-none outline-none text-[14px] flex items-center px-8 transition-all duration-300 ease-in-out ${
-                    isAIExpanded
-                      ? 'opacity-100 translate-x-0 cursor-text'
-                      : 'opacity-0 -translate-x-5 pointer-events-none'
-                  }`}
-                  style={{ outline: 'none', boxShadow: 'none' }}
-                />
-
-                {isAIExpanded && aiQuery && (
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      submitAIQuery();
-                    }}
-                    className="absolute right-3 flex items-center justify-center w-5 h-5 rounded-full transition-colors duration-200 text-purple-500 hover:text-purple-700"
-                    title={t('userPanel.sendAIQuery')}
-                  >
+                  {/* Icono IA */}
+                  <div className={`flex items-center justify-center transition-all duration-300 z-10 ${
+                     isAIExpanded ? 'mr-2 opacity-70' : 'w-full h-full opacity-100'
+                  }`}>
                     <svg
-                      className="w-3.5 h-3.5"
+                      className={`${isAIExpanded ? 'w-4 h-4' : 'w-5 h-5'} text-purple-500`}
                       fill="none"
                       stroke="currentColor"
                       viewBox="0 0 24 24"
                     >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"
-                      />
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
                     </svg>
-                  </button>
-                )}
+                  </div>
+
+                  {/* Input IA (Replica exacta del input de búsqueda) */}
+                  <input
+                    type="text"
+                    placeholder={
+                      (indexingStatus?.isBuilding) 
+                        ? "Procesando archivos... (Espere)" 
+                        : (!indexingStatus?.isIndexed || indexingStatus?.fileCount === 0) 
+                            ? "Indexando tus archivos..." 
+                            : t('userPanel.aiPlaceholder')
+                    }
+                    value={aiQuery}
+                    onChange={handleAISearch}
+                    onKeyDown={(e) => {
+                       if (e.key === 'Enter') {
+                         submitAIQuery();
+                         e.target.blur(); // Opcional
+                       }
+                    }}
+                    onBlur={() => !aiQuery && setIsAIExpanded(false)}
+                    autoFocus={isAIExpanded}
+                    className={`absolute left-0 w-full h-full bg-transparent border-none outline-none text-[14px] flex items-center px-9 transition-all duration-300 ease-in-out search-input-reset z-0 ${
+                      isAIExpanded 
+                         ? 'opacity-100 translate-x-0 cursor-text' 
+                         : 'opacity-0 -translate-x-5 pointer-events-none'
+                    }`}
+                  />
+
+                  {/* Indicator de Indexación */}
+                  {isAIExpanded && indexingStatus && (indexingStatus.isBuilding || !indexingStatus.isIndexed) && (
+                     <div className="absolute right-3 top-0 bottom-0 flex items-center pointer-events-none z-20">
+                        <span className="flex h-3 w-3 relative" title="Indexando archivos...">
+                          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-purple-400 opacity-75"></span>
+                          <span className="relative inline-flex rounded-full h-3 w-3 bg-purple-500"></span>
+                        </span>
+                     </div>
+                  )}
+
+                  {/* Botón Enviar (Flecha) visible solo si hay texto */}
+                  {isAIExpanded && aiQuery && (
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        submitAIQuery();
+                      }}
+                      className="absolute right-3 flex items-center justify-center w-6 h-6 rounded-full hover:bg-gray-100 dark:hover:bg-slate-700 transition-colors duration-200 z-20"
+                      title={t('userPanel.sendAIQuery')}
+                    >
+                      <svg
+                        className="w-4 h-4 text-purple-500"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
+                      </svg>
+                    </button>
+                  )}
               </div>
 
               {/* Search Results Counter */}
@@ -1243,7 +1400,8 @@ useEffect(() => {
                   onFileClick={(file) => {
                     if (file.type === 'folder') {
                       navigateToFolder(file.name);
-                    } else if (canPreview(file.name)) {
+                    } else if (canEdit(file.name) || canPreview(file.name)) {
+                      // Abrir archivos de Office y previsualizable en el visor modal
                       openFileViewer(file);
                     } else {
                       downloadFile(file.id, file.name, t);
@@ -1251,21 +1409,6 @@ useEffect(() => {
                   }}
                 />
               ))}
-              
-              {/* Botón Ver todos rediseñado */}
-              <div 
-                className="recent-view-all"
-                onClick={() => {
-                  // TODO: Implementar vista completa de archivos recientes
-                  console.log(t('userPanel.viewAllRecent'));
-                }}
-                title={t('userPanel.viewAllRecent')}
-              >
-                <div className="recent-view-all-content">
-                  <div className="recent-view-all-icon"></div>
-                  <span>{t('userPanel.viewAll')}</span>
-                </div>
-              </div>
             </div>
           </div>
         )}
@@ -1389,6 +1532,10 @@ useEffect(() => {
                   panelId={panel.id}
                   onClose={() => closeEditorPanel(panel.id)}
                   onBringToFront={() => bringPanelToFront(panel.id)}
+                  onFileSaved={() => {
+                    console.log('File saved, reloading files...');
+                    loadFiles();
+                  }}
                   isInline={true}
                 />
               </div>
@@ -1415,7 +1562,7 @@ useEffect(() => {
         type="file"
         id="fileInput"
         multiple
-        style={{ display: 'none' }}
+        className="hidden-input"
         onChange={(e) => {
           handleFileUpload(Array.from(e.target.files));
           e.target.value = ''; // Reset input
@@ -1426,7 +1573,7 @@ useEffect(() => {
         id="folderInput"
         webkitdirectory=""
         multiple
-        style={{ display: 'none' }}
+        className="hidden-input"
         onChange={(e) => {
           handleFolderUpload(Array.from(e.target.files));
           e.target.value = ''; // Reset input
@@ -1468,6 +1615,15 @@ useEffect(() => {
         item={shareItem}
       />
 
+      {/* AI Results Modal */}
+      <AIResultsModal 
+        isOpen={showAIResults}
+        onClose={() => setShowAIResults(false)}
+        results={aiResultsData}
+        onOpenFile={(file) => openFileViewer(file)}
+        onDownloadFile={(file) => downloadFile(file.id, file.name, t)}
+      />
+
       {/* Settings Modal */}
       {showSettingsModal && (
         <SettingsModal
@@ -1476,8 +1632,17 @@ useEffect(() => {
           onThemeToggle={onThemeToggle}
           isDarkMode={isDarkMode}
           initialTab={settingsInitialTab}
+          onUserUpdate={onUserUpdate}
         />
       )}
+
+      {/* Delete Confirmation Modal */}
+      <DeleteConfirmationModal
+        isOpen={showDeleteModal}
+        onClose={() => setShowDeleteModal(false)}
+        onConfirm={executeDelete}
+        itemName={itemToDelete ? itemToDelete.name : ''}
+      />
 
       {/* File Viewer Modal */}
       {showFileViewer && viewerFile && (
@@ -1485,6 +1650,30 @@ useEffect(() => {
           file={viewerFile}
           onClose={closeFileViewer}
           user={user}
+        />
+      )}
+
+      {/* RDP Connection Modal (Deprecated in favor of /remote page but kept for backward compatibility if triggered internally) */}
+      {showRDPModal && (
+        <RDPConnectionModal
+            onClose={() => setShowRDPModal(false)}
+            onConnect={(id) => {
+                setRdpConnectionId(id);
+                setShowRDPModal(false);
+                setShowRDPViewer(true);
+            }}
+        />
+      )}
+
+      {/* RDP Viewer */}
+      {showRDPViewer && (
+        <RDPViewer
+          connectionToken={getAuthToken()}
+          connectionId={rdpConnectionId}
+          onClose={() => {
+              setShowRDPViewer(false);
+              setRdpConnectionId(null);
+          }}
         />
       )}
 

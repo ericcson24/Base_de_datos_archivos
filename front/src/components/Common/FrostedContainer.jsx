@@ -5,7 +5,7 @@ const FrostedContainer = ({ children, className = '', variant = 'default' }) => 
   return (
     <>
       {/* SVG Filter Definition */}
-      <svg style={{ position: 'absolute', width: 0, height: 0 }}>
+      <svg className="frosted-svg-def">
         <defs>
           <filter id="frosted" x="-50%" y="-50%" width="200%" height="200%">
             <feTurbulence baseFrequency="0.1" numOctaves="1" result="noise"/>

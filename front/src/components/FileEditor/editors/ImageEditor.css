@@ -53,6 +53,14 @@
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
 }
 
+.drawing-canvas {
+  cursor: default;
+}
+
+.drawing-canvas.is-drawing {
+  cursor: crosshair;
+}
+
 .btn-icon {
   padding: 8px 12px;
   border: none;

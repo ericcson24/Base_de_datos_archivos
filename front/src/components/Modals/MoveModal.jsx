@@ -19,7 +19,7 @@ const MoveModal = ({ isOpen, onClose, itemToMove, onMove }) => {
     setLoading(true);
     try {
       const pathString = path.join('/');
-      const response = await fetch(`/api/files?path=${pathString}`, {
+      const response = await fetch(`/api/files/list?path=${pathString}`, {
         headers: { 'Authorization': `Bearer ${getAuthToken()}` }
       });
       const data = await response.json();

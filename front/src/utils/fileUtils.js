@@ -76,6 +76,11 @@ export const canPreview = (filename) => {
   return ['image', 'video', 'pdf', 'text'].includes(type);
 };
 
+export const canEdit = (filename) => {
+  const type = getFileType(filename);
+  return ['word', 'excel', 'powerpoint'].includes(type);
+};
+
 export const getAuthenticatedPreviewUrl = async (fileId, filename) => {
   // Removed canPreview check to allow fetching URLs for all file types (e.g. for download or external viewers)
   // The caller is responsible for determining if the file can actually be previewed/rendered.

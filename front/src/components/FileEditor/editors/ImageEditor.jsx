@@ -319,12 +319,11 @@ const ImageEditor = ({ fileUrl, file }) => {
           />
           <canvas
             ref={drawingCanvasRef}
-            className="absolute top-0 left-0 max-w-full h-auto"
+            className={`absolute top-0 left-0 max-w-full h-auto drawing-canvas ${isDrawing ? 'is-drawing' : ''}`}
             onMouseDown={startDrawing}
             onMouseMove={draw}
             onMouseUp={() => {}}
             onMouseLeave={() => {}}
-            style={{ cursor: isDrawing ? 'crosshair' : 'default' }}
           />
         </div>
       </div>

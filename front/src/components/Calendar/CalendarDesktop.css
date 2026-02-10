@@ -1,0 +1,13 @@
+
+/* Hide mobile elements by default */
+.mobile-header {
+  display: none;
+}
+
+.sidebar-overlay {
+  display: none;
+}
+
+.mobile-close-btn {
+  display: none;
+}

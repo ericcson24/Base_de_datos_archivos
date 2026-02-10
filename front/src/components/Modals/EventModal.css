@@ -99,6 +99,19 @@
   width: 6px;
 }
 
+.location-input-container {
+  display: flex;
+  gap: 8px;
+}
+
+.location-input {
+  flex: 1;
+}
+
+.location-picker-btn {
+  padding: 0 12px;
+}
+
 .event-modal::-webkit-scrollbar-thumb {
   background: rgba(0, 0, 0, 0.2);
   border-radius: 3px;
@@ -284,6 +297,20 @@
 }
 
 /* Botones */
+.categories-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.category-tag {
+  padding: 4px 10px;
+  border-radius: 16px;
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: #fff; /* Moved from inline */
+}
+
 .modal-footer {
   padding: 20px 24px;
   border-top: 1px solid var(--cal-border, rgba(0,0,0,0.1));
@@ -369,6 +396,25 @@
   border-radius: 8px;
   margin-bottom: 16px;
   border: 1px solid rgba(239, 68, 68, 0.2);
+}
+
+.category-option {
+  padding: 6px 12px;
+  border-radius: 20px;
+  border: 1px solid transparent;
+  cursor: pointer;
+  transition: all 0.2s;
+  font-size: 0.9rem;
+  font-weight: 500;
+  color: var(--cal-text);
+}
+
+.category-option.selected {
+  color: #fff;
+}
+
+.category-option:hover {
+  transform: translateY(-1px);
 }
 
 /* Estilos para inputs de fecha y checkbox */

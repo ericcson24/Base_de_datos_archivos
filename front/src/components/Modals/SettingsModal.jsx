@@ -1,27 +1,28 @@
 import React, { useState, useEffect } from 'react';
-import FrostedContainer from '../Common/FrostedContainer';
 import Button from '../Common/Button';
 import Input from '../Common/Input';
 import { getAuthToken } from '../../utils/fileUtils';
 import { useToast } from '../../context/ToastContext';
 import { useLanguage } from '../../context/LanguageContext';
+import { useFetch } from '../../hooks/useFetch';
 import './SettingsModal.css';
 
-const SettingsModal = ({ onClose, user, onThemeToggle, isDarkMode, initialTab = 'general' }) => {
+const SettingsModal = ({ onClose, user, onThemeToggle, isDarkMode, initialTab = 'general', onUserUpdate }) => {
   const { addToast } = useToast();
-  const { t, changeLanguage } = useLanguage();
+  const fetchWithNotify = useFetch();
+  const { t, changeLanguage, language: currentLanguage } = useLanguage();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [syncing, setSyncing] = useState(false);
   const [settings, setSettings] = useState({
-    username: '',
-    role: '',
-    avatarUrl: '',
-    theme: 'light',
-    language: 'es',
-    notifications: true,
-    storageUsed: 0,
-    storageLimit: 1024 * 1024 * 1024, // 1GB default
+    username: user?.username || '',
+    role: user?.role || '',
+    avatarUrl: user?.avatarUrl || '',
+    theme: isDarkMode ? 'dark' : 'light',
+    language: currentLanguage || 'es',
+    notifications: user?.notifications ?? true,
+    storageUsed: user?.storageUsed || 0,
+    storageLimit: user?.storageLimit || 1024 * 1024 * 1024, // 1GB default
     microsoftAccount: null // { email: '...', name: '...' }
   });
   const [newPassword, setNewPassword] = useState('');
@@ -30,11 +31,36 @@ const SettingsModal = ({ onClose, user, onThemeToggle, isDarkMode, initialTab = 
   const [showAvatarSelector, setShowAvatarSelector] = useState(false);
   const [defaultAvatars, setDefaultAvatars] = useState([]);
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
+  const [deletingAvatar, setDeletingAvatar] = useState(false);
+  const [aiStatus, setAiStatus] = useState(null);
 
   useEffect(() => {
     fetchSettings();
     fetchDefaultAvatars();
   }, []);
+
+  useEffect(() => {
+    let interval;
+    if (activeTab === 'ia') {
+      const fetchAiStatus = async () => {
+        try {
+          const response = await fetch('/api/ai/indexing-status', {
+             headers: { 'Authorization': `Bearer ${getAuthToken()}` }
+          });
+          if (response.ok) {
+            const data = await response.json();
+            setAiStatus(data);
+          }
+        } catch (error) {
+          console.error('Error fetching AI status', error);
+        }
+      };
+
+      fetchAiStatus();
+      interval = setInterval(fetchAiStatus, 1000); 
+    }
+    return () => clearInterval(interval);
+  }, [activeTab]);
 
   const fetchDefaultAvatars = async () => {
     try {
@@ -75,7 +101,7 @@ const SettingsModal = ({ onClose, user, onThemeToggle, isDarkMode, initialTab = 
 
     setUploadingAvatar(true);
     try {
-      const response = await fetch('/api/auth/avatar', {
+      const response = await fetchWithNotify('/api/auth/avatar', {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${getAuthToken()}`
@@ -86,16 +112,46 @@ const SettingsModal = ({ onClose, user, onThemeToggle, isDarkMode, initialTab = 
       const data = await response.json();
       if (data.success) {
         setSettings({ ...settings, avatarUrl: data.avatarUrl });
-        addToast(t('settings.avatarUploaded'), 'success');
+        // Actualizar estado global inmediatamente
+        if (onUserUpdate) {
+          onUserUpdate({ avatarUrl: data.avatarUrl });
+        }
+        // Notification handled by backend
         setShowAvatarSelector(false);
-      } else {
-        addToast(data.message || t('settings.avatarUploadError'), 'error');
       }
     } catch (error) {
       console.error('Error uploading avatar:', error);
-      addToast(t('settings.avatarConnectionError'), 'error');
+      // Notification handled by backend or generic error
     } finally {
       setUploadingAvatar(false);
+    }
+  };
+
+  const handleAvatarDelete = async () => {
+    setDeletingAvatar(true);
+    try {
+      const response = await fetch('/api/auth/avatar', {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${getAuthToken()}`
+        }
+      });
+      const data = await response.json();
+      if (response.ok && data.success) {
+        setSettings({ ...settings, avatarUrl: null });
+        if (onUserUpdate) {
+          onUserUpdate({ avatarUrl: null });
+        }
+        addToast(t('settings.avatarDeleted'), 'success');
+        setShowAvatarSelector(false);
+      } else {
+        addToast(data.message || t('settings.avatarDeleteError'), 'error');
+      }
+    } catch (error) {
+      console.error('Error deleting avatar:', error);
+      addToast(t('settings.avatarConnectionError'), 'error');
+    } finally {
+      setDeletingAvatar(false);
     }
   };
 
@@ -110,7 +166,15 @@ const SettingsModal = ({ onClose, user, onThemeToggle, isDarkMode, initialTab = 
       if (response.ok) {
         const data = await response.json();
         if (data.success) {
-          setSettings(data.settings);
+          setSettings(prev => ({
+            ...prev,
+            ...data.settings,
+            // Mantener el estado visual actual para evitar inconsistencias
+            theme: isDarkMode ? 'dark' : 'light',
+            language: currentLanguage,
+            // Asegurar que notifications sea booleano
+            notifications: data.settings.notifications === undefined ? true : !!data.settings.notifications
+          }));
         }
       }
     } catch (error) {
@@ -144,6 +208,16 @@ const SettingsModal = ({ onClose, user, onThemeToggle, isDarkMode, initialTab = 
       });
 
       if (response.ok) {
+        // Actualizar estado global del usuario
+        if (onUserUpdate) {
+          onUserUpdate({
+            avatarUrl: settings.avatarUrl,
+            notifications: settings.notifications,
+            language: settings.language,
+            theme: settings.theme
+          });
+        }
+
         // Si cambió el tema, aplicar
         if ((settings.theme === 'dark' && !isDarkMode) || (settings.theme === 'light' && isDarkMode)) {
           onThemeToggle();
@@ -206,20 +280,17 @@ const SettingsModal = ({ onClose, user, onThemeToggle, isDarkMode, initialTab = 
   const handleSync = async () => {
     setSyncing(true);
     try {
-      const response = await fetch('/api/events/sync', {
+      const response = await fetchWithNotify('/api/events/sync', {
         method: 'POST',
         headers: { 'Authorization': `Bearer ${getAuthToken()}` }
       });
       
       if (response.ok) {
-        const data = await response.json();
-        addToast(data.message || t('settings.syncSuccess'), 'success');
-      } else {
-        addToast(t('settings.syncError'), 'error');
+        // Notification handled by backend
       }
     } catch (error) {
       console.error('Error syncing:', error);
-      addToast(t('settings.connectionErrorGeneric'), 'error');
+      // Notification handled by backend or generic error
     } finally {
       setSyncing(false);
     }
@@ -237,59 +308,69 @@ const SettingsModal = ({ onClose, user, onThemeToggle, isDarkMode, initialTab = 
 
   return (
     <div className="modal-overlay" onClick={onClose}>
-      <div className="modal-content settings-modal w-full max-w-2xl" onClick={e => e.stopPropagation()}>
-        <div className="flex justify-between items-center mb-6">
-          <h2 className="text-2xl font-bold text-gray-800 dark:text-white">{t('settings.title')}</h2>
-          <button onClick={onClose} className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200">
+      <div className="modal-content settings-modal" onClick={e => e.stopPropagation()}>
+        <div className="settings-header">
+          <h2 className="settings-title">{t('settings.title')}</h2>
+          <button onClick={onClose} className="settings-close-btn">
             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
             </svg>
           </button>
         </div>
 
-        <div className="flex space-x-4 mb-6 border-b border-gray-200 dark:border-gray-700">
+        <div className="settings-tabs">
           <button
-            className={`pb-2 px-4 font-medium transition-colors ${activeTab === 'general' ? 'text-blue-600 border-b-2 border-blue-600' : 'text-gray-500 hover:text-gray-700 dark:text-gray-400'}`}
+            className={`settings-tab ${activeTab === 'general' ? 'active' : ''}`}
             onClick={() => setActiveTab('general')}
           >
             {t('settings.general')}
           </button>
           {settings.role === 'admin' && (
             <button
-              className={`pb-2 px-4 font-medium transition-colors ${activeTab === 'security' ? 'text-blue-600 border-b-2 border-blue-600' : 'text-gray-500 hover:text-gray-700 dark:text-gray-400'}`}
+              className={`settings-tab ${activeTab === 'security' ? 'active' : ''}`}
               onClick={() => setActiveTab('security')}
             >
               {t('settings.security')}
             </button>
           )}
           <button
-            className={`pb-2 px-4 font-medium transition-colors ${activeTab === 'storage' ? 'text-blue-600 border-b-2 border-blue-600' : 'text-gray-500 hover:text-gray-700 dark:text-gray-400'}`}
+            className={`settings-tab ${activeTab === 'storage' ? 'active' : ''}`}
             onClick={() => setActiveTab('storage')}
           >
             {t('settings.storage')}
           </button>
           <button
-            className={`pb-2 px-4 font-medium transition-colors ${activeTab === 'integrations' ? 'text-blue-600 border-b-2 border-blue-600' : 'text-gray-500 hover:text-gray-700 dark:text-gray-400'}`}
+            className={`settings-tab ${activeTab === 'integrations' ? 'active' : ''}`}
             onClick={() => setActiveTab('integrations')}
           >
             {t('settings.integrations')}
           </button>
+          <button
+            className={`settings-tab ${activeTab === 'ia' ? 'active' : ''}`}
+            onClick={() => setActiveTab('ia')}
+          >
+            IA
+          </button>
         </div>
         
-        <div className="space-y-6 max-h-[60vh] overflow-y-auto pr-2">
+        <div className="settings-content">
           {activeTab === 'general' && (
-            <div className="space-y-6">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{t('settings.avatar')}</label>
-                <div className="flex items-center gap-4 mb-4">
-                  <div className="relative">
+            <div className="settings-section">
+              <div className="mb-6">
+                <label className="settings-label">{t('settings.avatar')}</label>
+                <div className="settings-avatar-container">
+                  <div className="settings-avatar-wrapper">
                     <img 
                       src={settings.avatarUrl || `https://ui-avatars.com/api/?name=${settings.username}&background=random`} 
                       alt={t('settings.currentAvatar')} 
-                      className="w-20 h-20 rounded-full object-cover border-4 border-white shadow-lg"
+                      className="settings-avatar-img"
+                      onError={(e) => {
+                        e.target.onerror = null; 
+                        e.target.src = `https://ui-avatars.com/api/?name=${settings.username}&background=random`;
+                      }}
                     />
                     <button 
-                      className="absolute bottom-0 right-0 bg-blue-600 text-white p-1.5 rounded-full hover:bg-blue-700 transition-colors shadow-md"
+                      className="settings-avatar-edit-btn"
                       onClick={() => setShowAvatarSelector(!showAvatarSelector)}
                       title={t('settings.changeAvatar')}
                     >
@@ -304,24 +385,27 @@ const SettingsModal = ({ onClose, user, onThemeToggle, isDarkMode, initialTab = 
                 </div>
                 
                 {showAvatarSelector && (
-                  <div className="avatar-selector-container animate-fade-in mt-4 p-4 bg-gray-50 dark:bg-slate-700/50 rounded-xl border border-gray-200 dark:border-slate-600">
+                  <div className="avatar-selector-container">
                     <div className="mb-4">
-                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">{t('settings.uploadAvatar')}</label>
+                      <label className="settings-label">{t('settings.uploadAvatar')}</label>
                       <div className="flex items-center gap-2">
                         <input
                           type="file"
                           accept="image/*"
                           onChange={handleAvatarUpload}
-                          className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 dark:file:bg-blue-900/30 dark:file:text-blue-300"
+                          className="avatar-upload-input"
                           disabled={uploadingAvatar}
                         />
+                        <Button variant="secondary" onClick={handleAvatarDelete} disabled={deletingAvatar || uploadingAvatar}>
+                          {deletingAvatar ? t('common.loading') : t('settings.removeAvatar')}
+                        </Button>
                         {uploadingAvatar && <span className="text-sm text-blue-500">{t('settings.uploading')}</span>}
                       </div>
                     </div>
                     
                     <div className="border-t border-gray-200 dark:border-slate-600 my-4"></div>
                     
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">{t('settings.defaultAvatars')}</label>
+                    <label className="settings-label mb-2">{t('settings.defaultAvatars')}</label>
                     <div className="avatar-selector">
                       {defaultAvatars.map((url, index) => (
                         <div 
@@ -340,8 +424,8 @@ const SettingsModal = ({ onClose, user, onThemeToggle, isDarkMode, initialTab = 
                 )}
               </div>
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{t('settings.username')}</label>
+              <div className="mb-6">
+                <label className="settings-label">{t('settings.username')}</label>
                 <Input
                   value={settings.username}
                   disabled={true}
@@ -350,12 +434,12 @@ const SettingsModal = ({ onClose, user, onThemeToggle, isDarkMode, initialTab = 
                 <p className="text-xs text-gray-500 mt-1">{t('settings.usernameLocked')}</p>
               </div>
               
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{t('settings.language')}</label>
+              <div className="mb-6">
+                <label className="settings-label">{t('settings.language')}</label>
                 <select
                   value={settings.language}
                   onChange={(e) => setSettings({ ...settings, language: e.target.value })}
-                  className="w-full p-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-slate-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 outline-none transition-all"
+                  className="settings-select"
                 >
                   <option value="es">Español</option>
                   <option value="en">English</option>
@@ -363,10 +447,10 @@ const SettingsModal = ({ onClose, user, onThemeToggle, isDarkMode, initialTab = 
                 </select>
               </div>
 
-              <div className="flex items-center justify-between p-4 bg-gray-50 dark:bg-slate-700 rounded-lg">
+              <div className="settings-notification-row mb-6">
                 <div>
-                  <h4 className="font-medium text-gray-900 dark:text-white">{t('settings.notifications')}</h4>
-                  <p className="text-sm text-gray-500 dark:text-gray-400">{t('settings.notificationsDesc')}</p>
+                  <h4 className="settings-card-title">{t('settings.notifications')}</h4>
+                  <p className="settings-card-desc">{t('settings.notificationsDesc')}</p>
                 </div>
                 <label className="relative inline-flex items-center cursor-pointer">
                   <input
@@ -380,24 +464,24 @@ const SettingsModal = ({ onClose, user, onThemeToggle, isDarkMode, initialTab = 
               </div>
               {/* Tema */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">{t('settings.theme')}</label>
-                <div className="flex space-x-4">
+                <label className="settings-label mb-2">{t('settings.theme')}</label>
+                <div className="theme-options">
                   <button
                     onClick={() => setSettings({ ...settings, theme: 'light' })}
-                    className={`flex-1 p-3 rounded-lg border-2 transition-all ${settings.theme === 'light' ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20' : 'border-gray-200 dark:border-gray-700'}`}
+                    className={`theme-btn ${settings.theme === 'light' ? 'active' : ''}`}
                   >
-                    <div className="flex items-center justify-center space-x-2">
+                    <div className="theme-btn-content">
                       <span>☀️</span>
-                      <span className="text-gray-900 dark:text-white">{t('common.theme.light')}</span>
+                      <span className="theme-btn-text">{t('common.theme.light')}</span>
                     </div>
                   </button>
                   <button
                     onClick={() => setSettings({ ...settings, theme: 'dark' })}
-                    className={`flex-1 p-3 rounded-lg border-2 transition-all ${settings.theme === 'dark' ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20' : 'border-gray-200 dark:border-gray-700'}`}
+                    className={`theme-btn ${settings.theme === 'dark' ? 'active' : ''}`}
                   >
-                    <div className="flex items-center justify-center space-x-2">
+                    <div className="theme-btn-content">
                       <span>🌙</span>
-                      <span className="text-gray-900 dark:text-white">{t('common.theme.dark')}</span>
+                      <span className="theme-btn-text">{t('common.theme.dark')}</span>
                     </div>
                   </button>
                 </div>
@@ -406,10 +490,10 @@ const SettingsModal = ({ onClose, user, onThemeToggle, isDarkMode, initialTab = 
           )}
           
           {activeTab === 'security' && (
-            <div className="space-y-4">
-              <h3 className="text-lg font-medium text-gray-900 dark:text-white">{t('settings.changePassword')}</h3>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{t('settings.newPassword')}</label>
+            <div className="settings-section">
+              <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-4">{t('settings.changePassword')}</h3>
+              <div className="mb-4">
+                <label className="settings-label">{t('settings.newPassword')}</label>
                 <Input
                   type="password"
                   value={newPassword}
@@ -419,7 +503,7 @@ const SettingsModal = ({ onClose, user, onThemeToggle, isDarkMode, initialTab = 
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{t('settings.confirmPassword')}</label>
+                <label className="settings-label">{t('settings.confirmPassword')}</label>
                 <Input
                   type="password"
                   value={confirmPassword}
@@ -432,11 +516,11 @@ const SettingsModal = ({ onClose, user, onThemeToggle, isDarkMode, initialTab = 
           )}
           
           {activeTab === 'storage' && (
-            <div className="space-y-6">
-              <div className="bg-gray-50 dark:bg-slate-700 p-6 rounded-xl text-center">
+            <div className="settings-section">
+              <div className="storage-card">
                 <div className="text-4xl mb-2">☁️</div>
-                <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-1">{t('settings.storage')}</h3>
-                <p className="text-gray-500 dark:text-gray-400 mb-6">{t('settings.manageStorage')}</p>
+                <h3 className="storage-card-title">{t('settings.storage')}</h3>
+                <p className="storage-card-desc">{t('settings.manageStorage')}</p>
                 
                 <div className="relative pt-1">
                   <div className="flex mb-2 items-center justify-between">
@@ -451,10 +535,10 @@ const SettingsModal = ({ onClose, user, onThemeToggle, isDarkMode, initialTab = 
                       </span>
                     </div>
                   </div>
-                  <div className="overflow-hidden h-2 mb-4 text-xs flex rounded bg-blue-200">
-                    <div style={{ width: `${(settings.storageUsed / settings.storageLimit) * 100}%` }} className="shadow-none flex flex-col text-center whitespace-nowrap text-white justify-center bg-blue-500"></div>
+                  <div className="storage-progress-bg">
+                    <div style={{ width: `${(settings.storageUsed / settings.storageLimit) * 100}%` }} className="storage-progress-fill"></div>
                   </div>
-                  <div className="flex justify-between text-sm text-gray-600 dark:text-gray-300">
+                  <div className="storage-stats">
                     <span>{t('settings.used', { size: formatBytes(settings.storageUsed) })}</span>
                     <span>{t('settings.total', { size: formatBytes(settings.storageLimit) })}</span>
                   </div>
@@ -464,33 +548,48 @@ const SettingsModal = ({ onClose, user, onThemeToggle, isDarkMode, initialTab = 
           )}
 
           {activeTab === 'integrations' && (
-            <div className="space-y-6">
-              <div className="bg-gray-50 dark:bg-slate-700 p-6 rounded-xl">
-                <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-4">{t('settings.microsoftAccount')}</h3>
+            <div className="settings-section">
+              <div className="storage-card">
+                <h3 className="storage-card-title mb-4">{t('settings.microsoftAccount')}</h3>
                 
                 {settings.microsoftLinked ? (
                   <div className="space-y-4">
-                    <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-4 bg-white dark:bg-slate-800 rounded-lg border border-gray-200 dark:border-gray-600 shadow-sm">
-                      <div className="flex items-center space-x-4 mb-4 sm:mb-0">
-                        <div className="w-12 h-12 bg-blue-100 dark:bg-blue-900/30 rounded-full flex items-center justify-center text-blue-600 dark:text-blue-400 text-2xl">
+                    <div className="integration-card">
+                      <div className="integration-info">
+                        <div className="integration-icon">
                           📧
                         </div>
                         <div>
-                          <p className="font-bold text-gray-900 dark:text-white text-lg">{settings.microsoftEmail}</p>
-                          <p className="text-sm text-green-600 dark:text-green-400 flex items-center font-medium">
-                            <span className="w-2 h-2 bg-green-500 rounded-full mr-2 animate-pulse"></span>
-                            {t('settings.linkedActive')}
-                          </p>
+                          <p className="integration-email">{settings.microsoftEmail}</p>
+                          <div className="integration-status">
+                            <span className="integration-status-dot">
+                              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+                              <span className="relative inline-flex rounded-full h-3 w-3 bg-green-500"></span>
+                            </span>
+                            <p className="integration-status-text">
+                              {t('settings.linkedActive')}
+                            </p>
+                          </div>
                         </div>
                       </div>
                       <Button variant="secondary" onClick={handleSync} disabled={syncing} className="w-full sm:w-auto">
-                        {syncing ? t('settings.syncing') : t('settings.syncNow')}
+                        {syncing ? (
+                          <span className="flex items-center">
+                            <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-gray-700 dark:text-gray-200" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                            </svg>
+                            {t('settings.syncing')}
+                          </span>
+                        ) : (
+                          t('settings.syncNow')
+                        )}
                       </Button>
                     </div>
 
-                    <div className="bg-blue-50 dark:bg-blue-900/20 p-4 rounded-lg border border-blue-100 dark:border-blue-800">
-                        <h4 className="font-semibold text-blue-800 dark:text-blue-300 mb-2">{t('settings.syncInfoTitle')}</h4>
-                        <p className="text-sm text-blue-600 dark:text-blue-400">
+                    <div className="sync-info-box">
+                        <h4 className="sync-info-title">{t('settings.syncInfoTitle')}</h4>
+                        <p className="sync-info-desc">
                             {t('settings.syncInfoDesc')}
                         </p>
                     </div>
@@ -509,8 +608,8 @@ const SettingsModal = ({ onClose, user, onThemeToggle, isDarkMode, initialTab = 
                     <div className="w-16 h-16 bg-gray-200 dark:bg-gray-600 rounded-full flex items-center justify-center text-3xl mx-auto mb-4 text-gray-500 dark:text-gray-400">
                         📅
                     </div>
-                    <h4 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">{t('settings.connectCalendar')}</h4>
-                    <p className="text-gray-600 dark:text-gray-300 mb-6 max-w-md mx-auto">
+                    <h4 className="connect-calendar-title">{t('settings.connectCalendar')}</h4>
+                    <p className="connect-calendar-desc">
                       {t('settings.connectCalendarDesc')}
                     </p>
                     <Button variant="primary" onClick={handleLinkMicrosoft} className="px-8 py-3 text-lg">
@@ -524,9 +623,82 @@ const SettingsModal = ({ onClose, user, onThemeToggle, isDarkMode, initialTab = 
               </div>
             </div>
           )}
+
+          {activeTab === 'ia' && (
+            <div className="settings-section">
+              <div className="storage-card !text-left">
+                 <h3 className="storage-card-title text-center">Estado de Indexación IA</h3>
+                 <p className="storage-card-desc mb-6 text-center">
+                    Visualiza el progreso de construcción de tu nodo personal de conocimiento. 
+                    El sistema detecta automáticamente nuevos documentos y actualiza tu grafo de conocimiento.
+                 </p>
+                 
+                 {!aiStatus ? (
+                    <div className="p-8 text-center text-gray-500">
+                        <svg className="animate-spin h-8 w-8 mx-auto mb-2 text-blue-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                        Cargando estado...
+                    </div>
+                 ) : (
+                    <div className="space-y-6">
+                        {/* Estado General */}
+                        <div className="bg-white dark:bg-slate-700/50 p-4 rounded-lg border border-gray-200 dark:border-slate-600 shadow-sm">
+                            <div className="flex justify-between items-center mb-2">
+                                <span className="font-medium text-gray-700 dark:text-gray-200">Estado del Nodo</span>
+                                <span className={`px-2 py-1 rounded text-xs font-semibold ${
+                                    aiStatus.progress && aiStatus.progress.state === 'indexing' 
+                                    ? 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300' 
+                                    : 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300'
+                                }`}>
+                                    {aiStatus.progress && aiStatus.progress.state === 'indexing' ? 'CONSTRUYENDO' : 'ACTIVO'}
+                                </span>
+                            </div>
+                            <div className="text-sm text-gray-500 dark:text-gray-400 flex justify-between">
+                                <span>Archivos en nodo:</span>
+                                <span className="font-mono">{aiStatus.fileCount}</span>
+                            </div>
+                        </div>
+
+                        {/* Contenido en Progreso */}
+                        {aiStatus.progress && aiStatus.progress.state === 'indexing' ? (
+                            <div className="bg-white dark:bg-slate-700/50 p-4 rounded-lg border border-gray-200 dark:border-slate-600 shadow-sm animate-pulse">
+                                <div className="flex justify-between text-sm mb-2 text-gray-600 dark:text-gray-300">
+                                    <span>Construyendo conocimiento...</span>
+                                    <span>{aiStatus.progress.percent}%</span>
+                                </div>
+                                <div className="w-full bg-gray-200 rounded-full h-2.5 dark:bg-slate-600 mb-4 overflow-hidden">
+                                    <div className="bg-blue-600 h-2.5 rounded-full transition-all duration-300 ease-out" 
+                                         style={{ width: `${aiStatus.progress.percent}%` }}></div>
+                                </div>
+                                
+                                <div className="bg-gray-100 dark:bg-slate-900 p-3 rounded text-xs font-mono text-gray-600 dark:text-gray-400 overflow-hidden text-ellipsis whitespace-nowrap border border-gray-200 dark:border-slate-700">
+                                    <span className="text-blue-500 mr-2">➜</span>
+                                    {aiStatus.progress.currentFile || 'Iniciando proceso...'}
+                                </div>
+                                
+                                {aiStatus.progress.timeRemaining && (
+                                    <div className="mt-2 text-xs text-gray-400 text-right">
+                                        Tiempo estimado: ~{aiStatus.progress.timeRemaining}s
+                                    </div>
+                                )}
+                            </div>
+                        ) : (
+                             <div className="text-center py-6 text-gray-500 dark:text-gray-400 border-t border-gray-100 dark:border-slate-700 pt-6">
+                                <div className="text-4xl mb-3 opacity-80">🧠</div>
+                                <p className="text-sm">El nodo está sincronizado.</p>
+                                <p className="text-xs mt-1 opacity-70">Listo para detectar nuevos documentos.</p>
+                             </div>
+                        )}
+                    </div>
+                 )}
+              </div>
+            </div>
+          )}
         </div>
 
-        <div className="mt-8 flex justify-end space-x-3 pt-4 border-t border-gray-200 dark:border-gray-700">
+        <div className="settings-footer">
           <Button variant="secondary" onClick={onClose}>
             {t('common.cancel')}
           </Button>

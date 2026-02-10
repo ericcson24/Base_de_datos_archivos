@@ -1,6 +1,6 @@
 {
   "name": "client",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "private": true,
   "dependencies": {
     "@fullcalendar/core": "^6.1.19",
@@ -8,13 +8,20 @@
     "@fullcalendar/interaction": "^6.1.19",
     "@fullcalendar/react": "^6.1.19",
     "@fullcalendar/timegrid": "^6.1.19",
+    "docx": "^9.5.1",
+    "guacamole-common-js": "^1.5.0",
+    "html-docx-js": "^0.3.1",
     "leaflet": "^1.9.4",
     "mammoth": "^1.11.0",
+    "quill": "^2.0.3",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
+    "react-icons": "^5.5.0",
     "react-leaflet": "^4.2.1",
+    "react-quill": "^2.0.0",
     "react-router-dom": "^7.9.4",
     "react-scripts": "^5.0.1",
+    "socket.io-client": "^4.8.3",
     "systeminformation": "^5.28.3",
     "web-vitals": "^5.1.0",
     "xlsx": "^0.18.5"
@@ -23,7 +30,8 @@
     "start": "react-scripts start",
     "build": "react-scripts build",
     "test": "react-scripts test",
-    "eject": "react-scripts eject"
+    "eject": "react-scripts eject",
+    "clean-cache": "echo 'Cache invalidated'"
   },
   "eslintConfig": {
     "extends": [

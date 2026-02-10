@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import ContextMenu from './ContextMenu';
-import { getFileType, getFileIcon, canPreview, getAuthenticatedPreviewUrl, formatFileSize, downloadFile } from '../../utils/fileUtils';
+import { getFileType, getFileIcon, canPreview, canEdit, getAuthenticatedPreviewUrl, formatFileSize, downloadFile } from '../../utils/fileUtils';
 import { useLanguage } from '../../context/LanguageContext';
 
 const FileItem = ({ item, onFolderClick, onDelete, onRename, onMove, onView, onHover, onLeave, isHovered, onOpenSidebar, onEdit, onDuplicate, onShare, onDragStart, onDragEnd, viewMode = 'list' }) => {
@@ -26,9 +26,12 @@ const FileItem = ({ item, onFolderClick, onDelete, onRename, onMove, onView, onH
     if (item.type === 'folder') {
       onFolderClick(item);
     } else {
-      if (canPreview(item.name)) {
+      // Prioridad 1: Archivos previsualizable (imágenes, videos, PDFs) y editables (Office)
+      if (canPreview(item.name) || canEdit(item.name)) {
         onView(item);
-      } else {
+      }
+      // Prioridad 2: Descargar otros archivos
+      else {
         downloadFile(item.id, item.name, t);
       }
     }
@@ -271,7 +274,7 @@ const FileItem = ({ item, onFolderClick, onDelete, onRename, onMove, onView, onH
                     title={item.name}
                   />
                 )}
-                <div className="file-icon absolute inset-0 flex items-center justify-center bg-gray-100 rounded-lg" style={{ display: 'none' }}>
+                <div className="file-icon absolute inset-0 flex items-center justify-center bg-gray-100 rounded-lg fallback-icon-hidden">
                   {getFileIcon(item.name)}
                 </div>
               </>
@@ -367,7 +370,7 @@ const FileItem = ({ item, onFolderClick, onDelete, onRename, onMove, onView, onH
                     title={item.name}
                   />
                 )}
-                <div className="file-icon" style={{ display: 'none' }}>
+                <div className="file-icon fallback-icon-hidden">
                   {getFileIcon(item.name)}
                 </div>
               </>
