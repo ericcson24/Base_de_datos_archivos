@@ -81,6 +81,13 @@ const AITaskModal = ({ isOpen, onClose, onTaskCreated, user }) => {
         setPrompt(''); // Clear prompt
         onTaskCreated(); // Refresh calendar
         onClose(); // Close modal
+      } else if (response.status === 429) {
+        // Rate limit error
+        const retryAfter = data.retryAfter || 10;
+        addToast(
+          data.error || t('ai.rateLimitError', { seconds: retryAfter }),
+          'warning'
+        );
       } else {
         addToast(data.error || t('common.error'), 'error');
       }

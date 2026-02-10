@@ -20,14 +20,26 @@ const createEvent = async (req, res) => {
     // 1. Contexto de Tiempo (User Timezone)
     // Asumimos Europe/Madrid por contexto del usuario
     const userTimeZone = 'Europe/Madrid'; 
-    const nowInUserTZ = new Date().toLocaleString('en-US', { timeZone: userTimeZone });
+    const now = new Date();
+    
+    // Formato ISO no ambiguo para la IA (YYYY-MM-DD HH:mm:ss)
+    const nowInUserTZ = new Intl.DateTimeFormat('es-ES', {
+      timeZone: userTimeZone,
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+      hour12: false
+    }).format(now);
     
     console.log(`[AI CALENDAR] Usuario ${userId}: "${query}" [UserTZ: ${nowInUserTZ}]`);
 
     // 2. Prompt para Gemini (Inteligente con Zonas Horarias)
     const prompt = `Eres un asistente de calendario inteligente.
 Contexto Actual:
-- Fecha y hora del usuario (${userTimeZone}): ${nowInUserTZ}.
+- Fecha y hora actual en formato DD/MM/YYYY HH:mm:ss (zona ${userTimeZone}): ${nowInUserTZ}
 - El usuario quiere gestionar su calendario.
 
 Tu tarea:
@@ -40,8 +52,11 @@ Tu tarea:
 2. Extraer los detalles.
 
 IMPORTANTE SOBRE FECHAS:
-- Calcula fecha/hora exacta basándote en "ahora" (${nowInUserTZ}).
-- Devuelve formato ISO 8601 UTC (Z). 
+- La fecha/hora actual es: ${nowInUserTZ} (formato DD/MM/YYYY HH:mm:ss, zona ${userTimeZone})
+- Calcula fecha/hora exacta basándote en esta fecha actual
+- "mañana" significa sumar 1 día a la fecha actual
+- "hoy" significa la misma fecha que la actual
+- Devuelve SIEMPRE formato ISO 8601 UTC con Z al final (ejemplo: "2026-02-11T20:00:00Z") 
 
 Estructura JSON de Respuesta:
 {
@@ -62,8 +77,50 @@ Query del usuario: "${query}"
 Responde SOLO el JSON.`;
 
     const model = genAI.getGenerativeModel({ model: 'gemini-flash-latest' });
-    const result = await model.generateContent(prompt);
-    let aiResponse = result.response.text().trim();
+    
+    // Retry logic for rate limiting
+    let aiResponse;
+    let retryCount = 0;
+    const maxRetries = 3;
+    
+    while (retryCount < maxRetries) {
+      try {
+        const result = await model.generateContent(prompt);
+        aiResponse = result.response.text().trim();
+        break; // Success, exit loop
+      } catch (apiError) {
+        retryCount++;
+        
+        // Check if it's a rate limit error (429 or quota exceeded)
+        if (apiError.message && (
+          apiError.message.includes('429') ||
+          apiError.message.includes('quota') ||
+          apiError.message.includes('rate limit') ||
+          apiError.message.includes('Too Many Requests')
+        )) {
+          if (retryCount < maxRetries) {
+            const waitTime = Math.pow(2, retryCount) * 1000; // Exponential backoff: 2s, 4s, 8s
+            console.log(`[AI CALENDAR] Rate limit hit, waiting ${waitTime}ms before retry ${retryCount}/${maxRetries}`);
+            await new Promise(resolve => setTimeout(resolve, waitTime));
+            continue;
+          }
+          
+          console.error('[AI CALENDAR] Rate limit exceeded after retries');
+          return res.status(429).json({ 
+            error: 'Demasiadas solicitudes a la IA. Intenta de nuevo en unos segundos.',
+            retryAfter: 10
+          });
+        }
+        
+        // Other errors, throw immediately
+        throw apiError;
+      }
+    }
+    
+    if (!aiResponse) {
+      return res.status(500).json({ error: 'No se pudo obtener respuesta de la IA' });
+    }
+    
     aiResponse = aiResponse.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
 
     let eventData;

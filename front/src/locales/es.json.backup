@@ -681,12 +681,7 @@
     "open": "Abrir",
     "download": "Descargar",
     "noFilesFound": "No se encontraron archivos relacionados.",
-    "foundIn": "Encontrado en:"
-  },
-  "ai": {
-    "rateLimitError": "Demasiadas solicitudes a la IA. Intenta de nuevo en {{seconds}} segundos.",
-    "processingError": "Error al procesar la solicitud de IA",
-    "noResponse": "No se pudo obtener respuesta de la IA",
-    "retrying": "Reintentando..."
+    "foundIn": "Encontrado en:",
+    "viewInContext": "Ver en documento"
   }
 }

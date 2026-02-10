@@ -597,11 +597,5 @@
     "from": "od {{owner}}",
     "shared": "Udostępnione",
     "by": "przez {{owner}}"
-  },
-  "ai": {
-    "rateLimitError": "Zbyt wiele żądań do AI. Spróbuj ponownie za {{seconds}} sekund.",
-    "processingError": "Błąd przetwarzania żądania AI",
-    "noResponse": "Nie udało się uzyskać odpowiedzi AI",
-    "retrying": "Ponowna próba..."
   }
 }

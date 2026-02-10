@@ -648,11 +648,5 @@
     "open": "Open",
     "download": "Download",
     "noFilesFound": "No related files found."
-  },
-  "ai": {
-    "rateLimitError": "Too many AI requests. Please try again in {{seconds}} seconds.",
-    "processingError": "Error processing AI request",
-    "noResponse": "Could not get AI response",
-    "retrying": "Retrying..."
   }
 }
