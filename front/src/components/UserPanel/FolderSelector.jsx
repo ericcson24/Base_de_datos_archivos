@@ -5,7 +5,7 @@ import SettingsModal from '../Modals/SettingsModal';
 import { useLanguage } from '../../context/LanguageContext';
 import './FolderSelector.css';
 
-const FolderSelector = ({ user, onSelectFolder, onLogout, onThemeToggle, isDarkMode, onGoToAdmin, onGoToCalendar }) => {
+const FolderSelector = ({ user, onSelectFolder, onLogout, onThemeToggle, isDarkMode, onGoToAdmin, onGoToCalendar, onGoToRemote }) => {
   const { t } = useLanguage();
   const [showSettingsModal, setShowSettingsModal] = useState(false);
 
@@ -18,6 +18,12 @@ const FolderSelector = ({ user, onSelectFolder, onLogout, onThemeToggle, isDarkM
   const handleCalendar = () => {
     if (onGoToCalendar) {
       onGoToCalendar();
+    }
+  };
+
+  const handleRemote = () => {
+    if (onGoToRemote) {
+      onGoToRemote();
     }
   };
 
@@ -66,10 +72,7 @@ const FolderSelector = ({ user, onSelectFolder, onLogout, onThemeToggle, isDarkM
 
           <Button
             variant="frosted"
-            onClick={() => {
-               window.history.pushState(null, '', '/remote');
-               onSelectFolder('remote');
-            }}
+            onClick={handleRemote}
             className="option-btn"
           >
             💻 {t('userPanel.remoteWork')}

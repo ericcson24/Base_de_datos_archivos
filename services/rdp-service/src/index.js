@@ -4,6 +4,7 @@ const http = require('http');
 const GuacamoleLite = require('guacamole-lite');
 const jwt = require('jsonwebtoken');
 const cors = require('cors');
+const crypto = require('crypto');
 
 const app = express();
 const PORT = process.env.PORT || 5008;
@@ -17,14 +18,43 @@ app.use(express.json());
 const server = http.createServer(app);
 
 // Guacamole tunnel configuration
+// Ensure the key is exactly 32 bytes for AES-256-CBC
+const encryptionKey = Buffer.alloc(32);
+Buffer.from('MySuperSecretKeyForParams123456', 'binary').copy(encryptionKey);
+
 const guacOptions = {
     crypt: {
         cypher: 'AES-256-CBC',
-        key: 'MySuperSecretKeyForParams123456' // In prod, use env var
+        key: encryptionKey
     },
     log: {
         level: 'verbose'
     }
+};
+
+// Helper function to encrypt tokens (compatible with guacamole-lite)
+const encryptToken = (data) => {
+    // Generate a random IV (initialization vector)
+    const iv = crypto.randomBytes(16);
+    
+    // Use the same key as guacamole-lite
+    const key = guacOptions.crypt.key;
+    
+    // Create cipher with the IV
+    const cipher = crypto.createCipheriv('aes-256-cbc', key, iv);
+    
+    // Encrypt the data
+    let encrypted = cipher.update(data, 'utf8', 'binary');
+    encrypted += cipher.final('binary');
+    
+    // Create the format that guacamole-lite expects
+    const payload = {
+        iv: Buffer.from(iv).toString('base64'),
+        value: Buffer.from(encrypted, 'binary').toString('base64')
+    };
+    
+    // Return the base64-encoded JSON
+    return Buffer.from(JSON.stringify(payload)).toString('base64');
 };
 
 const { dbAsync, initDb } = require('./database/db');
@@ -239,6 +269,50 @@ app.get('/connections', async (req, res) => {
     }
 });
 
+// NEW: Generate encrypted token for a connection
+app.get('/connections/:id/token', async (req, res) => {
+    try {
+        const authHeader = req.headers.authorization;
+        if (!authHeader) return res.status(401).json({ error: 'No token provided' });
+        
+        const token = authHeader.split(' ')[1];
+        const decoded = verifyToken(token);
+        
+        const connectionId = req.params.id;
+        const connection = await dbAsync.get('SELECT * FROM rdp_connections WHERE id = ?', [connectionId]);
+        
+        if (!connection) {
+            return res.status(404).json({ error: 'Connection not found' });
+        }
+
+        // Create the full connection payload with all settings
+        const payload = {
+            connection: {
+                type: connection.protocol || 'rdp',
+                settings: {
+                    hostname: connection.hostname || 'host.docker.internal',
+                    port: connection.port || 3389,
+                    username: connection.username || '',
+                    password: connection.password || '',
+                    security: 'any',
+                    'ignore-cert': true,
+                    'enable-drive': true,
+                    'drive-path': '/shared',
+                    'create-drive-path': true
+                }
+            }
+        };
+
+        // Encrypt the token with full connection details
+        const encryptedToken = encryptToken(JSON.stringify(payload));
+        
+        res.json({ token: encryptedToken, connectionId });
+    } catch (error) {
+        console.error('Error generating connection token:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
 app.post('/connections', async (req, res) => {
     try {
         const authHeader = req.headers.authorization;
@@ -302,6 +376,10 @@ app.delete('/connections/:id', async (req, res) => {
 });
 
 const clientConnectionCallback = async (request, client, path) => {
+    // Log the incoming request URL for debugging
+    console.log('ClientConnectionCallback - URL:', request.url);
+    console.log('ClientConnectionCallback - Path:', path);
+    
     // Check settings first
     try {
         const settingsRows = await dbAsync.all('SELECT setting_key, setting_value FROM rdp_settings');

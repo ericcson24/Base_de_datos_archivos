@@ -354,6 +354,10 @@ function App() {
             setCurrentView('calendar');
             window.history.pushState(null, '', '/calendar');
           }}
+          onGoToRemote={() => {
+            setCurrentView('remote');
+            window.history.pushState(null, '', '/remote');
+          }}
         />
       </div>
     );
@@ -393,8 +397,8 @@ function App() {
     );
   }
 
-  // Si está logueado y en vista de panel o remote
-  if ((currentView === 'panel' || currentView === 'remote') && user) {
+  // Si está logueado y en vista de panel
+  if (currentView === 'panel' && user) {
     console.log('Renderizando UserPanel con user:', user, 'currentView:', currentView);
     return (
       <NotificationProvider 
@@ -429,7 +433,55 @@ function App() {
             setCurrentView('calendar');
             window.history.pushState(null, '', '/calendar');
           }}
+          onGoToRemote={() => {
+            setCurrentView('remote');
+            window.history.pushState(null, '', '/remote');
+          }}
           onUserUpdate={handleUserUpdate}
+        />
+      </NotificationProvider>
+    );
+  }
+
+  // Si está logueado y en vista de remote (página independiente)
+  if (currentView === 'remote' && user) {
+    console.log('Renderizando RemotePage independiente con user:', user);
+    return (
+      <NotificationProvider 
+        user={user}
+        onNavigate={(path) => {
+          if (path === '/calendar') {
+            setCurrentView('calendar');
+            window.history.pushState(null, '', '/calendar');
+          } else if (path === '/admin') {
+            setCurrentView('admin');
+            window.history.pushState(null, '', '/admin');
+          } else if (path === '/panel') {
+            setCurrentView('panel');
+            window.history.pushState(null, '', '/panel');
+          } else if (path === '/remote') {
+            setCurrentView('remote');
+            window.history.pushState(null, '', '/remote');
+          }
+        }}
+      >
+        <RemotePage
+          user={user}
+          onLogout={handleLogout}
+          onGoBack={() => {
+            setCurrentView('folders');
+            window.history.pushState(null, '', '/folders');
+          }}
+          onGoToPanel={() => {
+            setCurrentView('panel');
+            window.history.pushState(null, '', '/panel');
+          }}
+          onGoToCalendar={() => {
+            setCurrentView('calendar');
+            window.history.pushState(null, '', '/calendar');
+          }}
+          onThemeToggle={toggleTheme}
+          isDarkMode={isDarkMode}
         />
       </NotificationProvider>
     );
@@ -450,6 +502,9 @@ function App() {
           } else if (path === '/panel') {
             setCurrentView('panel');
             window.history.pushState(null, '', '/panel');
+          } else if (path === '/remote') {
+            setCurrentView('remote');
+            window.history.pushState(null, '', '/remote');
           }
         }}
       >
@@ -463,6 +518,10 @@ function App() {
           onBackToFolders={() => {
             setCurrentView('folders');
             window.history.pushState(null, '', '/folders');
+          }}
+          onGoToRemote={() => {
+            setCurrentView('remote');
+            window.history.pushState(null, '', '/remote');
           }}
           onThemeToggle={toggleTheme}
           isDarkMode={isDarkMode}
@@ -493,73 +552,17 @@ function App() {
       }}
     >
     <div className="App">
-      {/* <div style={{ padding: '20px', background: 'red', color: 'white' }}>
-        <h2>DEBUG INFO:</h2>
-        <p>isLoggedIn: {isLoggedIn ? 'true' : 'false'}</p>
-        <p>currentView: {currentView}</p>
-        <p>user: {user ? JSON.stringify(user) : 'null'}</p>
-      </div> */}
       {isLoggedIn ? (
-        currentView === 'admin' ? (
-          <AdminPanel 
-            user={user} 
-            onLogout={handleLogout} 
-            onThemeToggle={toggleTheme} 
-            isDarkMode={isDarkMode} 
-          />
-        ) : currentView === 'calendar' ? (
-          <Calendar 
-            user={user} 
-            onLogout={handleLogout} 
-            onBackToPanel={() => {
-              setCurrentView('panel');
-              window.history.pushState(null, '', '/panel');
-            }}
-            onThemeToggle={toggleTheme}
-            isDarkMode={isDarkMode}
-          />
-        ) : currentView === 'remote' ? (
-            <RemotePage 
-                user={user}
-                onGoBack={() => {
-                    setCurrentView('folders');
-                    window.history.pushState(null, '', '/folders');
-                }}
-            />
-        ) : (currentView === 'panel') ? (
-          <UserPanel 
-            user={user} 
-            initialView={currentView}
-            onLogout={handleLogout} 
-            onBackToFolders={() => {
-              setCurrentView('folders');
-              window.history.pushState(null, '', '/folders');
-            }}
-            onThemeToggle={toggleTheme}
-            isDarkMode={isDarkMode}
-            onGoToCalendar={() => {
-              setCurrentView('calendar');
-              window.history.pushState(null, '', '/calendar');
-            }}
-            onGoToRemote={() => {
-              setCurrentView('remote');
-              window.history.pushState(null, '', '/remote');
-            }}
-            onUserUpdate={handleUserUpdate}
-          />
-        ) : (
-          <FolderSelector 
-            user={user} 
-            onSelectFolder={(folder) => {
-              // Lógica para seleccionar carpeta si fuera necesario
-              setCurrentView('panel');
-              window.history.pushState(null, '', '/panel');
-            }} 
-            onLogout={handleLogout}
-            onThemeToggle={toggleTheme}
-            isDarkMode={isDarkMode}
-          />
-        )
+        <FolderSelector 
+          user={user} 
+          onSelectFolder={(folder) => {
+            setCurrentView('panel');
+            window.history.pushState(null, '', '/panel');
+          }} 
+          onLogout={handleLogout}
+          onThemeToggle={toggleTheme}
+          isDarkMode={isDarkMode}
+        />
       ) : (
         <Login onLogin={handleLogin} onThemeToggle={toggleTheme} isDarkMode={isDarkMode} />
       )}

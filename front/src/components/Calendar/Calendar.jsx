@@ -146,7 +146,7 @@ const DailyTimeline = ({ events }) => {
   );
 };
 
-const Calendar = ({ user, onLogout, onBackToPanel, onBackToFolders, onThemeToggle, isDarkMode }) => {
+const Calendar = ({ user, onLogout, onBackToPanel, onBackToFolders, onGoToRemote, onThemeToggle, isDarkMode }) => {
   const { t, language } = useLanguage();
   const calendarRef = useRef(null);
   const { addToast } = useToast();
@@ -741,7 +741,11 @@ const Calendar = ({ user, onLogout, onBackToPanel, onBackToFolders, onThemeToggl
             <button className="sidebar-btn sidebar-btn-action" onClick={onBackToPanel}>
               {t('calendar.panel')}
             </button>
-            <button className="sidebar-btn sidebar-btn-action" onClick={() => setShowRDPModal(true)}>
+            <button className="sidebar-btn sidebar-btn-action" onClick={() => {
+              if (onGoToRemote) {
+                onGoToRemote();
+              }
+            }}>
               {t('common.remoteDesktop')}
             </button>
           </div>

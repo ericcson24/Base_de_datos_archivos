@@ -1,0 +1,42 @@
+/* =========================================
+   REMOTE PAGE DESKTOP STYLES
+   ========================================= */
+
+/* Hide mobile elements by default */
+.mobile-header {
+  display: none;
+}
+
+.sidebar-overlay {
+  display: none;
+}
+
+.mobile-close-btn {
+  display: none;
+}
+
+/* Desktop-specific adjustments */
+@media (min-width: 769px) {
+  .remote-sidebar {
+    min-width: 300px;
+    max-width: 320px;
+  }
+
+  .remote-connections-grid {
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 24px;
+  }
+
+  .remote-connection-card {
+    padding: 24px;
+  }
+
+  .remote-connection-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+  }
+
+  .remote-sidebar-footer {
+    padding: 24px 20px;
+  }
+}

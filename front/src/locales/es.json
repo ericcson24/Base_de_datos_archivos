@@ -81,7 +81,13 @@
     "stopAllConfirm": "¿Estás seguro de que quieres detener todas las conexiones? Esto activará el modo mantenimiento.",
     "stopAllSuccess": "Todas las conexiones detenidas (Modo Mantenimiento Activado)",
     "fetchError": "Error al obtener conexiones",
-    "createError": "Error al crear conexión"
+    "createError": "Error al crear conexión",
+    "remoteDesktop": "Escritorio Remoto",
+    "description": "Conecta a tu escritorio virtual privado desde cualquier lugar",
+    "selectConnection": "Selecciona una Conexión",
+    "selectConnectionDesc": "Elige el escritorio remoto al que deseas conectarte",
+    "noConnectionsDesc": "No hay conexiones remotas configuradas todavía.",
+    "initializeDefault": "Inicializar Conexión por Defecto"
   },
   "folders": {
     "title": "Selecciona una carpeta",

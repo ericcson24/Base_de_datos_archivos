@@ -1074,7 +1074,7 @@ useEffect(() => {
             <button className="sidebar-btn sidebar-btn-action" onClick={() => {
                    if (onGoToRemote) onGoToRemote();
             }}>
-              Remote Desktop (V2)
+              {t('common.remoteDesktop')}
             </button>
           </div>
           <button className="sidebar-btn" onClick={() => setShowSettingsModal(true)}>

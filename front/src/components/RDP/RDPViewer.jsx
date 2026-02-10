@@ -14,12 +14,29 @@ const RDPViewer = ({ connectionToken, connectionId, onClose }) => {
 
     // Connect to Guacamole
     useEffect(() => {
-        if (!connectionToken || !connectionId || !elementRef.current) return;
+        if (!connectionToken || !connectionId || !elementRef.current) {
+            console.warn('RDPViewer - Missing required params:', {
+                hasToken: !!connectionToken,
+                hasConnectionId: !!connectionId,
+                hasElementRef: !!elementRef.current
+            });
+            if (!connectionToken) {
+                setConnectionState('ERROR');
+                setErrorMsg('No authentication token provided');
+            }
+            return;
+        }
 
-        // Create tunnel
+        console.log('RDPViewer - Initializing connection:', { connectionId });
+
+        // Create tunnel with encrypted token from backend
         const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
         const host = window.location.host;
-        const tunnelUrl = `${protocol}//${host}/api/rdp/?token=${encodeURIComponent(connectionToken)}&id=${connectionId}`; 
+        
+        // Use the encrypted token as a query parameter (guacamole-lite expects ?token=...)
+        const tunnelUrl = `${protocol}//${host}/api/rdp?token=${encodeURIComponent(connectionToken)}`;
+        
+        console.log('RDPViewer - Connecting to:', tunnelUrl);
         
         const tunnel = new Guacamole.WebSocketTunnel(tunnelUrl);
         
@@ -156,6 +173,18 @@ const RDPViewer = ({ connectionToken, connectionId, onClose }) => {
                 <div className="rdp-overlay">
                     <div className="spinner"></div>
                     <p>{t('rdp.connecting')}</p>
+                </div>
+            ) : null}
+
+            {/* Error Overlay */}
+            {connectionState === 'ERROR' && errorMsg ? (
+                <div className="rdp-overlay error">
+                    <div className="error-icon">⚠️</div>
+                    <h3>{t('rdp.error')}</h3>
+                    <p>{errorMsg}</p>
+                    <button onClick={onClose} className="rdp-btn">
+                        {t('common.close')}
+                    </button>
                 </div>
             ) : null}
 
