@@ -9,12 +9,12 @@
   cursor: pointer;
   position: relative;
   padding: 8px;
-  color: var(--text-primary);
+  color: var(--text-primary, var(--text-color, #333));
   transition: color 0.2s;
 }
 
 .notification-bell:hover {
-  color: var(--primary-color);
+  color: var(--primary-color, #4285f4);
 }
 
 .notification-badge {
@@ -30,7 +30,7 @@
   line-height: 20px;
   min-width: 20px;
   text-align: center;
-  border: 2px solid var(--bg-secondary);
+  border: 2px solid var(--bg-secondary, var(--panel-bg, #ffffff));
 }
 
 .notification-dropdown {
@@ -38,8 +38,8 @@
   top: 100%;
   right: 0;
   width: 350px;
-  background-color: var(--bg-secondary);
-  border: 1px solid var(--border-color);
+  background-color: var(--bg-secondary, var(--panel-bg, rgba(255, 255, 255, 0.95)));
+  border: 1px solid var(--border-color, var(--sidebar-border, rgba(0, 0, 0, 0.1)));
   border-radius: 8px;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
   z-index: 1000;
@@ -47,6 +47,8 @@
   flex-direction: column;
   max-height: 500px;
   animation: slideDown 0.2s ease-out;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
 }
 
 @keyframes slideDown {
@@ -56,7 +58,7 @@
 
 .notification-header {
   padding: 12px 16px;
-  border-bottom: 1px solid var(--border-color);
+  border-bottom: 1px solid var(--border-color, var(--sidebar-border, rgba(0, 0, 0, 0.1)));
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -66,12 +68,13 @@
   margin: 0;
   font-size: 16px;
   font-weight: 600;
+  color: var(--text-primary, var(--text-color, #333));
 }
 
 .mark-all-read {
   background: none;
   border: none;
-  color: var(--primary-color);
+  color: var(--primary-color, #4285f4);
   font-size: 12px;
   cursor: pointer;
   padding: 4px 8px;
@@ -79,7 +82,7 @@
 }
 
 .mark-all-read:hover {
-  background-color: var(--bg-hover);
+  background-color: var(--bg-hover, rgba(0, 0, 0, 0.05));
 }
 
 .notification-list {
@@ -92,7 +95,7 @@
 
 .notification-item {
   padding: 12px 16px;
-  border-bottom: 1px solid var(--border-color);
+  border-bottom: 1px solid var(--border-color, var(--sidebar-border, rgba(0, 0, 0, 0.1)));
   cursor: pointer;
   transition: background-color 0.2s;
   display: flex;
@@ -101,7 +104,7 @@
 }
 
 .notification-item:hover {
-  background-color: var(--bg-hover);
+  background-color: var(--bg-hover, rgba(0, 0, 0, 0.05));
 }
 
 .notification-item.unread {
@@ -125,31 +128,58 @@
   font-weight: 600;
   font-size: 14px;
   margin-bottom: 4px;
-  color: var(--text-primary);
+  color: var(--text-primary, var(--text-color, #333));
 }
 
 .notification-message {
   font-size: 13px;
-  color: var(--text-secondary);
+  color: var(--text-secondary, var(--panel-secondary-text, #666));
   margin-bottom: 6px;
   line-height: 1.4;
 }
 
 .notification-time {
   font-size: 11px;
-  color: var(--text-tertiary);
+  color: var(--text-tertiary, #999);
 }
 
 .notification-empty {
   padding: 32px;
   text-align: center;
-  color: var(--text-secondary);
+  color: var(--text-secondary, var(--panel-secondary-text, #666));
 }
 
 .notification-dot {
   width: 8px;
   height: 8px;
-  background-color: var(--primary-color);
+  background-color: var(--primary-color, #4285f4);
   border-radius: 50%;
   margin-top: 8px;
+}
+
+/* Dark mode overrides */
+[data-theme="dark"] .notification-dropdown {
+  background-color: var(--bg-secondary, rgba(30, 30, 35, 0.95));
+  border-color: var(--border-color, rgba(255, 255, 255, 0.1));
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+}
+
+[data-theme="dark"] .notification-badge {
+  border-color: var(--bg-secondary, rgba(30, 30, 35, 0.95));
+}
+
+[data-theme="dark"] .notification-header {
+  border-bottom-color: var(--border-color, rgba(255, 255, 255, 0.1));
+}
+
+[data-theme="dark"] .notification-item {
+  border-bottom-color: var(--border-color, rgba(255, 255, 255, 0.1));
+}
+
+[data-theme="dark"] .notification-item:hover {
+  background-color: var(--bg-hover, rgba(255, 255, 255, 0.05));
+}
+
+[data-theme="dark"] .notification-bell {
+  color: var(--text-primary, var(--text-color, #fff));
 }

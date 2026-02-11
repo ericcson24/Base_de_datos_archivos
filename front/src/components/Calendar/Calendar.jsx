@@ -17,7 +17,7 @@ import { useToast } from '../../context/ToastContext';
 import { useLanguage } from '../../context/LanguageContext';
 import { getAuthToken } from '../../utils/fileUtils';
 
-const DailyTimeline = ({ events }) => {
+const DailyTimeline = ({ events, headerActions }) => {
   const { t, language } = useLanguage();
   const [currentTime, setCurrentTime] = useState(new Date());
   const containerRef = useRef(null);
@@ -99,6 +99,7 @@ const DailyTimeline = ({ events }) => {
     >
       <div className="daily-timeline-header daily-timeline-header-sticky">
         <h3>{t('calendar.todayDate', { date: today.toLocaleDateString(language === 'es' ? 'es-ES' : language === 'pl' ? 'pl-PL' : 'en-US', { weekday: 'long', day: 'numeric', month: 'long' }) })}</h3>
+        {headerActions && <div className="daily-timeline-actions">{headerActions}</div>}
       </div>
       <div className="daily-timeline-track">
         {/* Overlay para el pasado */}
@@ -759,16 +760,6 @@ const Calendar = ({ user, onLogout, onBackToPanel, onBackToFolders, onGoToRemote
 
       {/* Main Content */}
       <div className="calendar-main">
-        <div style={{ 
-          display: 'flex', 
-          justifyContent: 'flex-end', 
-          padding: '10px 20px', 
-          background: 'var(--bg-secondary)',
-          borderBottom: '1px solid var(--border-color)'
-        }}>
-          <NotificationCenter />
-        </div>
-
         {!microsoftStatus.linked && (
           <div className="bg-red-50 dark:bg-red-900/20 border-l-4 border-red-500 p-4 m-4 rounded shadow-sm flex justify-between items-center">
             <div className="flex items-center">
@@ -792,7 +783,7 @@ const Calendar = ({ user, onLogout, onBackToPanel, onBackToFolders, onGoToRemote
           </div>
         )}
 
-        <DailyTimeline events={filteredEvents} />
+        <DailyTimeline events={filteredEvents} headerActions={<NotificationCenter />} />
 
         <div className="calendar-view">
           <div className="calendar-card">

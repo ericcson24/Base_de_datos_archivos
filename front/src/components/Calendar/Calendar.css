@@ -435,6 +435,16 @@
   text-transform: capitalize;
 }
 
+.daily-timeline-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.daily-timeline-actions {
+  flex-shrink: 0;
+}
+
 .daily-timeline-track {
   position: relative;
   height: 60px; /* Más alto para ver texto */

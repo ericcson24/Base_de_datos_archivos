@@ -4,7 +4,7 @@ import { getAuthToken } from '../../utils/fileUtils';
 import NotificationCenter from '../Common/NotificationCenter';
 import SettingsModal from '../Modals/SettingsModal';
 import RDPViewer from '../RDP/RDPViewer';
-import { FiArrowLeft, FiLayout, FiCalendar, FiSettings, FiLogOut } from 'react-icons/fi';
+import { FiArrowLeft, FiLayout, FiCalendar, FiSettings, FiLogOut, FiMonitor, FiWifi } from 'react-icons/fi';
 import './RemotePage.css';
 import './RemotePageDesktop.css';
 import './RemotePageMobile.css';
@@ -106,14 +106,16 @@ const RemotePage = ({ user, onLogout, onGoBack, onGoToPanel, onGoToCalendar, onT
             <div className={`sidebar-overlay ${sidebarOpen ? 'visible' : ''}`} onClick={() => setSidebarOpen(false)}></div>
             <div className={`remote-sidebar ${sidebarOpen ? 'open' : ''}`}>
                 <div className="remote-sidebar-header">
-                    <h2>🖥️ {t('rdp.remoteDesktop')}</h2>
-                    <p className="remote-sidebar-subtitle">{t('rdp.description')}</p>
+                    <div className="remote-sidebar-title-row">
+                        <FiMonitor className="remote-sidebar-title-icon" />
+                        <h2>{t('rdp.remoteDesktop')}</h2>
+                    </div>
                 </div>
 
                 <div className="remote-sidebar-content">
                     <div className="remote-sidebar-section">
                         <div className="remote-info-card">
-                            <div className="info-icon">ℹ️</div>
+                            <FiWifi className="remote-info-icon" />
                             <p>{t('rdp.selectConnectionDesc')}</p>
                         </div>
                     </div>

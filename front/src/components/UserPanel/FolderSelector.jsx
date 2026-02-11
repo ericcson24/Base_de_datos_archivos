@@ -1,9 +1,7 @@
 import React, { useState } from 'react';
-import FrostedContainer from '../Common/FrostedContainer';
-import Button from '../Common/Button';
 import SettingsModal from '../Modals/SettingsModal';
 import { useLanguage } from '../../context/LanguageContext';
-import { FiFolder, FiMonitor, FiCalendar, FiTool, FiLogOut } from 'react-icons/fi';
+import { FiFolder, FiMonitor, FiCalendar, FiTool, FiLogOut, FiSettings } from 'react-icons/fi';
 import './FolderSelector.css';
 
 const FolderSelector = ({ user, onSelectFolder, onLogout, onThemeToggle, isDarkMode, onGoToAdmin, onGoToCalendar, onGoToRemote }) => {
@@ -39,7 +37,7 @@ const FolderSelector = ({ user, onSelectFolder, onLogout, onThemeToggle, isDarkM
         onClick={() => setShowSettingsModal(true)}
         title={t('userPanel.settings')}
       >
-        ⚙️
+        <FiSettings />
       </button>
 
       {showSettingsModal && (
@@ -52,7 +50,7 @@ const FolderSelector = ({ user, onSelectFolder, onLogout, onThemeToggle, isDarkM
       )}
 
       <div className="selector-container">
-        <FrostedContainer variant="card" className="options-container">
+        <div className="options-container">
           <h2>{t('folders.subtitle')}</h2>
           
           {/* Mostrar información del usuario */}
@@ -63,49 +61,44 @@ const FolderSelector = ({ user, onSelectFolder, onLogout, onThemeToggle, isDarkM
             </div>
           )}
 
-          <Button
-            variant="frosted"
+          <button
+            className="folder-btn"
             onClick={() => handleFolderSelect('privada')}
-            className="option-btn"
           >
-            <FiFolder className="option-btn-icon" /> {t('userPanel.myFiles')}
-          </Button>
+            <FiFolder className="folder-btn-icon" /> {t('userPanel.myFiles')}
+          </button>
 
-          <Button
-            variant="frosted"
+          <button
+            className="folder-btn"
             onClick={handleRemote}
-            className="option-btn"
           >
-            <FiMonitor className="option-btn-icon" /> {t('userPanel.remoteWork')}
-          </Button>
+            <FiMonitor className="folder-btn-icon" /> {t('userPanel.remoteWork')}
+          </button>
 
-          <Button
-            variant="frosted"
+          <button
+            className="folder-btn"
             onClick={handleCalendar}
-            className="option-btn"
           >
-            <FiCalendar className="option-btn-icon" /> {t('userPanel.calendar')}
-          </Button>
+            <FiCalendar className="folder-btn-icon" /> {t('userPanel.calendar')}
+          </button>
 
           {/* Botón de administrador solo para admins */}
           {user && user.role === 'admin' && onGoToAdmin && (
-            <Button
-              variant="warning"
+            <button
+              className="folder-btn"
               onClick={onGoToAdmin}
-              className="option-btn admin-btn"
             >
-              <FiTool className="option-btn-icon" /> {t('folders.adminPanel')}
-            </Button>
+              <FiTool className="folder-btn-icon" /> {t('folders.adminPanel')}
+            </button>
           )}
 
-          <Button
-            variant="danger"
+          <button
+            className="folder-btn folder-btn-logout"
             onClick={onLogout}
-            className="option-btn logout-btn"
           >
-            <FiLogOut className="option-btn-icon" /> {t('userPanel.logout')}
-          </Button>
-        </FrostedContainer>
+            <FiLogOut className="folder-btn-icon" /> {t('userPanel.logout')}
+          </button>
+        </div>
       </div>
     </div>
   );
