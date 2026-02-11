@@ -492,3 +492,136 @@ input:checked + .slider:before {
     justify-content: space-around;  
     align-items: center;  
 }
+
+/* Glassmorphism base class */
+.glassmorphism {
+    background: var(--sidebar-bg, rgba(255,255,255,0.05));
+    backdrop-filter: blur(10px);
+    border: 1px solid var(--sidebar-border, rgba(255,255,255,0.1));
+}
+
+/* Back button for RDP viewer */
+.back-btn {
+    background: var(--sidebar-btn-bg, rgba(255,255,255,0.1));
+    color: var(--text-color, #fff);
+    border: 1px solid var(--sidebar-border, rgba(255,255,255,0.15));
+    padding: 8px 16px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-weight: 500;
+    transition: all 0.2s;
+    margin-bottom: 10px;
+}
+
+.back-btn:hover {
+    background: var(--sidebar-btn-hover, rgba(255,255,255,0.15));
+}
+
+/* RDP viewer wrapper */
+.rdp-viewer-wrapper {
+    position: relative;
+    width: 100%;
+    height: calc(100vh - 80px);
+    display: flex;
+    flex-direction: column;
+}
+
+/* Connect button variants */
+.connect-btn.primary {
+    background: #fff;
+    color: #000;
+    font-weight: 700;
+}
+
+.connect-btn.primary:hover {
+    background: #e8e8e8;
+    transform: translateY(-1px);
+}
+
+.connect-btn.secondary {
+    background: transparent;
+    color: var(--text-color, #fff);
+    border: 1px solid var(--sidebar-border, rgba(255,255,255,0.2));
+}
+
+.connect-btn.secondary:hover {
+    background: rgba(255,255,255,0.05);
+}
+
+.connect-btn:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+    transform: none;
+}
+
+/* Access methods container */
+.access-methods {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+/* Small variant of setting toggle row */
+.setting-toggle-row.small {
+    padding: 4px 0;
+    margin-bottom: 8px;
+}
+
+/* Small setting label */
+.setting-label-small {
+    font-weight: 500;
+    font-size: 0.85rem;
+    color: var(--text-color);
+    opacity: 0.8;
+}
+
+/* Action button disabled state */
+.action-btn:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+}
+
+/* Setting description theme-aware */
+.setting-desc {  
+    font-size: 0.85rem;  
+    color: var(--text-secondary, rgba(255,255,255,0.6));  
+}
+
+/* Modal content theme-aware */
+.modal-content {
+    background: var(--sidebar-bg, #1a1a1a);
+    color: var(--text-color, #fff);
+}
+
+/* Responsive layout */
+@media (max-width: 768px) {
+    .rdp-dashboard-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .rdp-status-card {
+        min-height: 180px;
+    }
+
+    .status-actions {
+        flex-direction: column;
+        gap: 10px;
+        width: 100%;
+    }
+
+    .action-btn {
+        width: 100%;
+        text-align: center;
+    }
+
+    .method-row {
+        flex-direction: column;
+        gap: 10px;
+        text-align: center;
+    }
+
+    .rdp-info-card {
+        flex-direction: column;
+        gap: 15px;
+    }
+}

@@ -102,4 +102,28 @@
     font-size: 0.875rem;
     padding: 8px 12px;
   }
+
+  /* Mobile menu hamburger button */
+  .mobile-menu-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: none;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    color: inherit;
+    font-size: 1.5rem;
+    padding: 6px 10px;
+    border-radius: 8px;
+    cursor: pointer;
+    margin-right: 12px;
+  }
+
+  .mobile-menu-btn:hover {
+    background: rgba(255, 255, 255, 0.1);
+  }
+}
+
+/* Hide hamburger on desktop */
+.mobile-menu-btn {
+  display: none;
 }

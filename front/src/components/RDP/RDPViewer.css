@@ -84,9 +84,13 @@
     align-items: center;
     justify-content: center;
     background-color: #000;
-    cursor: none;
     position: relative;
     overflow: hidden;
+}
+
+/* Only hide cursor when connected */
+.rdp-display.cursor-hidden {
+    cursor: none;
 }
 
 .rdp-display canvas {
@@ -105,11 +109,18 @@
     justify-content: center;
     color: white;
     z-index: 20;
+    pointer-events: auto;
+    cursor: default;
 }
 
 .rdp-overlay.error {
     background: rgba(50, 0, 0, 0.9);
 }
+
+/* Status dot for WAITING state */
+.status-dot.waiting { background-color: #ff9800; animation: pulse 1s infinite; }
+.status-dot.idle { background-color: #9e9e9e; }
+.status-dot.disconnecting { background-color: #ff9800; }
 
 @keyframes pulse {
     0% { opacity: 1; }

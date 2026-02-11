@@ -1,7 +1,7 @@
 {
   "name": "base-de-datos-archivos",
   "version": "1.0.0",
-  "description": "Sistema de gesti\u00f3n de archivos con microservicios",
+  "description": "Sistema de gestión de archivos con microservicios",
   "scripts": {
     "start": "docker compose up --build",
     "stop": "docker compose down",
@@ -34,6 +34,7 @@
     "pg": "^8.16.3"
   },
   "devDependencies": {
-    "concurrently": "^9.1.2"
+    "concurrently": "^9.1.2",
+    "ws": "^8.19.0"
   }
 }

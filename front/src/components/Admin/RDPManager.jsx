@@ -12,7 +12,6 @@ const RDPManager = () => {
     const [loading, setLoading] = useState(true);
     const [activeConnection, setActiveConnection] = useState(null);
     const [defaultConnection, setDefaultConnection] = useState(null);
-    const [isChecking, setIsChecking] = useState(false);
 
     const fetchSettings = async () => {
         try {
@@ -30,7 +29,6 @@ const RDPManager = () => {
     };
 
     const initializeDefault = async () => {
-        setIsChecking(true);
         try {
             const token = getAuthToken();
             const response = await fetch('/api/rdp/initialize-default', {
@@ -44,7 +42,6 @@ const RDPManager = () => {
         } catch (error) {
             console.error("Failed to init", error);
         } finally {
-            setIsChecking(false);
             setLoading(false);
         }
     };
@@ -136,6 +133,7 @@ session bpp:i:32
                     <RDPViewer 
                         connectionId={activeConnection.id} 
                         token={getAuthToken()}
+                        onClose={() => setActiveConnection(null)}
                     />
                 </div>
             ) : (
@@ -221,6 +219,9 @@ session bpp:i:32
                                                  body: JSON.stringify({ lan_only: String(val) })
                                               }).then(() => {
                                                   setSettings(prev => ({...prev, lan_only: String(val)}));
+                                              }).catch(() => {
+                                                  setSettings(prev => ({...prev, lan_only: String(!val)}));
+                                                  addToast(t('common.error'), 'error');
                                               });
                                         }}
                                     />

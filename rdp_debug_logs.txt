@@ -1,0 +1,988 @@
+rdp-service-1  | 
+rdp-service-1  | > rdp-service@1.0.0 start
+rdp-service-1  | > node src/index.js
+rdp-service-1  | 
+rdp-service-1  | WebSocket server initialized for RDP connections
+rdp-service-1  | Database connection established
+rdp-service-1  | Initializing RDP Database...
+rdp-service-1  | RDP columns: [
+rdp-service-1  |   'id',          'user_id',
+rdp-service-1  |   'server_id',   'name',
+rdp-service-1  |   'hostname',    'port',
+rdp-service-1  |   'username',    'password_encrypted',
+rdp-service-1  |   'domain',      'security',
+rdp-service-1  |   'ignore_cert', 'enable_drive',
+rdp-service-1  |   'drive_path',  'enable_audio',
+rdp-service-1  |   'created_at',  'last_used',
+rdp-service-1  |   'is_active',   'virtual_ip',
+rdp-service-1  |   'public_key',  'protocol',
+rdp-service-1  |   'password'
+rdp-service-1  | ]
+rdp-service-1  | RDP Database initialized successfully
+rdp-service-1  | Database initialized successfully
+rdp-service-1  | RDP Service listening on port 5008
+rdp-service-1  | WS VerifyClient: Token valid, accepting
+rdp-service-1  | WS Protocol Negotiation: Set(1) { 'guacamole' }
+rdp-service-1  | ===== WebSocket Connection Established =====
+rdp-service-1  | Selected Protocol: guacamole
+rdp-service-1  | Sending tunnel UUID: 13f8dd4e-4b8d-4333-b4d4-c3c1a124fd13 | instruction: 0.,36.13f8dd4e-4b8d-4333-b4d4-c3c1a124fd13;
+rdp-service-1  | Request Headers available: [
+rdp-service-1  |   'upgrade',
+rdp-service-1  |   'connection',
+rdp-service-1  |   'host',
+rdp-service-1  |   'x-real-ip',
+rdp-service-1  |   'x-forwarded-for',
+rdp-service-1  |   'x-original-uri',
+rdp-service-1  |   'sec-websocket-version',
+rdp-service-1  |   'sec-websocket-key',
+rdp-service-1  |   'sec-websocket-extensions',
+rdp-service-1  |   'sec-websocket-protocol'
+rdp-service-1  | ]
+rdp-service-1  | Using X-Original-URI from headers: /api/rdp?token=eyJpZCI6MSwidXNlcm5hbWUiOiJhZG1pbmlzdHJhZG9yIiwicm9sZSI6ImFkbWluIn0%3D&id=3
+rdp-service-1  | Final Request URL to parse: /api/rdp?token=eyJpZCI6MSwidXNlcm5hbWUiOiJhZG1pbmlzdHJhZG9yIiwicm9sZSI6ImFkbWluIn0%3D&id=3
+rdp-service-1  | Token: eyJpZCI6MSwidXNlcm5h...
+rdp-service-1  | Connection ID Raw: 3
+rdp-service-1  | Connection ID Parsed: 3
+rdp-service-1  | User administrador connecting to RDP...
+rdp-service-1  | Connecting to: host.docker.internal : 3389
+rdp-service-1  | Pre-check: RDP target is reachable
+rdp-service-1  | Connected to guacd
+rdp-service-1  | Sending select: 6.select,3.rdp;
+rdp-service-1  | Guacd opcode: args | elements count: 90
+rdp-service-1  | Guacd version: VERSION_1_5_0
+rdp-service-1  | Guacd wants args: 88 names: [
+rdp-service-1  |   'hostname',
+rdp-service-1  |   'port',
+rdp-service-1  |   'timeout',
+rdp-service-1  |   'domain',
+rdp-service-1  |   'username',
+rdp-service-1  |   'password',
+rdp-service-1  |   'width',
+rdp-service-1  |   'height',
+rdp-service-1  |   'dpi',
+rdp-service-1  |   'initial-program'
+rdp-service-1  | ] ...
+rdp-service-1  | Responding with 88 values for 88 args
+rdp-service-1  | Sending handshake response (length: 569 )
+rdp-service-1  | Connect instruction has 89 args (version + 88 values)
+rdp-service-1  | First 200 chars of handshake: 4.size,4.1024,3.768,2.96;5.audio,8.audio/L8,9.audio/L16;5.video;5.image,9.image/png,10.image/jpeg,10.image/webp;8.timezone,16.America/New_York;7.connect,13.VERSION_1_5_0,20.host.docker.internal,4.3389
+rdp-service-1  | Guacd opcode: ready | elements count: 2
+rdp-service-1  | Guacd opcode: audio | elements count: 3
+rdp-service-1  | Guacd opcode: cursor | elements count: 8
+rdp-service-1  | Guacd opcode: mouse | elements count: 5
+rdp-service-1  | Guacd opcode: sync | elements count: 3
+rdp-service-1  | Guacd opcode: required | elements count: 2
+rdp-service-1  | Guacd requires: [ 'password' ]
+rdp-service-1  | Forwarding required instruction to browser (no stored credentials)
+rdp-service-1  | Guacd opcode: nop | elements count: 1
+rdp-service-1  | Guacd opcode: error | elements count: 3
+rdp-service-1  | Guacd opcode: disconnect | elements count: 1
+rdp-service-1  | WebSocket closed
+rdp-service-1  | Guacd connection closed
+rdp-service-1  | WS VerifyClient: Token valid, accepting
+rdp-service-1  | WS Protocol Negotiation: Set(1) { 'guacamole' }
+rdp-service-1  | ===== WebSocket Connection Established =====
+rdp-service-1  | Selected Protocol: guacamole
+rdp-service-1  | Sending tunnel UUID: 15893b71-fd6d-4e82-a1ba-6e26d0e9ea6c | instruction: 0.,36.15893b71-fd6d-4e82-a1ba-6e26d0e9ea6c;
+rdp-service-1  | Request Headers available: [
+rdp-service-1  |   'upgrade',
+rdp-service-1  |   'connection',
+rdp-service-1  |   'host',
+rdp-service-1  |   'x-real-ip',
+rdp-service-1  |   'x-forwarded-for',
+rdp-service-1  |   'x-original-uri',
+rdp-service-1  |   'sec-websocket-version',
+rdp-service-1  |   'sec-websocket-key',
+rdp-service-1  |   'sec-websocket-extensions',
+rdp-service-1  |   'sec-websocket-protocol'
+rdp-service-1  | ]
+rdp-service-1  | Using X-Original-URI from headers: /api/rdp?token=eyJpZCI6MSwidXNlcm5hbWUiOiJhZG1pbmlzdHJhZG9yIiwicm9sZSI6ImFkbWluIn0%3D&id=3
+rdp-service-1  | Final Request URL to parse: /api/rdp?token=eyJpZCI6MSwidXNlcm5hbWUiOiJhZG1pbmlzdHJhZG9yIiwicm9sZSI6ImFkbWluIn0%3D&id=3
+rdp-service-1  | Token: eyJpZCI6MSwidXNlcm5h...
+rdp-service-1  | Connection ID Raw: 3
+rdp-service-1  | Connection ID Parsed: 3
+rdp-service-1  | User administrador connecting to RDP...
+rdp-service-1  | Connecting to: host.docker.internal : 3389
+rdp-service-1  | Pre-check: RDP target is reachable
+rdp-service-1  | Connected to guacd
+rdp-service-1  | Sending select: 6.select,3.rdp;
+rdp-service-1  | Guacd opcode: args | elements count: 90
+rdp-service-1  | Guacd version: VERSION_1_5_0
+rdp-service-1  | Guacd wants args: 88 names: [
+rdp-service-1  |   'hostname',
+rdp-service-1  |   'port',
+rdp-service-1  |   'timeout',
+rdp-service-1  |   'domain',
+rdp-service-1  |   'username',
+rdp-service-1  |   'password',
+rdp-service-1  |   'width',
+rdp-service-1  |   'height',
+rdp-service-1  |   'dpi',
+rdp-service-1  |   'initial-program'
+rdp-service-1  | ] ...
+rdp-service-1  | Responding with 88 values for 88 args
+rdp-service-1  | Sending handshake response (length: 569 )
+rdp-service-1  | Connect instruction has 89 args (version + 88 values)
+rdp-service-1  | First 200 chars of handshake: 4.size,4.1024,3.768,2.96;5.audio,8.audio/L8,9.audio/L16;5.video;5.image,9.image/png,10.image/jpeg,10.image/webp;8.timezone,16.America/New_York;7.connect,13.VERSION_1_5_0,20.host.docker.internal,4.3389
+rdp-service-1  | Guacd opcode: ready | elements count: 2
+rdp-service-1  | Guacd opcode: audio | elements count: 3
+rdp-service-1  | Guacd opcode: cursor | elements count: 8
+rdp-service-1  | Guacd opcode: mouse | elements count: 5
+rdp-service-1  | Guacd opcode: sync | elements count: 3
+rdp-service-1  | Guacd opcode: error | elements count: 3
+rdp-service-1  | WebSocket closed
+rdp-service-1  | Guacd opcode: nop | elements count: 1
+rdp-service-1  | Guacd opcode: error | elements count: 3
+rdp-service-1  | Guacd opcode: disconnect | elements count: 1
+rdp-service-1  | Guacd connection closed
+rdp-service-1  | WS VerifyClient: Token valid, accepting
+rdp-service-1  | WS Protocol Negotiation: Set(1) { 'guacamole' }
+rdp-service-1  | ===== WebSocket Connection Established =====
+rdp-service-1  | Selected Protocol: guacamole
+rdp-service-1  | Sending tunnel UUID: 663b43d1-839c-498f-90da-3bd8ec7c3f8d | instruction: 0.,36.663b43d1-839c-498f-90da-3bd8ec7c3f8d;
+rdp-service-1  | Request Headers available: [
+rdp-service-1  |   'upgrade',
+rdp-service-1  |   'connection',
+rdp-service-1  |   'host',
+rdp-service-1  |   'x-real-ip',
+rdp-service-1  |   'x-forwarded-for',
+rdp-service-1  |   'x-original-uri',
+rdp-service-1  |   'sec-websocket-version',
+rdp-service-1  |   'sec-websocket-key',
+rdp-service-1  |   'sec-websocket-extensions',
+rdp-service-1  |   'sec-websocket-protocol'
+rdp-service-1  | ]
+rdp-service-1  | Using X-Original-URI from headers: /api/rdp?token=eyJpZCI6MSwidXNlcm5hbWUiOiJhZG1pbmlzdHJhZG9yIiwicm9sZSI6ImFkbWluIn0%3D&id=3
+rdp-service-1  | Final Request URL to parse: /api/rdp?token=eyJpZCI6MSwidXNlcm5hbWUiOiJhZG1pbmlzdHJhZG9yIiwicm9sZSI6ImFkbWluIn0%3D&id=3
+rdp-service-1  | Token: eyJpZCI6MSwidXNlcm5h...
+rdp-service-1  | Connection ID Raw: 3
+rdp-service-1  | Connection ID Parsed: 3
+rdp-service-1  | User administrador connecting to RDP...
+rdp-service-1  | Connecting to: host.docker.internal : 3389
+rdp-service-1  | Pre-check: RDP target is reachable
+rdp-service-1  | Connected to guacd
+rdp-service-1  | Sending select: 6.select,3.rdp;
+rdp-service-1  | Guacd opcode: args | elements count: 90
+rdp-service-1  | Guacd version: VERSION_1_5_0
+rdp-service-1  | Guacd wants args: 88 names: [
+rdp-service-1  |   'hostname',
+rdp-service-1  |   'port',
+rdp-service-1  |   'timeout',
+rdp-service-1  |   'domain',
+rdp-service-1  |   'username',
+rdp-service-1  |   'password',
+rdp-service-1  |   'width',
+rdp-service-1  |   'height',
+rdp-service-1  |   'dpi',
+rdp-service-1  |   'initial-program'
+rdp-service-1  | ] ...
+rdp-service-1  | Responding with 88 values for 88 args
+rdp-service-1  | Sending handshake response (length: 569 )
+rdp-service-1  | Connect instruction has 89 args (version + 88 values)
+rdp-service-1  | First 200 chars of handshake: 4.size,4.1024,3.768,2.96;5.audio,8.audio/L8,9.audio/L16;5.video;5.image,9.image/png,10.image/jpeg,10.image/webp;8.timezone,16.America/New_York;7.connect,13.VERSION_1_5_0,20.host.docker.internal,4.3389
+rdp-service-1  | Guacd opcode: ready | elements count: 2
+rdp-service-1  | Guacd opcode: audio | elements count: 3
+rdp-service-1  | Guacd opcode: cursor | elements count: 8
+rdp-service-1  | Guacd opcode: mouse | elements count: 5
+rdp-service-1  | Guacd opcode: sync | elements count: 3
+rdp-service-1  | Guacd opcode: size | elements count: 4
+rdp-service-1  | Guacd opcode: size | elements count: 4
+rdp-service-1  | Guacd opcode: size | elements count: 4
+rdp-service-1  | Guacd opcode: rect | elements count: 6
+rdp-service-1  | Guacd opcode: cfill | elements count: 7
+rdp-service-1  | Guacd opcode: img | elements count: 7
+rdp-service-1  | Guacd opcode: rect | elements count: 6
+rdp-service-1  | Guacd opcode: cfill | elements count: 7
+rdp-service-1  | Guacd opcode: img | elements count: 7
+rdp-service-1  | Guacd opcode: blob | elements count: 3
+rdp-service-1  | Guacd opcode: end | elements count: 2
+rdp-service-1  | Guacd opcode: blob | elements count: 3
+rdp-service-1  | Guacd opcode: end | elements count: 2
+rdp-service-1  | Guacd opcode: cursor | elements count: 8
+rdp-service-1  | Guacd opcode: sync | elements count: 3
+rdp-service-1  | Guacd opcode: rect | elements count: 6
+rdp-service-1  | Guacd opcode: cfill | elements count: 7
+rdp-service-1  | Guacd opcode: copy | elements count: 10
+rdp-service-1  | Guacd opcode: rect | elements count: 6
+rdp-service-1  | Guacd opcode: cfill | elements count: 7
+rdp-service-1  | Guacd opcode: copy | elements count: 10
+rdp-service-1  | Guacd opcode: size | elements count: 4
+rdp-service-1  | Guacd opcode: rect | elements count: 6
+rdp-service-1  | Guacd opcode: cfill | elements count: 7
+rdp-service-1  | Guacd opcode: img | elements count: 7
+rdp-service-1  | Guacd opcode: blob | elements count: 3
+rdp-service-1  | Guacd opcode: end | elements count: 2
+rdp-service-1  | Guacd opcode: sync | elements count: 3
+rdp-service-1  | Guacd opcode: rect | elements count: 6
+rdp-service-1  | Guacd opcode: cfill | elements count: 7
+rdp-service-1  | Guacd opcode: copy | elements count: 10
+rdp-service-1  | Guacd opcode: size | elements count: 4
+rdp-service-1  | Guacd opcode: rect | elements count: 6
+rdp-service-1  | Guacd opcode: cfill | elements count: 7
+rdp-service-1  | Guacd opcode: rect | elements count: 6
+rdp-service-1  | Guacd opcode: cfill | elements count: 7
+rdp-service-1  | Guacd opcode: img | elements count: 7
+rdp-service-1  | Guacd opcode: img | elements count: 7
+rdp-service-1  | Guacd opcode: blob | elements count: 3
+rdp-service-1  | Guacd opcode: end | elements count: 2
+rdp-service-1  | Guacd opcode: blob | elements count: 3
+rdp-service-1  | Guacd opcode: end | elements count: 2
+rdp-service-1  | Guacd opcode: cursor | elements count: 8
+rdp-service-1  | Guacd opcode: sync | elements count: 3
+rdp-service-1  | Guacd opcode: rect | elements count: 6
+rdp-service-1  | Guacd opcode: cfill | elements count: 7
+rdp-service-1  | Guacd opcode: copy | elements count: 10
+rdp-service-1  | Guacd opcode: rect | elements count: 6
+rdp-service-1  | Guacd opcode: cfill | elements count: 7
+rdp-service-1  | Guacd opcode: copy | elements count: 10
+rdp-service-1  | Guacd opcode: size | elements count: 4
+rdp-service-1  | Guacd opcode: rect | elements count: 6
+rdp-service-1  | Guacd opcode: cfill | elements count: 7
+rdp-service-1  | Guacd opcode: rect | elements count: 6
+rdp-service-1  | Guacd opcode: cfill | elements count: 7
+rdp-service-1  | Guacd opcode: img | elements count: 7
+rdp-service-1  | Guacd opcode: img | elements count: 7
+rdp-service-1  | Guacd opcode: blob | elements count: 3
+rdp-service-1  | Guacd opcode: end | elements count: 2
+rdp-service-1  | Guacd opcode: blob | elements count: 3
+rdp-service-1  | Guacd opcode: end | elements count: 2
+rdp-service-1  | Guacd opcode: cursor | elements count: 8
+rdp-service-1  | Guacd opcode: sync | elements count: 3
+rdp-service-1  | Guacd opcode: rect | elements count: 6
+rdp-service-1  | Guacd opcode: cfill | elements count: 7
+rdp-service-1  | Guacd opcode: copy | elements count: 10
+rdp-service-1  | Guacd opcode: rect | elements count: 6
+rdp-service-1  | Guacd opcode: cfill | elements count: 7
+rdp-service-1  | Guacd opcode: copy | elements count: 10
+rdp-service-1  | Guacd opcode: size | elements count: 4
+rdp-service-1  | Guacd opcode: rect | elements count: 6
+rdp-service-1  | Guacd opcode: cfill | elements count: 7
+rdp-service-1  | Guacd opcode: rect | elements count: 6
+rdp-service-1  | Guacd opcode: cfill | elements count: 7
+rdp-service-1  | Guacd opcode: img | elements count: 7
+rdp-service-1  | Guacd opcode: img | elements count: 7
+rdp-service-1  | Guacd opcode: blob | elements count: 3
+rdp-service-1  | Guacd opcode: end | elements count: 2
+rdp-service-1  | Guacd opcode: blob | elements count: 3
+rdp-service-1  | Guacd opcode: end | elements count: 2
+rdp-service-1  | Guacd opcode: cursor | elements count: 8
+rdp-service-1  | Guacd opcode: sync | elements count: 3
+rdp-service-1  | Guacd opcode: rect | elements count: 6
+rdp-service-1  | Guacd opcode: cfill | elements count: 7
+rdp-service-1  | Guacd opcode: copy | elements count: 10
+rdp-service-1  | Guacd opcode: rect | elements count: 6
+rdp-service-1  | Guacd opcode: cfill | elements count: 7
+rdp-service-1  | Guacd opcode: copy | elements count: 10
+rdp-service-1  | Guacd opcode: size | elements count: 4
+rdp-service-1  | Guacd opcode: size | elements count: 4
+rdp-service-1  | Guacd opcode: rect | elements count: 6
+rdp-service-1  | Guacd opcode: cfill | elements count: 7
+rdp-service-1  | Guacd opcode: img | elements count: 7
+rdp-service-1  | Guacd opcode: rect | elements count: 6
+rdp-service-1  | Guacd opcode: cfill | elements count: 7
+rdp-service-1  | Guacd opcode: img | elements count: 7
+rdp-service-1  | Guacd opcode: rect | elements count: 6
+rdp-service-1  | Guacd opcode: cfill | elements count: 7
+rdp-service-1  | Guacd opcode: img | elements count: 7
+rdp-service-1  | Guacd opcode: blob | elements count: 3
+rdp-service-1  | Guacd opcode: end | elements count: 2
+rdp-service-1  | Guacd opcode: blob | elements count: 3
+rdp-service-1  | Guacd opcode: end | elements count: 2
+rdp-service-1  | Guacd opcode: blob | elements count: 3
+rdp-service-1  | Guacd opcode: end | elements count: 2
+rdp-service-1  | Guacd opcode: cursor | elements count: 8
+rdp-service-1  | Guacd opcode: sync | elements count: 3
+rdp-service-1  | Guacd opcode: rect | elements count: 6
+rdp-service-1  | Guacd opcode: cfill | elements count: 7
+rdp-service-1  | Guacd opcode: copy | elements count: 10
+rdp-service-1  | Guacd opcode: rect | elements count: 6
+rdp-service-1  | Guacd opcode: cfill | elements count: 7
+rdp-service-1  | Guacd opcode: copy | elements count: 10
+rdp-service-1  | Guacd opcode: rect | elements count: 6
+rdp-service-1  | Guacd opcode: cfill | elements count: 7
+rdp-service-1  | Guacd opcode: copy | elements count: 10
+rdp-service-1  | Guacd opcode: size | elements count: 4
+rdp-service-1  | Guacd opcode: rect | elements count: 6
+rdp-service-1  | Guacd opcode: cfill | elements count: 7
+rdp-service-1  | Guacd opcode: rect | elements count: 6
+rdp-service-1  | Guacd opcode: cfill | elements count: 7
+rdp-service-1  | Guacd opcode: img | elements count: 7
+rdp-service-1  | Guacd opcode: img | elements count: 7
+rdp-service-1  | Guacd opcode: blob | elements count: 3
+rdp-service-1  | Guacd opcode: end | elements count: 2
+rdp-service-1  | Guacd opcode: blob | elements count: 3
+rdp-service-1  | Guacd opcode: end | elements count: 2
+rdp-service-1  | Guacd opcode: cursor | elements count: 8
+rdp-service-1  | Guacd opcode: sync | elements count: 3
+rdp-service-1  | Guacd opcode: rect | elements count: 6
+rdp-service-1  | Guacd opcode: cfill | elements count: 7
+rdp-service-1  | Guacd opcode: copy | elements count: 10
+rdp-service-1  | Guacd opcode: rect | elements count: 6
+rdp-service-1  | Guacd opcode: cfill | elements count: 7
+rdp-service-1  | Guacd opcode: copy | elements count: 10
+rdp-service-1  | Guacd opcode: size | elements count: 4
+rdp-service-1  | Guacd opcode: rect | elements count: 6
+rdp-service-1  | Guacd opcode: cfill | elements count: 7
+rdp-service-1  | Guacd opcode: img | elements count: 7
+rdp-service-1  | Guacd opcode: rect | elements count: 6
+rdp-service-1  | Guacd opcode: cfill | elements count: 7
+rdp-service-1  | Guacd opcode: img | elements count: 7
+rdp-service-1  | Guacd opcode: blob | elements count: 3
+rdp-service-1  | Guacd opcode: end | elements count: 2
+rdp-service-1  | Guacd opcode: blob | elements count: 3
+rdp-service-1  | Guacd opcode: end | elements count: 2
+rdp-service-1  | Guacd opcode: cursor | elements count: 8
+rdp-service-1  | Guacd opcode: sync | elements count: 3
+rdp-service-1  | Guacd opcode: rect | elements count: 6
+rdp-service-1  | Guacd opcode: cfill | elements count: 7
+rdp-service-1  | Guacd opcode: copy | elements count: 10
+rdp-service-1  | Guacd opcode: rect | elements count: 6
+rdp-service-1  | Guacd opcode: cfill | elements count: 7
+rdp-service-1  | Guacd opcode: copy | elements count: 10
+rdp-service-1  | Guacd opcode: rect | elements count: 6
+rdp-service-1  | Guacd opcode: cfill | elements count: 7
+rdp-service-1  | Guacd opcode: img | elements count: 7
+rdp-service-1  | Guacd opcode: blob | elements count: 3
+rdp-service-1  | Guacd opcode: end | elements count: 2
+rdp-service-1  | Guacd opcode: cursor | elements count: 8
+rdp-service-1  | Guacd opcode: sync | elements count: 3
+rdp-service-1  | Guacd opcode: rect | elements count: 6
+rdp-service-1  | Guacd opcode: cfill | elements count: 7
+rdp-service-1  | Guacd opcode: copy | elements count: 10
+rdp-service-1  | Guacd opcode: rect | elements count: 6
+rdp-service-1  | Guacd opcode: cfill | elements count: 7
+rdp-service-1  | Guacd opcode: rect | elements count: 6
+rdp-service-1  | Guacd opcode: cfill | elements count: 7
+rdp-service-1  | Guacd opcode: rect | elements count: 6
+rdp-service-1  | Guacd opcode: cfill | elements count: 7
+rdp-service-1  | Guacd opcode: rect | elements count: 6
+rdp-service-1  | Guacd opcode: cfill | elements count: 7
+rdp-service-1  | Guacd opcode: sync | elements count: 3
+rdp-service-1  | Guacd opcode: copy | elements count: 10
+rdp-service-1  | Guacd opcode: img | elements count: 7
+rdp-service-1  | Guacd opcode: img | elements count: 7
+rdp-service-1  | Guacd opcode: img | elements count: 7
+rdp-service-1  | Guacd opcode: img | elements count: 7
+rdp-service-1  | Guacd opcode: blob | elements count: 3
+rdp-service-1  | Guacd opcode: blob | elements count: 3
+rdp-service-1  | Guacd opcode: blob | elements count: 3
+rdp-service-1  | Guacd opcode: end | elements count: 2
+rdp-service-1  | Guacd opcode: blob | elements count: 3
+rdp-service-1  | Guacd opcode: end | elements count: 2
+rdp-service-1  | Guacd opcode: blob | elements count: 3
+rdp-service-1  | Guacd opcode: blob | elements count: 3
+rdp-service-1  | Guacd opcode: blob | elements count: 3
+rdp-service-1  | Guacd opcode: end | elements count: 2
+rdp-service-1  | Guacd opcode: blob | elements count: 3
+rdp-service-1  | Guacd opcode: blob | elements count: 3
+rdp-service-1  | Guacd opcode: blob | elements count: 3
+rdp-service-1  | Guacd opcode: blob | elements count: 3
+rdp-service-1  | Guacd opcode: end | elements count: 2
+rdp-service-1  | Guacd opcode: sync | elements count: 3
+rdp-service-1  | Guacd opcode: copy | elements count: 10
+rdp-service-1  | Guacd opcode: img | elements count: 7
+rdp-service-1  | Guacd opcode: img | elements count: 7
+rdp-service-1  | Guacd opcode: img | elements count: 7
+rdp-service-1  | Guacd opcode: img | elements count: 7
+rdp-service-1  | Guacd opcode: img | elements count: 7
+rdp-service-1  | Guacd opcode: img | elements count: 7
+rdp-service-1  | Guacd opcode: img | elements count: 7
+rdp-service-1  | Guacd opcode: img | elements count: 7
+rdp-service-1  | Guacd opcode: img | elements count: 7
+rdp-service-1  | Guacd opcode: blob | elements count: 3
+rdp-service-1  | Guacd opcode: end | elements count: 2
+rdp-service-1  | Guacd opcode: blob | elements count: 3
+rdp-service-1  | Guacd opcode: end | elements count: 2
+rdp-service-1  | Guacd opcode: blob | elements count: 3
+rdp-service-1  | Guacd opcode: end | elements count: 2
+rdp-service-1  | Guacd opcode: blob | elements count: 3
+rdp-service-1  | Guacd opcode: end | elements count: 2
+rdp-service-1  | Guacd opcode: blob | elements count: 3
+rdp-service-1  | Guacd opcode: end | elements count: 2
+rdp-service-1  | Guacd opcode: blob | elements count: 3
+rdp-service-1  | Guacd opcode: end | elements count: 2
+rdp-service-1  | Guacd opcode: blob | elements count: 3
+rdp-service-1  | Guacd opcode: end | elements count: 2
+rdp-service-1  | Guacd opcode: blob | elements count: 3
+rdp-service-1  | Guacd opcode: end | elements count: 2
+rdp-service-1  | Guacd opcode: blob | elements count: 3
+rdp-service-1  | Guacd opcode: end | elements count: 2
+rdp-service-1  | Guacd opcode: sync | elements count: 3
+rdp-service-1  | Guacd opcode: copy | elements count: 10
+rdp-service-1  | Guacd opcode: img | elements count: 7
+rdp-service-1  | Guacd opcode: blob | elements count: 3
+rdp-service-1  | Guacd opcode: end | elements count: 2
+rdp-service-1  | Guacd opcode: sync | elements count: 3
+rdp-service-1  | Guacd opcode: copy | elements count: 10
+rdp-service-1  | Guacd opcode: nop | elements count: 1
+rdp-service-1  | Guacd opcode: error | elements count: 3
+rdp-service-1  | Guacd opcode: disconnect | elements count: 1
+rdp-service-1  | WebSocket closed
+rdp-service-1  | Guacd connection closed
+rdp-service-1  | WS VerifyClient: Token valid, accepting
+rdp-service-1  | WS Protocol Negotiation: Set(1) { 'guacamole' }
+rdp-service-1  | ===== WebSocket Connection Established =====
+rdp-service-1  | Selected Protocol: guacamole
+rdp-service-1  | Sending tunnel UUID: 76a1b490-e45f-4db3-8126-c92f872fb08c | instruction: 0.,36.76a1b490-e45f-4db3-8126-c92f872fb08c;
+rdp-service-1  | Request Headers available: [
+rdp-service-1  |   'upgrade',
+rdp-service-1  |   'connection',
+rdp-service-1  |   'host',
+rdp-service-1  |   'x-real-ip',
+rdp-service-1  |   'x-forwarded-for',
+rdp-service-1  |   'x-original-uri',
+rdp-service-1  |   'sec-websocket-version',
+rdp-service-1  |   'sec-websocket-key',
+rdp-service-1  |   'sec-websocket-extensions',
+rdp-service-1  |   'sec-websocket-protocol'
+rdp-service-1  | ]
+rdp-service-1  | Using X-Original-URI from headers: /api/rdp?token=eyJpZCI6MSwidXNlcm5hbWUiOiJhZG1pbmlzdHJhZG9yIiwicm9sZSI6ImFkbWluIn0%3D&id=3
+rdp-service-1  | Final Request URL to parse: /api/rdp?token=eyJpZCI6MSwidXNlcm5hbWUiOiJhZG1pbmlzdHJhZG9yIiwicm9sZSI6ImFkbWluIn0%3D&id=3
+rdp-service-1  | Token: eyJpZCI6MSwidXNlcm5h...
+rdp-service-1  | Connection ID Raw: 3
+rdp-service-1  | Connection ID Parsed: 3
+rdp-service-1  | User administrador connecting to RDP...
+rdp-service-1  | Connecting to: host.docker.internal : 3389
+rdp-service-1  | Pre-check: RDP target is reachable
+rdp-service-1  | Connected to guacd
+rdp-service-1  | Sending select: 6.select,3.rdp;
+rdp-service-1  | Guacd opcode: args | elements count: 90
+rdp-service-1  | Guacd version: VERSION_1_5_0
+rdp-service-1  | Guacd wants args: 88 names: [
+rdp-service-1  |   'hostname',
+rdp-service-1  |   'port',
+rdp-service-1  |   'timeout',
+rdp-service-1  |   'domain',
+rdp-service-1  |   'username',
+rdp-service-1  |   'password',
+rdp-service-1  |   'width',
+rdp-service-1  |   'height',
+rdp-service-1  |   'dpi',
+rdp-service-1  |   'initial-program'
+rdp-service-1  | ] ...
+rdp-service-1  | Responding with 88 values for 88 args
+rdp-service-1  | Sending handshake response (length: 569 )
+rdp-service-1  | Connect instruction has 89 args (version + 88 values)
+rdp-service-1  | First 200 chars of handshake: 4.size,4.1024,3.768,2.96;5.audio,8.audio/L8,9.audio/L16;5.video;5.image,9.image/png,10.image/jpeg,10.image/webp;8.timezone,16.America/New_York;7.connect,13.VERSION_1_5_0,20.host.docker.internal,4.3389
+rdp-service-1  | Guacd opcode: ready | elements count: 2
+rdp-service-1  | Guacd opcode: audio | elements count: 3
+rdp-service-1  | Guacd opcode: cursor | elements count: 8
+rdp-service-1  | Guacd opcode: mouse | elements count: 5
+rdp-service-1  | Guacd opcode: sync | elements count: 3
+rdp-service-1  | Guacd opcode: size | elements count: 4
+rdp-service-1  | Guacd opcode: size | elements count: 4
+rdp-service-1  | Guacd opcode: size | elements count: 4
+rdp-service-1  | Guacd opcode: rect | elements count: 6
+rdp-service-1  | Guacd opcode: cfill | elements count: 7
+rdp-service-1  | Guacd opcode: rect | elements count: 6
+rdp-service-1  | Guacd opcode: cfill | elements count: 7
+rdp-service-1  | Guacd opcode: img | elements count: 7
+rdp-service-1  | Guacd opcode: img | elements count: 7
+rdp-service-1  | Guacd opcode: blob | elements count: 3
+rdp-service-1  | Guacd opcode: end | elements count: 2
+rdp-service-1  | Guacd opcode: blob | elements count: 3
+rdp-service-1  | Guacd opcode: end | elements count: 2
+rdp-service-1  | Guacd opcode: cursor | elements count: 8
+rdp-service-1  | Guacd opcode: sync | elements count: 3
+rdp-service-1  | Guacd opcode: rect | elements count: 6
+rdp-service-1  | Guacd opcode: cfill | elements count: 7
+rdp-service-1  | Guacd opcode: copy | elements count: 10
+rdp-service-1  | Guacd opcode: rect | elements count: 6
+rdp-service-1  | Guacd opcode: cfill | elements count: 7
+rdp-service-1  | Guacd opcode: copy | elements count: 10
+rdp-service-1  | Guacd opcode: size | elements count: 4
+rdp-service-1  | Guacd opcode: rect | elements count: 6
+rdp-service-1  | Guacd opcode: cfill | elements count: 7
+rdp-service-1  | Guacd opcode: img | elements count: 7
+rdp-service-1  | Guacd opcode: rect | elements count: 6
+rdp-service-1  | Guacd opcode: cfill | elements count: 7
+rdp-service-1  | Guacd opcode: img | elements count: 7
+rdp-service-1  | Guacd opcode: blob | elements count: 3
+rdp-service-1  | Guacd opcode: end | elements count: 2
+rdp-service-1  | Guacd opcode: blob | elements count: 3
+rdp-service-1  | Guacd opcode: end | elements count: 2
+rdp-service-1  | Guacd opcode: cursor | elements count: 8
+rdp-service-1  | Guacd opcode: sync | elements count: 3
+rdp-service-1  | Guacd opcode: rect | elements count: 6
+rdp-service-1  | Guacd opcode: cfill | elements count: 7
+rdp-service-1  | Guacd opcode: copy | elements count: 10
+rdp-service-1  | Guacd opcode: rect | elements count: 6
+rdp-service-1  | Guacd opcode: cfill | elements count: 7
+rdp-service-1  | Guacd opcode: copy | elements count: 10
+rdp-service-1  | Guacd opcode: size | elements count: 4
+rdp-service-1  | Guacd opcode: rect | elements count: 6
+rdp-service-1  | Guacd opcode: cfill | elements count: 7
+rdp-service-1  | Guacd opcode: rect | elements count: 6
+rdp-service-1  | Guacd opcode: cfill | elements count: 7
+rdp-service-1  | Guacd opcode: img | elements count: 7
+rdp-service-1  | Guacd opcode: img | elements count: 7
+rdp-service-1  | Guacd opcode: blob | elements count: 3
+rdp-service-1  | Guacd opcode: end | elements count: 2
+rdp-service-1  | Guacd opcode: blob | elements count: 3
+rdp-service-1  | Guacd opcode: end | elements count: 2
+rdp-service-1  | Guacd opcode: cursor | elements count: 8
+rdp-service-1  | Guacd opcode: sync | elements count: 3
+rdp-service-1  | Guacd opcode: rect | elements count: 6
+rdp-service-1  | Guacd opcode: cfill | elements count: 7
+rdp-service-1  | Guacd opcode: copy | elements count: 10
+rdp-service-1  | Guacd opcode: rect | elements count: 6
+rdp-service-1  | Guacd opcode: cfill | elements count: 7
+rdp-service-1  | Guacd opcode: copy | elements count: 10
+rdp-service-1  | Guacd opcode: size | elements count: 4
+rdp-service-1  | Guacd opcode: rect | elements count: 6
+rdp-service-1  | Guacd opcode: cfill | elements count: 7
+rdp-service-1  | Guacd opcode: img | elements count: 7
+rdp-service-1  | Guacd opcode: rect | elements count: 6
+rdp-service-1  | Guacd opcode: cfill | elements count: 7
+rdp-service-1  | Guacd opcode: img | elements count: 7
+rdp-service-1  | Guacd opcode: blob | elements count: 3
+rdp-service-1  | Guacd opcode: end | elements count: 2
+rdp-service-1  | Guacd opcode: blob | elements count: 3
+rdp-service-1  | Guacd opcode: end | elements count: 2
+rdp-service-1  | Guacd opcode: cursor | elements count: 8
+rdp-service-1  | Guacd opcode: sync | elements count: 3
+rdp-service-1  | Guacd opcode: rect | elements count: 6
+rdp-service-1  | Guacd opcode: cfill | elements count: 7
+rdp-service-1  | Guacd opcode: copy | elements count: 10
+rdp-service-1  | Guacd opcode: rect | elements count: 6
+rdp-service-1  | Guacd opcode: cfill | elements count: 7
+rdp-service-1  | Guacd opcode: copy | elements count: 10
+rdp-service-1  | Guacd opcode: size | elements count: 4
+rdp-service-1  | Guacd opcode: rect | elements count: 6
+rdp-service-1  | Guacd opcode: cfill | elements count: 7
+rdp-service-1  | Guacd opcode: rect | elements count: 6
+rdp-service-1  | Guacd opcode: cfill | elements count: 7
+rdp-service-1  | Guacd opcode: img | elements count: 7
+rdp-service-1  | Guacd opcode: img | elements count: 7
+rdp-service-1  | Guacd opcode: blob | elements count: 3
+rdp-service-1  | Guacd opcode: end | elements count: 2
+rdp-service-1  | Guacd opcode: blob | elements count: 3
+rdp-service-1  | Guacd opcode: end | elements count: 2
+rdp-service-1  | Guacd opcode: cursor | elements count: 8
+rdp-service-1  | Guacd opcode: sync | elements count: 3
+rdp-service-1  | Guacd opcode: rect | elements count: 6
+rdp-service-1  | Guacd opcode: cfill | elements count: 7
+rdp-service-1  | Guacd opcode: copy | elements count: 10
+rdp-service-1  | Guacd opcode: rect | elements count: 6
+rdp-service-1  | Guacd opcode: cfill | elements count: 7
+rdp-service-1  | Guacd opcode: copy | elements count: 10
+rdp-service-1  | Guacd opcode: size | elements count: 4
+rdp-service-1  | Guacd opcode: size | elements count: 4
+rdp-service-1  | Guacd opcode: rect | elements count: 6
+rdp-service-1  | Guacd opcode: cfill | elements count: 7
+rdp-service-1  | Guacd opcode: img | elements count: 7
+rdp-service-1  | Guacd opcode: rect | elements count: 6
+rdp-service-1  | Guacd opcode: cfill | elements count: 7
+rdp-service-1  | Guacd opcode: rect | elements count: 6
+rdp-service-1  | Guacd opcode: cfill | elements count: 7
+rdp-service-1  | Guacd opcode: img | elements count: 7
+rdp-service-1  | Guacd opcode: img | elements count: 7
+rdp-service-1  | Guacd opcode: blob | elements count: 3
+rdp-service-1  | Guacd opcode: end | elements count: 2
+rdp-service-1  | Guacd opcode: blob | elements count: 3
+rdp-service-1  | Guacd opcode: end | elements count: 2
+rdp-service-1  | Guacd opcode: blob | elements count: 3
+rdp-service-1  | Guacd opcode: end | elements count: 2
+rdp-service-1  | Guacd opcode: cursor | elements count: 8
+rdp-service-1  | Guacd opcode: sync | elements count: 3
+rdp-service-1  | Guacd opcode: rect | elements count: 6
+rdp-service-1  | Guacd opcode: cfill | elements count: 7
+rdp-service-1  | Guacd opcode: copy | elements count: 10
+rdp-service-1  | Guacd opcode: rect | elements count: 6
+rdp-service-1  | Guacd opcode: cfill | elements count: 7
+rdp-service-1  | Guacd opcode: copy | elements count: 10
+rdp-service-1  | Guacd opcode: rect | elements count: 6
+rdp-service-1  | Guacd opcode: cfill | elements count: 7
+rdp-service-1  | Guacd opcode: copy | elements count: 10
+rdp-service-1  | Guacd opcode: size | elements count: 4
+rdp-service-1  | Guacd opcode: rect | elements count: 6
+rdp-service-1  | Guacd opcode: cfill | elements count: 7
+rdp-service-1  | Guacd opcode: img | elements count: 7
+rdp-service-1  | Guacd opcode: rect | elements count: 6
+rdp-service-1  | Guacd opcode: cfill | elements count: 7
+rdp-service-1  | Guacd opcode: img | elements count: 7
+rdp-service-1  | Guacd opcode: blob | elements count: 3
+rdp-service-1  | Guacd opcode: end | elements count: 2
+rdp-service-1  | Guacd opcode: blob | elements count: 3
+rdp-service-1  | Guacd opcode: end | elements count: 2
+rdp-service-1  | Guacd opcode: cursor | elements count: 8
+rdp-service-1  | Guacd opcode: sync | elements count: 3
+rdp-service-1  | Guacd opcode: rect | elements count: 6
+rdp-service-1  | Guacd opcode: cfill | elements count: 7
+rdp-service-1  | Guacd opcode: copy | elements count: 10
+rdp-service-1  | Guacd opcode: rect | elements count: 6
+rdp-service-1  | Guacd opcode: cfill | elements count: 7
+rdp-service-1  | Guacd opcode: copy | elements count: 10
+rdp-service-1  | Guacd opcode: rect | elements count: 6
+rdp-service-1  | Guacd opcode: cfill | elements count: 7
+rdp-service-1  | Guacd opcode: img | elements count: 7
+rdp-service-1  | Guacd opcode: blob | elements count: 3
+rdp-service-1  | Guacd opcode: end | elements count: 2
+rdp-service-1  | Guacd opcode: cursor | elements count: 8
+rdp-service-1  | Guacd opcode: sync | elements count: 3
+rdp-service-1  | Guacd opcode: rect | elements count: 6
+rdp-service-1  | Guacd opcode: cfill | elements count: 7
+rdp-service-1  | Guacd opcode: copy | elements count: 10
+rdp-service-1  | Guacd opcode: rect | elements count: 6
+rdp-service-1  | Guacd opcode: cfill | elements count: 7
+rdp-service-1  | Guacd opcode: img | elements count: 7
+rdp-service-1  | Guacd opcode: blob | elements count: 3
+rdp-service-1  | Guacd opcode: end | elements count: 2
+rdp-service-1  | Guacd opcode: cursor | elements count: 8
+rdp-service-1  | Guacd opcode: sync | elements count: 3
+rdp-service-1  | Guacd opcode: rect | elements count: 6
+rdp-service-1  | Guacd opcode: cfill | elements count: 7
+rdp-service-1  | Guacd opcode: copy | elements count: 10
+rdp-service-1  | Guacd opcode: rect | elements count: 6
+rdp-service-1  | Guacd opcode: cfill | elements count: 7
+rdp-service-1  | Guacd opcode: rect | elements count: 6
+rdp-service-1  | Guacd opcode: cfill | elements count: 7
+rdp-service-1  | Guacd opcode: rect | elements count: 6
+rdp-service-1  | Guacd opcode: cfill | elements count: 7
+rdp-service-1  | Guacd opcode: rect | elements count: 6
+rdp-service-1  | Guacd opcode: cfill | elements count: 7
+rdp-service-1  | Guacd opcode: sync | elements count: 3
+rdp-service-1  | Guacd opcode: copy | elements count: 10
+rdp-service-1  | Guacd opcode: img | elements count: 7
+rdp-service-1  | Guacd opcode: img | elements count: 7
+rdp-service-1  | Guacd opcode: img | elements count: 7
+rdp-service-1  | Guacd opcode: img | elements count: 7
+rdp-service-1  | Guacd opcode: blob | elements count: 3
+rdp-service-1  | Guacd opcode: blob | elements count: 3
+rdp-service-1  | Guacd opcode: blob | elements count: 3
+rdp-service-1  | Guacd opcode: blob | elements count: 3
+rdp-service-1  | Guacd opcode: blob | elements count: 3
+rdp-service-1  | Guacd opcode: blob | elements count: 3
+rdp-service-1  | Guacd opcode: blob | elements count: 3
+rdp-service-1  | Guacd opcode: blob | elements count: 3
+rdp-service-1  | Guacd opcode: end | elements count: 2
+rdp-service-1  | Guacd opcode: blob | elements count: 3
+rdp-service-1  | Guacd opcode: end | elements count: 2
+rdp-service-1  | Guacd opcode: blob | elements count: 3
+rdp-service-1  | Guacd opcode: blob | elements count: 3
+rdp-service-1  | Guacd opcode: blob | elements count: 3
+rdp-service-1  | Guacd opcode: blob | elements count: 3
+rdp-service-1  | Guacd opcode: blob | elements count: 3
+rdp-service-1  | Guacd opcode: end | elements count: 2
+rdp-service-1  | Guacd opcode: blob | elements count: 3
+rdp-service-1  | Guacd opcode: blob | elements count: 3
+rdp-service-1  | Guacd opcode: blob | elements count: 3
+rdp-service-1  | Guacd opcode: blob | elements count: 3
+rdp-service-1  | Guacd opcode: blob | elements count: 3
+rdp-service-1  | Guacd opcode: end | elements count: 2
+rdp-service-1  | Guacd opcode: sync | elements count: 3
+rdp-service-1  | Guacd opcode: copy | elements count: 10
+rdp-service-1  | Guacd opcode: img | elements count: 7
+rdp-service-1  | Guacd opcode: img | elements count: 7
+rdp-service-1  | Guacd opcode: blob | elements count: 3
+rdp-service-1  | Guacd opcode: end | elements count: 2
+rdp-service-1  | Guacd opcode: blob | elements count: 3
+rdp-service-1  | Guacd opcode: end | elements count: 2
+rdp-service-1  | Guacd opcode: sync | elements count: 3
+rdp-service-1  | Guacd opcode: copy | elements count: 10
+rdp-service-1  | Guacd opcode: img | elements count: 7
+rdp-service-1  | Guacd opcode: blob | elements count: 3
+rdp-service-1  | Guacd opcode: end | elements count: 2
+rdp-service-1  | Guacd opcode: sync | elements count: 3
+rdp-service-1  | Guacd opcode: copy | elements count: 10
+rdp-service-1  | WebSocket closed
+rdp-service-1  | Guacd opcode: nop | elements count: 1
+rdp-service-1  | Guacd opcode: error | elements count: 3
+rdp-service-1  | Guacd opcode: disconnect | elements count: 1
+rdp-service-1  | Guacd connection closed
+rdp-service-1  | RDP /settings Auth Header: Bearer eyJpZCI6MiwidXNlcm5hbWUiOiJlcmljIiwicm9sZSI6InVzZXIifQ==
+rdp-service-1  | WS VerifyClient: Token valid, accepting
+rdp-service-1  | WS Protocol Negotiation: Set(1) { 'guacamole' }
+rdp-service-1  | ===== WebSocket Connection Established =====
+rdp-service-1  | Selected Protocol: guacamole
+rdp-service-1  | Sending tunnel UUID: fcbc9496-f31e-4e0d-a07b-3b854ca391cc | instruction: 0.,36.fcbc9496-f31e-4e0d-a07b-3b854ca391cc;
+rdp-service-1  | Request Headers available: [
+rdp-service-1  |   'upgrade',
+rdp-service-1  |   'connection',
+rdp-service-1  |   'host',
+rdp-service-1  |   'x-real-ip',
+rdp-service-1  |   'x-forwarded-for',
+rdp-service-1  |   'x-forwarded-proto',
+rdp-service-1  |   'x-original-uri',
+rdp-service-1  |   'user-agent',
+rdp-service-1  |   'accept-encoding',
+rdp-service-1  |   'accept-language',
+rdp-service-1  |   'cache-control',
+rdp-service-1  |   'cdn-loop',
+rdp-service-1  |   'cf-connecting-ip',
+rdp-service-1  |   'cf-ipcountry',
+rdp-service-1  |   'cf-ray',
+rdp-service-1  |   'cf-visitor',
+rdp-service-1  |   'cf-warp-tag-id',
+rdp-service-1  |   'cookie',
+rdp-service-1  |   'origin',
+rdp-service-1  |   'pragma',
+rdp-service-1  |   'sec-websocket-extensions',
+rdp-service-1  |   'sec-websocket-key',
+rdp-service-1  |   'sec-websocket-protocol',
+rdp-service-1  |   'sec-websocket-version'
+rdp-service-1  | ]
+rdp-service-1  | Using X-Original-URI from headers: /api/rdp?token=eyJpZCI6MiwidXNlcm5hbWUiOiJlcmljIiwicm9sZSI6InVzZXIifQ%3D%3D&id=4
+rdp-service-1  | Final Request URL to parse: /api/rdp?token=eyJpZCI6MiwidXNlcm5hbWUiOiJlcmljIiwicm9sZSI6InVzZXIifQ%3D%3D&id=4
+rdp-service-1  | Token: eyJpZCI6MiwidXNlcm5h...
+rdp-service-1  | Connection ID Raw: 4
+rdp-service-1  | Connection ID Parsed: 4
+rdp-service-1  | User eric connecting to RDP...
+rdp-service-1  | Connecting to: 192.168.1.100 : 3389
+rdp-service-1  | Error setting up connection: Error: RDP server at 192.168.1.100:3389 is not responding (timeout)
+rdp-service-1  |     at Socket.<anonymous> (/app/src/index.js:526:24)
+rdp-service-1  |     at Socket.emit (node:events:517:28)
+rdp-service-1  |     at Socket._onTimeout (node:net:598:8)
+rdp-service-1  |     at listOnTimeout (node:internal/timers:569:17)
+rdp-service-1  |     at process.processTimers (node:internal/timers:512:7)
+rdp-service-1  | WS VerifyClient: Token valid, accepting
+rdp-service-1  | WS Protocol Negotiation: Set(1) { 'guacamole' }
+rdp-service-1  | ===== WebSocket Connection Established =====
+rdp-service-1  | Selected Protocol: guacamole
+rdp-service-1  | Sending tunnel UUID: ec9a983e-75cb-412b-9449-4ddfd9e11da4 | instruction: 0.,36.ec9a983e-75cb-412b-9449-4ddfd9e11da4;
+rdp-service-1  | Request Headers available: [
+rdp-service-1  |   'upgrade',
+rdp-service-1  |   'connection',
+rdp-service-1  |   'host',
+rdp-service-1  |   'x-real-ip',
+rdp-service-1  |   'x-forwarded-for',
+rdp-service-1  |   'x-original-uri',
+rdp-service-1  |   'sec-websocket-version',
+rdp-service-1  |   'sec-websocket-key',
+rdp-service-1  |   'sec-websocket-extensions',
+rdp-service-1  |   'sec-websocket-protocol'
+rdp-service-1  | ]
+rdp-service-1  | Using X-Original-URI from headers: /api/rdp?token=eyJpZCI6MiwidXNlcm5hbWUiOiJlcmljIiwicm9sZSI6InVzZXIifQ%3D%3D&id=4
+rdp-service-1  | Final Request URL to parse: /api/rdp?token=eyJpZCI6MiwidXNlcm5hbWUiOiJlcmljIiwicm9sZSI6InVzZXIifQ%3D%3D&id=4
+rdp-service-1  | Token: eyJpZCI6MiwidXNlcm5h...
+rdp-service-1  | Connection ID Raw: 4
+rdp-service-1  | Connection ID Parsed: 4
+rdp-service-1  | User eric connecting to RDP...
+rdp-service-1  | Connecting to: host.docker.internal : 3389
+rdp-service-1  | Pre-check: RDP target is reachable
+rdp-service-1  | Connected to guacd
+rdp-service-1  | Sending select: 6.select,3.rdp;
+rdp-service-1  | Guacd opcode: args | elements count: 90
+rdp-service-1  | Guacd version: VERSION_1_5_0
+rdp-service-1  | Guacd wants args: 88 names: [
+rdp-service-1  |   'hostname',
+rdp-service-1  |   'port',
+rdp-service-1  |   'timeout',
+rdp-service-1  |   'domain',
+rdp-service-1  |   'username',
+rdp-service-1  |   'password',
+rdp-service-1  |   'width',
+rdp-service-1  |   'height',
+rdp-service-1  |   'dpi',
+rdp-service-1  |   'initial-program'
+rdp-service-1  | ] ...
+rdp-service-1  | Responding with 88 values for 88 args
+rdp-service-1  | Sending handshake response (length: 569 )
+rdp-service-1  | Connect instruction has 89 args (version + 88 values)
+rdp-service-1  | First 200 chars of handshake: 4.size,4.1024,3.768,2.96;5.audio,8.audio/L8,9.audio/L16;5.video;5.image,9.image/png,10.image/jpeg,10.image/webp;8.timezone,16.America/New_York;7.connect,13.VERSION_1_5_0,20.host.docker.internal,4.3389
+rdp-service-1  | Guacd opcode: ready | elements count: 2
+rdp-service-1  | Guacd opcode: audio | elements count: 3
+rdp-service-1  | Guacd opcode: cursor | elements count: 8
+rdp-service-1  | Guacd opcode: mouse | elements count: 5
+rdp-service-1  | Guacd opcode: sync | elements count: 3
+rdp-service-1  | Guacd opcode: size | elements count: 4
+rdp-service-1  | Guacd opcode: size | elements count: 4
+rdp-service-1  | Guacd opcode: size | elements count: 4
+rdp-service-1  | Guacd opcode: rect | elements count: 6
+rdp-service-1  | Guacd opcode: cfill | elements count: 7
+rdp-service-1  | Guacd opcode: img | elements count: 7
+rdp-service-1  | Guacd opcode: rect | elements count: 6
+rdp-service-1  | Guacd opcode: cfill | elements count: 7
+rdp-service-1  | Guacd opcode: img | elements count: 7
+rdp-service-1  | Guacd opcode: blob | elements count: 3
+rdp-service-1  | Guacd opcode: end | elements count: 2
+rdp-service-1  | Guacd opcode: blob | elements count: 3
+rdp-service-1  | Guacd opcode: end | elements count: 2
+rdp-service-1  | Guacd opcode: cursor | elements count: 8
+rdp-service-1  | Guacd opcode: sync | elements count: 3
+rdp-service-1  | Guacd opcode: rect | elements count: 6
+rdp-service-1  | Guacd opcode: cfill | elements count: 7
+rdp-service-1  | Guacd opcode: copy | elements count: 10
+rdp-service-1  | Guacd opcode: rect | elements count: 6
+rdp-service-1  | Guacd opcode: cfill | elements count: 7
+rdp-service-1  | Guacd opcode: copy | elements count: 10
+rdp-service-1  | Guacd opcode: size | elements count: 4
+rdp-service-1  | Guacd opcode: rect | elements count: 6
+rdp-service-1  | Guacd opcode: cfill | elements count: 7
+rdp-service-1  | Guacd opcode: img | elements count: 7
+rdp-service-1  | Guacd opcode: rect | elements count: 6
+rdp-service-1  | Guacd opcode: cfill | elements count: 7
+rdp-service-1  | Guacd opcode: img | elements count: 7
+rdp-service-1  | Guacd opcode: blob | elements count: 3
+rdp-service-1  | Guacd opcode: end | elements count: 2
+rdp-service-1  | Guacd opcode: blob | elements count: 3
+rdp-service-1  | Guacd opcode: end | elements count: 2
+rdp-service-1  | Guacd opcode: cursor | elements count: 8
+rdp-service-1  | Guacd opcode: sync | elements count: 3
+rdp-service-1  | Guacd opcode: rect | elements count: 6
+rdp-service-1  | Guacd opcode: cfill | elements count: 7
+rdp-service-1  | Guacd opcode: copy | elements count: 10
+rdp-service-1  | Guacd opcode: rect | elements count: 6
+rdp-service-1  | Guacd opcode: cfill | elements count: 7
+rdp-service-1  | Guacd opcode: copy | elements count: 10
+rdp-service-1  | Guacd opcode: size | elements count: 4
+rdp-service-1  | Guacd opcode: rect | elements count: 6
+rdp-service-1  | Guacd opcode: cfill | elements count: 7
+rdp-service-1  | Guacd opcode: rect | elements count: 6
+rdp-service-1  | Guacd opcode: cfill | elements count: 7
+rdp-service-1  | Guacd opcode: img | elements count: 7
+rdp-service-1  | Guacd opcode: img | elements count: 7
+rdp-service-1  | Guacd opcode: blob | elements count: 3
+rdp-service-1  | Guacd opcode: end | elements count: 2
+rdp-service-1  | Guacd opcode: blob | elements count: 3
+rdp-service-1  | Guacd opcode: end | elements count: 2
+rdp-service-1  | Guacd opcode: cursor | elements count: 8
+rdp-service-1  | Guacd opcode: sync | elements count: 3
+rdp-service-1  | Guacd opcode: rect | elements count: 6
+rdp-service-1  | Guacd opcode: cfill | elements count: 7
+rdp-service-1  | Guacd opcode: copy | elements count: 10
+rdp-service-1  | Guacd opcode: rect | elements count: 6
+rdp-service-1  | Guacd opcode: cfill | elements count: 7
+rdp-service-1  | Guacd opcode: copy | elements count: 10
+rdp-service-1  | Guacd opcode: size | elements count: 4
+rdp-service-1  | Guacd opcode: rect | elements count: 6
+rdp-service-1  | Guacd opcode: cfill | elements count: 7
+rdp-service-1  | Guacd opcode: img | elements count: 7
+rdp-service-1  | Guacd opcode: rect | elements count: 6
+rdp-service-1  | Guacd opcode: cfill | elements count: 7
+rdp-service-1  | Guacd opcode: img | elements count: 7
+rdp-service-1  | Guacd opcode: blob | elements count: 3
+rdp-service-1  | Guacd opcode: end | elements count: 2
+rdp-service-1  | Guacd opcode: blob | elements count: 3
+rdp-service-1  | Guacd opcode: end | elements count: 2
+rdp-service-1  | Guacd opcode: cursor | elements count: 8
+rdp-service-1  | Guacd opcode: sync | elements count: 3
+rdp-service-1  | Guacd opcode: rect | elements count: 6
+rdp-service-1  | Guacd opcode: cfill | elements count: 7
+rdp-service-1  | Guacd opcode: copy | elements count: 10
+rdp-service-1  | Guacd opcode: rect | elements count: 6
+rdp-service-1  | Guacd opcode: cfill | elements count: 7
+rdp-service-1  | Guacd opcode: copy | elements count: 10
+rdp-service-1  | Guacd opcode: size | elements count: 4
+rdp-service-1  | Guacd opcode: size | elements count: 4
+rdp-service-1  | Guacd opcode: rect | elements count: 6
+rdp-service-1  | Guacd opcode: cfill | elements count: 7
+rdp-service-1  | Guacd opcode: rect | elements count: 6
+rdp-service-1  | Guacd opcode: cfill | elements count: 7
+rdp-service-1  | Guacd opcode: img | elements count: 7
+rdp-service-1  | Guacd opcode: img | elements count: 7
+rdp-service-1  | Guacd opcode: rect | elements count: 6
+rdp-service-1  | Guacd opcode: cfill | elements count: 7
+rdp-service-1  | Guacd opcode: img | elements count: 7
+rdp-service-1  | Guacd opcode: blob | elements count: 3
+rdp-service-1  | Guacd opcode: end | elements count: 2
+rdp-service-1  | Guacd opcode: blob | elements count: 3
+rdp-service-1  | Guacd opcode: end | elements count: 2
+rdp-service-1  | Guacd opcode: blob | elements count: 3
+rdp-service-1  | Guacd opcode: end | elements count: 2
+rdp-service-1  | Guacd opcode: cursor | elements count: 8
+rdp-service-1  | Guacd opcode: sync | elements count: 3
+rdp-service-1  | Guacd opcode: rect | elements count: 6
+rdp-service-1  | Guacd opcode: cfill | elements count: 7
+rdp-service-1  | Guacd opcode: copy | elements count: 10
+rdp-service-1  | Guacd opcode: rect | elements count: 6
+rdp-service-1  | Guacd opcode: cfill | elements count: 7
+rdp-service-1  | Guacd opcode: copy | elements count: 10
+rdp-service-1  | Guacd opcode: rect | elements count: 6
+rdp-service-1  | Guacd opcode: cfill | elements count: 7
+rdp-service-1  | Guacd opcode: copy | elements count: 10
+rdp-service-1  | Guacd opcode: size | elements count: 4
+rdp-service-1  | Guacd opcode: rect | elements count: 6
+rdp-service-1  | Guacd opcode: cfill | elements count: 7
+rdp-service-1  | Guacd opcode: img | elements count: 7
+rdp-service-1  | Guacd opcode: rect | elements count: 6
+rdp-service-1  | Guacd opcode: cfill | elements count: 7
+rdp-service-1  | Guacd opcode: img | elements count: 7
+rdp-service-1  | Guacd opcode: blob | elements count: 3
+rdp-service-1  | Guacd opcode: end | elements count: 2
+rdp-service-1  | Guacd opcode: blob | elements count: 3
+rdp-service-1  | Guacd opcode: end | elements count: 2
+rdp-service-1  | Guacd opcode: cursor | elements count: 8
+rdp-service-1  | Guacd opcode: sync | elements count: 3
+rdp-service-1  | Guacd opcode: rect | elements count: 6
+rdp-service-1  | Guacd opcode: cfill | elements count: 7
+rdp-service-1  | Guacd opcode: copy | elements count: 10
+rdp-service-1  | Guacd opcode: rect | elements count: 6
+rdp-service-1  | Guacd opcode: cfill | elements count: 7
+rdp-service-1  | Guacd opcode: copy | elements count: 10
+rdp-service-1  | Guacd opcode: rect | elements count: 6
+rdp-service-1  | Guacd opcode: cfill | elements count: 7
+rdp-service-1  | Guacd opcode: img | elements count: 7
+rdp-service-1  | Guacd opcode: blob | elements count: 3
+rdp-service-1  | Guacd opcode: end | elements count: 2
+rdp-service-1  | Guacd opcode: cursor | elements count: 8
+rdp-service-1  | Guacd opcode: sync | elements count: 3
+rdp-service-1  | Guacd opcode: rect | elements count: 6
+rdp-service-1  | Guacd opcode: cfill | elements count: 7
+rdp-service-1  | Guacd opcode: copy | elements count: 10
+rdp-service-1  | Guacd opcode: rect | elements count: 6
+rdp-service-1  | Guacd opcode: cfill | elements count: 7
+rdp-service-1  | Guacd opcode: rect | elements count: 6
+rdp-service-1  | Guacd opcode: cfill | elements count: 7
+rdp-service-1  | Guacd opcode: rect | elements count: 6
+rdp-service-1  | Guacd opcode: cfill | elements count: 7
+rdp-service-1  | Guacd opcode: rect | elements count: 6
+rdp-service-1  | Guacd opcode: cfill | elements count: 7
+rdp-service-1  | Guacd opcode: sync | elements count: 3
+rdp-service-1  | Guacd opcode: copy | elements count: 10
+rdp-service-1  | Guacd opcode: img | elements count: 7
+rdp-service-1  | Guacd opcode: img | elements count: 7
+rdp-service-1  | Guacd opcode: img | elements count: 7
+rdp-service-1  | Guacd opcode: img | elements count: 7
+rdp-service-1  | Guacd opcode: blob | elements count: 3
+rdp-service-1  | Guacd opcode: blob | elements count: 3
+rdp-service-1  | Guacd opcode: end | elements count: 2
+rdp-service-1  | Guacd opcode: blob | elements count: 3
+rdp-service-1  | Guacd opcode: blob | elements count: 3
+rdp-service-1  | Guacd opcode: end | elements count: 2
+rdp-service-1  | Guacd opcode: blob | elements count: 3
+rdp-service-1  | Guacd opcode: blob | elements count: 3
+rdp-service-1  | Guacd opcode: blob | elements count: 3
+rdp-service-1  | Guacd opcode: end | elements count: 2
+rdp-service-1  | Guacd opcode: blob | elements count: 3
+rdp-service-1  | Guacd opcode: blob | elements count: 3
+rdp-service-1  | Guacd opcode: blob | elements count: 3
+rdp-service-1  | Guacd opcode: blob | elements count: 3
+rdp-service-1  | Guacd opcode: end | elements count: 2
+rdp-service-1  | Guacd opcode: sync | elements count: 3
+rdp-service-1  | Guacd opcode: copy | elements count: 10
+rdp-service-1  | Guacd opcode: img | elements count: 7
+rdp-service-1  | Guacd opcode: img | elements count: 7
+rdp-service-1  | Guacd opcode: img | elements count: 7
+rdp-service-1  | Guacd opcode: img | elements count: 7
+rdp-service-1  | Guacd opcode: img | elements count: 7
+rdp-service-1  | Guacd opcode: img | elements count: 7
+rdp-service-1  | Guacd opcode: img | elements count: 7
+rdp-service-1  | Guacd opcode: img | elements count: 7
+rdp-service-1  | Guacd opcode: img | elements count: 7
+rdp-service-1  | Guacd opcode: blob | elements count: 3
+rdp-service-1  | Guacd opcode: end | elements count: 2
+rdp-service-1  | Guacd opcode: blob | elements count: 3
+rdp-service-1  | Guacd opcode: end | elements count: 2
+rdp-service-1  | Guacd opcode: blob | elements count: 3
+rdp-service-1  | Guacd opcode: end | elements count: 2
+rdp-service-1  | Guacd opcode: blob | elements count: 3
+rdp-service-1  | Guacd opcode: end | elements count: 2
+rdp-service-1  | Guacd opcode: blob | elements count: 3
+rdp-service-1  | Guacd opcode: end | elements count: 2
+rdp-service-1  | Guacd opcode: blob | elements count: 3
+rdp-service-1  | Guacd opcode: end | elements count: 2
+rdp-service-1  | Guacd opcode: blob | elements count: 3
+rdp-service-1  | Guacd opcode: end | elements count: 2
+rdp-service-1  | Guacd opcode: blob | elements count: 3
+rdp-service-1  | Guacd opcode: end | elements count: 2
+rdp-service-1  | Guacd opcode: blob | elements count: 3
+rdp-service-1  | Guacd opcode: end | elements count: 2
+rdp-service-1  | Guacd opcode: sync | elements count: 3
+rdp-service-1  | Guacd opcode: copy | elements count: 10
+rdp-service-1  | WebSocket closed
+rdp-service-1  | Guacd opcode: nop | elements count: 1
+rdp-service-1  | Guacd opcode: nop | elements count: 1
+rdp-service-1  | Guacd opcode: error | elements count: 3
+rdp-service-1  | Guacd opcode: disconnect | elements count: 1
+rdp-service-1  | Guacd connection closed

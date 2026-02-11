@@ -137,35 +137,26 @@ CREATE TABLE IF NOT EXISTS shared_files (
 -- RDP Connections (for rdp-service)
 CREATE TABLE IF NOT EXISTS rdp_connections (
     id SERIAL PRIMARY KEY,
-    user_id INTEGER NOT NULL,
-    server_id TEXT NOT NULL,
-    name TEXT NOT NULL,
-    hostname TEXT NOT NULL,
+    user_id INTEGER NOT NULL DEFAULT 1,
+    server_id TEXT NOT NULL DEFAULT '',
+    name VARCHAR(255) NOT NULL,
+    hostname VARCHAR(255) NOT NULL,
     port INTEGER DEFAULT 3389,
-    username TEXT,
-    password_encrypted TEXT,
-    domain TEXT,
-    security TEXT DEFAULT 'any',
-    ignore_cert BOOLEAN DEFAULT TRUE,
-    enable_drive BOOLEAN DEFAULT FALSE,
-    drive_path TEXT,
-    enable_audio BOOLEAN DEFAULT TRUE,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    last_used TIMESTAMP,
-    is_active BOOLEAN DEFAULT TRUE,
-    FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
+    username VARCHAR(255),
+    password VARCHAR(255),
+    protocol VARCHAR(50) DEFAULT 'rdp',
+    virtual_ip VARCHAR(50),
+    public_key VARCHAR(255),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
--- RDP Settings (for rdp-service)
+-- RDP Settings (key-value store for rdp-service)
 CREATE TABLE IF NOT EXISTS rdp_settings (
-    id SERIAL PRIMARY KEY,
-    user_id INTEGER UNIQUE NOT NULL,
-    default_security TEXT DEFAULT 'any',
-    default_ignore_cert BOOLEAN DEFAULT TRUE,
-    default_enable_drive BOOLEAN DEFAULT FALSE,
-    default_enable_audio BOOLEAN DEFAULT TRUE,
-    max_connections INTEGER DEFAULT 5,
-    session_timeout INTEGER DEFAULT 3600,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
+    setting_key VARCHAR(50) PRIMARY KEY,
+    setting_value VARCHAR(255)
 );
+
+-- Default RDP settings
+INSERT INTO rdp_settings (setting_key, setting_value)
+VALUES ('lan_only', 'false'), ('server_id', ''), ('maintenance_mode', 'false')
+ON CONFLICT (setting_key) DO NOTHING;

@@ -1,26 +1,25 @@
-import React, { useEffect, useRef, useState, useCallback } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import Guacamole from 'guacamole-common-js';
 import { useLanguage } from '../../context/LanguageContext';
 import './RDPViewer.css';
 
-const RDPViewer = ({ connectionToken, connectionId, onClose }) => {
+const RDPViewer = ({ connectionId, token, onClose }) => {
     const { t } = useLanguage();
     const elementRef = useRef(null);
     const [client, setClient] = useState(null);
     const [display, setDisplay] = useState(null);
-    const [connectionState, setConnectionState] = useState('CONNECTING'); // CONNECTING, CONNECTED, DISCONNECTED, ERROR
+    const [connectionState, setConnectionState] = useState('CONNECTING');
     const [errorMsg, setErrorMsg] = useState('');
-    const [scale, setScale] = useState(1);
 
     // Connect to Guacamole
     useEffect(() => {
-        if (!connectionToken || !connectionId || !elementRef.current) {
+        if (!token || !connectionId || !elementRef.current) {
             console.warn('RDPViewer - Missing required params:', {
-                hasToken: !!connectionToken,
+                hasToken: !!token,
                 hasConnectionId: !!connectionId,
                 hasElementRef: !!elementRef.current
             });
-            if (!connectionToken) {
+            if (!token) {
                 setConnectionState('ERROR');
                 setErrorMsg('No authentication token provided');
             }
@@ -29,14 +28,16 @@ const RDPViewer = ({ connectionToken, connectionId, onClose }) => {
 
         console.log('RDPViewer - Initializing connection:', { connectionId });
 
-        // Create tunnel with encrypted token from backend
+        // Create tunnel - custom WebSocket implementation
         const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
         const host = window.location.host;
         
-        // Use the encrypted token as a query parameter (guacamole-lite expects ?token=...)
-        const tunnelUrl = `${protocol}//${host}/api/rdp?token=${encodeURIComponent(connectionToken)}`;
+        // Build tunnel URL WITHOUT query params — they'll be added by tunnel.connect()
+        // WebSocketTunnel.connect(data) does: new WebSocket(tunnelURL + "?" + data, "guacamole")
+        const tunnelUrl = `${protocol}//${host}/api/rdp`;
+        const connectData = `token=${encodeURIComponent(token)}&id=${connectionId}`;
         
-        console.log('RDPViewer - Connecting to:', tunnelUrl);
+        console.log('RDPViewer - Tunnel URL:', tunnelUrl, '| connect data:', connectData);
         
         const tunnel = new Guacamole.WebSocketTunnel(tunnelUrl);
         
@@ -50,6 +51,26 @@ const RDPViewer = ({ connectionToken, connectionId, onClose }) => {
             setErrorMsg(error.message || 'Unknown error');
         };
 
+        // Handle 'required' instruction — guacd needs credentials interactively
+        guacClient.onrequired = (params) => {
+            console.warn('Guacamole requires params:', params);
+            // If password is required, prompt the user
+            if (params && params.includes('password')) {
+                const pwd = window.prompt(t('rdp.enterPassword') || 'Enter password for RDP connection:');
+                if (pwd !== null) {
+                    // Send password via argv stream
+                    const stream = guacClient.createArgumentValueStream('text/plain', 'password');
+                    stream.onack = () => {}; // ack handler
+                    stream.sendBlob(btoa(pwd));
+                    stream.sendEnd();
+                } else {
+                    // User cancelled
+                    setConnectionState('ERROR');
+                    setErrorMsg(t('rdp.passwordRequired') || 'Password required but not provided');
+                }
+            }
+        };
+
         // State change handler
         guacClient.onstatechange = (state) => {
             switch (state) {
@@ -59,6 +80,7 @@ const RDPViewer = ({ connectionToken, connectionId, onClose }) => {
                 case 3: setConnectionState('CONNECTED'); break;
                 case 4: setConnectionState('DISCONNECTING'); break;
                 case 5: setConnectionState('DISCONNECTED'); break;
+                default: break;
             }
         };
 
@@ -68,15 +90,18 @@ const RDPViewer = ({ connectionToken, connectionId, onClose }) => {
         
         // Add display to DOM
         const displayElement = guacDisplay.getElement();
-        elementRef.current.innerHTML = '';
-        elementRef.current.appendChild(displayElement);
+        const containerEl = elementRef.current;
+        containerEl.innerHTML = '';
+        containerEl.appendChild(displayElement);
 
-        // Connect
-        guacClient.connect();
+        // Connect — pass query params here so URL is clean (tunnelURL + "?" + data)
+        guacClient.connect(connectData);
 
-        // Mouse & Keyboard
+        // Mouse & Keyboard - attach keyboard to display element instead of document
+        // to avoid capturing keystrokes from toolbar buttons
         const mouse = new Guacamole.Mouse(displayElement);
-        const keyboard = new Guacamole.Keyboard(document);
+        displayElement.tabIndex = 0; // Make focusable for keyboard capture
+        const keyboard = new Guacamole.Keyboard(displayElement);
 
         mouse.onmousedown = mouse.onmouseup = mouse.onmousemove = (mouseState) => {
             guacClient.sendMouseState(mouseState);
@@ -91,12 +116,17 @@ const RDPViewer = ({ connectionToken, connectionId, onClose }) => {
 
         // Cleanup
         return () => {
+            keyboard.onkeydown = null;
+            keyboard.onkeyup = null;
+            mouse.onmousedown = null;
+            mouse.onmouseup = null;
+            mouse.onmousemove = null;
             guacClient.disconnect();
-            if (elementRef.current) {
-                elementRef.current.innerHTML = '';
+            if (containerEl) {
+                containerEl.innerHTML = '';
             }
         };
-    }, [connectionToken]);
+    }, [token, connectionId]);
 
     // Fit to screen
     useEffect(() => {
@@ -118,20 +148,25 @@ const RDPViewer = ({ connectionToken, connectionId, onClose }) => {
             const minScale = Math.min(scaleX, scaleY);
             
             display.scale(minScale);
-            setScale(minScale);
         };
 
         window.addEventListener('resize', resize);
-        // Initial resize after connection
+        // Initial resize after connection — with max attempts guard
+        let attempts = 0;
         const interval = setInterval(() => {
              if (display.getWidth() > 0) {
                  resize();
                  clearInterval(interval);
+             } else if (++attempts > 100) {
+                 clearInterval(interval); // Stop after 10s to prevent infinite polling
              }
         }, 100);
 
-        return () => window.removeEventListener('resize', resize);
-    }, [display, connectionState]);
+        return () => {
+            clearInterval(interval);
+            window.removeEventListener('resize', resize);
+        };
+    }, [display]); // Only re-run when display changes, not on every state change
 
     const sendCtrlAltDel = () => {
         if (!client) return;
@@ -166,7 +201,7 @@ const RDPViewer = ({ connectionToken, connectionId, onClose }) => {
             </div>
 
             {/* Canvas Container */}
-            <div className="rdp-display" ref={elementRef}></div>
+            <div className={`rdp-display${connectionState === 'CONNECTED' ? ' cursor-hidden' : ''}`} ref={elementRef}></div>
 
             {/* Loading Overlay */}
             {connectionState === 'CONNECTING' || connectionState === 'WAITING' ? (
@@ -177,23 +212,14 @@ const RDPViewer = ({ connectionToken, connectionId, onClose }) => {
             ) : null}
 
             {/* Error Overlay */}
-            {connectionState === 'ERROR' && errorMsg ? (
+            {connectionState === 'ERROR' && (
                 <div className="rdp-overlay error">
                     <div className="error-icon">⚠️</div>
                     <h3>{t('rdp.error')}</h3>
-                    <p>{errorMsg}</p>
+                    <p>{errorMsg || t('rdp.unknownError') || 'Unknown error'}</p>
                     <button onClick={onClose} className="rdp-btn">
                         {t('common.close')}
                     </button>
-                </div>
-            ) : null}
-
-            {/* Error Overlay */}
-            {connectionState === 'ERROR' && (
-                <div className="rdp-overlay error">
-                    <p>{t('rdp.error')}</p>
-                    <small>{errorMsg}</small>
-                    <button onClick={onClose}>{t('common.close')}</button>
                 </div>
             )}
         </div>

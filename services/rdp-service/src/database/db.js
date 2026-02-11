@@ -67,15 +67,33 @@ const dbAsync = {
   }
 };
 
+// Wait for postgres to be ready
+const waitForDb = async (maxRetries = 15, delay = 2000) => {
+  for (let i = 0; i < maxRetries; i++) {
+    try {
+      await pool.query('SELECT 1');
+      console.log('Database connection established');
+      return true;
+    } catch (err) {
+      console.log(`Waiting for database... attempt ${i + 1}/${maxRetries}`);
+      await new Promise(r => setTimeout(r, delay));
+    }
+  }
+  throw new Error('Could not connect to database after retries');
+};
+
 // Initialize DB
 const initDb = async () => {
   try {
+    await waitForDb();
     console.log('Initializing RDP Database...');
     
     // Create rdp_connections table (if it doesn't exist at all)
     await pool.query(`
       CREATE TABLE IF NOT EXISTS rdp_connections (
         id SERIAL PRIMARY KEY,
+        user_id INTEGER NOT NULL DEFAULT 1,
+        server_id TEXT NOT NULL DEFAULT '',
         name VARCHAR(255) NOT NULL,
         hostname VARCHAR(255) NOT NULL,
         port INTEGER DEFAULT 3389,
@@ -88,7 +106,7 @@ const initDb = async () => {
       )
     `);
 
-    // Check columns explicitly using information_schema
+    // Check columns and add missing ones (migration support)
     try {
         const res = await pool.query(`
             SELECT column_name 
@@ -96,45 +114,47 @@ const initDb = async () => {
             WHERE table_name = 'rdp_connections';
         `);
         const columns = res.rows.map(r => r.column_name);
-        console.log('DEBUG: Current columns in rdp_connections:', columns);
+        console.log('RDP columns:', columns);
 
-        if (!columns.includes('virtual_ip')) {
-            console.log('DEBUG: Adding virtual_ip column...');
-            await pool.query(`ALTER TABLE rdp_connections ADD COLUMN virtual_ip VARCHAR(50);`);
-        }
-        
-        if (!columns.includes('public_key')) {
-            console.log('DEBUG: Adding public_key column...');
-            await pool.query(`ALTER TABLE rdp_connections ADD COLUMN public_key VARCHAR(255);`);
-        }
+        const migrations = [
+          { col: 'virtual_ip', sql: 'ALTER TABLE rdp_connections ADD COLUMN virtual_ip VARCHAR(50)' },
+          { col: 'public_key', sql: 'ALTER TABLE rdp_connections ADD COLUMN public_key VARCHAR(255)' },
+          { col: 'password', sql: 'ALTER TABLE rdp_connections ADD COLUMN password VARCHAR(255)' },
+          { col: 'protocol', sql: "ALTER TABLE rdp_connections ADD COLUMN protocol VARCHAR(50) DEFAULT 'rdp'" },
+          { col: 'user_id', sql: 'ALTER TABLE rdp_connections ADD COLUMN user_id INTEGER NOT NULL DEFAULT 1' },
+          { col: 'server_id', sql: "ALTER TABLE rdp_connections ADD COLUMN server_id TEXT NOT NULL DEFAULT ''" },
+        ];
 
-        if (!columns.includes('password')) {
-            console.log('DEBUG: Adding password column...');
-            await pool.query(`ALTER TABLE rdp_connections ADD COLUMN password VARCHAR(255);`);
-        }
-
-        if (!columns.includes('protocol')) {
-            console.log('DEBUG: Adding protocol column...');
-            await pool.query(`ALTER TABLE rdp_connections ADD COLUMN protocol VARCHAR(50) DEFAULT 'rdp';`);
-        }
-
-        if (!columns.includes('protocol')) {
-            console.log('DEBUG: Adding protocol column...');
-            await pool.query(`ALTER TABLE rdp_connections ADD COLUMN protocol VARCHAR(50) DEFAULT 'rdp';`);
-        }
-        
-        if (!columns.includes('password')) {
-            console.log('DEBUG: Adding password column...');
-            await pool.query(`ALTER TABLE rdp_connections ADD COLUMN password VARCHAR(255);`);
+        for (const m of migrations) {
+          if (!columns.includes(m.col)) {
+            console.log(`Adding column: ${m.col}`);
+            await pool.query(m.sql);
+          }
         }
     } catch (e) {
-        console.error('DEBUG: Error verifying/migrating columns:', e);
+        console.error('Error verifying/migrating columns:', e);
     }
 
-    // Create rdp_settings table
-    // Re-creating to fix column names (avoid reserved keywords)
-    await pool.query(`DROP TABLE IF EXISTS rdp_settings`);
-    
+    // Ensure rdp_settings is the correct key-value schema
+    // The old schema from 01_schema.sql had (id, user_id, default_security, ...)
+    // We need the simple key-value format (setting_key, setting_value)
+    try {
+      const settingsCheck = await pool.query(`
+        SELECT column_name FROM information_schema.columns
+        WHERE table_name = 'rdp_settings'
+      `);
+      const settingsCols = settingsCheck.rows.map(r => r.column_name);
+      
+      if (settingsCols.length > 0 && !settingsCols.includes('setting_key')) {
+        // Old schema detected - need to recreate
+        console.log('Migrating rdp_settings from old schema to key-value store...');
+        await pool.query('DROP TABLE IF EXISTS rdp_settings CASCADE');
+      }
+    } catch (e) {
+      console.log('rdp_settings check:', e.message);
+    }
+
+    // Create rdp_settings table (key-value store)
     await pool.query(`
       CREATE TABLE IF NOT EXISTS rdp_settings (
         setting_key VARCHAR(50) PRIMARY KEY,
@@ -145,13 +165,14 @@ const initDb = async () => {
     // Insert default settings if not exist
     await pool.query(`
       INSERT INTO rdp_settings (setting_key, setting_value)
-      VALUES ('lan_only', 'false'), ('server_id', '')
+      VALUES ('lan_only', 'false'), ('server_id', ''), ('maintenance_mode', 'false')
       ON CONFLICT (setting_key) DO NOTHING
     `);
     
     console.log('RDP Database initialized successfully');
   } catch (error) {
     console.error('Error initializing RDP database:', error);
+    throw error;
   }
 };
 

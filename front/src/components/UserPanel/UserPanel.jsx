@@ -1668,7 +1668,7 @@ useEffect(() => {
       {/* RDP Viewer */}
       {showRDPViewer && (
         <RDPViewer
-          connectionToken={getAuthToken()}
+          token={getAuthToken()}
           connectionId={rdpConnectionId}
           onClose={() => {
               setShowRDPViewer(false);

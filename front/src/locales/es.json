@@ -87,7 +87,18 @@
     "selectConnection": "Selecciona una Conexión",
     "selectConnectionDesc": "Elige el escritorio remoto al que deseas conectarte",
     "noConnectionsDesc": "No hay conexiones remotas configuradas todavía.",
-    "initializeDefault": "Inicializar Conexión por Defecto"
+    "initializeDefault": "Inicializar Conexión por Defecto",
+    "running": "EN EJECUCIÓN",
+    "stopped": "DETENIDO",
+    "stop": "DETENER",
+    "start": "INICIAR",
+    "restart": "REINICIAR",
+    "serviceStarted": "Servicio Iniciado",
+    "serviceStopped": "Servicio Detenido",
+    "restartConfirm": "¿Reiniciar servicio RDP? Esto desconectará a los usuarios activos.",
+    "restartSuccess": "Servicio Reiniciado",
+    "access": "Métodos de Acceso",
+    "unknownError": "Error desconocido"
   },
   "folders": {
     "title": "Selecciona una carpeta",

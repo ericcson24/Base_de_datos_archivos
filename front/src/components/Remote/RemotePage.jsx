@@ -14,8 +14,8 @@ const RemotePage = ({ user, onLogout, onGoBack, onGoToPanel, onGoToCalendar, onT
     const [settings, setSettings] = useState({});
     const [loading, setLoading] = useState(true);
     const [activeConnectionId, setActiveConnectionId] = useState(null);
-    const [activeConnectionToken, setActiveConnectionToken] = useState(null);
     const [showSettingsModal, setShowSettingsModal] = useState(false);
+    const [sidebarOpen, setSidebarOpen] = useState(false);
 
     useEffect(() => {
         fetchData();
@@ -24,7 +24,7 @@ const RemotePage = ({ user, onLogout, onGoBack, onGoToPanel, onGoToCalendar, onT
     const fetchData = async () => {
         setLoading(true);
         try {
-            const token = getAuthToken();
+            const token = user?.token || getAuthToken();
             const [connRes, setRes] = await Promise.all([
                 fetch('/api/rdp/connections', { 
                     headers: { 'Authorization': `Bearer ${token}` } 
@@ -50,27 +50,16 @@ const RemotePage = ({ user, onLogout, onGoBack, onGoToPanel, onGoToCalendar, onT
     };
 
     const handleConnectionClick = async (connectionId) => {
-        try {
-            const token = getAuthToken();
-            const response = await fetch(`/api/rdp/connections/${connectionId}/token`, {
-                headers: { 'Authorization': `Bearer ${token}` }
-            });
-            
-            if (response.ok) {
-                const data = await response.json();
-                setActiveConnectionId(connectionId);
-                setActiveConnectionToken(data.token);
-            } else {
-                console.error('Error getting connection token');
-            }
-        } catch (error) {
-            console.error('Error getting connection token:', error);
-        }
+        // Use token from user object, fallback to localStorage
+        const token = user?.token || getAuthToken();
+        console.log('handleConnectionClick - token from user:', token);
+        console.log('handleConnectionClick - connectionId:', connectionId);
+        setActiveConnectionId(connectionId);
     };
 
     const initializeDefault = async () => {
         try {
-            const token = getAuthToken();
+            const token = user?.token || getAuthToken();
             const response = await fetch('/api/rdp/initialize-default', {
                 method: 'POST',
                 headers: { 
@@ -86,13 +75,13 @@ const RemotePage = ({ user, onLogout, onGoBack, onGoToPanel, onGoToCalendar, onT
         }
     };
 
-    if (activeConnectionId && activeConnectionToken) {
+    if (activeConnectionId) {
         return (
             <div className="remote-viewer-fullscreen">
                 <div className="remote-viewer-header">
                     <button className="remote-back-btn" onClick={() => {
                         setActiveConnectionId(null);
-                        setActiveConnectionToken(null);
+
                     }}>
                         ← {t('common.back')}
                     </button>
@@ -101,10 +90,9 @@ const RemotePage = ({ user, onLogout, onGoBack, onGoToPanel, onGoToCalendar, onT
                 <div className="remote-viewer-content">
                     <RDPViewer 
                         connectionId={activeConnectionId} 
-                        connectionToken={activeConnectionToken} 
+                        token={user?.token || getAuthToken()} 
                         onClose={() => {
                             setActiveConnectionId(null);
-                            setActiveConnectionToken(null);
                         }}
                     />
                 </div>
@@ -114,7 +102,8 @@ const RemotePage = ({ user, onLogout, onGoBack, onGoToPanel, onGoToCalendar, onT
 
     return (
         <div className="remote-page">
-            <div className="remote-sidebar">
+            <div className={`sidebar-overlay ${sidebarOpen ? 'visible' : ''}`} onClick={() => setSidebarOpen(false)}></div>
+            <div className={`remote-sidebar ${sidebarOpen ? 'open' : ''}`}>
                 <div className="remote-sidebar-header">
                     <h2>🖥️ {t('rdp.remoteDesktop')}</h2>
                     <p className="remote-sidebar-subtitle">{t('rdp.description')}</p>
@@ -153,6 +142,7 @@ const RemotePage = ({ user, onLogout, onGoBack, onGoToPanel, onGoToCalendar, onT
             <div className="remote-main">
                 <div className="remote-header">
                     <div className="remote-header-content">
+                        <button className="mobile-menu-btn" onClick={() => setSidebarOpen(true)}>☰</button>
                         <h1>{t('rdp.selectConnection')}</h1>
                     </div>
                     <div className="remote-header-actions">
