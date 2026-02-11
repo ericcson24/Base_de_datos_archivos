@@ -121,7 +121,7 @@ const RemotePage = ({ user, onLogout, onGoBack, onGoToPanel, onGoToCalendar, onT
                     </div>
                 </div>
 
-                <div className="remote-sidebar-footer">
+                <div className="sidebar-footer">
                     <button className="sidebar-btn" onClick={onGoBack}>
                         <FiArrowLeft className="sidebar-btn-icon" /> {t('common.back')}
                     </button>
