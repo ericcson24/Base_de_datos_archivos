@@ -91,6 +91,9 @@
     font-size: 0.95rem;
     transition: all 0.2s ease;
     text-align: left;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
 }
 
 .sidebar-btn:hover {
@@ -98,17 +101,39 @@
     border-color: var(--text-secondary);
 }
 
-.sidebar-footer-actions {
+.sidebar-btn-icon {
+    font-size: 1.1rem;
+    opacity: 0.45;
+    flex-shrink: 0;
+    transition: opacity 0.2s;
     display: flex;
-    gap: 10px;
-    margin-bottom: 10px;
+    align-items: center;
+    justify-content: center;
+    width: 20px;
+    height: 20px;
 }
 
-.sidebar-btn-action {
-    flex: 1;
-    text-align: center;
-    font-size: 0.85rem;
-    padding: 10px;
+.sidebar-btn:hover .sidebar-btn-icon {
+    opacity: 0.85;
+}
+
+.sidebar-btn-logout {
+    color: #ff3b30;
+    border-color: rgba(255, 59, 48, 0.2);
+}
+
+.sidebar-btn-logout .sidebar-btn-icon {
+    opacity: 0.5;
+}
+
+.sidebar-btn-logout:hover {
+    background: rgba(255, 59, 48, 0.1);
+    color: #ff3b30;
+    border-color: rgba(255, 59, 48, 0.3);
+}
+
+.sidebar-btn-logout:hover .sidebar-btn-icon {
+    opacity: 0.9;
 }
 
 /* =========================================

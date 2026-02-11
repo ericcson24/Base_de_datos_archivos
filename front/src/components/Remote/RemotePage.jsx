@@ -4,6 +4,7 @@ import { getAuthToken } from '../../utils/fileUtils';
 import NotificationCenter from '../Common/NotificationCenter';
 import SettingsModal from '../Modals/SettingsModal';
 import RDPViewer from '../RDP/RDPViewer';
+import { FiArrowLeft, FiLayout, FiCalendar, FiSettings, FiLogOut } from 'react-icons/fi';
 import './RemotePage.css';
 import './RemotePageDesktop.css';
 import './RemotePageMobile.css';
@@ -120,21 +121,19 @@ const RemotePage = ({ user, onLogout, onGoBack, onGoToPanel, onGoToCalendar, onT
 
                 <div className="remote-sidebar-footer">
                     <button className="sidebar-btn" onClick={onGoBack}>
-                        {t('common.back')}
+                        <FiArrowLeft className="sidebar-btn-icon" /> {t('common.back')}
                     </button>
-                    <div className="sidebar-footer-actions">
-                        <button className="sidebar-btn sidebar-btn-action" onClick={onGoToPanel}>
-                            📁 {t('calendar.panel')}
-                        </button>
-                        <button className="sidebar-btn sidebar-btn-action" onClick={onGoToCalendar}>
-                            📅 {t('userPanel.calendar')}
-                        </button>
-                    </div>
+                    <button className="sidebar-btn" onClick={onGoToPanel}>
+                        <FiLayout className="sidebar-btn-icon" /> {t('calendar.panel')}
+                    </button>
+                    <button className="sidebar-btn" onClick={onGoToCalendar}>
+                        <FiCalendar className="sidebar-btn-icon" /> {t('userPanel.calendar')}
+                    </button>
                     <button className="sidebar-btn" onClick={() => setShowSettingsModal(true)}>
-                        {t('common.settings')}
+                        <FiSettings className="sidebar-btn-icon" /> {t('common.settings')}
                     </button>
-                    <button className="sidebar-btn" onClick={onLogout}>
-                        {t('common.logout')}
+                    <button className="sidebar-btn sidebar-btn-logout" onClick={onLogout}>
+                        <FiLogOut className="sidebar-btn-icon" /> {t('common.logout')}
                     </button>
                 </div>
             </div>

@@ -15,7 +15,7 @@ import AIResultsModal from '../Modals/AIResultsModal';
 import SidebarPanel from './SidebarPanel';
 import FileItem from './FileItem';
 import NotificationCenter from '../Common/NotificationCenter';
-import { FiHardDrive, FiUsers, FiArrowLeft, FiCalendar, FiMonitor, FiSettings, FiLogOut } from 'react-icons/fi';
+import { FiHardDrive, FiUsers, FiArrowLeft, FiCalendar, FiMonitor, FiSettings, FiLogOut, FiLayout } from 'react-icons/fi';
 import { 
   getAuthToken, 
   downloadFile, 
@@ -1064,20 +1064,18 @@ useEffect(() => {
           <button className="sidebar-btn" onClick={onBackToFolders}>
             <FiArrowLeft className="sidebar-btn-icon" /> {t('common.back')}
           </button>
-          <div className="sidebar-footer-actions">
-            <button className="sidebar-btn sidebar-btn-action" onClick={() => {
+          <button className="sidebar-btn" onClick={() => {
               if (onGoToCalendar) {
                 onGoToCalendar();
               }
             }}>
-              <FiCalendar className="sidebar-btn-icon" /> {t('userPanel.calendar')}
-            </button>
-            <button className="sidebar-btn sidebar-btn-action" onClick={() => {
+            <FiCalendar className="sidebar-btn-icon" /> {t('userPanel.calendar')}
+          </button>
+          <button className="sidebar-btn" onClick={() => {
                    if (onGoToRemote) onGoToRemote();
             }}>
-              <FiMonitor className="sidebar-btn-icon" /> {t('common.remoteDesktop')}
-            </button>
-          </div>
+            <FiMonitor className="sidebar-btn-icon" /> {t('common.remoteDesktop')}
+          </button>
           <button className="sidebar-btn" onClick={() => setShowSettingsModal(true)}>
             <FiSettings className="sidebar-btn-icon" /> {t('userPanel.settings')}
           </button>
