@@ -1109,7 +1109,7 @@ useEffect(() => {
           onDragOver={handleDragOver}
           onDrop={handleDrop}
         >{/* Modern Search and Controls Bar - Moved outside file-grid */}
-        <div className="search-controls-wrapper relative z-10 mb-6 w-full px-6 min-h-[5%]">
+        <div className="search-controls-wrapper relative z-10 mb-6 w-full min-h-[5%]">
           <div className="search-controls-bar flex items-center justify-between glassmorphism rounded-2xl p-4 shadow-lg border-gray-200/50 transition-all duration-300 hover:shadow-xl">
             {/* Search Section */}
             <div className="flex items-center space-x-3 flex-1 max-w-md">
