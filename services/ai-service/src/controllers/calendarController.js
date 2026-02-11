@@ -48,6 +48,7 @@ Tu tarea:
    - "query": Consultar eventos.
    - "update": Modificar evento existente.
    - "delete": Eliminar evento.
+   - "add_category": Crear/añadir una categoría nueva.
 
 2. Extraer los detalles.
 
@@ -58,15 +59,32 @@ IMPORTANTE SOBRE FECHAS:
 - "hoy" significa la misma fecha que la actual
 - Devuelve SIEMPRE formato ISO 8601 UTC con Z al final (ejemplo: "2026-02-11T20:00:00Z") 
 
+IMPORTANTE SOBRE UPDATES:
+- Si el usuario quiere MODIFICAR un evento existente, debes distinguir:
+  - "searchTitle": El título ACTUAL del evento a buscar (cómo se llama ahora)
+  - "title": El NUEVO título (si el usuario quiere renombrarlo). Si no quiere cambiar el título, pon null.
+- Si dice "cambia la reunión de equipo a las 5pm", searchTitle="reunión de equipo", title=null (no cambia nombre)
+- Si dice "renombra la reunión de equipo a daily standup", searchTitle="reunión de equipo", title="daily standup"
+
+IMPORTANTE SOBRE CATEGORÍAS:
+- Las categorías son etiquetas de color para eventos (ej: "Trabajo", "Personal", "Urgente")
+- Para crear categoría: intent="add_category", categoryName="nombre", categoryColor="preset0" a "preset24"
+- Para asignar categorías a un evento (create/update): incluye el campo "categories" como array de strings
+- Colores disponibles: preset0(rojo), preset1(naranja), preset2(marrón), preset3(amarillo), preset4(verde), preset5(turquesa), preset6(azul), preset7(púrpura), preset8(gris), preset9(gris oscuro), preset12(azul real), preset13(verde bosque)
+
 Estructura JSON de Respuesta:
 {
-  "intent": "create", // "query", "update", "delete"
-  "title": "TÍTULO DEL EVENTO", // Si es eliminación genérica ("borra lo de mañana"), pon "ANY" o null
+  "intent": "create", // "query", "update", "delete", "add_category"
+  "title": "TÍTULO DEL EVENTO O NUEVO TÍTULO",
+  "searchTitle": "TÍTULO ACTUAL del evento (solo para update/delete)", 
   "startTimeUTC": "YYYY-MM-DDTHH:mm:ssZ", 
   "endTimeUTC": "YYYY-MM-DDTHH:mm:ssZ",
   "description": "Descripción opcional",
   "location": "Ubicación opcional",
   "isAllDay": false,
+  "categories": ["Categoría1"], // Array de nombres de categorías a asignar
+  "categoryName": "Nombre de la categoría nueva (solo para add_category)",
+  "categoryColor": "preset0-preset24 (solo para add_category)",
   "success": true
 }
 
@@ -150,7 +168,8 @@ Responde SOLO el JSON.`;
 
     // --- UPDATE or DELETE ---
     if (eventData.intent === 'update' || eventData.intent === 'delete') {
-        const searchTitle = eventData.title;
+        // Use searchTitle first (for updates where user renames), fallback to title
+        const searchTitle = eventData.searchTitle || eventData.title;
         let searchRes;
 
         // Si tenemos título específico, buscamos por título
@@ -162,11 +181,6 @@ Responde SOLO el JSON.`;
         } 
         // Si no hay título pero sí fecha (ej: "borra evento de mañana")
         else if (eventData.startTimeUTC) {
-             // Buscamos eventos que solapen con el rango dado o empiecen cerca
-             // Asumimos un margen de 24h si solo dio "mañana" (que la IA habrá convertido a 00:00 o hora específica)
-             // Si la IA devolvio un rango, lo usamos.
-             
-             // Buscar evento en ese día (rango start - end)
              searchRes = await db.query(
                 `SELECT * FROM calendar_events 
                  WHERE user_id = $1 
@@ -190,7 +204,7 @@ Responde SOLO el JSON.`;
         
         if (eventData.intent === 'delete') {
              try {
-                 const delRes = await fetch(`${OUTLOOK_SERVICE_URL}/events/${targetEvent.id}`, { // Pass Local DB ID
+                 const delRes = await fetch(`${OUTLOOK_SERVICE_URL}/events/${targetEvent.id}`, {
                      method: 'DELETE',
                      headers: { 'Authorization': req.headers.authorization || '' }
                  });
@@ -206,12 +220,26 @@ Responde SOLO el JSON.`;
         
         if (eventData.intent === 'update') {
              try {
-                 // Construct payload
+                 // Construct payload - only include fields that need changing
                  const updatePayload = {};
-                 if (eventData.title) updatePayload.subject = eventData.title;
+                 // Only set new title if the AI explicitly provided one different from search
+                 if (eventData.title && eventData.title !== searchTitle) {
+                     updatePayload.subject = eventData.title;
+                 } else if (eventData.title && !eventData.searchTitle) {
+                     // Legacy: if no searchTitle, title might be the new title
+                     // but only if it differs from the found event
+                     if (eventData.title.toLowerCase() !== targetEvent.subject.toLowerCase()) {
+                         updatePayload.subject = eventData.title;
+                     }
+                 }
                  if (eventData.startTimeUTC) updatePayload.startTime = eventData.startTimeUTC;
                  if (eventData.endTimeUTC) updatePayload.endTime = eventData.endTimeUTC;
                  if (eventData.location) updatePayload.location = eventData.location;
+                 if (eventData.description) updatePayload.body = eventData.description;
+                 if (eventData.isAllDay !== undefined) updatePayload.isAllDay = eventData.isAllDay;
+                 if (eventData.categories && Array.isArray(eventData.categories) && eventData.categories.length > 0) {
+                     updatePayload.categories = eventData.categories;
+                 }
                  
                  const upRes = await fetch(`${OUTLOOK_SERVICE_URL}/events/${targetEvent.id}`, {
                      method: 'PATCH',
@@ -223,13 +251,49 @@ Responde SOLO el JSON.`;
                  });
                  
                  if (upRes.ok) {
-                     return res.json({ success: true, message: `Evento "${targetEvent.subject}" actualizado.` });
+                     const updatedTitle = updatePayload.subject || targetEvent.subject;
+                     return res.json({ success: true, message: `Evento "${updatedTitle}" actualizado.` });
                  } else {
                      throw new Error(await upRes.text());
                  }
              } catch (e) {
                  return res.status(500).json({ error: 'Error actualizando evento', details: e.message });
              }
+        }
+    }
+
+    // --- ADD CATEGORY ---
+    if (eventData.intent === 'add_category') {
+        try {
+            const categoryName = eventData.categoryName || eventData.title;
+            const categoryColor = eventData.categoryColor || 'preset6'; // Default blue
+            
+            if (!categoryName) {
+                return res.status(400).json({ error: 'Nombre de categoría requerido' });
+            }
+            
+            const catRes = await fetch(`${OUTLOOK_SERVICE_URL}/categories`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': req.headers.authorization || ''
+                },
+                body: JSON.stringify({ name: categoryName, color: categoryColor })
+            });
+            
+            if (catRes.ok) {
+                const catData = await catRes.json();
+                return res.json({ 
+                    success: true, 
+                    message: `Categoría "${categoryName}" creada correctamente.`,
+                    category: catData
+                });
+            } else {
+                const errorData = await catRes.json().catch(() => ({}));
+                throw new Error(errorData.error || 'Error creating category');
+            }
+        } catch (e) {
+            return res.status(500).json({ error: 'Error creando categoría', details: e.message });
         }
     }
 
@@ -275,7 +339,8 @@ Responde SOLO el JSON.`;
                     startTime: eventData.startTimeUTC, // Enviamos UTC directo
                     endTime: eventData.endTimeUTC,
                     location: eventData.location,
-                    isAllDay: eventData.isAllDay
+                    isAllDay: eventData.isAllDay,
+                    categories: eventData.categories || []
                 })
             });
 

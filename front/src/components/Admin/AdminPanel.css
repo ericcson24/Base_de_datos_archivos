@@ -256,12 +256,27 @@
   transform: scale(1.02);
 }
 
+.admin-btn-small {
+  padding: 4px 10px;
+  font-size: 12px;
+}
+
 /* Badges */
 .status-badge {
   padding: 4px 8px;
   border-radius: 6px;
   font-size: 12px;
   font-weight: 600;
+}
+
+.status-badge.success {
+  background: rgba(52, 199, 89, 0.1);
+  color: #34c759;
+}
+
+.status-badge.error {
+  background: rgba(255, 59, 48, 0.1);
+  color: #ff3b30;
 }
 
 .status-active {
@@ -272,6 +287,32 @@
 .status-locked {
   background: rgba(255, 59, 48, 0.1);
   color: #ff3b30;
+}
+
+/* Section subtitle */
+.section-subtitle {
+  font-size: 16px;
+  font-weight: 600;
+  margin: 0;
+}
+
+/* Admin info list */
+.admin-info-list p {
+  margin: 8px 0;
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+/* Diagnostics results */
+.admin-diagnostics-results .admin-log-entry {
+  display: flex;
+  align-items: center;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--admin-border-light);
+}
+
+[data-theme='dark'] .admin-diagnostics-results .admin-log-entry {
+  border-bottom: 1px solid var(--admin-border-dark);
 }
 
 /* Forms */
@@ -288,6 +329,168 @@
 [data-theme='dark'] .admin-input {
   border: 1px solid var(--admin-border-dark);
   background: rgba(0, 0, 0, 0.3);
+}
+
+.admin-input:focus {
+  outline: none;
+  border-color: var(--admin-accent);
+}
+
+/* Select element styling */
+select.admin-input {
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  appearance: none;
+  background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23666' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e");
+  background-repeat: no-repeat;
+  background-position: right 10px center;
+  background-size: 16px;
+  padding-right: 36px;
+  cursor: pointer;
+}
+
+[data-theme='dark'] select.admin-input {
+  background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23ccc' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e");
+}
+
+/* Form groups */
+.admin-form-group {
+  margin-bottom: 16px;
+}
+
+.admin-form-label {
+  display: block;
+  font-size: 13px;
+  font-weight: 600;
+  margin-bottom: 6px;
+  opacity: 0.8;
+}
+
+/* Modals */
+.admin-modal {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  -webkit-backdrop-filter: blur(5px);
+  backdrop-filter: blur(5px);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+}
+
+.admin-modal-content {
+  background: rgba(255, 255, 255, 0.95);
+  -webkit-backdrop-filter: blur(20px);
+  backdrop-filter: blur(20px);
+  border: 1px solid var(--admin-border-light);
+  border-radius: 16px;
+  width: 100%;
+  max-width: 480px;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.15);
+}
+
+[data-theme='dark'] .admin-modal-content {
+  background: rgba(28, 28, 30, 0.95);
+  border: 1px solid var(--admin-border-dark);
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5);
+}
+
+.admin-modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20px 24px;
+  border-bottom: 1px solid var(--admin-border-light);
+}
+
+[data-theme='dark'] .admin-modal-header {
+  border-bottom: 1px solid var(--admin-border-dark);
+}
+
+.admin-modal-header h3 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.admin-modal-close {
+  background: none;
+  border: none;
+  font-size: 24px;
+  cursor: pointer;
+  color: inherit;
+  opacity: 0.6;
+  transition: opacity 0.2s;
+}
+
+.admin-modal-close:hover {
+  opacity: 1;
+}
+
+.admin-modal-body {
+  padding: 24px;
+}
+
+/* Logs list */
+.admin-logs-list {
+  max-height: 500px;
+  overflow-y: auto;
+}
+
+.admin-log-entry {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--admin-border-light);
+  font-size: 13px;
+  font-family: 'SF Mono', 'Fira Code', monospace;
+}
+
+[data-theme='dark'] .admin-log-entry {
+  border-bottom: 1px solid var(--admin-border-dark);
+}
+
+.admin-log-timestamp {
+  color: var(--admin-accent);
+  white-space: nowrap;
+  font-size: 12px;
+}
+
+.admin-log-message {
+  word-break: break-word;
+}
+
+/* Alert */
+.admin-alert {
+  padding: 12px 20px;
+  border-radius: 10px;
+  margin-bottom: 20px;
+  font-weight: 500;
+  font-size: 14px;
+}
+
+.admin-alert-success {
+  background: rgba(52, 199, 89, 0.1);
+  color: #34c759;
+  border: 1px solid rgba(52, 199, 89, 0.2);
+}
+
+.admin-alert-error {
+  background: rgba(255, 59, 48, 0.1);
+  color: #ff3b30;
+  border: 1px solid rgba(255, 59, 48, 0.2);
+}
+
+/* User profile in header */
+.admin-user-profile {
+  font-size: 14px;
+  font-weight: 500;
+  opacity: 0.8;
 }
 
 /* Loading */
@@ -332,6 +535,16 @@
   --sidebar-border: var(--admin-border-light);
   --button-primary-bg: var(--admin-text-light);
   --button-primary-text: #ffffff;
+  /* Generic theme variables for GroupManager, DeleteConfirmationModal, NotificationCenter */
+  --bg-primary: #ffffff;
+  --bg-secondary: rgba(255, 255, 255, 0.85);
+  --bg-hover: rgba(0, 0, 0, 0.06);
+  --text-primary: #1d1d1f;
+  --text-secondary: #6e6e73;
+  --border-color: rgba(0, 0, 0, 0.12);
+  --primary-color: #0071e3;
+  --primary-color-alpha: rgba(0, 113, 227, 0.2);
+  --primary-hover: #0077ed;
 }
 
 [data-theme='dark'] .admin-panel {
@@ -340,4 +553,14 @@
   --sidebar-border: var(--admin-border-dark);
   --button-primary-bg: var(--admin-text-dark);
   --button-primary-text: #000000;
+  /* Generic theme variables - dark */
+  --bg-primary: #1a1a1a;
+  --bg-secondary: rgba(30, 30, 30, 0.9);
+  --bg-hover: rgba(255, 255, 255, 0.08);
+  --text-primary: #f5f5f7;
+  --text-secondary: #a1a1a6;
+  --border-color: rgba(255, 255, 255, 0.12);
+  --primary-color: #2997ff;
+  --primary-color-alpha: rgba(41, 151, 255, 0.25);
+  --primary-hover: #40a9ff;
 }

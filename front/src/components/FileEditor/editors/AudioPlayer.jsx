@@ -87,7 +87,7 @@ const AudioPlayer = ({ fileUrl, file }) => {
           {/* Playback Rate */}
           <div className="tool-group flex items-center gap-2">
             <label className="text-xs font-medium text-gray-700 dark:text-gray-300">
-              Velocidad:
+              {t('audioPlayer.speed')}:
             </label>
             <div className="flex gap-1">
               {[0.5, 0.75, 1, 1.25, 1.5, 2].map(rate => (

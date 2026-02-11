@@ -183,43 +183,94 @@
 }
 
 /* Dark mode */
-.dark .word-editor-container {
+[data-theme="dark"] .word-editor-container {
   background: #1f2937;
 }
 
-.dark .word-toolbar {
+[data-theme="dark"] .word-toolbar {
   background: #374151;
   border-color: #4b5563;
 }
 
-.dark .word-toolbar-left h3 {
+[data-theme="dark"] .word-toolbar-left h3 {
   color: #f3f4f6;
 }
 
-.dark .word-preview {
+[data-theme="dark"] .word-preview {
   background: #111827;
   color: #e5e7eb;
 }
 
-.dark .word-preview td, .dark .word-preview th {
+[data-theme="dark"] .word-preview td, [data-theme="dark"] .word-preview th {
   border-color: #4b5563;
 }
 
-.dark .quill {
+[data-theme="dark"] .quill {
   background: #111827;
 }
 
-.dark .ql-toolbar {
+[data-theme="dark"] .ql-toolbar {
   background: #1f2937;
   border-color: #4b5563 !important;
 }
 
-.dark .ql-container {
+[data-theme="dark"] .ql-toolbar .ql-stroke {
+  stroke: #d1d5db;
+}
+
+[data-theme="dark"] .ql-toolbar .ql-fill {
+  fill: #d1d5db;
+}
+
+[data-theme="dark"] .ql-toolbar .ql-picker-label {
+  color: #d1d5db;
+}
+
+[data-theme="dark"] .ql-toolbar button:hover .ql-stroke,
+[data-theme="dark"] .ql-toolbar .ql-picker-label:hover .ql-stroke {
+  stroke: #60a5fa;
+}
+
+[data-theme="dark"] .ql-toolbar button:hover .ql-fill,
+[data-theme="dark"] .ql-toolbar .ql-picker-label:hover .ql-fill {
+  fill: #60a5fa;
+}
+
+[data-theme="dark"] .ql-toolbar button.ql-active .ql-stroke {
+  stroke: #3b82f6;
+}
+
+[data-theme="dark"] .ql-toolbar button.ql-active .ql-fill {
+  fill: #3b82f6;
+}
+
+[data-theme="dark"] .ql-container {
   border-color: #4b5563 !important;
   color: #e5e7eb;
 }
 
-.dark .ql-editor {
-  color: #e5e7eb;
+[data-theme="dark"] .ql-editor {
+  color: #e5e7eb !important;
+}
+
+[data-theme="dark"] .ql-editor p,
+[data-theme="dark"] .ql-editor h1,
+[data-theme="dark"] .ql-editor h2,
+[data-theme="dark"] .ql-editor h3,
+[data-theme="dark"] .ql-editor h4,
+[data-theme="dark"] .ql-editor h5,
+[data-theme="dark"] .ql-editor h6,
+[data-theme="dark"] .ql-editor span,
+[data-theme="dark"] .ql-editor div,
+[data-theme="dark"] .ql-editor li {
+  color: #e5e7eb !important;
+}
+
+[data-theme="dark"] .ql-editor.ql-blank::before {
+  color: #6b7280;
+}
+
+[data-theme="dark"] .word-content {
+  background: #1f2937;
 }
 

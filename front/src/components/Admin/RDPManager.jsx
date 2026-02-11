@@ -169,12 +169,12 @@ session bpp:i:32
                         {/* Connection Card */}
                         <div className="rdp-connection-card glassmorphism">
                             <h3>{t('rdp.access') || 'Access Methods'}</h3>
-                            {loading ? <p>Loading...</p> : (
+                            {loading ? <p>{t('common.loading')}</p> : (
                                 <div className="access-methods">
                                     <div className="method-row">
                                         <div className="method-info">
-                                            <h4>Web Access</h4>
-                                            <p>Connect directly securely in browser</p>
+                                            <h4>{t('admin.webAccess')}</h4>
+                                            <p>{t('admin.webAccessDesc')}</p>
                                         </div>
                                         <button 
                                             className="connect-btn primary"
@@ -186,8 +186,8 @@ session bpp:i:32
                                     </div>
                                     <div className="method-row">
                                         <div className="method-info">
-                                            <h4>Native Client</h4>
-                                            <p>Download configuration for RDP client</p>
+                                            <h4>{t('admin.nativeClient')}</h4>
+                                            <p>{t('admin.nativeClientDesc')}</p>
                                         </div>
                                         <button 
                                             className="connect-btn secondary"
@@ -203,8 +203,8 @@ session bpp:i:32
                         
                         {/* Info Card */}
                          <div className="rdp-info-card glassmorphism">
-                            <h4>ℹ️ Info</h4>
-                            <p><strong>Server ID:</strong> {settings.server_id}</p>
+                            <h4>ℹ️ {t('common.info')}</h4>
+                            <p><strong>{t('rdp.serverId')}:</strong> {settings.server_id}</p>
                             <p><strong>Host:</strong> {defaultConnection?.hostname || 'System'}</p>
                              <div className="setting-toggle-row small">
                                 <label className="switch">

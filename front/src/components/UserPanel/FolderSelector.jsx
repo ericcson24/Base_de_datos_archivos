@@ -3,6 +3,7 @@ import FrostedContainer from '../Common/FrostedContainer';
 import Button from '../Common/Button';
 import SettingsModal from '../Modals/SettingsModal';
 import { useLanguage } from '../../context/LanguageContext';
+import { FiFolder, FiMonitor, FiCalendar, FiTool, FiLogOut } from 'react-icons/fi';
 import './FolderSelector.css';
 
 const FolderSelector = ({ user, onSelectFolder, onLogout, onThemeToggle, isDarkMode, onGoToAdmin, onGoToCalendar, onGoToRemote }) => {
@@ -67,7 +68,7 @@ const FolderSelector = ({ user, onSelectFolder, onLogout, onThemeToggle, isDarkM
             onClick={() => handleFolderSelect('privada')}
             className="option-btn"
           >
-            📁 {t('userPanel.myFiles')}
+            <FiFolder className="option-btn-icon" /> {t('userPanel.myFiles')}
           </Button>
 
           <Button
@@ -75,7 +76,7 @@ const FolderSelector = ({ user, onSelectFolder, onLogout, onThemeToggle, isDarkM
             onClick={handleRemote}
             className="option-btn"
           >
-            💻 {t('userPanel.remoteWork')}
+            <FiMonitor className="option-btn-icon" /> {t('userPanel.remoteWork')}
           </Button>
 
           <Button
@@ -83,7 +84,7 @@ const FolderSelector = ({ user, onSelectFolder, onLogout, onThemeToggle, isDarkM
             onClick={handleCalendar}
             className="option-btn"
           >
-            📅 {t('userPanel.calendar')}
+            <FiCalendar className="option-btn-icon" /> {t('userPanel.calendar')}
           </Button>
 
           {/* Botón de administrador solo para admins */}
@@ -93,7 +94,7 @@ const FolderSelector = ({ user, onSelectFolder, onLogout, onThemeToggle, isDarkM
               onClick={onGoToAdmin}
               className="option-btn admin-btn"
             >
-              🛠️ {t('folders.adminPanel')}
+              <FiTool className="option-btn-icon" /> {t('folders.adminPanel')}
             </Button>
           )}
 
@@ -102,7 +103,7 @@ const FolderSelector = ({ user, onSelectFolder, onLogout, onThemeToggle, isDarkM
             onClick={onLogout}
             className="option-btn logout-btn"
           >
-            {t('userPanel.logout')}
+            <FiLogOut className="option-btn-icon" /> {t('userPanel.logout')}
           </Button>
         </FrostedContainer>
       </div>

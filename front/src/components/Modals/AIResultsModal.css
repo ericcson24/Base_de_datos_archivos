@@ -57,7 +57,7 @@
 .ai-results-modal .ai-response-section h3 {
   margin: 0 0 1rem 0;
   font-size: 1.1rem;
-  color: rgba(255, 255, 255, 0.9);
+  opacity: 0.9;
 }
 
 .ai-results-modal .ai-response-text {
@@ -76,7 +76,7 @@
 .ai-results-modal .sources-section h3 {
   margin: 0 0 0.75rem 0;
   font-size: 1rem;
-  color: rgba(255, 255, 255, 0.8);
+  opacity: 0.8;
 }
 
 .ai-results-modal .sources-list {
@@ -98,7 +98,7 @@
 .ai-results-modal .files-section h3 {
   margin: 0 0 1rem 0;
   font-size: 1.1rem;
-  color: rgba(255, 255, 255, 0.9);
+  opacity: 0.9;
 }
 
 .ai-results-modal .files-list {
@@ -149,12 +149,12 @@
 .ai-results-modal .file-name {
   font-weight: 500;
   margin-bottom: 0.25rem;
-  color: rgba(255, 255, 255, 0.95);
+  opacity: 0.95;
 }
 
 .ai-results-modal .file-meta {
   font-size: 0.85rem;
-  color: rgba(255, 255, 255, 0.6);
+  opacity: 0.6;
 }
 
 .ai-results-modal .file-actions {
@@ -165,7 +165,7 @@
 .ai-results-modal .no-files {
   text-align: center;
   padding: 3rem 1rem;
-  color: rgba(255, 255, 255, 0.6);
+  opacity: 0.6;
 }
 
 .ai-results-modal .modal-footer {

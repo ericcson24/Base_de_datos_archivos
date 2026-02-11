@@ -30,6 +30,27 @@
     color: var(--text-color);
     font-size: 0.9rem;
     font-weight: 500;
+    gap: 12px;
+}
+
+.rdp-status-text {
+    margin-right: 4px;
+}
+
+.rdp-ping {
+    font-size: 0.8rem;
+    font-weight: 600;
+    font-family: 'Courier New', monospace;
+    padding: 2px 8px;
+    border-radius: 4px;
+    background: rgba(0,0,0,0.15);
+    white-space: nowrap;
+}
+
+.rdp-frames {
+    font-size: 0.75rem;
+    color: var(--text-secondary, #888);
+    white-space: nowrap;
 }
 
 .status-dot {
@@ -91,6 +112,12 @@
 /* Only hide cursor when connected */
 .rdp-display.cursor-hidden {
     cursor: none;
+}
+
+/* Ensure the Guacamole display element fills the container and receives events */
+.rdp-display > div {
+    outline: none !important;
+    touch-action: none; /* Prevent browser touch gestures interfering with remote desktop */
 }
 
 .rdp-display canvas {

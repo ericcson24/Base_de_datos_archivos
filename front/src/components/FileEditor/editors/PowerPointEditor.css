@@ -5,7 +5,7 @@
   background: #f3f4f6;
 }
 
-.ppt-toolbar {
+.editor-header {
   padding: 12px 20px;
   background: #fff;
   border-bottom: 1px solid #e5e7eb;
@@ -15,19 +15,19 @@
   box-shadow: 0 1px 2px rgba(0,0,0,0.05);
 }
 
-.ppt-toolbar-left h3 {
+.editor-header h2 {
   margin: 0;
   font-size: 16px;
   font-weight: 600;
   color: #374151;
 }
 
-.ppt-toolbar-right {
+.editor-actions {
   display: flex;
   gap: 8px;
 }
 
-.ppt-toolbar button {
+.editor-header button {
   padding: 8px 16px;
   border: none;
   border-radius: 6px;
@@ -46,27 +46,52 @@
   background: #059669;
 }
 
-.btn-add-slide {
+.add-slide-btn {
+  width: 100%;
+  margin-top: 12px;
+  padding: 8px 16px;
   background: #3b82f6;
   color: white;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 500;
+  transition: all 0.2s;
 }
 
-.btn-add-slide:hover {
+.add-slide-btn:hover {
   background: #2563eb;
 }
 
-.btn-delete-slide {
+.delete-slide {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  width: 20px;
+  height: 20px;
+  padding: 0;
   background: #ef4444;
   color: white;
+  border: none;
+  border-radius: 50%;
+  cursor: pointer;
+  font-size: 14px;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transition: all 0.2s;
 }
 
-.btn-delete-slide:hover:not(:disabled) {
+.slide-thumbnail:hover .delete-slide {
+  opacity: 1;
+}
+
+.delete-slide:hover {
   background: #dc2626;
-}
-
-.btn-delete-slide:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
+  transform: scale(1.1);
 }
 
 .btn-save {
@@ -92,7 +117,7 @@
   background: #4b5563;
 }
 
-.ppt-content {
+.presentation-container {
   flex: 1;
   display: flex;
   overflow: hidden;
@@ -126,6 +151,7 @@
   cursor: pointer;
   transition: all 0.2s;
   background: #f9fafb;
+  position: relative;
 }
 
 .slide-thumbnail:hover {
@@ -138,14 +164,14 @@
   background: #dbeafe;
 }
 
-.slide-number {
+.thumbnail-number {
   font-size: 12px;
   font-weight: 600;
   color: #6b7280;
   margin-bottom: 4px;
 }
 
-.slide-preview-title {
+.thumbnail-title {
   font-size: 12px;
   color: #374151;
   overflow: hidden;
@@ -160,14 +186,30 @@
   padding: 20px;
 }
 
-.slide-canvas {
+.slide-content-wrapper {
   flex: 1;
   background: #fff;
   border-radius: 8px;
   padding: 40px;
   box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
   overflow-y: auto;
-  margin-bottom: 20px;
+}
+
+.slide-preview h1 {
+  font-size: 32px;
+  font-weight: bold;
+  margin: 0 0 24px 0;
+  color: #1f2937;
+}
+
+.slide-preview div {
+  font-size: 18px;
+  line-height: 1.6;
+  color: #374151;
+}
+
+.slide-preview div p {
+  margin: 8px 0;
 }
 
 .slide-title-input {
@@ -206,149 +248,79 @@
   border-color: #3b82f6;
 }
 
-.slide-title-preview {
-  font-size: 32px;
-  font-weight: bold;
-  margin: 0 0 24px 0;
-  color: #1f2937;
-}
-
-.slide-content-preview {
-  font-size: 18px;
-  line-height: 1.6;
-  color: #374151;
-}
-
-.slide-content-preview p {
-  margin: 8px 0;
-}
-
-.slide-navigation {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 20px;
-  padding: 12px;
-  background: #fff;
-  border-radius: 8px;
-  box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-}
-
-.nav-btn {
-  padding: 8px 16px;
-  background: #3b82f6;
-  color: white;
-  border: none;
-  border-radius: 6px;
-  cursor: pointer;
-  font-size: 14px;
-  transition: all 0.2s;
-}
-
-.nav-btn:hover:not(:disabled) {
-  background: #2563eb;
-}
-
-.nav-btn:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-.slide-counter {
-  font-size: 14px;
-  font-weight: 600;
-  color: #374151;
-  min-width: 80px;
-  text-align: center;
-}
-
-.loading-container {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  height: 100%;
-  gap: 16px;
-}
-
-.spinner {
-  width: 48px;
-  height: 48px;
-  border: 4px solid #e5e7eb;
-  border-top-color: #3b82f6;
-  border-radius: 50%;
-  animation: spin 1s linear infinite;
-}
-
-@keyframes spin {
-  to { transform: rotate(360deg); }
-}
-
 /* Dark mode */
-.dark .powerpoint-editor {
+[data-theme="dark"] .powerpoint-editor {
   background: #1f2937;
 }
 
-.dark .ppt-toolbar {
+[data-theme="dark"] .editor-header {
   background: #374151;
   border-color: #4b5563;
 }
 
-.dark .ppt-toolbar-left h3 {
+[data-theme="dark"] .editor-header h2 {
   color: #f3f4f6;
 }
 
-.dark .slides-sidebar {
+[data-theme="dark"] .slides-sidebar {
   background: #374151;
   border-color: #4b5563;
 }
 
-.dark .slides-sidebar h4 {
+[data-theme="dark"] .slides-sidebar h4 {
   color: #f3f4f6;
 }
 
-.dark .slide-thumbnail {
+[data-theme="dark"] .slide-thumbnail {
   background: #1f2937;
   border-color: #4b5563;
 }
 
-.dark .slide-thumbnail:hover {
+[data-theme="dark"] .slide-thumbnail:hover {
   border-color: #3b82f6;
   background: #1e3a8a;
 }
 
-.dark .slide-thumbnail.active {
+[data-theme="dark"] .slide-thumbnail.active {
   border-color: #3b82f6;
   background: #1e40af;
 }
 
-.dark .slide-preview-title {
+[data-theme="dark"] .thumbnail-number {
+  color: #9ca3af;
+}
+
+[data-theme="dark"] .thumbnail-title {
   color: #e5e7eb;
 }
 
-.dark .slide-canvas {
+[data-theme="dark"] .slide-content-wrapper {
   background: #111827;
 }
 
-.dark .slide-title-input,
-.dark .slide-content-input {
+[data-theme="dark"] .slide-title-input,
+[data-theme="dark"] .slide-content-input {
   background: #1f2937;
   color: #e5e7eb;
   border-color: #4b5563;
 }
 
-.dark .slide-title-preview {
+[data-theme="dark"] .slide-preview h1 {
   color: #f3f4f6;
 }
 
-.dark .slide-content-preview {
+[data-theme="dark"] .slide-preview div {
   color: #e5e7eb;
 }
 
-.dark .slide-navigation {
-  background: #374151;
+[data-theme="dark"] .add-slide-btn {
+  background: #2563eb;
 }
 
-.dark .slide-counter {
-  color: #e5e7eb;
+[data-theme="dark"] .add-slide-btn:hover {
+  background: #1d4ed8;
+}
+
+[data-theme="dark"] .slide-editor {
+  background: #1f2937;
 }

@@ -136,6 +136,28 @@
   box-shadow: var(--shadow-hover) !important;
 }
 
+.option-btn .button-text {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.option-btn-icon {
+  font-size: 1.2rem;
+  opacity: 0.4;
+  flex-shrink: 0;
+  transition: opacity 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+}
+
+.option-btn:hover .option-btn-icon {
+  opacity: 0.75;
+}
+
 /* Dark Mode */
 [data-theme="dark"] .options-container {
   background: linear-gradient(145deg, rgba(32, 32, 40, 0.92), rgba(20, 20, 28, 0.85));

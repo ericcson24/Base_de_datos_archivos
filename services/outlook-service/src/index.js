@@ -445,16 +445,39 @@ app.delete('/:id', authenticate, async (req, res) => {
     const username = req.user.username;
     const user = await dbAsync.get('SELECT id, microsoft_access_token FROM users WHERE username = ?', [username]);
 
-    if (!user || !user.microsoft_access_token) return res.status(401).json({ error: 'No vinculado' });
+    if (!user) return res.status(404).json({ error: 'Usuario no encontrado' });
 
     const { id } = req.params;
-    const client = getAuthenticatedClient(user.microsoft_access_token);
 
-    await client.api(`/me/events/${id}`).delete();
-    await dbAsync.run('DELETE FROM calendar_events WHERE microsoft_id = ?', [id]);
+    // Find event in local DB first
+    let dbEvent = await dbAsync.get('SELECT * FROM calendar_events WHERE microsoft_id = ? AND user_id = ?', [id, user.id]);
+    if (!dbEvent && !isNaN(id)) {
+      dbEvent = await dbAsync.get('SELECT * FROM calendar_events WHERE id = ? AND user_id = ?', [parseInt(id), user.id]);
+    }
+
+    if (!dbEvent) {
+      return res.status(404).json({ error: 'Evento no encontrado' });
+    }
+
+    const isLocalOnly = !dbEvent.microsoft_id || dbEvent.microsoft_id.startsWith('local_');
+
+    // Delete from Microsoft if linked
+    if (!isLocalOnly && user.microsoft_access_token) {
+      try {
+        const client = getAuthenticatedClient(user.microsoft_access_token);
+        await client.api(`/me/events/${dbEvent.microsoft_id}`).delete();
+      } catch (msError) {
+        console.error('[OUTLOOK] Microsoft Graph delete failed:', msError.message);
+        // Continue with local deletion even if MS fails
+      }
+    }
+
+    // Delete from local DB
+    await dbAsync.run('DELETE FROM calendar_events WHERE id = ?', [dbEvent.id]);
 
     res.json({ success: true, message: 'Evento eliminado', id });
   } catch (error) {
+    console.error('Error deleting event:', error);
     res.status(500).json({ error: 'Error eliminando evento' });
   }
 });
@@ -464,43 +487,89 @@ app.put('/:id', authenticate, async (req, res) => {
     const username = req.user.username;
     const user = await dbAsync.get('SELECT id, microsoft_access_token FROM users WHERE username = ?', [username]);
 
-    if (!user || !user.microsoft_access_token) return res.status(401).json({ error: 'No vinculado' });
+    if (!user) return res.status(404).json({ error: 'Usuario no encontrado' });
 
     const { id } = req.params;
     const { title, start, end, allDay, location, description, attendees, categories } = req.body;
-    const client = getAuthenticatedClient(user.microsoft_access_token);
 
-    const updatedEvent = {
-      subject: title,
-      location: location ? { displayName: location } : null,
-      body: { contentType: 'text', content: description || '' },
-      categories: Array.isArray(categories) ? categories : (categories ? [categories] : [])
-    };
-
-    if (allDay) {
-      updatedEvent.isAllDay = true;
-      updatedEvent.start = { date: start.split('T')[0], timeZone: 'Europe/Madrid' };
-      updatedEvent.end = { date: end.split('T')[0], timeZone: 'Europe/Madrid' };
-    } else {
-      updatedEvent.isAllDay = false;
-      updatedEvent.start = { dateTime: start, timeZone: 'Europe/Madrid' };
-      updatedEvent.end = { dateTime: end, timeZone: 'Europe/Madrid' };
+    // Find the event in the local DB first (by microsoft_id or by local numeric id)
+    let dbEvent = await dbAsync.get('SELECT * FROM calendar_events WHERE microsoft_id = ? AND user_id = ?', [id, user.id]);
+    if (!dbEvent && !isNaN(id)) {
+      dbEvent = await dbAsync.get('SELECT * FROM calendar_events WHERE id = ? AND user_id = ?', [parseInt(id), user.id]);
     }
 
-    const response = await client.api(`/me/events/${id}`).patch(updatedEvent);
+    if (!dbEvent) {
+      return res.status(404).json({ error: 'Evento no encontrado' });
+    }
 
+    const isLocalOnly = !dbEvent.microsoft_id || dbEvent.microsoft_id.startsWith('local_');
+    const categoriesJson = JSON.stringify(Array.isArray(categories) ? categories : (categories ? [categories] : []));
+
+    // If linked to Microsoft and user has token, update in Graph
+    if (!isLocalOnly && user.microsoft_access_token) {
+      try {
+        const client = getAuthenticatedClient(user.microsoft_access_token);
+
+        const updatedEvent = {
+          subject: title,
+          location: location ? { displayName: location } : null,
+          body: { contentType: 'text', content: description || '' },
+          categories: Array.isArray(categories) ? categories : (categories ? [categories] : [])
+        };
+
+        if (allDay) {
+          updatedEvent.isAllDay = true;
+          updatedEvent.start = { date: start.split('T')[0], timeZone: 'Europe/Madrid' };
+          updatedEvent.end = { date: end.split('T')[0], timeZone: 'Europe/Madrid' };
+        } else {
+          updatedEvent.isAllDay = false;
+          updatedEvent.start = { dateTime: start, timeZone: 'Europe/Madrid' };
+          updatedEvent.end = { dateTime: end, timeZone: 'Europe/Madrid' };
+        }
+
+        const response = await client.api(`/me/events/${dbEvent.microsoft_id}`).patch(updatedEvent);
+
+        // Update local DB with Microsoft response
+        await dbAsync.run(`
+            UPDATE calendar_events SET
+            subject = ?, body_preview = ?, start_time = ?, end_time = ?, is_all_day = ?,
+            location = ?, web_link = ?, categories = ?, last_synced = CURRENT_TIMESTAMP
+            WHERE id = ?
+        `, [
+            response.subject, response.bodyPreview, response.start.dateTime, response.end.dateTime,
+            response.isAllDay ? 1 : 0, response.location?.displayName, response.webLink,
+            categoriesJson, dbEvent.id
+        ]);
+
+        return res.json({ id: response.id, title: response.subject });
+      } catch (msError) {
+        console.error('[OUTLOOK] Microsoft Graph update failed:', msError.message);
+        // If token expired, invalidate and fall through to local-only update
+        if (msError.statusCode === 401 || msError.code === 'InvalidAuthenticationToken' ||
+            (msError.message && msError.message.includes('JWT is not well formed'))) {
+          try {
+            await dbAsync.run('UPDATE users SET microsoft_access_token = NULL, microsoft_refresh_token = NULL WHERE username = ?', [username]);
+          } catch (dbErr) {}
+        }
+        // Fall through to local-only update
+      }
+    }
+
+    // Local-only update (no Microsoft link, token expired, or Graph failed)
     await dbAsync.run(`
         UPDATE calendar_events SET
         subject = ?, body_preview = ?, start_time = ?, end_time = ?, is_all_day = ?,
-        location = ?, web_link = ?, last_synced = CURRENT_TIMESTAMP
-        WHERE microsoft_id = ?
+        location = ?, categories = ?, last_synced = CURRENT_TIMESTAMP
+        WHERE id = ?
     `, [
-        response.subject, response.bodyPreview, response.start.dateTime, response.end.dateTime,
-        response.isAllDay ? 1 : 0, response.location?.displayName, response.webLink, id
+        title, description || '', start, end,
+        allDay ? 1 : 0, location || null,
+        categoriesJson, dbEvent.id
     ]);
 
-    res.json({ id: response.id, title: response.subject });
+    res.json({ id: dbEvent.microsoft_id || dbEvent.id.toString(), title });
   } catch (error) {
+    console.error('Error updating event:', error);
     res.status(500).json({ error: 'Error actualizando evento' });
   }
 });
@@ -715,7 +784,7 @@ app.post('/assign-user', authenticate, async (req, res) => {
 // NEW ENDPOINT: Create Event (AI/Manual)
 app.post('/events', authenticate, async (req, res) => {
   try {
-    const { subject, body, startTime, endTime, location, isAllDay } = req.body;
+    const { subject, body, startTime, endTime, location, isAllDay, categories } = req.body;
     const username = req.user.username;
 
     if (!subject || !startTime || !endTime) {
@@ -748,7 +817,8 @@ app.post('/events', authenticate, async (req, res) => {
               timeZone: 'UTC'
           },
           location: { displayName: location || '' },
-          isAllDay: !!isAllDay
+          isAllDay: !!isAllDay,
+          categories: Array.isArray(categories) ? categories : (categories ? [categories] : [])
         };
 
         const result = await client.api('/me/events').post(newEvent);
@@ -778,8 +848,8 @@ app.post('/events', authenticate, async (req, res) => {
         INSERT INTO calendar_events (
             microsoft_id, user_id, subject, body_preview, 
             start_time, end_time, is_all_day, location, 
-            web_link, last_synced, created_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+            web_link, categories, last_synced, created_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
     `, [
         eventId,
         user.id,
@@ -789,7 +859,8 @@ app.post('/events', authenticate, async (req, res) => {
         endTime,
         isAllDay ? 1 : 0,
         location || null,
-        webLink || null
+        webLink || null,
+        JSON.stringify(Array.isArray(categories) ? categories : (categories ? [categories] : []))
     ]);
 
     res.json({ 
@@ -809,16 +880,9 @@ app.post('/events', authenticate, async (req, res) => {
 app.patch('/events/:id', authenticate, async (req, res) => {
   try {
     const { id } = req.params; // Can be local ID or Microsoft ID
-    const { subject, body, startTime, endTime, location, isAllDay } = req.body;
+    const { subject, body, startTime, endTime, location, isAllDay, categories } = req.body;
     const username = req.user.username;
 
-    // Get event to see if it has MS ID
-    // We look up by microsoft_id OR local ID depending on what's passed.
-    // However, the AI will likely find the event in DB first.
-    // Let's assume ID passed is DB PRIMARY ID or Microsoft ID? 
-    // To be safe, try to find in DB first.
-    
-    // We only support updating "my" events or if Admin.
     const user = await dbAsync.get('SELECT id, microsoft_access_token FROM users WHERE username = ?', [username]);
     
     // Check if event exists
@@ -837,8 +901,10 @@ app.patch('/events/:id', authenticate, async (req, res) => {
 
     if (!event) return res.status(404).json({ error: 'Event not found or not owned' });
 
-    // Update Outlook
-    if (event.microsoft_id && user.microsoft_access_token) {
+    const isLocalOnly = !event.microsoft_id || event.microsoft_id.startsWith('local_');
+
+    // Update Outlook if linked
+    if (!isLocalOnly && user.microsoft_access_token) {
         try {
             const client = getAuthenticatedClient(user.microsoft_access_token);
             const updateEvent = {};
@@ -848,28 +914,37 @@ app.patch('/events/:id', authenticate, async (req, res) => {
             if (endTime) updateEvent.end = { dateTime: endTime, timeZone: 'UTC' };
             if (location) updateEvent.location = { displayName: location };
             if (isAllDay !== undefined) updateEvent.isAllDay = isAllDay;
+            if (categories) updateEvent.categories = Array.isArray(categories) ? categories : [categories];
 
             await client.api(`/me/events/${event.microsoft_id}`).patch(updateEvent);
             console.log(`[OUTLOOK] Event updated in Cloud: ${event.microsoft_id}`);
         } catch (e) {
             console.error('[OUTLOOK] Update failed:', e.message);
+            // If token expired, invalidate
+            if (e.statusCode === 401 || (e.message && e.message.includes('JWT is not well formed'))) {
+                try {
+                    await dbAsync.run('UPDATE users SET microsoft_access_token = NULL, microsoft_refresh_token = NULL WHERE username = ?', [username]);
+                } catch (dbErr) {}
+            }
         }
     }
 
-    // Update Local DB
-    // Simple dynamic update builder
+    // Update Local DB - dynamic update builder
     let sets = [];
     let vals = [];
     if (subject) { sets.push('subject = ?'); vals.push(subject); }
-    if (body) { sets.push('body_preview = ?'); vals.push(body); } // simplified
+    if (body) { sets.push('body_preview = ?'); vals.push(body); }
     if (startTime) { sets.push('start_time = ?'); vals.push(startTime); }
     if (endTime) { sets.push('end_time = ?'); vals.push(endTime); }
     if (location) { sets.push('location = ?'); vals.push(location); }
     if (isAllDay !== undefined) { sets.push('is_all_day = ?'); vals.push(isAllDay ? 1 : 0); }
+    if (categories) {
+        const catsJson = JSON.stringify(Array.isArray(categories) ? categories : [categories]);
+        sets.push('categories = ?'); vals.push(catsJson);
+    }
     
     if (sets.length > 0) {
         sets.push('last_synced = CURRENT_TIMESTAMP');
-        // Add ID at end
         vals.push(event.id); 
         await dbAsync.run(`UPDATE calendar_events SET ${sets.join(', ')} WHERE id = ?`, vals);
     }

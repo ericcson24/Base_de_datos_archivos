@@ -123,6 +123,15 @@ const initDb = async () => {
           { col: 'protocol', sql: "ALTER TABLE rdp_connections ADD COLUMN protocol VARCHAR(50) DEFAULT 'rdp'" },
           { col: 'user_id', sql: 'ALTER TABLE rdp_connections ADD COLUMN user_id INTEGER NOT NULL DEFAULT 1' },
           { col: 'server_id', sql: "ALTER TABLE rdp_connections ADD COLUMN server_id TEXT NOT NULL DEFAULT ''" },
+          { col: 'security', sql: "ALTER TABLE rdp_connections ADD COLUMN security VARCHAR(20) DEFAULT 'any'" },
+          { col: 'domain', sql: 'ALTER TABLE rdp_connections ADD COLUMN domain VARCHAR(255)' },
+          { col: 'ignore_cert', sql: "ALTER TABLE rdp_connections ADD COLUMN ignore_cert BOOLEAN DEFAULT TRUE" },
+          { col: 'enable_drive', sql: "ALTER TABLE rdp_connections ADD COLUMN enable_drive BOOLEAN DEFAULT FALSE" },
+          { col: 'drive_path', sql: 'ALTER TABLE rdp_connections ADD COLUMN drive_path VARCHAR(255)' },
+          { col: 'enable_audio', sql: "ALTER TABLE rdp_connections ADD COLUMN enable_audio BOOLEAN DEFAULT FALSE" },
+          { col: 'password_encrypted', sql: 'ALTER TABLE rdp_connections ADD COLUMN password_encrypted TEXT' },
+          { col: 'last_used', sql: 'ALTER TABLE rdp_connections ADD COLUMN last_used TIMESTAMP' },
+          { col: 'is_active', sql: 'ALTER TABLE rdp_connections ADD COLUMN is_active BOOLEAN DEFAULT TRUE' },
         ];
 
         for (const m of migrations) {

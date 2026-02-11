@@ -11,6 +11,7 @@ const GroupManager = () => {
   const [newGroup, setNewGroup] = useState({ name: '', description: '' });
   const [selectedUsers, setSelectedUsers] = useState({}); // { groupId: userId }
   const [expandedGroups, setExpandedGroups] = useState({}); // { groupId: boolean } to load members on demand if needed, but I'll load them with the group or separately.
+  const [errorMsg, setErrorMsg] = useState('');
 
   // Actually, the list groups endpoint returns member count. 
   // I should probably fetch members when a group is expanded or just fetch all for now if not too many.
@@ -98,12 +99,13 @@ const GroupManager = () => {
       }
     } catch (error) {
       console.error('Error creating group:', error);
-      alert(error.message || 'Error creating group');
+      setErrorMsg(error.message || t('admin.errorCreatingGroup') || 'Error creating group');
+      setTimeout(() => setErrorMsg(''), 4000);
     }
   };
 
   const handleDeleteGroup = async (groupId) => {
-    if (!window.confirm(t('confirmDeleteGroup') || 'Are you sure you want to delete this group?')) return;
+    if (!window.confirm(t('admin.confirmDeleteGroup') || 'Are you sure you want to delete this group?')) return;
 
     try {
       const res = await fetchWithAuth(`/api/users/groups/${groupId}`, {
@@ -132,7 +134,8 @@ const GroupManager = () => {
         loadGroupMembers(groupId);
         setSelectedUsers(prev => ({ ...prev, [groupId]: '' }));
       } else {
-        alert(res.message);
+        setErrorMsg(res.message || t('admin.errorAddingMember') || 'Error adding member');
+        setTimeout(() => setErrorMsg(''), 4000);
       }
     } catch (error) {
       console.error('Error adding member:', error);
@@ -158,7 +161,7 @@ const GroupManager = () => {
       <div className="group-manager-header">
         <h2 className="group-manager-title">
           <FiUsers style={{ marginRight: '10px' }} />
-          {t('groupManagement') || 'Gestión de Grupos'}
+          {t('admin.groupManagement') || 'Gestión de Grupos'}
         </h2>
       </div>
 
@@ -166,38 +169,72 @@ const GroupManager = () => {
         <form onSubmit={handleCreateGroup}>
           <div className="form-row">
             <div className="form-group">
-              <label>{t('groupName') || 'Nombre del Grupo'}</label>
+              <label>{t('admin.groupName') || 'Nombre del Grupo'}</label>
               <input
                 type="text"
                 className="form-input"
                 value={newGroup.name}
                 onChange={e => setNewGroup({ ...newGroup, name: e.target.value })}
-                placeholder="Ej: Montadores"
+                placeholder={t('admin.groupNamePlaceholder') || 'Ej: Montadores'}
               />
             </div>
             <div className="form-group">
-              <label>{t('description') || 'Descripción'}</label>
+              <label>{t('admin.description') || 'Descripción'}</label>
               <input
                 type="text"
                 className="form-input"
                 value={newGroup.description}
                 onChange={e => setNewGroup({ ...newGroup, description: e.target.value })}
-                placeholder="Descripción opcional"
+                placeholder={t('admin.descriptionPlaceholder') || 'Descripción opcional'}
               />
             </div>
             <button type="submit" className="btn-primary">
-              <FiPlus /> {t('createGroup') || 'Crear Grupo'}
+              <FiPlus /> {t('admin.createGroup') || 'Crear Grupo'}
             </button>
           </div>
         </form>
       </div>
 
+      {errorMsg && (
+        <div style={{
+          padding: '12px 20px',
+          borderRadius: '10px',
+          marginBottom: '16px',
+          fontWeight: 500,
+          fontSize: '14px',
+          background: 'rgba(255, 59, 48, 0.1)',
+          color: '#ff3b30',
+          border: '1px solid rgba(255, 59, 48, 0.2)'
+        }}>
+          {errorMsg}
+        </div>
+      )}
+
       {loading ? (
-        <div>Loading...</div>
+        <div style={{
+          display: 'flex',
+          justifyContent: 'center',
+          alignItems: 'center',
+          padding: '60px 0',
+          color: 'var(--text-secondary)',
+          fontSize: '15px',
+          gap: '10px'
+        }}>
+          <span style={{
+            display: 'inline-block',
+            width: '20px',
+            height: '20px',
+            border: '2px solid var(--border-color)',
+            borderTopColor: 'var(--primary-color)',
+            borderRadius: '50%',
+            animation: 'spin 0.8s linear infinite'
+          }}></span>
+          {t('common.loading') || 'Loading...'}
+        </div>
       ) : groups.length === 0 ? (
         <div className="empty-state">
           <FiUsers size={48} />
-          <p>{t('noGroups') || 'No hay grupos creados'}</p>
+          <p>{t('admin.noGroups') || 'No hay grupos creados'}</p>
         </div>
       ) : (
         <div className="groups-grid">
@@ -212,7 +249,7 @@ const GroupManager = () => {
                   <button 
                     className="icon-btn delete" 
                     onClick={() => handleDeleteGroup(group.id)}
-                    title="Eliminar grupo"
+                    title={t('common.delete')}
                   >
                     <FiTrash2 />
                   </button>
@@ -222,7 +259,7 @@ const GroupManager = () => {
               <div className="group-card-body">
                 <div className="members-section">
                   <div className="members-header">
-                    <h4>{t('members') || 'Miembros'} ({group.members?.length || 0})</h4>
+                    <h4>{t('admin.members') || 'Miembros'} ({group.members?.length || 0})</h4>
                   </div>
                   
                   <div className="members-list">
@@ -248,7 +285,7 @@ const GroupManager = () => {
                     ))}
                     {(!group.members || group.members.length === 0) && (
                       <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', fontStyle: 'italic' }}>
-                        {t('noMembers') || 'Sin miembros'}
+                        {t('admin.noMembers') || 'Sin miembros'}
                       </p>
                     )}
                   </div>
@@ -259,7 +296,7 @@ const GroupManager = () => {
                       value={selectedUsers[group.id] || ''}
                       onChange={e => setSelectedUsers({ ...selectedUsers, [group.id]: e.target.value })}
                     >
-                      <option value="">{t('selectUser') || 'Seleccionar usuario...'}</option>
+                      <option value="">{t('admin.selectUser') || 'Seleccionar usuario...'}</option>
                       {users
                         .filter(u => !group.members?.some(m => m.id === u.id))
                         .filter(u => u.role !== 'guest')

@@ -625,3 +625,115 @@ input:checked + .slider:before {
         gap: 15px;
     }
 }
+
+/* ============ Light Theme Overrides ============ */
+
+/* Status text in light mode */
+.rdp-manager-container {
+    color: var(--admin-text-light, var(--text-color, #1d1d1f));
+}
+
+[data-theme='dark'] .rdp-manager-container {
+    color: var(--admin-text-dark, var(--text-color, #f5f5f7));
+}
+
+/* Connection card light mode */
+.rdp-connection-card {
+    border: 1px solid var(--admin-border-light, rgba(0,0,0,0.1));
+}
+
+[data-theme='dark'] .rdp-connection-card {
+    border: 1px solid var(--admin-border-dark, rgba(255,255,255,0.1));
+}
+
+/* Method rows in light mode */
+.method-row {
+    background: rgba(0,0,0,0.03);
+}
+
+[data-theme='dark'] .method-row {
+    background: rgba(255,255,255,0.03);
+}
+
+/* Info card light mode */
+.rdp-info-card {
+    background: rgba(0,0,0,0.03);
+}
+
+[data-theme='dark'] .rdp-info-card {
+    background: rgba(0,0,0,0.2);
+}
+
+/* Connect button light adjustments */
+.connect-btn.primary {
+    background: var(--admin-text-light, #1d1d1f);
+    color: #fff;
+}
+
+[data-theme='dark'] .connect-btn.primary {
+    background: #fff;
+    color: #000;
+}
+
+.connect-btn.primary:hover {
+    background: var(--admin-text-light, #333);
+    opacity: 0.9;
+}
+
+[data-theme='dark'] .connect-btn.primary:hover {
+    background: #e8e8e8;
+}
+
+.connect-btn.secondary {
+    background: transparent;
+    color: inherit;
+    border: 1px solid var(--admin-border-light, rgba(0,0,0,0.15));
+}
+
+[data-theme='dark'] .connect-btn.secondary {
+    border: 1px solid var(--admin-border-dark, rgba(255,255,255,0.2));
+}
+
+/* Restart button light mode */
+.btn-restart {
+    background-color: rgba(0,0,0,0.05);
+    color: var(--admin-text-light, #1d1d1f);
+    border: 1px solid var(--admin-border-light, rgba(0,0,0,0.15));
+}
+
+[data-theme='dark'] .btn-restart {
+    background-color: rgba(255,255,255,0.1);
+    color: #fff;
+    border: 1px solid rgba(255,255,255,0.2);
+}
+
+/* Status card border in light mode */
+.rdp-status-card {
+    border: 1px solid var(--admin-border-light, rgba(0,0,0,0.1));
+}
+
+[data-theme='dark'] .rdp-status-card {
+    border: 1px solid rgba(255,255,255,0.1);
+}
+
+/* Glassmorphism light mode */
+.rdp-manager-container .glassmorphism {
+    background: var(--admin-glass-light, rgba(255,255,255,0.7));
+    border: 1px solid var(--admin-border-light, rgba(0,0,0,0.1));
+}
+
+[data-theme='dark'] .rdp-manager-container .glassmorphism {
+    background: var(--admin-glass-dark, rgba(20,20,20,0.7));
+    border: 1px solid var(--admin-border-dark, rgba(255,255,255,0.1));
+}
+
+/* Setting description light mode */
+.setting-desc {
+    color: var(--admin-text-light, #666);
+    opacity: 0.6;
+}
+
+[data-theme='dark'] .setting-desc {
+    color: rgba(255,255,255,0.6);
+    opacity: 1;
+}

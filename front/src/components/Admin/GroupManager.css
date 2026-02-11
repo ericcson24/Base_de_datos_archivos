@@ -238,3 +238,8 @@
   border-radius: 8px;
   border: 1px dashed var(--border-color);
 }
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}

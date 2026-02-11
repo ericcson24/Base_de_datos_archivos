@@ -15,6 +15,7 @@ import AIResultsModal from '../Modals/AIResultsModal';
 import SidebarPanel from './SidebarPanel';
 import FileItem from './FileItem';
 import NotificationCenter from '../Common/NotificationCenter';
+import { FiHardDrive, FiUsers, FiArrowLeft, FiCalendar, FiMonitor, FiSettings, FiLogOut } from 'react-icons/fi';
 import { 
   getAuthToken, 
   downloadFile, 
@@ -1046,14 +1047,14 @@ useEffect(() => {
                 className={`sidebar-btn ${currentView === 'privada' ? 'active' : ''}`}
                 onClick={() => changeView('privada')}
               >
-                {t('userPanel.myDrive')}
+                <FiHardDrive className="sidebar-btn-icon" /> {t('userPanel.myDrive')}
               </button>
 
               <button
                 className={`sidebar-btn ${currentView === 'shared' ? 'active' : ''}`}
                 onClick={() => changeView('shared')}
               >
-                {t('userPanel.sharedWithMe')}
+                <FiUsers className="sidebar-btn-icon" /> {t('userPanel.sharedWithMe')}
               </button>
             </div>
           </div>
@@ -1061,7 +1062,7 @@ useEffect(() => {
 
         <div className="sidebar-footer">
           <button className="sidebar-btn" onClick={onBackToFolders}>
-            {t('common.back')}
+            <FiArrowLeft className="sidebar-btn-icon" /> {t('common.back')}
           </button>
           <div className="sidebar-footer-actions">
             <button className="sidebar-btn sidebar-btn-action" onClick={() => {
@@ -1069,19 +1070,19 @@ useEffect(() => {
                 onGoToCalendar();
               }
             }}>
-              {t('userPanel.calendar')}
+              <FiCalendar className="sidebar-btn-icon" /> {t('userPanel.calendar')}
             </button>
             <button className="sidebar-btn sidebar-btn-action" onClick={() => {
                    if (onGoToRemote) onGoToRemote();
             }}>
-              {t('common.remoteDesktop')}
+              <FiMonitor className="sidebar-btn-icon" /> {t('common.remoteDesktop')}
             </button>
           </div>
           <button className="sidebar-btn" onClick={() => setShowSettingsModal(true)}>
-            {t('userPanel.settings')}
+            <FiSettings className="sidebar-btn-icon" /> {t('userPanel.settings')}
           </button>
-          <button className="sidebar-btn" onClick={onLogout}>
-            {t('userPanel.logout')}
+          <button className="sidebar-btn sidebar-btn-logout" onClick={onLogout}>
+            <FiLogOut className="sidebar-btn-icon" /> {t('userPanel.logout')}
           </button>
         </div>
       </div>
@@ -1111,24 +1112,21 @@ useEffect(() => {
           onDrop={handleDrop}
         >{/* Modern Search and Controls Bar - Moved outside file-grid */}
         <div className="search-controls-wrapper relative z-10 mb-6 w-full px-6 min-h-[5%]">
-          <div className="search-container flex items-center justify-between glassmorphism rounded-2xl p-4 shadow-lg border-gray-200/50 transition-all duration-300 hover:shadow-xl">
+          <div className="search-controls-bar flex items-center justify-between glassmorphism rounded-2xl p-4 shadow-lg border-gray-200/50 transition-all duration-300 hover:shadow-xl">
             {/* Search Section */}
             <div className="flex items-center space-x-3 flex-1 max-w-md">
               <div
   role="search"
-  onClick={() => setIsSearchExpanded(true)}
-  className={`search-container relative flex items-center overflow-hidden transition-all duration-300 ease-in-out border cursor-text ${isSearchExpanded
-    ? 'w-80 h-11 rounded-xl shadow-lg pl-3 pr-10 justify-start'
-    : 'w-12 h-12 rounded-full justify-center'
+  onClick={() => !isSearchExpanded && setIsSearchExpanded(true)}
+  className={`search-container flex items-center transition-all duration-300 ease-in-out cursor-text ${
+    isSearchExpanded
+      ? 'expanded w-72 h-10 rounded-lg px-3 gap-2'
+      : 'collapsed w-10 h-10 rounded-lg justify-center'
   }`}
 >
   {/* 🔍 Icono */}
   <svg
-    className={`search-clear-btn transition-all duration-300 ease-in-out ${
-      isSearchExpanded
-        ? 'w-4 h-4 mr-2 opacity-70 translate-x-0'
-        : 'w-5 h-5 opacity-100'
-    }`}
+    className="w-4 h-4 flex-shrink-0 search-icon-color"
     fill="none"
     stroke="currentColor"
     viewBox="0 0 24 24"
@@ -1141,132 +1139,108 @@ useEffect(() => {
     />
   </svg>
 
-  {/* Input */}
-  <input
-    type="text"
-    placeholder={t('userPanel.searchPlaceholder')}
-    value={searchQuery}
-    onChange={handleSearch}
-    onKeyPress={(e) => e.key === 'Enter' && e.target.blur()}
-    autoFocus={isSearchExpanded}
-    className={`search-input absolute left-0 w-full h-full bg-transparent border-none outline-none text-[14px] flex items-center pl-10 pr-10 transition-all duration-300 ease-in-out search-input-reset ${
-      isSearchExpanded
-        ? 'opacity-100 translate-x-0 cursor-text'
-        : 'opacity-0 -translate-x-5 pointer-events-none'
-    }`}
-  />
-
-  {/* Botón limpiar */}
-  {isSearchExpanded && searchQuery && (
-    <button
-      onClick={(e) => {
-        e.stopPropagation(); // evita cerrar el buscador
-        setSearchQuery('');
-      }}
-      className="search-clear-btn absolute right-3 flex items-center justify-center w-6 h-6 rounded-full transition-colors duration-200"
-      title={t('userPanel.clearSearch')}
-    >
-      <svg
-        className="w-4 h-4"
-        fill="none"
-        stroke="currentColor"
-        viewBox="0 0 24 24"
-      >
-        <path
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          strokeWidth={2}
-          d="M6 18L18 6M6 6l12 12"
-        />
-      </svg>
-    </button>
+  {/* Input — solo visible cuando expandido, en flujo normal */}
+  {isSearchExpanded && (
+    <>
+      <input
+        type="text"
+        placeholder={t('userPanel.searchPlaceholder')}
+        value={searchQuery}
+        onChange={handleSearch}
+        onKeyPress={(e) => e.key === 'Enter' && e.target.blur()}
+        autoFocus
+        className="search-input flex-1 min-w-0 bg-transparent border-none outline-none text-[13px] search-input-reset"
+      />
+      {searchQuery && (
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            setSearchQuery('');
+          }}
+          className="search-clear-btn flex-shrink-0 flex items-center justify-center w-5 h-5 rounded transition-colors duration-200"
+          title={t('userPanel.clearSearch')}
+        >
+          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        </button>
+      )}
+    </>
   )}
 </div>
 
 
 
-              {/* Botón IA REFACTORIZADO para igualar diseño del buscador */}
+              {/* Botón IA — mismo estilo cuadrado que el buscador */}
               <div
                 role="search"
-                onClick={() => setIsAIExpanded(true)}
-                className={`relative flex items-center overflow-hidden transition-all duration-300 ease-in-out border cursor-pointer ${isAIExpanded
-                  // Estilo expandido (igual que Search)
-                  ? 'w-80 h-11 rounded-xl shadow-lg border-gray-200 justify-start pl-3 pr-10'
-                  // Estilo colapsado
-                  : 'w-12 h-12 rounded-full justify-center border-transparent'
+                onClick={() => !isAIExpanded && setIsAIExpanded(true)}
+                className={`ai-container flex items-center transition-all duration-300 ease-in-out cursor-pointer ${
+                  isAIExpanded
+                    ? 'expanded w-72 h-10 rounded-lg px-3 gap-2'
+                    : 'collapsed w-10 h-10 rounded-lg justify-center'
                 }`}
                 title={t('userPanel.aiChatbotTitle')}
               >
                   {/* Icono IA */}
-                  <div className={`flex items-center justify-center transition-all duration-300 z-10 ${
-                     isAIExpanded ? 'mr-2 opacity-70' : 'w-full h-full opacity-100'
-                  }`}>
-                    <svg
-                      className={`${isAIExpanded ? 'w-4 h-4' : 'w-5 h-5'} text-purple-500`}
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
-                    </svg>
-                  </div>
+                  <svg
+                    className="w-4 h-4 flex-shrink-0 text-purple-500"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+                  </svg>
 
-                  {/* Input IA (Replica exacta del input de búsqueda) */}
-                  <input
-                    type="text"
-                    placeholder={
-                      (indexingStatus?.isBuilding) 
-                        ? "Procesando archivos... (Espere)" 
-                        : (!indexingStatus?.isIndexed || indexingStatus?.fileCount === 0) 
-                            ? "Indexando tus archivos..." 
-                            : t('userPanel.aiPlaceholder')
-                    }
-                    value={aiQuery}
-                    onChange={handleAISearch}
-                    onKeyDown={(e) => {
-                       if (e.key === 'Enter') {
-                         submitAIQuery();
-                         e.target.blur(); // Opcional
-                       }
-                    }}
-                    onBlur={() => !aiQuery && setIsAIExpanded(false)}
-                    autoFocus={isAIExpanded}
-                    className={`absolute left-0 w-full h-full bg-transparent border-none outline-none text-[14px] flex items-center px-9 transition-all duration-300 ease-in-out search-input-reset z-0 ${
-                      isAIExpanded 
-                         ? 'opacity-100 translate-x-0 cursor-text' 
-                         : 'opacity-0 -translate-x-5 pointer-events-none'
-                    }`}
-                  />
+                  {/* Input + controles — solo visible cuando expandido, en flujo normal */}
+                  {isAIExpanded && (
+                    <>
+                      <input
+                        type="text"
+                        placeholder={
+                          (indexingStatus?.isBuilding)
+                            ? "Procesando archivos... (Espere)"
+                            : (!indexingStatus?.isIndexed || indexingStatus?.fileCount === 0)
+                                ? "Indexando tus archivos..."
+                                : t('userPanel.aiPlaceholder')
+                        }
+                        value={aiQuery}
+                        onChange={handleAISearch}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            submitAIQuery();
+                            e.target.blur();
+                          }
+                        }}
+                        onBlur={() => !aiQuery && setIsAIExpanded(false)}
+                        autoFocus
+                        className="ai-input flex-1 min-w-0 bg-transparent border-none outline-none text-[13px] search-input-reset"
+                      />
 
-                  {/* Indicator de Indexación */}
-                  {isAIExpanded && indexingStatus && (indexingStatus.isBuilding || !indexingStatus.isIndexed) && (
-                     <div className="absolute right-3 top-0 bottom-0 flex items-center pointer-events-none z-20">
-                        <span className="flex h-3 w-3 relative" title="Indexando archivos...">
+                      {/* Indicador de indexación */}
+                      {indexingStatus && (indexingStatus.isBuilding || !indexingStatus.isIndexed) && (
+                        <span className="flex h-2.5 w-2.5 flex-shrink-0 relative" title="Indexando archivos...">
                           <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-purple-400 opacity-75"></span>
-                          <span className="relative inline-flex rounded-full h-3 w-3 bg-purple-500"></span>
+                          <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-purple-500"></span>
                         </span>
-                     </div>
-                  )}
+                      )}
 
-                  {/* Botón Enviar (Flecha) visible solo si hay texto */}
-                  {isAIExpanded && aiQuery && (
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        submitAIQuery();
-                      }}
-                      className="absolute right-3 flex items-center justify-center w-6 h-6 rounded-full hover:bg-gray-100 dark:hover:bg-slate-700 transition-colors duration-200 z-20"
-                      title={t('userPanel.sendAIQuery')}
-                    >
-                      <svg
-                        className="w-4 h-4 text-purple-500"
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24"
-                      >
-                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
-                      </svg>
-                    </button>
+                      {/* Botón enviar */}
+                      {aiQuery && (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            submitAIQuery();
+                          }}
+                          className="flex-shrink-0 flex items-center justify-center w-5 h-5 rounded transition-colors duration-200 hover:bg-purple-100 dark:hover:bg-purple-900/30"
+                          title={t('userPanel.sendAIQuery')}
+                        >
+                          <svg className="w-3.5 h-3.5 text-purple-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
+                          </svg>
+                        </button>
+                      )}
+                    </>
                   )}
               </div>
 

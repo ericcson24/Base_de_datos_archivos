@@ -119,7 +119,7 @@ const AITaskModal = ({ isOpen, onClose, onTaskCreated, user }) => {
         <div className="modal-body">
           <div className="ai-task-input-section">
             <p style={{ opacity: 0.8, fontSize: '0.9rem' }}>
-              {t('calendar.aiTaskHelper') || 'Describe tu tarea en lenguaje natural. Ej: "Reunión de equipo mañana a las 10am" o "Entregar informe el viernes al mediodía".'}
+              {t('calendar.aiTaskHelper') || 'Describe lo que quieres hacer en lenguaje natural. Ej: "Reunión de equipo mañana a las 10am", "Cambia la reunión al viernes", "Elimina el evento de mañana", "Crea una categoría llamada Urgente en rojo".'}
             </p>
             <textarea 
               className="ai-prompt-textarea"
@@ -191,7 +191,7 @@ const AITaskModal = ({ isOpen, onClose, onTaskCreated, user }) => {
             {t('common.cancel')}
           </Button>
           <Button variant="primary" onClick={handleSubmit} disabled={isLoading || !prompt.trim()}>
-            {isLoading ? t('common.processing') : (t('calendar.createTask') || 'Crear Tarea')}
+            {isLoading ? t('common.processing') : (t('calendar.aiSend') || 'Enviar')}
           </Button>
         </div>
       </FrostedContainer>

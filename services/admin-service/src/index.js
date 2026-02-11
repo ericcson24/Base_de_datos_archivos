@@ -411,6 +411,62 @@ app.get('/api/inbox', requireAdmin, async (req, res) => {
   }
 });
 
+// Diagnostics endpoint
+app.get('/api/diagnostics', requireAdmin, async (req, res) => {
+  const diagnostics = [];
+
+  // Check Database
+  try {
+    await dbAsync.get("SELECT 1");
+    diagnostics.push({ name: 'Database', status: 'ok', message: 'Connection successful' });
+  } catch (e) {
+    diagnostics.push({ name: 'Database', status: 'error', message: e.message });
+  }
+
+  // Check Memory
+  try {
+    const mem = process.memoryUsage();
+    const usedMB = Math.round(mem.heapUsed / 1024 / 1024);
+    const totalMB = Math.round(mem.heapTotal / 1024 / 1024);
+    diagnostics.push({ name: 'Memory', status: usedMB < totalMB * 0.9 ? 'ok' : 'warning', message: `${usedMB}MB / ${totalMB}MB` });
+  } catch (e) {
+    diagnostics.push({ name: 'Memory', status: 'error', message: e.message });
+  }
+
+  // Check Disk (via os)
+  try {
+    const os = require('os');
+    const freeMem = Math.round(os.freemem() / 1024 / 1024);
+    const totalMem = Math.round(os.totalmem() / 1024 / 1024);
+    diagnostics.push({ name: 'System Memory', status: freeMem > 100 ? 'ok' : 'warning', message: `Free: ${freeMem}MB / Total: ${totalMem}MB` });
+  } catch (e) {
+    diagnostics.push({ name: 'System Memory', status: 'error', message: e.message });
+  }
+
+  // Check uptime
+  try {
+    const uptimeSeconds = process.uptime();
+    const hours = Math.floor(uptimeSeconds / 3600);
+    const minutes = Math.floor((uptimeSeconds % 3600) / 60);
+    diagnostics.push({ name: 'Uptime', status: 'ok', message: `${hours}h ${minutes}m` });
+  } catch (e) {
+    diagnostics.push({ name: 'Uptime', status: 'error', message: e.message });
+  }
+
+  // Check user count
+  try {
+    const result = await dbAsync.get("SELECT COUNT(*) as count FROM users");
+    diagnostics.push({ name: 'Users', status: 'ok', message: `${result.count} registered users` });
+  } catch (e) {
+    diagnostics.push({ name: 'Users', status: 'error', message: e.message });
+  }
+
+  // Check Node version
+  diagnostics.push({ name: 'Node.js', status: 'ok', message: process.version });
+
+  res.json({ success: true, diagnostics });
+});
+
 // Programar eliminación de usuario
 app.post('/api/users/:id/schedule-deletion', requireAdmin, async (req, res) => {
   try {

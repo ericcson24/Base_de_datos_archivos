@@ -43,7 +43,12 @@
     "downloadError": "Error al iniciar la descarga",
     "settings": "Ajustes",
     "logout": "Cerrar Sesión",
-    "remoteDesktop": "Escritorio Remoto"
+    "remoteDesktop": "Escritorio Remoto",
+    "required": "Este campo es obligatorio",
+    "processing": "Procesando...",
+    "networkError": "Error de conexión a la red",
+    "selectUser": "Seleccionar usuario",
+    "selectGroup": "Seleccionar grupo"
   },
   "rdp": {
     "connectTitle": "Conexión a Escritorio Remoto",
@@ -379,7 +384,15 @@
     "noGroups": "No hay grupos creados",
     "members": "Miembros",
     "noMembers": "Sin miembros",
-    "selectUser": "Seleccionar usuario..."
+    "selectUser": "Seleccionar usuario...",
+    "aiTaskBuilder": "Asistente IA de Tareas",
+    "aiTaskHelper": "Describe lo que quieres hacer en lenguaje natural. Ej: \"Reunión de equipo mañana a las 10am\", \"Cambia la reunión al viernes\", \"Elimina el evento de mañana\", \"Crea una categoría llamada Urgente en rojo\".",
+    "aiTaskPlaceholder": "Escribe aquí tu tarea...",
+    "aiSend": "Enviar a IA",
+    "aiProcess": "Procesando con IA...",
+    "myself": "Mí mismo",
+    "specificUser": "Usuario específico",
+    "group": "Grupo"
   },
   "sidebar": {
     "errorLoadingFile": "Error al cargar el archivo",
@@ -460,7 +473,8 @@
   },
   "audioPlayer": {
     "download": "Descargar",
-    "title": "Reproductor de Audio"
+    "title": "Reproductor de Audio",
+    "speed": "Velocidad"
   },
   "imageEditor": {
     "brightness": "Brillo",
@@ -512,7 +526,16 @@
     "saving": "Guardando...",
     "save": "Guardar",
     "cannotDeleteLastSheet": "No puedes eliminar la última hoja",
-    "enterSheetName": "Nombre de la hoja:"
+    "enterSheetName": "Nombre de la hoja:",
+    "undo": "Deshacer",
+    "redo": "Rehacer",
+    "bold": "Negrita",
+    "italic": "Cursiva",
+    "textColor": "Color de texto",
+    "bgColor": "Color de fondo",
+    "row": "Fila",
+    "col": "Col",
+    "typingPlaceholder": "Escribe aquí..."
   },
   "wordEditor": {
     "docNotSupported": "El formato .doc (Word 97-2003) no es soportado. Por favor, convierte el archivo a .docx o descárgalo para verlo.",
@@ -559,7 +582,8 @@
   },
   "videoPlayer": {
     "fullscreen": "Pantalla completa",
-    "download": "Descargar"
+    "download": "Descargar",
+    "speed": "Velocidad"
   },
   "fileEditor": {
     "emptyFile": "El archivo está vacío",
@@ -667,7 +691,59 @@
     "passwordMethod": "Método de contraseña",
     "accountCreated": "Cuenta creada",
     "note": "Nota",
-    "failedAttempts": "Intentos fallidos"
+    "failedAttempts": "Intentos fallidos",
+    "dashboard": "Panel de Control",
+    "users": "Usuarios",
+    "groups": "Grupos",
+    "system": "Sistema",
+    "logs": "Registros",
+    "rdpAdmin": "Administración RDP",
+    "rdpConnections": "Conexiones RDP",
+    "notifications": "Notificaciones",
+    "pendingDeletions": "Eliminaciones Pendientes",
+    "timeRemaining": "Tiempo Restante",
+    "cancelDeletion": "Cancelar Eliminación",
+    "lock": "Bloquear",
+    "newUser": "Nuevo Usuario",
+    "editUser": "Editar Usuario",
+    "newPassword": "Nueva Contraseña (Opcional)",
+    "leaveBlankToKeep": "Dejar en blanco para mantener",
+    "roleUser": "Usuario",
+    "roleBoss": "Jefe",
+    "roleAdmin": "Administrador",
+    "roleGuest": "Invitado (Sin Grupos)",
+    "greeting": "Hola, {{name}}",
+    "userCreated": "Usuario creado correctamente",
+    "errorCreatingUser": "Error al crear usuario",
+    "deletionScheduled": "Eliminación programada",
+    "deletionCancelled": "Eliminación cancelada",
+    "userUpdated": "Usuario actualizado correctamente",
+    "errorUpdatingUser": "Error al actualizar usuario",
+    "errorLockingUser": "Error al cambiar estado del usuario",
+    "userLocked": "Usuario bloqueado correctamente",
+    "userUnlocked": "Usuario desbloqueado correctamente",
+    "diagnosticsComplete": "Diagnóstico completado",
+    "diagnosticsError": "Error al ejecutar diagnóstico",
+    "deleteUser": "Eliminar Usuario",
+    "deleteConfirmationMessage": "¿Estás seguro de que deseas eliminar al usuario \"{{name}}\"?",
+    "warning": "Advertencia",
+    "deleteWarningDetail": "Esta acción programará la eliminación de todos los datos del usuario (archivos, eventos, correos). Tienes 5 minutos para cancelar esta operación.",
+    "confirmDelete": "Programar Eliminación",
+    "webAccess": "Acceso Web",
+    "webAccessDesc": "Conectar de forma segura desde el navegador",
+    "nativeClient": "Cliente Nativo",
+    "nativeClientDesc": "Descargar configuración para cliente RDP",
+    "groupManagement": "Gestión de Grupos",
+    "groupName": "Nombre del Grupo",
+    "groupNamePlaceholder": "Ej: Montadores",
+    "description": "Descripción",
+    "descriptionPlaceholder": "Descripción opcional",
+    "createGroup": "Crear Grupo",
+    "noGroups": "No hay grupos creados",
+    "confirmDeleteGroup": "¿Estás seguro de que quieres eliminar este grupo?",
+    "members": "Miembros",
+    "noMembers": "Sin miembros",
+    "selectUser": "Seleccionar usuario..."
   },
   "contextMenu": {
     "open": "Abrir",
@@ -692,7 +768,9 @@
     "open": "Abrir",
     "download": "Descargar",
     "noFilesFound": "No se encontraron archivos relacionados.",
-    "foundIn": "Encontrado en:"
+    "foundIn": "Encontrado en:",
+    "viewInContext": "Ver",
+    "selectFileToView": "Selecciona un archivo para ver su contenido"
   },
   "ai": {
     "rateLimitError": "Demasiadas solicitudes a la IA. Intenta de nuevo en {{seconds}} segundos.",

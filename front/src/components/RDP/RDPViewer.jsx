@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState, useCallback } from 'react';
 import Guacamole from 'guacamole-common-js';
 import { useLanguage } from '../../context/LanguageContext';
 import './RDPViewer.css';
@@ -6,10 +6,14 @@ import './RDPViewer.css';
 const RDPViewer = ({ connectionId, token, onClose }) => {
     const { t } = useLanguage();
     const elementRef = useRef(null);
-    const [client, setClient] = useState(null);
+    const clientRef = useRef(null);
+    const keyboardRef = useRef(null);
     const [display, setDisplay] = useState(null);
     const [connectionState, setConnectionState] = useState('CONNECTING');
     const [errorMsg, setErrorMsg] = useState('');
+    const [pingMs, setPingMs] = useState(null);
+    const [lastSync, setLastSync] = useState(null);
+    const [frameCount, setFrameCount] = useState(0);
 
     // Connect to Guacamole
     useEffect(() => {
@@ -42,7 +46,10 @@ const RDPViewer = ({ connectionId, token, onClose }) => {
         const tunnel = new Guacamole.WebSocketTunnel(tunnelUrl);
         
         const guacClient = new Guacamole.Client(tunnel);
-        setClient(guacClient);
+        clientRef.current = guacClient;
+
+        // Track sync frames for ping calculation
+        let syncCounter = 0;
 
         // Error handler
         guacClient.onerror = (error) => {
@@ -71,13 +78,36 @@ const RDPViewer = ({ connectionId, token, onClose }) => {
             }
         };
 
+        // Sync handler — track ping/latency and frame count
+        guacClient.onsync = (timestamp) => {
+            syncCounter++;
+            const now = Date.now();
+            // Calculate rough ping based on server timestamp vs local time
+            const rtt = Math.abs(now - timestamp);
+            // Only update ping every 5 syncs to avoid UI flicker
+            if (syncCounter % 5 === 0) {
+                setPingMs(rtt > 5000 ? null : rtt); // ignore absurd values
+            }
+            setLastSync(now);
+            setFrameCount(syncCounter);
+        };
+
         // State change handler
         guacClient.onstatechange = (state) => {
             switch (state) {
                 case 0: setConnectionState('IDLE'); break;
                 case 1: setConnectionState('CONNECTING'); break;
                 case 2: setConnectionState('WAITING'); break;
-                case 3: setConnectionState('CONNECTED'); break;
+                case 3: 
+                    setConnectionState('CONNECTED');
+                    // Auto-focus the display element when connected
+                    setTimeout(() => {
+                        const displayEl = elementRef.current?.querySelector('div');
+                        if (displayEl) {
+                            displayEl.focus();
+                        }
+                    }, 200);
+                    break;
                 case 4: setConnectionState('DISCONNECTING'); break;
                 case 5: setConnectionState('DISCONNECTED'); break;
                 default: break;
@@ -94,34 +124,68 @@ const RDPViewer = ({ connectionId, token, onClose }) => {
         containerEl.innerHTML = '';
         containerEl.appendChild(displayElement);
 
+        // Make the display element focusable for keyboard input
+        displayElement.tabIndex = 0;
+        displayElement.style.outline = 'none'; // Remove focus outline
+
         // Connect — pass query params here so URL is clean (tunnelURL + "?" + data)
         guacClient.connect(connectData);
 
-        // Mouse & Keyboard - attach keyboard to display element instead of document
-        // to avoid capturing keystrokes from toolbar buttons
+        // ========== MOUSE ==========
+        // Create mouse handler on the display element
         const mouse = new Guacamole.Mouse(displayElement);
-        displayElement.tabIndex = 0; // Make focusable for keyboard capture
-        const keyboard = new Guacamole.Keyboard(displayElement);
 
         mouse.onmousedown = mouse.onmouseup = mouse.onmousemove = (mouseState) => {
+            // When user clicks/interacts, ensure focus for keyboard
+            if (mouseState.left || mouseState.right || mouseState.middle) {
+                displayElement.focus();
+            }
             guacClient.sendMouseState(mouseState);
         };
 
+        // Touch support for mobile/tablet
+        let touch = null;
+        if (Guacamole.Mouse.Touchscreen) {
+            touch = new Guacamole.Mouse.Touchscreen(displayElement);
+            touch.onmousedown = touch.onmouseup = touch.onmousemove = (mouseState) => {
+                guacClient.sendMouseState(mouseState);
+            };
+        }
+
+        // ========== KEYBOARD ==========
+        // Attach keyboard to DOCUMENT for reliable key capture in fullscreen mode.
+        // The RDPViewer takes over the entire viewport, so there's no conflict
+        // with other input elements.
+        const keyboard = new Guacamole.Keyboard(document);
+        keyboardRef.current = keyboard;
+
         keyboard.onkeydown = (keysym) => {
             guacClient.sendKeyEvent(1, keysym);
+            return false; // Prevent browser default for captured keys
         };
         keyboard.onkeyup = (keysym) => {
             guacClient.sendKeyEvent(0, keysym);
+            return false;
         };
+
+        // Focus the display element so user sees it's interactive
+        displayElement.focus();
 
         // Cleanup
         return () => {
             keyboard.onkeydown = null;
             keyboard.onkeyup = null;
+            keyboardRef.current = null;
             mouse.onmousedown = null;
             mouse.onmouseup = null;
             mouse.onmousemove = null;
+            if (touch) {
+                touch.onmousedown = null;
+                touch.onmouseup = null;
+                touch.onmousemove = null;
+            }
             guacClient.disconnect();
+            clientRef.current = null;
             if (containerEl) {
                 containerEl.innerHTML = '';
             }
@@ -168,27 +232,63 @@ const RDPViewer = ({ connectionId, token, onClose }) => {
         };
     }, [display]); // Only re-run when display changes, not on every state change
 
-    const sendCtrlAltDel = () => {
-        if (!client) return;
+    // Ping "alive" indicator — detect stale connection
+    const [isStale, setIsStale] = useState(false);
+    useEffect(() => {
+        if (connectionState !== 'CONNECTED') return;
+        const staleCheck = setInterval(() => {
+            if (lastSync && Date.now() - lastSync > 5000) {
+                setIsStale(true);
+            } else {
+                setIsStale(false);
+            }
+        }, 1000);
+        return () => clearInterval(staleCheck);
+    }, [connectionState, lastSync]);
+
+    const sendCtrlAltDel = useCallback(() => {
+        const c = clientRef.current;
+        if (!c) return;
         // Send Ctrl+Alt+Del sequence
         // 0xFFE3 (Ctrl), 0xFFE9 (Alt), 0xFFFF (Delete)
-        // Press
-        client.sendKeyEvent(1, 0xFFE3);
-        client.sendKeyEvent(1, 0xFFE9);
-        client.sendKeyEvent(1, 0xFFFF);
-        // Release
-        client.sendKeyEvent(0, 0xFFFF);
-        client.sendKeyEvent(0, 0xFFE9);
-        client.sendKeyEvent(0, 0xFFE3);
+        c.sendKeyEvent(1, 0xFFE3);
+        c.sendKeyEvent(1, 0xFFE9);
+        c.sendKeyEvent(1, 0xFFFF);
+        c.sendKeyEvent(0, 0xFFFF);
+        c.sendKeyEvent(0, 0xFFE9);
+        c.sendKeyEvent(0, 0xFFE3);
+    }, []);
+
+    // Format ping display
+    const getPingDisplay = () => {
+        if (connectionState !== 'CONNECTED') return null;
+        if (isStale) return { text: 'STALE', color: '#f44336', icon: '🔴' };
+        if (pingMs === null) return { text: '...', color: '#ff9800', icon: '🟡' };
+        if (pingMs < 50) return { text: `${pingMs}ms`, color: '#4caf50', icon: '🟢' };
+        if (pingMs < 150) return { text: `${pingMs}ms`, color: '#8bc34a', icon: '🟢' };
+        if (pingMs < 300) return { text: `${pingMs}ms`, color: '#ff9800', icon: '🟡' };
+        return { text: `${pingMs}ms`, color: '#f44336', icon: '🔴' };
     };
+
+    const pingInfo = getPingDisplay();
 
     return (
         <div className="rdp-viewer-container">
             {/* Toolbar */}
-            <div className="rdp-toolbar glassmorphism">
+            <div className="rdp-toolbar glassmorphism" onMouseDown={(e) => e.stopPropagation()}>
                 <div className="rdp-status">
                     <span className={`status-dot ${connectionState.toLowerCase()}`}></span>
-                    {connectionState}
+                    <span className="rdp-status-text">{connectionState}</span>
+                    {pingInfo && (
+                        <span className="rdp-ping" style={{ color: pingInfo.color }}>
+                            {pingInfo.icon} {pingInfo.text}
+                        </span>
+                    )}
+                    {connectionState === 'CONNECTED' && (
+                        <span className="rdp-frames">
+                            📊 {frameCount} frames
+                        </span>
+                    )}
                 </div>
                 <div className="rdp-actions">
                     <button onClick={sendCtrlAltDel} className="rdp-btn" title={t('rdp.sendCtrlAltDel')}>
@@ -201,7 +301,15 @@ const RDPViewer = ({ connectionId, token, onClose }) => {
             </div>
 
             {/* Canvas Container */}
-            <div className={`rdp-display${connectionState === 'CONNECTED' ? ' cursor-hidden' : ''}`} ref={elementRef}></div>
+            <div 
+                className={`rdp-display${connectionState === 'CONNECTED' ? ' cursor-hidden' : ''}`} 
+                ref={elementRef}
+                onClick={() => {
+                    // Re-focus display element on click for keyboard capture
+                    const displayEl = elementRef.current?.querySelector('div');
+                    if (displayEl) displayEl.focus();
+                }}
+            ></div>
 
             {/* Loading Overlay */}
             {connectionState === 'CONNECTING' || connectionState === 'WAITING' ? (

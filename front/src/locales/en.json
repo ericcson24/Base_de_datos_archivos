@@ -43,7 +43,12 @@
     "downloadError": "Error initiating download",
     "settings": "Settings",
     "logout": "Logout",
-    "remoteDesktop": "Remote Desktop"
+    "remoteDesktop": "Remote Desktop",
+    "required": "This field is required",
+    "processing": "Processing...",
+    "networkError": "Network connection error",
+    "selectUser": "Select user",
+    "selectGroup": "Select group"
   },
   "folders": {
     "title": "Select a folder",
@@ -316,7 +321,15 @@
     "noGroups": "No groups created",
     "members": "Members",
     "noMembers": "No members",
-    "selectUser": "Select user..."
+    "selectUser": "Select user...",
+    "aiTaskBuilder": "AI Task Assistant",
+    "aiTaskHelper": "Describe what you want to do in natural language. E.g: \"Team meeting tomorrow at 10am\", \"Move the meeting to Friday\", \"Delete tomorrow's event\", \"Create a category called Urgent in red\".",
+    "aiTaskPlaceholder": "Write your task here...",
+    "aiSend": "Send to AI",
+    "aiProcess": "Processing with AI...",
+    "myself": "Myself",
+    "specificUser": "Specific user",
+    "group": "Group"
   },
   "sidebar": {
     "errorLoadingFile": "Error loading file",
@@ -397,7 +410,8 @@
   },
   "audioPlayer": {
     "download": "Download",
-    "title": "Audio Player"
+    "title": "Audio Player",
+    "speed": "Speed"
   },
   "imageEditor": {
     "brightness": "Brightness",
@@ -447,7 +461,16 @@
     "saveError": "Error saving file",
     "loading": "Loading spreadsheet...",
     "saving": "Saving...",
-    "save": "Save"
+    "save": "Save",
+    "undo": "Undo",
+    "redo": "Redo",
+    "bold": "Bold",
+    "italic": "Italic",
+    "textColor": "Text color",
+    "bgColor": "Background color",
+    "row": "Row",
+    "col": "Col",
+    "typingPlaceholder": "Type here..."
   },
   "wordEditor": {
     "docNotSupported": ".doc format (Word 97-2003) is not supported. Please convert the file to .docx or download it to view.",
@@ -480,7 +503,8 @@
   },
   "videoPlayer": {
     "fullscreen": "Fullscreen",
-    "download": "Download"
+    "download": "Download",
+    "speed": "Speed"
   },
   "fileEditor": {
     "emptyFile": "The file is empty",
@@ -585,7 +609,59 @@
     "passwordMethod": "Password method",
     "accountCreated": "Account created",
     "note": "Note",
-    "failedAttempts": "Failed attempts"
+    "failedAttempts": "Failed attempts",
+    "dashboard": "Dashboard",
+    "users": "Users",
+    "groups": "Groups",
+    "system": "System",
+    "logs": "Logs",
+    "rdpAdmin": "RDP Administration",
+    "rdpConnections": "RDP Connections",
+    "notifications": "Notifications",
+    "pendingDeletions": "Pending Deletions",
+    "timeRemaining": "Time Remaining",
+    "cancelDeletion": "Cancel Deletion",
+    "lock": "Lock",
+    "newUser": "New User",
+    "editUser": "Edit User",
+    "newPassword": "New Password (Optional)",
+    "leaveBlankToKeep": "Leave blank to keep current",
+    "roleUser": "User",
+    "roleBoss": "Boss",
+    "roleAdmin": "Administrator",
+    "roleGuest": "Guest (No Groups)",
+    "greeting": "Hello, {{name}}",
+    "userCreated": "User created successfully",
+    "errorCreatingUser": "Error creating user",
+    "deletionScheduled": "Deletion scheduled",
+    "deletionCancelled": "Deletion cancelled",
+    "userUpdated": "User updated successfully",
+    "errorUpdatingUser": "Error updating user",
+    "errorLockingUser": "Error changing user status",
+    "userLocked": "User locked successfully",
+    "userUnlocked": "User unlocked successfully",
+    "diagnosticsComplete": "Diagnostics completed",
+    "diagnosticsError": "Error running diagnostics",
+    "deleteUser": "Delete User",
+    "deleteConfirmationMessage": "Are you sure you want to delete user \"{{name}}\"?",
+    "warning": "Warning",
+    "deleteWarningDetail": "This action will schedule the deletion of all user data (files, events, emails). You have 5 minutes to cancel this operation.",
+    "confirmDelete": "Schedule Deletion",
+    "webAccess": "Web Access",
+    "webAccessDesc": "Connect directly and securely in browser",
+    "nativeClient": "Native Client",
+    "nativeClientDesc": "Download configuration for RDP client",
+    "groupManagement": "Group Management",
+    "groupName": "Group Name",
+    "groupNamePlaceholder": "E.g.: Assemblers",
+    "description": "Description",
+    "descriptionPlaceholder": "Optional description",
+    "createGroup": "Create Group",
+    "noGroups": "No groups created",
+    "confirmDeleteGroup": "Are you sure you want to delete this group?",
+    "members": "Members",
+    "noMembers": "No members",
+    "selectUser": "Select user..."
   },
   "contextMenu": {
     "open": "Open",
@@ -664,7 +740,10 @@
     "relevantFiles": "Relevant Files",
     "open": "Open",
     "download": "Download",
-    "noFilesFound": "No related files found."
+    "noFilesFound": "No related files found.",
+    "foundIn": "Found in:",
+    "viewInContext": "View",
+    "selectFileToView": "Select a file to view its content"
   },
   "ai": {
     "rateLimitError": "Too many AI requests. Please try again in {{seconds}} seconds.",

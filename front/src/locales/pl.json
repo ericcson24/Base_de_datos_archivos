@@ -43,7 +43,12 @@
     "downloadError": "Błąd podczas rozpoczynania pobierania",
     "settings": "Ustawienia",
     "logout": "Wyloguj",
-    "remoteDesktop": "Pulpit Zdalny"
+    "remoteDesktop": "Pulpit Zdalny",
+    "required": "To pole jest wymagane",
+    "processing": "Przetwarzanie...",
+    "networkError": "Błąd połączenia sieciowego",
+    "selectUser": "Wybierz użytkownika",
+    "selectGroup": "Wybierz grupę"
   },
   "folders": {
     "title": "Wybierz folder",
@@ -313,7 +318,16 @@
     "noGroups": "Brak utworzonych grup",
     "members": "Członkowie",
     "noMembers": "Brak członków",
-    "selectUser": "Wybierz użytkownika..."
+    "selectUser": "Wybierz użytkownika...",
+    "aiAssistant": "Asystent AI",
+    "aiTaskBuilder": "Asystent AI Zadań",
+    "aiTaskHelper": "Opisz, co chcesz zrobić w języku naturalnym. Np: \"Spotkanie zespołu jutro o 10\", \"Przenieś spotkanie na piątek\", \"Usuń jutrzejsze wydarzenie\", \"Utwórz kategorię Pilne w kolorze czerwonym\".",
+    "aiTaskPlaceholder": "Napisz tutaj swoje zadanie...",
+    "aiSend": "Wyślij do AI",
+    "aiProcess": "Przetwarzanie z AI...",
+    "myself": "Ja",
+    "specificUser": "Konkretny użytkownik",
+    "group": "Grupa"
   },
   "sidebar": {
     "errorLoadingFile": "Błąd podczas ładowania pliku",
@@ -394,7 +408,8 @@
   },
   "audioPlayer": {
     "download": "Pobierz",
-    "title": "Odtwarzacz Audio"
+    "title": "Odtwarzacz Audio",
+    "speed": "Prędkość"
   },
   "imageEditor": {
     "brightness": "Jasność",
@@ -444,7 +459,16 @@
     "saveError": "Błąd zapisu pliku",
     "loading": "Ładowanie arkusza...",
     "saving": "Zapisywanie...",
-    "save": "Zapisz"
+    "save": "Zapisz",
+    "undo": "Cofnij",
+    "redo": "Ponów",
+    "bold": "Pogrubienie",
+    "italic": "Kursywa",
+    "textColor": "Kolor tekstu",
+    "bgColor": "Kolor tła",
+    "row": "Wiersz",
+    "col": "Kol",
+    "typingPlaceholder": "Wpisz tutaj..."
   },
   "wordEditor": {
     "docNotSupported": "Format .doc (Word 97-2003) nie jest obsługiwany. Proszę przekonwertować plik na .docx lub pobrać go, aby wyświetlić.",
@@ -477,7 +501,8 @@
   },
   "videoPlayer": {
     "fullscreen": "Pełny ekran",
-    "download": "Pobierz"
+    "download": "Pobierz",
+    "speed": "Prędkość"
   },
   "fileEditor": {
     "emptyFile": "Plik jest pusty",
@@ -582,7 +607,59 @@
     "passwordMethod": "Metoda hasła",
     "accountCreated": "Konto utworzone",
     "note": "Notatka",
-    "failedAttempts": "Nieudane próby"
+    "failedAttempts": "Nieudane próby",
+    "dashboard": "Panel Sterowania",
+    "users": "Użytkownicy",
+    "groups": "Grupy",
+    "system": "System",
+    "logs": "Logi",
+    "rdpAdmin": "Administracja RDP",
+    "rdpConnections": "Połączenia RDP",
+    "notifications": "Powiadomienia",
+    "pendingDeletions": "Oczekujące Usunięcia",
+    "timeRemaining": "Pozostały Czas",
+    "cancelDeletion": "Anuluj Usunięcie",
+    "lock": "Zablokuj",
+    "newUser": "Nowy Użytkownik",
+    "editUser": "Edytuj Użytkownika",
+    "newPassword": "Nowe Hasło (Opcjonalne)",
+    "leaveBlankToKeep": "Pozostaw puste, aby zachować obecne",
+    "roleUser": "Użytkownik",
+    "roleBoss": "Szef",
+    "roleAdmin": "Administrator",
+    "roleGuest": "Gość (Bez Grup)",
+    "greeting": "Cześć, {{name}}",
+    "userCreated": "Użytkownik utworzony pomyślnie",
+    "errorCreatingUser": "Błąd podczas tworzenia użytkownika",
+    "deletionScheduled": "Usunięcie zaplanowane",
+    "deletionCancelled": "Usunięcie anulowane",
+    "userUpdated": "Użytkownik zaktualizowany pomyślnie",
+    "errorUpdatingUser": "Błąd podczas aktualizacji użytkownika",
+    "errorLockingUser": "Błąd podczas zmiany statusu użytkownika",
+    "userLocked": "Użytkownik zablokowany pomyślnie",
+    "userUnlocked": "Użytkownik odblokowany pomyślnie",
+    "diagnosticsComplete": "Diagnostyka zakończona",
+    "diagnosticsError": "Błąd podczas uruchamiania diagnostyki",
+    "deleteUser": "Usuń Użytkownika",
+    "deleteConfirmationMessage": "Czy na pewno chcesz usunąć użytkownika \"{{name}}\"?",
+    "warning": "Ostrzeżenie",
+    "deleteWarningDetail": "Ta akcja zaplanuje usunięcie wszystkich danych użytkownika (pliki, wydarzenia, e-maile). Masz 5 minut na anulowanie tej operacji.",
+    "confirmDelete": "Zaplanuj Usunięcie",
+    "webAccess": "Dostęp Web",
+    "webAccessDesc": "Połącz się bezpiecznie przez przeglądarkę",
+    "nativeClient": "Klient Natywny",
+    "nativeClientDesc": "Pobierz konfigurację dla klienta RDP",
+    "groupManagement": "Zarządzanie Grupami",
+    "groupName": "Nazwa Grupy",
+    "groupNamePlaceholder": "Np.: Monterzy",
+    "description": "Opis",
+    "descriptionPlaceholder": "Opis opcjonalny",
+    "createGroup": "Utwórz Grupę",
+    "noGroups": "Brak utworzonych grup",
+    "confirmDeleteGroup": "Czy na pewno chcesz usunąć tę grupę?",
+    "members": "Członkowie",
+    "noMembers": "Brak członków",
+    "selectUser": "Wybierz użytkownika..."
   },
   "contextMenu": {
     "open": "Otwórz",
@@ -598,6 +675,18 @@
     "from": "od {{owner}}",
     "shared": "Udostępnione",
     "by": "przez {{owner}}"
+  },
+  "aiResults": {
+    "title": "Wyniki Wyszukiwania AI",
+    "aiResponse": "Odpowiedź AI",
+    "sources": "Wykorzystane źródła",
+    "relevantFiles": "Powiązane Pliki",
+    "open": "Otwórz",
+    "download": "Pobierz",
+    "noFilesFound": "Nie znaleziono powiązanych plików.",
+    "foundIn": "Znaleziono w:",
+    "viewInContext": "Zobacz",
+    "selectFileToView": "Wybierz plik, aby zobaczyć jego zawartość"
   },
   "ai": {
     "rateLimitError": "Zbyt wiele żądań do AI. Spróbuj ponownie za {{seconds}} sekund.",

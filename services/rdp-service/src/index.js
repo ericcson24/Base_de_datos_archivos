@@ -176,9 +176,10 @@ app.post('/initialize-default', async (req, res) => {
             name: 'System Desktop',
             hostname: 'host.docker.internal',
             port: 3389,
-            username: 'Administrator',
+            username: 'eric2',
             password: '',
             protocol: 'rdp',
+            security: 'any',
             virtual_ip: '10.10.10.2'
         };
 
@@ -629,7 +630,11 @@ wss.on('connection', async (ws, request) => {
                 const elements = parseGuacElements(instructionStr);
                 const opcode = elements[0] || '';
                 
-                console.log('Guacd opcode:', opcode, '| elements count:', elements.length);
+                // Only log important opcodes, skip high-frequency ones (img, blob, end, sync, cursor, mouse)
+                const silentOpcodes = ['img', 'blob', 'end', 'sync', 'cursor', 'mouse', 'nop', 'rect', 'copy', 'cfill', 'size', 'move', 'shade', 'dispose', 'png', 'audio'];
+                if (!silentOpcodes.includes(opcode)) {
+                    console.log('Guacd opcode:', opcode, '| elements count:', elements.length);
+                }
                 
                 if (opcode === 'args' && !handshakeComplete) {
                     handshakeComplete = true;
@@ -650,7 +655,7 @@ wss.on('connection', async (ws, request) => {
                         'domain': connection.domain || '',
                         'username': connection.username || '',
                         'password': connection.password || '',
-                        'security': connection.security || 'nla',
+                        'security': connection.security || 'any',
                         'ignore-cert': 'true',
                         'enable-wallpaper': 'false',
                         'enable-theming': 'false',
@@ -823,6 +828,17 @@ wss.on('connection', async (ws, request) => {
             
             // Forward real Guacamole instructions to guacd
             if (guacdSocket.writable) {
+                // Log key and mouse events (first 5 of each) for debugging
+                if (!ws._inputLogCount) ws._inputLogCount = { key: 0, mouse: 0 };
+                const opMatch = msgStr.match(/^\d+\.(\w+),/);
+                const op = opMatch ? opMatch[1] : '';
+                if (op === 'key' && ws._inputLogCount.key < 5) {
+                    console.log('Browser→guacd key event:', msgStr.substring(0, 60));
+                    ws._inputLogCount.key++;
+                } else if (op === 'mouse' && ws._inputLogCount.mouse < 3) {
+                    console.log('Browser→guacd mouse event:', msgStr.substring(0, 80));
+                    ws._inputLogCount.mouse++;
+                }
                 guacdSocket.write(message.toString('latin1'));
             }
         });

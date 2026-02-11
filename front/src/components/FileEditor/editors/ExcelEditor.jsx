@@ -300,8 +300,8 @@ const ExcelEditor = ({ fileUrl, fileBlob, file, onClose, onFileSaved }) => {
           <button onClick={handleSave} disabled={saving} className="toolbar-btn save-btn">
             💾 {saving ? t('excelEditor.saving') : t('excelEditor.save')}
           </button>
-          <button onClick={undo} disabled={historyIndex <= 0} className="toolbar-btn" title="Deshacer (Ctrl+Z)">↶</button>
-          <button onClick={redo} disabled={historyIndex >= history.length - 1} className="toolbar-btn" title="Rehacer (Ctrl+Y)">↷</button>
+          <button onClick={undo} disabled={historyIndex <= 0} className="toolbar-btn" title={`${t('excelEditor.undo')} (Ctrl+Z)`}>↶</button>
+          <button onClick={redo} disabled={historyIndex >= history.length - 1} className="toolbar-btn" title={`${t('excelEditor.redo')} (Ctrl+Y)`}>↷</button>
         </div>
 
         <div className="toolbar-separator"></div>
@@ -311,22 +311,22 @@ const ExcelEditor = ({ fileUrl, fileBlob, file, onClose, onFileSaved }) => {
             onClick={() => applyCellStyle('fontWeight', selectedCell && getCellStyle(selectedCell.row, selectedCell.col).fontWeight === 'bold' ? 'normal' : 'bold')}
             className={`toolbar-btn ${selectedCell && getCellStyle(selectedCell.row, selectedCell.col).fontWeight === 'bold' ? 'active' : ''}`}
             disabled={!selectedCell}
-            title="Negrita"
+            title={t('excelEditor.bold')}
           ><strong>B</strong></button>
           
           <button 
             onClick={() => applyCellStyle('fontStyle', selectedCell && getCellStyle(selectedCell.row, selectedCell.col).fontStyle === 'italic' ? 'normal' : 'italic')}
             className={`toolbar-btn ${selectedCell && getCellStyle(selectedCell.row, selectedCell.col).fontStyle === 'italic' ? 'active' : ''}`}
             disabled={!selectedCell}
-            title="Cursiva"
+            title={t('excelEditor.italic')}
           ><em>I</em></button>
           
-          <label className="color-picker-label" title="Color de texto">
+          <label className="color-picker-label" title={t('excelEditor.textColor')}>
             <span className="color-icon">A</span>
             <input type="color" onChange={(e) => applyCellStyle('color', e.target.value)} disabled={!selectedCell} className="color-picker" />
           </label>
           
-          <label className="color-picker-label" title="Color de fondo">
+          <label className="color-picker-label" title={t('excelEditor.bgColor')}>
             <span className="color-icon">🎨</span>
             <input type="color" onChange={(e) => applyCellStyle('backgroundColor', e.target.value)} disabled={!selectedCell} className="color-picker" />
           </label>
@@ -335,12 +335,12 @@ const ExcelEditor = ({ fileUrl, fileBlob, file, onClose, onFileSaved }) => {
         <div className="toolbar-separator"></div>
 
         <div className="toolbar-group">
-          <button onClick={addRow} className="toolbar-btn">➕ Fila</button>
-          <button onClick={addColumn} className="toolbar-btn">➕ Col</button>
+          <button onClick={addRow} className="toolbar-btn">➕ {t('excelEditor.row')}</button>
+          <button onClick={addColumn} className="toolbar-btn">➕ {t('excelEditor.col')}</button>
           {selectedCell && (
             <>
-              <button onClick={() => deleteRow(selectedCell.row)} className="toolbar-btn danger-btn">➖ Fila</button>
-              <button onClick={() => deleteColumn(selectedCell.col)} className="toolbar-btn danger-btn">➖ Col</button>
+              <button onClick={() => deleteRow(selectedCell.row)} className="toolbar-btn danger-btn">➖ {t('excelEditor.row')}</button>
+              <button onClick={() => deleteColumn(selectedCell.col)} className="toolbar-btn danger-btn">➖ {t('excelEditor.col')}</button>
             </>
           )}
         </div>
@@ -364,7 +364,7 @@ const ExcelEditor = ({ fileUrl, fileBlob, file, onClose, onFileSaved }) => {
                 handleCellChange(selectedCell.row, selectedCell.col, e.target.value);
               }
             }}
-            placeholder="Escribe aquí..."
+            placeholder={t('excelEditor.typingPlaceholder')}
             disabled={!selectedCell}
           />
         </div>
