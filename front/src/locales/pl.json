@@ -64,7 +64,6 @@
     "recentLabel": "Niedawne",
     "upload": "Prześlij Plik",
     "newFolder": "Nowy Folder",
-    "storage": "Pamięć",
     "logout": "Wyloguj",
     "settings": "Ustawienia",
     "calendar": "Kalendarz",
@@ -76,6 +75,8 @@
     "microsoftLinkedSuccess": "✅ Konto Microsoft połączone pomyślnie",
     "searchPlaceholder": "Szukaj plików, folderów...",
     "aiPlaceholder": "Zapytaj swoją chmurę...",
+    "aiLoading": "Szukanie z AI...",
+    "aiLoadingDescription": "Analizowanie plików, aby znaleźć najlepszą odpowiedź",
     "uploadMenu": {
       "file": "Prześlij plik",
       "folder": "Prześlij folder",
@@ -167,7 +168,6 @@
     "title": "Ustawienia",
     "general": "Ogólne",
     "security": "Bezpieczeństwo",
-    "storage": "Pamięć",
     "integrations": "Integracje",
     "avatar": "Awatar",
     "changeAvatar": "Kliknij ołówek, aby zmienić awatar",
@@ -206,10 +206,6 @@
     "syncSuccess": "Synchronizacja zakończona",
     "syncError": "Błąd synchronizacji",
     "connectionErrorGeneric": "Błąd połączenia",
-    "manageStorage": "Zarządzaj swoim miejscem w chmurze",
-    "inUse": "W użyciu",
-    "used": "{{size}} użyte",
-    "total": "{{size}} łącznie",
     "syncInfoTitle": "Informacje o synchronizacji",
     "syncInfoDesc": "Wydarzenia synchronizują się automatycznie za każdym razem, gdy otwierasz kalendarz. Użyj przycisku \"Synchronizuj teraz\", jeśli nie widzisz ostatnich zmian z Outlooka.",
     "linkAnother": "Połącz inne konto",
@@ -748,5 +744,23 @@
     "selectConnectionDesc": "Wybierz pulpit zdalny, z którym chcesz się połączyć",
     "noConnectionsDesc": "Nie skonfigurowano jeszcze żadnych połączeń zdalnych.",
     "initializeDefault": "Zainicjuj Domyślne Połączenie"
+  },
+  "powerPointEditor": {
+    "slideTitle": "Slajd {{num}}",
+    "untitled": "Bez tytułu",
+    "addSlide": "Dodaj slajd",
+    "cannotDeleteLast": "Nie można usunąć ostatniego slajdu",
+    "titlePlaceholder": "Tytuł slajdu...",
+    "contentPlaceholder": "Treść slajdu...",
+    "saveSuccess": "Prezentacja zapisana pomyślnie",
+    "saveError": "Błąd zapisywania prezentacji",
+    "loadError": "Błąd ładowania prezentacji",
+    "noToken": "Nie znaleziono tokenu uwierzytelniania",
+    "saving": "Zapisywanie..."
+  },
+  "createFileModal": {
+    "title": "Utwórz nowy plik",
+    "description": "Wprowadź nazwę dla nowego pliku",
+    "placeholder": "Nazwa pliku..."
   }
 }

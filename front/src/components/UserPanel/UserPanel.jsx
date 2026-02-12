@@ -12,6 +12,7 @@ import SettingsModal from '../Modals/SettingsModal';
 import RDPViewer from '../RDP/RDPViewer';
 import RDPConnectionModal from '../Modals/RDPConnectionModal';
 import AIResultsModal from '../Modals/AIResultsModal';
+import CreateFileModal from '../Modals/CreateFileModal';
 import SidebarPanel from './SidebarPanel';
 import FileItem from './FileItem';
 import NotificationCenter from '../Common/NotificationCenter';
@@ -19,7 +20,6 @@ import { FiHardDrive, FiUsers, FiArrowLeft, FiCalendar, FiMonitor, FiSettings, F
 import { 
   getAuthToken, 
   downloadFile, 
-  formatFileSize, 
   canPreview,
   canEdit
 } from '../../utils/fileUtils';
@@ -43,8 +43,6 @@ const UserPanel = ({ user, onLogout, onBackToFolders, onThemeToggle, isDarkMode,
   const [uploadMenuOpen, setUploadMenuOpen] = useState(false);
   const [sharedFolders, setSharedFolders] = useState([]);
   const [sharedDropdownOpen, setSharedDropdownOpen] = useState(false);
-  const [storageUsed, setStorageUsed] = useState(0);
-  const [storageLimit] = useState(5 * 1024 * 1024 * 1024); // 5GB
   const [showCreateFolderModal, setShowCreateFolderModal] = useState(false);
   const [newFolderName, setNewFolderName] = useState('');
   const [showRenameModal, setShowRenameModal] = useState(false);
@@ -135,6 +133,12 @@ const UserPanel = ({ user, onLogout, onBackToFolders, onThemeToggle, isDarkMode,
   const [aiResultsData, setAIResultsData] = useState(null);
   const [showRecentSection, setShowRecentSection] = useState(true);
   const [indexingStatus, setIndexingStatus] = useState(null);
+  const [isAILoading, setIsAILoading] = useState(false);
+
+  // Estados para modal de crear archivo
+  const [showCreateFileModal, setShowCreateFileModal] = useState(false);
+  const [createFileDefaultName, setCreateFileDefaultName] = useState('');
+  const [createFileType, setCreateFileType] = useState('');
 
   // Check indexing status when AI is expanded
   useEffect(() => {
@@ -187,6 +191,7 @@ const UserPanel = ({ user, onLogout, onBackToFolders, onThemeToggle, isDarkMode,
     if (!aiQuery.trim()) return;
     
     console.log('Consulta IA:', aiQuery);
+    setIsAILoading(true);
     
     try {
       const token = localStorage.getItem('auth_token');
@@ -216,6 +221,8 @@ const UserPanel = ({ user, onLogout, onBackToFolders, onThemeToggle, isDarkMode,
     } catch (error) {
       console.error('Error AI search:', error);
       addToast('Error al procesar la consulta', 'error');
+    } finally {
+      setIsAILoading(false);
     }
   };
 
@@ -339,7 +346,6 @@ const loadFiles = useCallback(async () => {
     const data = await response.json();
     console.log('[UserPanel] Files loaded:', data.files?.length || 0, 'files');
     setFiles(data.files || []);
-    setStorageUsed(data.storageUsed || 0);
   } catch (error) {
     console.error('Error loading files:', error);
   } finally {
@@ -526,7 +532,13 @@ useEffect(() => {
   }, [currentPath, loadFiles, addToast]);
 
   const handleCreateFile = useCallback(async (defaultName, type) => {
-    const fileName = prompt(t('userPanel.fileNamePrompt'), defaultName);
+    setCreateFileDefaultName(defaultName);
+    setCreateFileType(type);
+    setShowCreateFileModal(true);
+    setUploadMenuOpen(false);
+  }, []);
+
+  const handleCreateFileConfirm = useCallback(async (fileName, type) => {
     if (!fileName) return;
 
     try {
@@ -549,7 +561,6 @@ useEffect(() => {
       }
 
       loadFiles();
-      setUploadMenuOpen(false);
       addToast(t('userPanel.fileCreatedSuccess'), 'success');
     } catch (error) {
       console.error('Error creating file:', error);
@@ -778,10 +789,6 @@ useEffect(() => {
     return files;
   };
 
-  const getStoragePercentage = () => {
-    return Math.min(100, (storageUsed / storageLimit) * 100);
-  };
-
   const openFileViewer = (file) => {
     setViewerFile(file);
     setShowFileViewer(true);
@@ -1002,37 +1009,25 @@ useEffect(() => {
                 </button>
                 <button
                   className="mini-menu-item"
-                  onClick={() => {
-                    handleCreateFile(t('userPanel.defaultFileName.text'), 'text');
-                    setUploadMenuOpen(false);
-                  }}
+                  onClick={() => handleCreateFile(t('userPanel.defaultFileName.text'), 'text')}
                 >
                   {t('userPanel.uploadMenu.createDoc')}
                 </button>
                 <button
                   className="mini-menu-item"
-                  onClick={() => {
-                    handleCreateFile(t('userPanel.defaultFileName.word'), 'word');
-                    setUploadMenuOpen(false);
-                  }}
+                  onClick={() => handleCreateFile(t('userPanel.defaultFileName.word'), 'word')}
                 >
                   {t('userPanel.uploadMenu.createWord')}
                 </button>
                 <button
                   className="mini-menu-item"
-                  onClick={() => {
-                    handleCreateFile(t('userPanel.defaultFileName.excel'), 'excel');
-                    setUploadMenuOpen(false);
-                  }}
+                  onClick={() => handleCreateFile(t('userPanel.defaultFileName.excel'), 'excel')}
                 >
                   {t('userPanel.uploadMenu.createExcel')}
                 </button>
                 <button
                   className="mini-menu-item"
-                  onClick={() => {
-                    handleCreateFile(t('userPanel.defaultFileName.powerpoint'), 'powerpoint');
-                    setUploadMenuOpen(false);
-                  }}
+                  onClick={() => handleCreateFile(t('userPanel.defaultFileName.powerpoint'), 'powerpoint')}
                 >
                   {t('userPanel.uploadMenu.createPowerPoint')}
                 </button>
@@ -1518,17 +1513,6 @@ useEffect(() => {
         </div> {/* Cierre main-content-container */}
       </div> {/* Cierre main-panel */}
 
-      {/* Storage Bar */}
-      <div className="storage-bar">
-        <div className="storage-text">
-          {formatFileSize(storageUsed)} de {formatFileSize(storageLimit)}
-        </div>
-        <div
-          className="storage-bar-fill"
-          style={{ width: `${getStoragePercentage()}%` }}
-        ></div>
-      </div>
-
       {/* Hidden file inputs */}
       <input
         type="file"
@@ -1670,6 +1654,31 @@ useEffect(() => {
             </svg>
             <p className="text-base font-semibold">{t('userPanel.dropToView')}</p>
             <p className="text-xs opacity-75">{fileDragging?.name}</p>
+          </div>
+        </div>
+      )}
+
+      {/* Create File Modal */}
+      <CreateFileModal
+        isOpen={showCreateFileModal}
+        onClose={() => setShowCreateFileModal(false)}
+        onCreateFile={handleCreateFileConfirm}
+        defaultName={createFileDefaultName}
+        fileType={createFileType}
+      />
+
+      {/* AI Loading Overlay */}
+      {isAILoading && (
+        <div className="fixed inset-0 bg-black/30 dark:bg-black/50 flex items-center justify-center z-[9999] backdrop-blur-sm">
+          <div className="glassmorphism-modal dark:bg-slate-800 rounded-2xl shadow-2xl border border-gray-200 dark:border-slate-600 p-8 flex flex-col items-center gap-4 max-w-sm mx-4">
+            <div className="relative">
+              <div className="w-14 h-14 rounded-full border-4 border-purple-200 dark:border-purple-900 border-t-purple-500 animate-spin"></div>
+              <svg className="w-6 h-6 text-purple-500 absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+              </svg>
+            </div>
+            <p className="text-base font-semibold text-gray-800 dark:text-slate-100">{t('userPanel.aiLoading')}</p>
+            <p className="text-sm text-gray-500 dark:text-slate-400 text-center">{t('userPanel.aiLoadingDescription')}</p>
           </div>
         </div>
       )}

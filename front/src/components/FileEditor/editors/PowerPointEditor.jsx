@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { getAuthToken } from '../../../utils/fileUtils';
 import { useLanguage } from '../../../context/LanguageContext';
 import { useToast } from '../../../context/ToastContext';
 import './PowerPointEditor.css';
@@ -101,7 +102,7 @@ const PowerPointEditor = ({ fileUrl, fileBlob, file, onClose, onFileSaved }) => 
     try {
       setIsSaving(true);
       
-      const token = sessionStorage.getItem('token') || localStorage.getItem('token');
+      const token = getAuthToken();
       if (!token) {
         addToast(t('powerPointEditor.noToken'), 'error');
         return;
@@ -159,7 +160,7 @@ const PowerPointEditor = ({ fileUrl, fileBlob, file, onClose, onFileSaved }) => 
       const formData = new FormData();
       formData.append('file', htmlBlob, file.name);
 
-      const response = await fetch(`/api/files/${file.id}`, {
+      const response = await fetch(`/api/files/${encodeURIComponent(file.id)}`, {
         method: 'PUT',
         headers: {
           'Authorization': `Bearer ${token}`

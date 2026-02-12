@@ -21,13 +21,11 @@ const SettingsModal = ({ onClose, user, onThemeToggle, isDarkMode, initialTab = 
     theme: isDarkMode ? 'dark' : 'light',
     language: currentLanguage || 'es',
     notifications: user?.notifications ?? true,
-    storageUsed: user?.storageUsed || 0,
-    storageLimit: user?.storageLimit || 1024 * 1024 * 1024, // 1GB default
     microsoftAccount: null // { email: '...', name: '...' }
   });
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
-  const [activeTab, setActiveTab] = useState(initialTab); // general, security, storage
+  const [activeTab, setActiveTab] = useState(initialTab); // general, security, integrations, ia
   const [showAvatarSelector, setShowAvatarSelector] = useState(false);
   const [defaultAvatars, setDefaultAvatars] = useState([]);
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
@@ -296,14 +294,6 @@ const SettingsModal = ({ onClose, user, onThemeToggle, isDarkMode, initialTab = 
     }
   };
 
-  const formatBytes = (bytes) => {
-    if (bytes === 0) return '0 Bytes';
-    const k = 1024;
-    const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB'];
-    const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
-  };
-
   if (loading) return null;
 
   return (
@@ -333,12 +323,6 @@ const SettingsModal = ({ onClose, user, onThemeToggle, isDarkMode, initialTab = 
               {t('settings.security')}
             </button>
           )}
-          <button
-            className={`settings-tab ${activeTab === 'storage' ? 'active' : ''}`}
-            onClick={() => setActiveTab('storage')}
-          >
-            {t('settings.storage')}
-          </button>
           <button
             className={`settings-tab ${activeTab === 'integrations' ? 'active' : ''}`}
             onClick={() => setActiveTab('integrations')}
@@ -511,38 +495,6 @@ const SettingsModal = ({ onClose, user, onThemeToggle, isDarkMode, initialTab = 
                   placeholder="••••••••"
                   className="w-full"
                 />
-              </div>
-            </div>
-          )}
-          
-          {activeTab === 'storage' && (
-            <div className="settings-section">
-              <div className="storage-card">
-                <div className="text-4xl mb-2">☁️</div>
-                <h3 className="storage-card-title">{t('settings.storage')}</h3>
-                <p className="storage-card-desc">{t('settings.manageStorage')}</p>
-                
-                <div className="relative pt-1">
-                  <div className="flex mb-2 items-center justify-between">
-                    <div>
-                      <span className="text-xs font-semibold inline-block py-1 px-2 uppercase rounded-full text-blue-600 bg-blue-200">
-                        {t('settings.inUse')}
-                      </span>
-                    </div>
-                    <div className="text-right">
-                      <span className="text-xs font-semibold inline-block text-blue-600">
-                        {Math.round((settings.storageUsed / settings.storageLimit) * 100)}%
-                      </span>
-                    </div>
-                  </div>
-                  <div className="storage-progress-bg">
-                    <div style={{ width: `${(settings.storageUsed / settings.storageLimit) * 100}%` }} className="storage-progress-fill"></div>
-                  </div>
-                  <div className="storage-stats">
-                    <span>{t('settings.used', { size: formatBytes(settings.storageUsed) })}</span>
-                    <span>{t('settings.total', { size: formatBytes(settings.storageLimit) })}</span>
-                  </div>
-                </div>
               </div>
             </div>
           )}

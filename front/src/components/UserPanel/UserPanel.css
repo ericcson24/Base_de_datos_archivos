@@ -23,7 +23,6 @@
   --file-name-color: #333;
   --modal-bg: rgba(255, 255, 255, 0.6);
   --modal-border: rgba(0, 0, 0, 0.1);
-  --storage-text-bg: rgba(255, 255, 255, 0.9);
   --input-border: #e0e0e0;
   --input-focus-border: #4285f4;
   --button-secondary-bg: #f8f9fa;
@@ -129,7 +128,6 @@
   --file-name-color: #ffffff;
   --modal-bg: rgba(20, 20, 20, 0.95);
   --modal-border: rgba(255, 255, 255, 0.1);
-  --storage-text-bg: rgba(20, 20, 20, 0.9);
   --input-border: #404040;
   --input-focus-border: #4285f4;
   --button-secondary-bg: #404040;
@@ -1287,40 +1285,6 @@ input[type="text"]:focus {
 
 /* MENU POPUP - REMOVED OLD STYLES */
 /* Using mini-menu-frosted instead */
-
-/* STORAGE BAR */
-.storage-bar {
-  position: fixed;
-  bottom: 1rem;
-  left: calc(var(--sidebar-width) + 1rem); /* Ajustado para coincidir con main-panel */
-  right: 2rem;
-  height: 4px;
-  background: #e0e0e0;
-  border-radius: 2px;
-  overflow: hidden;
-}
-
-.storage-bar-fill {
-  height: 100%;
-  background: linear-gradient(90deg, #4285f4 0%, #34a853 100%);
-  width: 0%;
-  border-radius: 2px;
-  transition: width 0.5s ease;
-}
-
-.storage-text {
-  position: fixed;
-  bottom: 1rem;
-  right: 2rem;
-  font-size: 0.8rem;
-  color: #666;
-  background: var(--storage-text-bg);
-  padding: 0.5rem 1rem;
-  border-radius: 20px;
-  box-shadow: var(--shadow);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
-}
 
 /* BACK BUTTON */
 .back-btn {

@@ -64,7 +64,6 @@
     "recentLabel": "Recent",
     "upload": "Upload File",
     "newFolder": "New Folder",
-    "storage": "Storage",
     "logout": "Logout",
     "settings": "Settings",
     "calendar": "Calendar",
@@ -77,6 +76,8 @@
     "microsoftLinkedSuccess": "✅ Microsoft account linked successfully",
     "searchPlaceholder": "Search files, folders...",
     "aiPlaceholder": "Ask your cloud...",
+    "aiLoading": "Searching with AI...",
+    "aiLoadingDescription": "Analyzing your files to find the best answer",
     "uploadMenu": {
       "file": "Upload File",
       "folder": "Upload Folder",
@@ -168,7 +169,6 @@
     "title": "Settings",
     "general": "General",
     "security": "Security",
-    "storage": "Storage",
     "integrations": "Integrations",
     "avatar": "Avatar",
     "changeAvatar": "Click the pencil to change your avatar",
@@ -207,10 +207,6 @@
     "syncSuccess": "Synchronization completed",
     "syncError": "Error syncing",
     "connectionErrorGeneric": "Connection error",
-    "manageStorage": "Manage your cloud storage",
-    "inUse": "In use",
-    "used": "{{size}} used",
-    "total": "{{size}} total",
     "syncInfoTitle": "Synchronization Information",
     "syncInfoDesc": "Events sync automatically every time you open the calendar. Use the \"Sync Now\" button if you don't see your latest Outlook changes.",
     "linkAnother": "Link another account",
@@ -393,7 +389,12 @@
     "lines": "lines",
     "characters": "chars",
     "unsaved": "Unsaved",
-    "undo": "Undo"
+    "undo": "Undo",
+    "presentation": "PowerPoint Presentation",
+    "presentationDesc": "PowerPoint presentations cannot be edited directly in the browser.",
+    "downloadToEdit": "Download to edit",
+    "cannotEdit": "Cannot edit this file",
+    "type": "Type: {{type}}"
   },
   "zipViewer": {
     "errorLoading": "Error loading ZIP file: {{error}}",
@@ -501,20 +502,23 @@
     "corruptedFile": "The file might be corrupted. Edit mode enabled to create new content.",
     "loadErrorFallback": "Could not load the file. Edit mode enabled to start fresh."
   },
+  "powerPointEditor": {
+    "slideTitle": "Slide {{num}}",
+    "untitled": "Untitled",
+    "addSlide": "Add Slide",
+    "cannotDeleteLast": "You cannot delete the last slide",
+    "titlePlaceholder": "Slide title...",
+    "contentPlaceholder": "Slide content...",
+    "saveSuccess": "Presentation saved successfully",
+    "saveError": "Error saving presentation",
+    "loadError": "Error loading presentation",
+    "noToken": "Authentication token not found",
+    "saving": "Saving..."
+  },
   "videoPlayer": {
     "fullscreen": "Fullscreen",
     "download": "Download",
     "speed": "Speed"
-  },
-  "fileEditor": {
-    "emptyFile": "The file is empty",
-    "serverError": "Server error processing file",
-    "errorLoading": "Error loading file: {{error}}",
-    "presentation": "PowerPoint Presentation",
-    "presentationDesc": "PowerPoint presentations cannot be edited directly in the browser.",
-    "downloadToEdit": "Download to edit",
-    "cannotEdit": "Cannot edit this file",
-    "type": "Type: {{type}}"
   },
   "fileViewer": {
     "errorLoading": "Error loading file",
@@ -750,5 +754,10 @@
     "processingError": "Error processing AI request",
     "noResponse": "Could not get AI response",
     "retrying": "Retrying..."
+  },
+  "createFileModal": {
+    "title": "Create New File",
+    "description": "Enter a name for the new file",
+    "placeholder": "File name..."
   }
 }

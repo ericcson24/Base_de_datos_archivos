@@ -304,37 +304,6 @@
   color: #9ca3af;
 }
 
-.storage-stats {
-  display: flex;
-  justify-content: space-between;
-  font-size: 0.875rem;
-  color: #4b5563;
-}
-[data-theme="dark"] .storage-stats {
-  color: #d1d5db;
-}
-
-.storage-progress-bg {
-  overflow: hidden;
-  height: 0.5rem;
-  margin-bottom: 1rem;
-  font-size: 0.75rem;
-  display: flex;
-  border-radius: 0.25rem;
-  background-color: #bfdbfe;
-}
-
-.storage-progress-fill {
-  box-shadow: none;
-  display: flex;
-  flex-direction: column;
-  text-align: center;
-  white-space: nowrap;
-  color: white;
-  justify-content: center;
-  background-color: #3b82f6;
-}
-
 .integration-card {
   display: flex;
   flex-direction: column;

@@ -8,6 +8,18 @@ dotenv.config();
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || "dummy_key_for_startup");
 const OUTLOOK_SERVICE_URL = 'http://outlook-service:5003';
 
+const GENERIC_TITLES = [
+  'tarea', 'evento', 'reunion', 'reunión', 'cita', 'cosa', 'algo', 'recordatorio', 
+  'pendiente', 'actividad', 'nota', 'puesto', 'clase', 'llamada', 'encuentro', 'labor', 
+  'la tarea', 'el evento', 'la reunión', 'la reunion', 'el recordatorio', 'la cita'
+];
+
+const isGenericTitle = (title) => {
+  if (!title) return true;
+  const t = title.toLowerCase().trim().replace(/^(el|la|los|las|un|una)\s+/, '');
+  return GENERIC_TITLES.some(g => g === t || g === title.toLowerCase().trim()) || t === 'any' || t === '';
+};
+
 const createEvent = async (req, res) => {
   try {
     const { query, assignMode = 'me', targetUserId, groupId } = req.body;
@@ -22,8 +34,8 @@ const createEvent = async (req, res) => {
     const userTimeZone = 'Europe/Madrid'; 
     const now = new Date();
     
-    // Formato ISO no ambiguo para la IA (YYYY-MM-DD HH:mm:ss)
-    const nowInUserTZ = new Intl.DateTimeFormat('es-ES', {
+    // Formato DD/MM/YYYY HH:mm:ss determinista para la IA
+    const parts = new Intl.DateTimeFormat('es-ES', {
       timeZone: userTimeZone,
       year: 'numeric',
       month: '2-digit',
@@ -32,7 +44,16 @@ const createEvent = async (req, res) => {
       minute: '2-digit',
       second: '2-digit',
       hour12: false
-    }).format(now);
+    }).formatToParts(now);
+    
+    const day = parts.find(p => p.type === 'day').value;
+    const month = parts.find(p => p.type === 'month').value;
+    const year = parts.find(p => p.type === 'year').value;
+    const hour = parts.find(p => p.type === 'hour').value;
+    const minute = parts.find(p => p.type === 'minute').value;
+    const second = parts.find(p => p.type === 'second').value;
+    
+    const nowInUserTZ = `${day}/${month}/${year} ${hour}:${minute}:${second}`;
     
     console.log(`[AI CALENDAR] Usuario ${userId}: "${query}" [UserTZ: ${nowInUserTZ}]`);
 
@@ -55,18 +76,16 @@ Tu tarea:
 IMPORTANTE SOBRE FECHAS:
 - La fecha/hora actual es: ${nowInUserTZ} (formato DD/MM/YYYY HH:mm:ss, zona ${userTimeZone})
 - Calcula fecha/hora exacta basándote en esta fecha actual
-- "mañana" significa sumar 1 día a la fecha actual
+- "mañana" o "mñn" significa sumar 1 día a la fecha actual
 - "hoy" significa la misma fecha que la actual
+- "pasado mañana" significa sumar 2 días a la fecha actual
 - Devuelve SIEMPRE formato ISO 8601 UTC con Z al final (ejemplo: "2026-02-11T20:00:00Z") 
 
-IMPORTANTE SOBRE UPDATES:
-- Si el usuario quiere MODIFICAR un evento existente, debes distinguir:
-  - "searchTitle": El título ACTUAL del evento a buscar (cómo se llama ahora)
-  - "title": El NUEVO título (si el usuario quiere renombrarlo). Si no quiere cambiar el título, pon null.
-- Si dice "cambia la reunión de equipo a las 5pm", searchTitle="reunión de equipo", title=null (no cambia nombre)
-- Si dice "renombra la reunión de equipo a daily standup", searchTitle="reunión de equipo", title="daily standup"
-
-IMPORTANTE SOBRE CATEGORÍAS:
+IMPORTANTE SOBRE UPDATES Y DELETES:
+- Si el usuario pone "bórralo", "elimínalo", "cámbialo" sin decir el nombre pero indicando un momento ("lo de las 5", "lo de mañana"), pon "ANY" en searchTitle y la fecha aproximada en startTimeUTC.
+- NO uses palabras genéricas como "tarea" o "evento" como searchTitle si el usuario las usa de forma genérica. Solo si es el nombre propio del evento.
+- "searchTitle" debe ser el título ACTUAL del evento que queremos buscar.
+- "title" debe ser el NUEVO título si el usuario pide cambiar el nombre. Si no, pon null.
 - Las categorías son etiquetas de color para eventos (ej: "Trabajo", "Personal", "Urgente")
 - Para crear categoría: intent="add_category", categoryName="nombre", categoryColor="preset0" a "preset24"
 - Para asignar categorías a un evento (create/update): incluye el campo "categories" como array de strings
@@ -168,34 +187,67 @@ Responde SOLO el JSON.`;
 
     // --- UPDATE or DELETE ---
     if (eventData.intent === 'update' || eventData.intent === 'delete') {
-        // Use searchTitle first (for updates where user renames), fallback to title
         const searchTitle = eventData.searchTitle || eventData.title;
+        const isGeneric = isGenericTitle(searchTitle);
         let searchRes;
 
-        // Si tenemos título específico, buscamos por título
-        if (searchTitle && searchTitle !== 'ANY' && searchTitle.toLowerCase() !== 'evento') {
-             searchRes = await db.query(
-                `SELECT * FROM calendar_events WHERE user_id = $1 AND subject ILIKE $2 ORDER BY start_time DESC LIMIT 1`,
-                [userId, `%${searchTitle}%`]
-            );
-        } 
-        // Si no hay título pero sí fecha (ej: "borra evento de mañana")
-        else if (eventData.startTimeUTC) {
-             searchRes = await db.query(
-                `SELECT * FROM calendar_events 
-                 WHERE user_id = $1 
-                 AND start_time >= $2::timestamp 
-                 AND start_time <= ($3::timestamp + interval '24 hours')
-                 ORDER BY start_time ASC LIMIT 1`,
-                [userId, eventData.startTimeUTC, eventData.startTimeUTC] 
-             );
+        // Construcción de consulta dinámica y flexible
+        let queryStr = `SELECT * FROM calendar_events WHERE user_id = $1`;
+        let params = [userId];
+
+        // 1. Filtro por título (si no es genérico)
+        if (searchTitle && !isGeneric) {
+            queryStr += ` AND (subject ILIKE $${params.length + 1} OR body_preview ILIKE $${params.length + 1})`;
+            params.push(`%${searchTitle}%`);
+        }
+
+        // 2. Filtro por fecha (si se proporciona)
+        if (eventData.startTimeUTC) {
+            // Buscamos en un rango generoso de 24h alrededor de la fecha indicada
+            // Si Gemini dice "mañana", suele poner las 00:00:00, cubriendo todo el día
+            queryStr += ` 
+                AND start_time >= $${params.length + 1}::timestamp 
+                AND start_time <= ($${params.length + 2}::timestamp + interval '24 hours')`;
+            params.push(eventData.startTimeUTC);
+            params.push(eventData.startTimeUTC);
+        }
+
+        // 3. Orden y Límite
+        // Priorizamos eventos más cercanos si hay una fecha, o el más reciente si no la hay
+        if (eventData.startTimeUTC) {
+            queryStr += ` ORDER BY ABS(EXTRACT(EPOCH FROM (start_time - $${params.length}::timestamp))) ASC LIMIT 1`;
         } else {
+            queryStr += ` ORDER BY start_time DESC LIMIT 1`;
+        }
+        
+        // Si no hay ningún criterio, error
+        if (params.length === 1 && !eventData.startTimeUTC) {
              return res.status(400).json({ error: "Necesito un título o fecha específica para encontrar el evento." });
+        }
+
+        searchRes = await db.query(queryStr, params);
+        
+        if (!searchRes || searchRes.rows.length === 0) {
+            // Segundo intento: Si falló con el título, intentamos solo con el tiempo si está disponible
+            if (!isGeneric && searchTitle && eventData.startTimeUTC) {
+                console.log(`[AI CALENDAR] No encontrado con título "${searchTitle}", reintentando solo con tiempo...`);
+                const retryRes = await db.query(
+                    `SELECT * FROM calendar_events 
+                     WHERE user_id = $1 
+                     AND start_time >= $2::timestamp 
+                     AND start_time <= ($3::timestamp + interval '36 hours')
+                     ORDER BY start_time ASC LIMIT 1`,
+                    [userId, eventData.startTimeUTC, eventData.startTimeUTC]
+                );
+                if (retryRes.rows.length > 0) {
+                    searchRes = retryRes;
+                }
+            }
         }
         
         if (!searchRes || searchRes.rows.length === 0) {
             return res.status(404).json({ 
-                error: `No encontré eventos que coincidan con la descripción.`, 
+                error: `No encontré ningún evento para ${searchTitle && !isGeneric ? '"' + searchTitle + '"' : 'esa fecha'}.`, 
                 success: false 
             });
         }

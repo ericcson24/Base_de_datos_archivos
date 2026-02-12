@@ -31,7 +31,6 @@ const FileEditorPanel = ({ file, onClose, position, zIndex, onBringToFront, pane
   const [size, setSize] = useState({ width: 800, height: 600 });
   const [pos, setPos] = useState(position || { x: 100, y: 100 });
   const [isDragging, setIsDragging] = useState(false);
-  const [isResizing, setIsResizing] = useState(false);
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
   const [isMinimized, setIsMinimized] = useState(false);
   const [isMaximized, setIsMaximized] = useState(false);
@@ -42,7 +41,6 @@ const FileEditorPanel = ({ file, onClose, position, zIndex, onBringToFront, pane
   const [error, setError] = useState(null);
 
   const panelRef = useRef(null);
-  const resizeHandleRef = useRef(null);
 
   const fileType = getFileType(file.name);
   
@@ -177,13 +175,11 @@ const FileEditorPanel = ({ file, onClose, position, zIndex, onBringToFront, pane
       let newY = e.clientY - mainPanelRect.top - dragOffset.y;
 
       // Boundaries - igual que file-grid
-      const storageBar = document.querySelector('.storage-bar');
-      const storageBarHeight = storageBar ? storageBar.offsetHeight : 0;
       const panelHeaderMain = document.querySelector('.panel-header-main');
       const headerHeight = panelHeaderMain ? panelHeaderMain.offsetHeight : 0;
       
       const maxX = mainPanel.offsetWidth - panel.offsetWidth - 40;
-      const maxY = mainPanel.offsetHeight - panel.offsetHeight - storageBarHeight - 40;
+      const maxY = mainPanel.offsetHeight - panel.offsetHeight - 40;
       const minX = 40;
       const minY = headerHeight + 60;
 
@@ -196,11 +192,10 @@ const FileEditorPanel = ({ file, onClose, position, zIndex, onBringToFront, pane
 
   const handleMouseUp = useCallback(() => {
     setIsDragging(false);
-    setIsResizing(false);
   }, []);
 
   useEffect(() => {
-    if (isDragging || isResizing) {
+    if (isDragging) {
       document.addEventListener('mousemove', handleMouseMove);
       document.addEventListener('mouseup', handleMouseUp);
       return () => {
@@ -208,35 +203,7 @@ const FileEditorPanel = ({ file, onClose, position, zIndex, onBringToFront, pane
         document.removeEventListener('mouseup', handleMouseUp);
       };
     }
-  }, [isDragging, isResizing, handleMouseMove, handleMouseUp]);
-
-  // Resize handlers
-  const handleResizeMouseDown = useCallback((e) => {
-    e.stopPropagation();
-    setIsResizing(true);
-    onBringToFront();
-  }, [onBringToFront]);
-
-  const handleResizeMouseMove = useCallback((e) => {
-    if (!isResizing) return;
-
-    const rect = panelRef.current.getBoundingClientRect();
-    const newWidth = Math.max(400, e.clientX - rect.left);
-    const newHeight = Math.max(300, e.clientY - rect.top);
-
-    setSize({ width: newWidth, height: newHeight });
-  }, [isResizing]);
-
-  useEffect(() => {
-    if (isResizing) {
-      document.addEventListener('mousemove', handleResizeMouseMove);
-      document.addEventListener('mouseup', handleMouseUp);
-      return () => {
-        document.removeEventListener('mousemove', handleResizeMouseMove);
-        document.removeEventListener('mouseup', handleMouseUp);
-      };
-    }
-  }, [isResizing, handleResizeMouseMove, handleMouseUp]);
+  }, [isDragging, handleMouseMove, handleMouseUp]);
 
   // Window controls
   const handleMinimize = () => {
@@ -435,19 +402,6 @@ const FileEditorPanel = ({ file, onClose, position, zIndex, onBringToFront, pane
       <div className="editor-content">
         {renderEditor()}
       </div>
-
-      {/* Resize Handle */}
-      {!isMaximized && (
-        <div
-          ref={resizeHandleRef}
-          className="resize-handle"
-          onMouseDown={handleResizeMouseDown}
-        >
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4" />
-          </svg>
-        </div>
-      )}
     </div>
   );
 };

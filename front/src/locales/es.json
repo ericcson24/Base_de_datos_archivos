@@ -119,7 +119,6 @@
     "recentLabel": "Reciente",
     "upload": "Subir Archivo",
     "newFolder": "Nueva Carpeta",
-    "storage": "Almacenamiento",
     "logout": "Cerrar Sesión",
     "settings": "Ajustes",
     "calendar": "Calendario",
@@ -132,6 +131,8 @@
     "microsoftLinkedSuccess": " Cuenta de Microsoft vinculada correctamente",
     "searchPlaceholder": "Buscar archivos, carpetas...",
     "aiPlaceholder": "Pregúntale a tu nube...",
+    "aiLoading": "Buscando con IA...",
+    "aiLoadingDescription": "Analizando tus archivos para encontrar la mejor respuesta",
     "uploadMenu": {
       "file": "Subir Archivo",
       "folder": "Subir Carpeta",
@@ -223,7 +224,6 @@
     "title": "Ajustes",
     "general": "General",
     "security": "Seguridad",
-    "storage": "Almacenamiento",
     "integrations": "Integraciones",
     "avatar": "Avatar",
     "changeAvatar": "Haz clic en el lápiz para cambiar tu avatar",
@@ -262,10 +262,6 @@
     "syncSuccess": "Sincronización completada",
     "syncError": "Error al sincronizar",
     "connectionErrorGeneric": "Error de conexión",
-    "manageStorage": "Gestiona tu espacio en la nube",
-    "inUse": "En uso",
-    "used": "{{size}} usados",
-    "total": "{{size}} total",
     "syncInfoTitle": "Información de sincronización",
     "syncInfoDesc": "Los eventos se sincronizan automáticamente cada vez que abres el calendario. Usa el botón \"Sincronizar ahora\" si no ves tus últimos cambios de Outlook.",
     "linkAnother": "Vincular otra cuenta",
@@ -777,5 +773,10 @@
     "processingError": "Error al procesar la solicitud de IA",
     "noResponse": "No se pudo obtener respuesta de la IA",
     "retrying": "Reintentando..."
+  },
+  "createFileModal": {
+    "title": "Crear Nuevo Archivo",
+    "description": "Introduce un nombre para el nuevo archivo",
+    "placeholder": "Nombre del archivo..."
   }
 }
