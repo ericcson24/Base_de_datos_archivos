@@ -182,6 +182,9 @@ function getOutlookCategoryColor(outlookColor) {
 
 // --- Rutas ---
 
+// Background sync tracker: avoid concurrent syncs for same user
+const syncInProgress = new Map();
+
 app.get('/', authenticate, async (req, res) => {
   try {
     const username = req.user.username;
@@ -192,84 +195,27 @@ app.get('/', authenticate, async (req, res) => {
     
     if (!user) return res.status(404).json({ error: 'Usuario no encontrado' });
 
-    // 2. Si tiene token, sincronizar con Microsoft (auto-refresh)
-    if (user.microsoft_access_token) {
-        try {
-            const validToken = await getValidAccessToken(user);
-            if (!validToken) throw new Error('Token refresh failed');
-            const client = getAuthenticatedClient(validToken);
-            
-            let query = client.api('/me/calendar/events')
-                .header('Prefer', 'outlook.timezone="UTC"')
-                .select('id,subject,bodyPreview,start,end,location,webLink,isAllDay,categories')
-                .top(100);
-
-            if (start && end) {
-                const startISO = new Date(start).toISOString();
-                const endISO = new Date(end).toISOString();
-                query = query.filter(`start/dateTime ge '${startISO}' and end/dateTime le '${endISO}'`);
-            }
-            
-            const eventsResponse = await query.get();
-
-            // Sync to DB
-            for (const event of eventsResponse.value) {
-                const startTime = event.start.dateTime.endsWith('Z') ? event.start.dateTime : event.start.dateTime + 'Z';
-                const endTime = event.end.dateTime.endsWith('Z') ? event.end.dateTime : event.end.dateTime + 'Z';
-
-                await dbAsync.run(`
-                    INSERT INTO calendar_events (microsoft_id, user_id, subject, body_preview, start_time, end_time, is_all_day, location, web_link, categories, last_synced)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
-                    ON CONFLICT(microsoft_id) DO UPDATE SET
-                    subject=excluded.subject,
-                    body_preview=excluded.body_preview,
-                    start_time=excluded.start_time,
-                    end_time=excluded.end_time,
-                    is_all_day=excluded.is_all_day,
-                    location=excluded.location,
-                    web_link=excluded.web_link,
-                    categories=excluded.categories,
-                    last_synced=CURRENT_TIMESTAMP
-                `, [
-                    event.id,
-                    user.id,
-                    event.subject,
-                    event.bodyPreview,
-                    startTime,
-                    endTime,
-                    event.isAllDay ? 1 : 0,
-                    event.location?.displayName,
-                    event.webLink,
-                    JSON.stringify(event.categories || [])
-                ]);
-            }
-        } catch (msError) {
-            console.error('Error syncing with Microsoft:', msError.message || msError);
-            // Token already attempted refresh in getValidAccessToken, no need to wipe here
-        }
-    }
-
-    // 3. Devolver eventos de la DB
+    // 2. Devolver eventos de la DB PRIMERO (rápido)
     let targetUserIds = [user.id];
     if ((user.role === 'admin' || user.role === 'boss') && req.query.userId) {
-        // Support comma-separated list of IDs
         targetUserIds = req.query.userId.split(',').map(id => id.trim());
     }
-    
-    console.log(`[DEBUG] Fetching events for user_ids: ${targetUserIds.join(',')}`);
 
-    // Construct query for multiple users
     const placeholders = targetUserIds.map(() => '?').join(',');
     let query = `SELECT * FROM calendar_events WHERE user_id IN (${placeholders})`;
     let params = [...targetUserIds];
 
+    // Add date filter to DB query for faster response
+    if (start && end) {
+        query += ` AND start_time <= ? AND end_time >= ?`;
+        params.push(new Date(end).toISOString(), new Date(start).toISOString());
+    }
+
     const dbEvents = await dbAsync.all(query, params);
-    console.log(`[DEBUG] Found ${dbEvents.length} events in DB`);
 
     const formattedEvents = dbEvents.map(e => {
         let categories = [];
         try {
-            // Handle both JSON string and array (if already parsed by driver)
             if (typeof e.categories === 'string') {
                 categories = JSON.parse(e.categories);
             } else if (Array.isArray(e.categories)) {
@@ -282,7 +228,7 @@ app.get('/', authenticate, async (req, res) => {
             title: e.subject,
             start: e.start_time,
             end: e.end_time,
-            allDay: e.is_all_day === 1 || e.is_all_day === true, // Handle boolean/int
+            allDay: e.is_all_day === 1 || e.is_all_day === true,
             location: e.location,
             description: e.body_preview,
             url: e.web_link,
@@ -292,7 +238,63 @@ app.get('/', authenticate, async (req, res) => {
         };
     });
 
+    // Send response immediately (fast!)
     res.json(formattedEvents);
+
+    // 3. Sync with Microsoft in BACKGROUND (non-blocking, after response sent)
+    if (user.microsoft_access_token && !syncInProgress.get(user.id)) {
+        syncInProgress.set(user.id, true);
+        setImmediate(async () => {
+            try {
+                const validToken = await getValidAccessToken(user);
+                if (!validToken) throw new Error('Token refresh failed');
+                const client = getAuthenticatedClient(validToken);
+                
+                let msQuery = client.api('/me/calendar/events')
+                    .header('Prefer', 'outlook.timezone="UTC"')
+                    .select('id,subject,bodyPreview,start,end,location,webLink,isAllDay,categories')
+                    .top(100);
+
+                if (start && end) {
+                    const startISO = new Date(start).toISOString();
+                    const endISO = new Date(end).toISOString();
+                    msQuery = msQuery.filter(`start/dateTime ge '${startISO}' and end/dateTime le '${endISO}'`);
+                }
+                
+                const eventsResponse = await msQuery.get();
+
+                for (const event of eventsResponse.value) {
+                    const startTime = event.start.dateTime.endsWith('Z') ? event.start.dateTime : event.start.dateTime + 'Z';
+                    const endTime = event.end.dateTime.endsWith('Z') ? event.end.dateTime : event.end.dateTime + 'Z';
+
+                    await dbAsync.run(`
+                        INSERT INTO calendar_events (microsoft_id, user_id, subject, body_preview, start_time, end_time, is_all_day, location, web_link, categories, last_synced)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+                        ON CONFLICT(microsoft_id) DO UPDATE SET
+                        subject=excluded.subject,
+                        body_preview=excluded.body_preview,
+                        start_time=excluded.start_time,
+                        end_time=excluded.end_time,
+                        is_all_day=excluded.is_all_day,
+                        location=excluded.location,
+                        web_link=excluded.web_link,
+                        categories=excluded.categories,
+                        last_synced=CURRENT_TIMESTAMP
+                    `, [
+                        event.id, user.id, event.subject, event.bodyPreview,
+                        startTime, endTime, event.isAllDay ? 1 : 0,
+                        event.location?.displayName, event.webLink,
+                        JSON.stringify(event.categories || [])
+                    ]);
+                }
+                console.log(`[SYNC] Background sync completed for user ${username}: ${eventsResponse.value.length} events`);
+            } catch (msError) {
+                console.error('[SYNC] Background Microsoft sync failed:', msError.message || msError);
+            } finally {
+                syncInProgress.delete(user.id);
+            }
+        });
+    }
 
   } catch (error) {
     console.error('Error getting events:', error);

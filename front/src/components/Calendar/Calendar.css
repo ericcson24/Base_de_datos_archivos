@@ -361,6 +361,8 @@
   padding: 1rem 2rem 0.5rem 2rem;
   border-bottom: 1px solid var(--cal-border);
   background: var(--cal-surface);
+  position: relative;
+  z-index: 50;
 }
 
 .daily-timeline-header h3 {

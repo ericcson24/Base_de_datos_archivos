@@ -162,6 +162,8 @@ const Calendar = ({ user, onLogout, onBackToPanel, onBackToFolders, onGoToRemote
   const [events, setEvents] = useState([]);
   const [isLoadingEvents, setIsLoadingEvents] = useState(false);
   const isFetchingRef = useRef(false);
+  const eventsCacheRef = useRef(new Map()); // Cache: eventId -> event data
+  const loadedRangesRef = useRef([]); // Track which date ranges have been loaded
   
   // Estado para el panel lateral del día
   const [selectedDay, setSelectedDay] = useState(null);
@@ -360,21 +362,34 @@ const Calendar = ({ user, onLogout, onBackToPanel, onBackToFolders, onGoToRemote
     }
   }, [events]); // Run when events change
 
+  // Check if a date range is already covered by cached ranges
+  const isRangeCovered = useCallback((start, end) => {
+    return loadedRangesRef.current.some(r => r.start <= start && r.end >= end);
+  }, []);
+
   const loadEvents = useCallback(async (startDate = null, endDate = null) => {
     if (isFetchingRef.current) return;
+    
+    let start, end;
+    if (startDate && endDate) {
+      start = new Date(startDate);
+      end = new Date(endDate);
+    } else {
+      // Default: load ±2 months around current date (much smaller than ±1 year)
+      const now = new Date();
+      start = new Date(now.getFullYear(), now.getMonth() - 2, 1);
+      end = new Date(now.getFullYear(), now.getMonth() + 3, 0); // End of month+2
+    }
+
+    // Skip if this range is already loaded (cache hit)
+    if (isRangeCovered(start.getTime(), end.getTime())) {
+      return;
+    }
+
     isFetchingRef.current = true;
     setIsLoadingEvents(true);
     
     try {
-      let start, end;
-      if (startDate && endDate) {
-        start = new Date(startDate);
-        end = new Date(endDate);
-      } else {
-        const now = new Date();
-        start = new Date(now.getFullYear() - 1, 0, 1);
-        end = new Date(now.getFullYear() + 1, 11, 31);
-      }
       const token = getAuthToken();
       const headers = {};
       if (token) headers['Authorization'] = `Bearer ${token}`;
@@ -390,7 +405,17 @@ const Calendar = ({ user, onLogout, onBackToPanel, onBackToFolders, onGoToRemote
       });
       if (response.ok) {
         const eventsData = await response.json();
-        setEvents(eventsData);
+        
+        // Merge into cache (keyed by event id)
+        eventsData.forEach(ev => {
+          eventsCacheRef.current.set(ev.id, ev);
+        });
+
+        // Track loaded range
+        loadedRangesRef.current.push({ start: start.getTime(), end: end.getTime() });
+
+        // Set all cached events as current state
+        setEvents(Array.from(eventsCacheRef.current.values()));
       }
     } catch (error) {
       console.error('Error loading events:', error);
@@ -398,9 +423,20 @@ const Calendar = ({ user, onLogout, onBackToPanel, onBackToFolders, onGoToRemote
       setIsLoadingEvents(false);
       isFetchingRef.current = false;
     }
-  }, [viewUserId]);
+  }, [viewUserId, isRangeCovered]);
+
+  // Force reload (clears cache) - used after create/edit/delete
+  const reloadEvents = useCallback(async () => {
+    eventsCacheRef.current.clear();
+    loadedRangesRef.current = [];
+    isFetchingRef.current = false;
+    await loadEvents();
+  }, [loadEvents]);
 
   useEffect(() => {
+    // Clear cache when switching user view
+    eventsCacheRef.current.clear();
+    loadedRangesRef.current = [];
     loadCategories();
     loadEvents();
   }, [loadCategories, loadEvents]);
@@ -517,7 +553,7 @@ const Calendar = ({ user, onLogout, onBackToPanel, onBackToFolders, onGoToRemote
         })
       });
       if (!response.ok) throw new Error('Error updating event');
-      loadEvents();
+      reloadEvents();
       addToast(t('calendar.eventUpdated'), 'success');
     } catch (error) {
       console.error('Error updating event:', error);
@@ -817,7 +853,12 @@ const Calendar = ({ user, onLogout, onBackToPanel, onBackToFolders, onGoToRemote
               eventDrop={handleEventDrop}
               eventResize={handleEventResize}
               datesSet={(dateInfo) => {
-                // Force update title
+                // Load events for the new visible range + buffer
+                const bufferStart = new Date(dateInfo.start);
+                bufferStart.setMonth(bufferStart.getMonth() - 1);
+                const bufferEnd = new Date(dateInfo.end);
+                bufferEnd.setMonth(bufferEnd.getMonth() + 1);
+                loadEvents(bufferStart, bufferEnd);
               }}
             />
           </div>
@@ -908,7 +949,7 @@ const Calendar = ({ user, onLogout, onBackToPanel, onBackToFolders, onGoToRemote
 
               setModalState({ ...modalState, isOpen: false });
               calendarRef.current?.getApi()?.unselect(); // Clear selection
-              loadEvents();
+              reloadEvents();
               
               if (eventData.assignMode === 'group') {
                  addToast(t('calendar.groupEventCreated', { 
@@ -939,7 +980,7 @@ const Calendar = ({ user, onLogout, onBackToPanel, onBackToFolders, onGoToRemote
               if (!response.ok) throw new Error('Error deleting event');
               setModalState({ ...modalState, isOpen: false });
               calendarRef.current?.getApi()?.unselect(); // Clear selection
-              loadEvents();
+              reloadEvents();
               addToast(t('calendar.eventDeleted'), 'success');
             } catch (error) {
               console.error('Error deleting event:', error);
@@ -960,7 +1001,7 @@ const Calendar = ({ user, onLogout, onBackToPanel, onBackToFolders, onGoToRemote
         <AITaskModal
           isOpen={showAIModal}
           onClose={() => setShowAIModal(false)}
-          onTaskCreated={() => loadEvents()}
+          onTaskCreated={() => reloadEvents()}
           user={user}
         />
       )}
