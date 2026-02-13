@@ -7,11 +7,15 @@ const axios = require('axios');
 const os = require('os');
 const util = require('util');
 const { exec } = require('child_process');
+const jwt = require('jsonwebtoken');
 const { dbAsync } = require('./database/db');
 const { encrypt, decrypt } = require('./utils/cryptoUtils');
 const bcrypt = require('bcrypt');
 
 const execAsync = util.promisify(exec);
+
+const JWT_SECRET = process.env.JWT_SECRET || 'fallback-secret-change-me';
+const AUTH_SERVICE_URL = process.env.AUTH_SERVICE_URL || 'http://auth-service:5001';
 
 const app = express();
 const PORT = process.env.PORT || 5006;
@@ -43,7 +47,7 @@ const requireAdmin = (req, res, next) => {
       });
     }
 
-    const userData = JSON.parse(Buffer.from(token, 'base64').toString());
+    const userData = jwt.verify(token, JWT_SECRET);
 
     if (!userData.username || userData.role !== 'admin') {
       return res.status(403).json({
@@ -55,10 +59,10 @@ const requireAdmin = (req, res, next) => {
     req.user = userData;
     next();
   } catch (error) {
-    console.error('Error verificando sesión de admin:', error);
+    console.error('Error verificando sesión de admin:', error.message);
     res.status(401).json({
       success: false,
-      message: 'Sesión inválida'
+      message: 'Sesión inválida o expirada'
     });
   }
 };
@@ -494,6 +498,131 @@ app.post('/api/users/:id/cancel-deletion', requireAdmin, async (req, res) => {
     res.json({ success: true });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// ==========================================
+// SECURITY MANAGEMENT ENDPOINTS
+// ==========================================
+
+// GET /api/security/overview - Security dashboard data
+app.get('/api/security/overview', requireAdmin, async (req, res) => {
+  try {
+    const stats = await dbAsync.get(`
+      SELECT 
+        COUNT(*) FILTER (WHERE action = 'LOGIN' AND timestamp > NOW() - INTERVAL '24 hours') as logins_24h,
+        COUNT(*) FILTER (WHERE action = 'LOGIN_FAILED' AND timestamp > NOW() - INTERVAL '24 hours') as failures_24h,
+        COUNT(*) FILTER (WHERE action = 'LOGIN' AND timestamp > NOW() - INTERVAL '7 days') as logins_7d,
+        COUNT(*) FILTER (WHERE action = 'LOGIN_FAILED' AND timestamp > NOW() - INTERVAL '7 days') as failures_7d
+      FROM audit_logs
+    `);
+
+    const lockedAccounts = await dbAsync.get("SELECT COUNT(*) as count FROM user_credentials WHERE is_locked = TRUE");
+    
+    const recentFailures = await dbAsync.all(`
+      SELECT username, COUNT(*) as attempt_count, MAX(timestamp) as last_attempt
+      FROM audit_logs 
+      WHERE action = 'LOGIN_FAILED' AND timestamp > NOW() - INTERVAL '24 hours'
+      GROUP BY username
+      ORDER BY attempt_count DESC
+      LIMIT 10
+    `);
+
+    // Fetch rate limits from auth-service
+    let rateLimits = { total: 0, blockedCount: 0, rateLimits: [] };
+    try {
+      const token = req.headers.authorization;
+      const rlRes = await axios.get(`${AUTH_SERVICE_URL}/security/rate-limits`, {
+        headers: { Authorization: token }
+      });
+      rateLimits = rlRes.data;
+    } catch (e) {
+      console.error('Could not fetch rate limits from auth-service:', e.message);
+    }
+
+    // Blocked accounts from DB
+    let blockedAccounts = [];
+    try {
+      const baRes = await axios.get(`${AUTH_SERVICE_URL}/security/blocked-accounts`, {
+        headers: { Authorization: req.headers.authorization }
+      });
+      blockedAccounts = baRes.data.accounts || [];
+    } catch (e) {
+      console.error('Could not fetch blocked accounts:', e.message);
+    }
+
+    res.json({
+      success: true,
+      stats: stats || { logins_24h: 0, failures_24h: 0, logins_7d: 0, failures_7d: 0 },
+      lockedAccounts: lockedAccounts?.count || 0,
+      recentFailures,
+      rateLimits,
+      blockedAccounts
+    });
+  } catch (error) {
+    console.error('Error fetching security overview:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// GET /api/security/logs - Security audit logs
+app.get('/api/security/logs', requireAdmin, async (req, res) => {
+  try {
+    const limit = parseInt(req.query.limit) || 100;
+    const filter = req.query.filter || 'all';
+    
+    let whereClause = '';
+    if (filter === 'logins') {
+      whereClause = "WHERE action IN ('LOGIN', 'LOGIN_FAILED')";
+    } else if (filter === 'failures') {
+      whereClause = "WHERE action = 'LOGIN_FAILED'";
+    } else if (filter === 'security') {
+      whereClause = "WHERE action IN ('LOGIN', 'LOGIN_FAILED', 'ACCOUNT_UNLOCK', 'RATE_LIMIT_CLEAR', 'RATE_LIMIT_CLEAR_ALL', 'PASSWORD_RECOVERY_REQUEST')";
+    }
+    
+    const logs = await dbAsync.all(`SELECT * FROM audit_logs ${whereClause} ORDER BY timestamp DESC LIMIT ?`, [limit]);
+    res.json({ success: true, logs });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// Proxy: Unblock a rate-limited IP
+app.delete('/api/security/rate-limits/:ip', requireAdmin, async (req, res) => {
+  try {
+    const response = await axios.delete(`${AUTH_SERVICE_URL}/security/rate-limits/${encodeURIComponent(req.params.ip)}`, {
+      headers: { Authorization: req.headers.authorization }
+    });
+    res.json(response.data);
+  } catch (error) {
+    const status = error.response?.status || 500;
+    res.status(status).json(error.response?.data || { success: false, message: error.message });
+  }
+});
+
+// Proxy: Clear all rate limits
+app.delete('/api/security/rate-limits', requireAdmin, async (req, res) => {
+  try {
+    const response = await axios.delete(`${AUTH_SERVICE_URL}/security/rate-limits`, {
+      headers: { Authorization: req.headers.authorization }
+    });
+    res.json(response.data);
+  } catch (error) {
+    const status = error.response?.status || 500;
+    res.status(status).json(error.response?.data || { success: false, message: error.message });
+  }
+});
+
+// Proxy: Unlock a user account
+app.post('/api/security/unlock-account/:userId', requireAdmin, async (req, res) => {
+  try {
+    const response = await axios.post(`${AUTH_SERVICE_URL}/security/unlock-account/${req.params.userId}`, {}, {
+      headers: { Authorization: req.headers.authorization }
+    });
+    res.json(response.data);
+  } catch (error) {
+    const status = error.response?.status || 500;
+    res.status(status).json(error.response?.data || { success: false, message: error.message });
   }
 });
 

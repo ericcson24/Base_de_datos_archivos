@@ -1,6 +1,7 @@
 const express = require('express');
 const cors = require('cors');
 const dotenv = require('dotenv');
+const jwt = require('jsonwebtoken');
 const db = require('./utils/database');
 const dualNodeIndexing = require('./utils/dualNodeIndexing');
 const { syncDatabaseWithDisk } = require('./utils/diskSync');
@@ -14,6 +15,7 @@ dotenv.config();
 
 const app = express();
 const PORT = process.env.PORT || 5009;
+const JWT_SECRET = process.env.JWT_SECRET || 'fallback-secret-change-me';
 
 // Middleware
 app.use(cors());
@@ -38,12 +40,12 @@ const authenticateToken = (req, res, next) => {
 
   if (token) {
     try {
-      const userData = JSON.parse(Buffer.from(token, 'base64').toString());
+      const userData = jwt.verify(token, JWT_SECRET);
       req.user = userData;
       next();
     } catch (error) {
       console.log('[AUTH ERROR]', error.message);
-      return res.status(403).json({ error: 'Token inválido' });
+      return res.status(403).json({ error: 'Token inválido o expirado' });
     }
   } else {
     return res.status(401).json({ error: 'Token requerido' });
@@ -112,10 +114,10 @@ app.post('/test-auth', (req, res) => {
   }
 
   try {
-    const userData = JSON.parse(Buffer.from(token, 'base64').toString());
+    const userData = jwt.verify(token, JWT_SECRET);
     return res.json({ 
       success: true,
-      decoded: userData,
+      decoded: { id: userData.id, username: userData.username, role: userData.role },
       tokenLength: token.length
     });
   } catch (error) {

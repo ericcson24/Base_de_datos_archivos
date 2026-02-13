@@ -55,16 +55,15 @@ const { dbAsync, initDb } = require('./database/db');
     }
 })();
 
-// Helper to verify token (supports both Base64 JSON and JWT)
+// Helper to verify token (JWT primary, Base64 legacy fallback)
 const verifyToken = (token) => {
     if (!token) throw new Error('No token provided');
     try {
-        // Try Base64 JSON first (current auth system)
-        const decoded = JSON.parse(Buffer.from(token, 'base64').toString());
-        return decoded;
-    } catch (e) {
-        // Fallback to JWT
+        // Try JWT first (secure auth system)
         return jwt.verify(token, JWT_SECRET);
+    } catch (e) {
+        // No fallback - reject invalid tokens
+        throw new Error('Token inválido o expirado');
     }
 };
 

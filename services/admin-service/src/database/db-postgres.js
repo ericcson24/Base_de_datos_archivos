@@ -108,13 +108,14 @@ const initDatabase = async () => {
             deletion_scheduled_at TIMESTAMP
         )`);
 
-        // Add deletion_scheduled_at column if it doesn't exist
-        try {
-            await client.query('ALTER TABLE users ADD COLUMN deletion_scheduled_at TIMESTAMP');
-            console.log('Migration: Added deletion_scheduled_at column to users table');
-        } catch (e) {
-            console.log('Migration: deletion_scheduled_at column already exists or error:', e.message);
-        }
+        // Add deletion_scheduled_at column if it doesn't exist (using DO block to avoid transaction abort)
+        await client.query(`
+            DO $$ BEGIN
+                ALTER TABLE users ADD COLUMN deletion_scheduled_at TIMESTAMP;
+            EXCEPTION WHEN duplicate_column THEN
+                NULL;
+            END $$;
+        `);
 
         // User Credentials
         await client.query(`CREATE TABLE IF NOT EXISTS user_credentials (

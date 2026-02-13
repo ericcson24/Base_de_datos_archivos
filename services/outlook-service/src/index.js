@@ -1,9 +1,12 @@
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
+const jwt = require('jsonwebtoken');
 const { Client } = require('@microsoft/microsoft-graph-client');
 const { dbAsync } = require('./database/db');
 require('isomorphic-fetch');
+
+const JWT_SECRET = process.env.JWT_SECRET || 'fallback-secret-change-me';
 
 const app = express();
 const PORT = process.env.PORT || 5003;
@@ -27,11 +30,11 @@ const authenticate = (req, res, next) => {
 
   if (token) {
     try {
-      const userData = JSON.parse(Buffer.from(token, 'base64').toString());
+      const userData = jwt.verify(token, JWT_SECRET);
       req.user = userData;
       next();
     } catch (error) {
-      return res.status(401).json({ success: false, message: 'Token inválido' });
+      return res.status(401).json({ success: false, message: 'Token inválido o expirado' });
     }
   } else {
     return res.status(401).json({ success: false, message: 'No autorizado' });
@@ -44,6 +47,83 @@ function getAuthenticatedClient(accessToken) {
       done(null, accessToken);
     }
   });
+}
+
+// --- Auto-refresh Microsoft tokens ---
+// Refreshes an expired access_token using the stored refresh_token
+async function refreshAccessToken(userId, refreshToken) {
+  const clientId = process.env.MS_CLIENT_ID || process.env.MICROSOFT_CLIENT_ID;
+  const clientSecret = process.env.MS_CLIENT_SECRET || process.env.MICROSOFT_CLIENT_SECRET;
+  
+  if (!clientId || !clientSecret || !refreshToken) {
+    console.warn('[TOKEN] Cannot refresh: missing clientId, clientSecret, or refreshToken');
+    return null;
+  }
+
+  try {
+    const response = await fetch('https://login.microsoftonline.com/common/oauth2/v2.0/token', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({
+        client_id: clientId,
+        client_secret: clientSecret,
+        refresh_token: refreshToken,
+        grant_type: 'refresh_token',
+        scope: 'user.read calendars.readwrite offline_access'
+      })
+    });
+
+    const data = await response.json();
+
+    if (data.error) {
+      console.error('[TOKEN] Refresh failed:', data.error, data.error_description);
+      // If refresh token is also invalid, clear everything
+      if (data.error === 'invalid_grant') {
+        await dbAsync.run('UPDATE users SET microsoft_access_token = NULL, microsoft_refresh_token = NULL WHERE id = ?', [userId]);
+      }
+      return null;
+    }
+
+    // Save new tokens to DB
+    const newAccessToken = data.access_token;
+    const newRefreshToken = data.refresh_token || refreshToken; // MS may or may not return a new refresh token
+    
+    await dbAsync.run(
+      'UPDATE users SET microsoft_access_token = ?, microsoft_refresh_token = ? WHERE id = ?',
+      [newAccessToken, newRefreshToken, userId]
+    );
+
+    console.log(`[TOKEN] Successfully refreshed access token for user ID ${userId}`);
+    return newAccessToken;
+  } catch (err) {
+    console.error('[TOKEN] Refresh request failed:', err.message);
+    return null;
+  }
+}
+
+// Gets a valid access token for a user - refreshes automatically if expired
+// user object must have: id, microsoft_access_token, microsoft_refresh_token
+async function getValidAccessToken(user) {
+  if (!user.microsoft_access_token) return null;
+
+  // First try with existing token (fast path - no extra API call)
+  try {
+    const client = getAuthenticatedClient(user.microsoft_access_token);
+    // Quick validation - use a lightweight endpoint
+    await client.api('/me').select('id').get();
+    return user.microsoft_access_token; // Token is valid
+  } catch (err) {
+    // Token expired or invalid - try refresh
+    if (err.statusCode === 401 || err.code === 'InvalidAuthenticationToken' || 
+        (err.message && (err.message.includes('JWT is not well formed') || err.message.includes('Access token has expired') || err.message.includes('Lifetime validation failed')))) {
+      console.log(`[TOKEN] Access token expired for user ID ${user.id}, attempting refresh...`);
+      const newToken = await refreshAccessToken(user.id, user.microsoft_refresh_token);
+      return newToken; // null if refresh failed
+    }
+    // Some other error (network, etc.) - return existing token and let caller handle
+    console.warn('[TOKEN] Validation check failed with non-auth error:', err.message);
+    return user.microsoft_access_token;
+  }
 }
 
 // Helper Response Handler
@@ -108,14 +188,16 @@ app.get('/', authenticate, async (req, res) => {
     const { start, end } = req.query;
 
     // 1. Obtener usuario y token
-    const user = await dbAsync.get('SELECT id, microsoft_access_token, role FROM users WHERE username = ?', [username]);
+    const user = await dbAsync.get('SELECT id, microsoft_access_token, microsoft_refresh_token, role FROM users WHERE username = ?', [username]);
     
     if (!user) return res.status(404).json({ error: 'Usuario no encontrado' });
 
-    // 2. Si tiene token, sincronizar con Microsoft
+    // 2. Si tiene token, sincronizar con Microsoft (auto-refresh)
     if (user.microsoft_access_token) {
         try {
-            const client = getAuthenticatedClient(user.microsoft_access_token);
+            const validToken = await getValidAccessToken(user);
+            if (!validToken) throw new Error('Token refresh failed');
+            const client = getAuthenticatedClient(validToken);
             
             let query = client.api('/me/calendar/events')
                 .header('Prefer', 'outlook.timezone="UTC"')
@@ -162,15 +244,8 @@ app.get('/', authenticate, async (req, res) => {
                 ]);
             }
         } catch (msError) {
-            console.error('Error syncing with Microsoft:', msError);
-            if (msError.code === 'InvalidAuthenticationToken' || (msError.message && msError.message.includes('JWT is not well formed'))) {
-              try {
-                await dbAsync.run(
-                  'UPDATE users SET microsoft_access_token = NULL, microsoft_refresh_token = NULL WHERE username = ?', 
-                  [username]
-                );
-              } catch (dbError) {}
-            }
+            console.error('Error syncing with Microsoft:', msError.message || msError);
+            // Token already attempted refresh in getValidAccessToken, no need to wipe here
         }
     }
 
@@ -247,11 +322,14 @@ app.get('/categories', authenticate, async (req, res) => {
 
     for (const username of targetUsernames) {
       try {
-        const user = await dbAsync.get('SELECT microsoft_access_token FROM users WHERE username = ?', [username]);
+        const user = await dbAsync.get('SELECT id, microsoft_access_token, microsoft_refresh_token FROM users WHERE username = ?', [username]);
         
         if (!user || !user.microsoft_access_token) continue;
 
-        const client = getAuthenticatedClient(user.microsoft_access_token);
+        const validToken = await getValidAccessToken(user);
+        if (!validToken) continue;
+
+        const client = getAuthenticatedClient(validToken);
         const categoriesResponse = await client.api('/me/outlook/masterCategories').get();
 
         if (categoriesResponse.value) {
@@ -292,12 +370,14 @@ app.get('/categories', authenticate, async (req, res) => {
 app.post('/categories', authenticate, async (req, res) => {
   try {
     const username = req.user.username;
-    const user = await dbAsync.get('SELECT microsoft_access_token FROM users WHERE username = ?', [username]);
+    const user = await dbAsync.get('SELECT id, microsoft_access_token, microsoft_refresh_token FROM users WHERE username = ?', [username]);
 
     if (!user || !user.microsoft_access_token) return res.status(401).json({ error: 'No vinculado' });
 
     const { name, color } = req.body;
-    const client = getAuthenticatedClient(user.microsoft_access_token);
+    const validToken = await getValidAccessToken(user);
+    if (!validToken) return res.status(401).json({ error: 'Token expirado, reconecta tu cuenta' });
+    const client = getAuthenticatedClient(validToken);
 
     const newCategory = { displayName: name, color: color || 'preset0' };
     const createdCategory = await client.api('/me/outlook/masterCategories').post(newCategory);
@@ -316,13 +396,15 @@ app.post('/categories', authenticate, async (req, res) => {
 app.post('/sync', authenticate, async (req, res) => {
   try {
     const username = req.user.username;
-    const user = await dbAsync.get('SELECT id, microsoft_access_token FROM users WHERE username = ?', [username]);
+    const user = await dbAsync.get('SELECT id, microsoft_access_token, microsoft_refresh_token FROM users WHERE username = ?', [username]);
 
     if (!user || !user.microsoft_access_token) {
       return sendResponse(res, 400, { error: 'No vinculado' });
     }
 
-    const client = getAuthenticatedClient(user.microsoft_access_token);
+    const validToken = await getValidAccessToken(user);
+    if (!validToken) return sendResponse(res, 401, { error: 'Token expirado, reconecta tu cuenta' });
+    const client = getAuthenticatedClient(validToken);
     const now = new Date();
     const start = new Date(now); start.setMonth(start.getMonth() - 1);
     const end = new Date(now); end.setMonth(end.getMonth() + 6);
@@ -369,12 +451,14 @@ app.post('/sync', authenticate, async (req, res) => {
 app.post('/', authenticate, async (req, res) => {
   try {
     const username = req.user.username;
-    const user = await dbAsync.get('SELECT id, microsoft_access_token FROM users WHERE username = ?', [username]);
+    const user = await dbAsync.get('SELECT id, microsoft_access_token, microsoft_refresh_token FROM users WHERE username = ?', [username]);
 
     if (!user || !user.microsoft_access_token) return res.status(401).json({ error: 'No vinculado' });
 
     const { title, start, end, allDay, location, description, attendees, categories } = req.body;
-    const client = getAuthenticatedClient(user.microsoft_access_token);
+    const validToken = await getValidAccessToken(user);
+    if (!validToken) return res.status(401).json({ error: 'Token expirado, reconecta tu cuenta' });
+    const client = getAuthenticatedClient(validToken);
 
     const newEvent = {
       subject: title,
@@ -444,16 +528,24 @@ app.post('/', authenticate, async (req, res) => {
 app.delete('/:id', authenticate, async (req, res) => {
   try {
     const username = req.user.username;
-    const user = await dbAsync.get('SELECT id, microsoft_access_token FROM users WHERE username = ?', [username]);
+    const user = await dbAsync.get('SELECT id, microsoft_access_token, microsoft_refresh_token, role FROM users WHERE username = ?', [username]);
 
     if (!user) return res.status(404).json({ error: 'Usuario no encontrado' });
 
     const { id } = req.params;
+    const isAdminOrBoss = user.role === 'admin' || user.role === 'boss';
 
-    // Find event in local DB first
+    // Find event in local DB - admin/boss can find ANY user's events
     let dbEvent = await dbAsync.get('SELECT * FROM calendar_events WHERE microsoft_id = ? AND user_id = ?', [id, user.id]);
     if (!dbEvent && !isNaN(id)) {
       dbEvent = await dbAsync.get('SELECT * FROM calendar_events WHERE id = ? AND user_id = ?', [parseInt(id), user.id]);
+    }
+    // If not found and user is admin/boss, search without user_id filter (for assigned events)
+    if (!dbEvent && isAdminOrBoss) {
+      dbEvent = await dbAsync.get('SELECT * FROM calendar_events WHERE microsoft_id = ?', [id]);
+      if (!dbEvent && !isNaN(id)) {
+        dbEvent = await dbAsync.get('SELECT * FROM calendar_events WHERE id = ?', [parseInt(id)]);
+      }
     }
 
     if (!dbEvent) {
@@ -463,13 +555,24 @@ app.delete('/:id', authenticate, async (req, res) => {
     const isLocalOnly = !dbEvent.microsoft_id || dbEvent.microsoft_id.startsWith('local_');
 
     // Delete from Microsoft if linked
-    if (!isLocalOnly && user.microsoft_access_token) {
-      try {
-        const client = getAuthenticatedClient(user.microsoft_access_token);
-        await client.api(`/me/events/${dbEvent.microsoft_id}`).delete();
-      } catch (msError) {
-        console.error('[OUTLOOK] Microsoft Graph delete failed:', msError.message);
-        // Continue with local deletion even if MS fails
+    // Use the EVENT OWNER's token to delete from their Outlook (not the admin's)
+    if (!isLocalOnly) {
+      const eventOwner = dbEvent.user_id === user.id 
+        ? user 
+        : await dbAsync.get('SELECT id, microsoft_access_token, microsoft_refresh_token FROM users WHERE id = ?', [dbEvent.user_id]);
+      
+      if (eventOwner && eventOwner.microsoft_access_token) {
+        try {
+          const validToken = await getValidAccessToken(eventOwner);
+          if (validToken) {
+            const client = getAuthenticatedClient(validToken);
+            await client.api(`/me/events/${dbEvent.microsoft_id}`).delete();
+            console.log(`[OUTLOOK] Deleted event ${dbEvent.microsoft_id} from user ${dbEvent.user_id}'s Outlook`);
+          }
+        } catch (msError) {
+          console.error('[OUTLOOK] Microsoft Graph delete failed:', msError.message);
+          // Continue with local deletion even if MS fails
+        }
       }
     }
 
@@ -486,17 +589,25 @@ app.delete('/:id', authenticate, async (req, res) => {
 app.put('/:id', authenticate, async (req, res) => {
   try {
     const username = req.user.username;
-    const user = await dbAsync.get('SELECT id, microsoft_access_token FROM users WHERE username = ?', [username]);
+    const user = await dbAsync.get('SELECT id, microsoft_access_token, microsoft_refresh_token, role FROM users WHERE username = ?', [username]);
 
     if (!user) return res.status(404).json({ error: 'Usuario no encontrado' });
 
     const { id } = req.params;
     const { title, start, end, allDay, location, description, attendees, categories } = req.body;
+    const isAdminOrBoss = user.role === 'admin' || user.role === 'boss';
 
     // Find the event in the local DB first (by microsoft_id or by local numeric id)
     let dbEvent = await dbAsync.get('SELECT * FROM calendar_events WHERE microsoft_id = ? AND user_id = ?', [id, user.id]);
     if (!dbEvent && !isNaN(id)) {
       dbEvent = await dbAsync.get('SELECT * FROM calendar_events WHERE id = ? AND user_id = ?', [parseInt(id), user.id]);
+    }
+    // If not found and user is admin/boss, search without user_id filter (for assigned events)
+    if (!dbEvent && isAdminOrBoss) {
+      dbEvent = await dbAsync.get('SELECT * FROM calendar_events WHERE microsoft_id = ?', [id]);
+      if (!dbEvent && !isNaN(id)) {
+        dbEvent = await dbAsync.get('SELECT * FROM calendar_events WHERE id = ?', [parseInt(id)]);
+      }
     }
 
     if (!dbEvent) {
@@ -506,10 +617,17 @@ app.put('/:id', authenticate, async (req, res) => {
     const isLocalOnly = !dbEvent.microsoft_id || dbEvent.microsoft_id.startsWith('local_');
     const categoriesJson = JSON.stringify(Array.isArray(categories) ? categories : (categories ? [categories] : []));
 
-    // If linked to Microsoft and user has token, update in Graph
-    if (!isLocalOnly && user.microsoft_access_token) {
+    // Use event owner's token for Microsoft Graph (not admin's if editing someone else's event)
+    const eventOwner = dbEvent.user_id === user.id 
+      ? user 
+      : await dbAsync.get('SELECT id, microsoft_access_token, microsoft_refresh_token FROM users WHERE id = ?', [dbEvent.user_id]);
+
+    // If linked to Microsoft and event owner has token, update in Graph
+    if (!isLocalOnly && eventOwner && eventOwner.microsoft_access_token) {
       try {
-        const client = getAuthenticatedClient(user.microsoft_access_token);
+        const validToken = await getValidAccessToken(eventOwner);
+        if (!validToken) throw new Error('Token refresh failed');
+        const client = getAuthenticatedClient(validToken);
 
         const updatedEvent = {
           subject: title,
@@ -545,13 +663,6 @@ app.put('/:id', authenticate, async (req, res) => {
         return res.json({ id: response.id, title: response.subject });
       } catch (msError) {
         console.error('[OUTLOOK] Microsoft Graph update failed:', msError.message);
-        // If token expired, invalidate and fall through to local-only update
-        if (msError.statusCode === 401 || msError.code === 'InvalidAuthenticationToken' ||
-            (msError.message && msError.message.includes('JWT is not well formed'))) {
-          try {
-            await dbAsync.run('UPDATE users SET microsoft_access_token = NULL, microsoft_refresh_token = NULL WHERE username = ?', [username]);
-          } catch (dbErr) {}
-        }
         // Fall through to local-only update
       }
     }
@@ -578,12 +689,14 @@ app.put('/:id', authenticate, async (req, res) => {
 app.get('/:id', authenticate, async (req, res) => {
   try {
     const username = req.user.username;
-    const user = await dbAsync.get('SELECT microsoft_access_token FROM users WHERE username = ?', [username]);
+    const user = await dbAsync.get('SELECT id, microsoft_access_token, microsoft_refresh_token FROM users WHERE username = ?', [username]);
 
     if (!user || !user.microsoft_access_token) return res.status(401).json({ error: 'No vinculado' });
 
     const { id } = req.params;
-    const client = getAuthenticatedClient(user.microsoft_access_token);
+    const validToken = await getValidAccessToken(user);
+    if (!validToken) return res.status(401).json({ error: 'Token expirado, reconecta tu cuenta' });
+    const client = getAuthenticatedClient(validToken);
 
     const event = await client.api(`/me/events/${id}`).get();
     
@@ -627,7 +740,7 @@ app.post('/group', authenticate, async (req, res) => {
     
     // 1. Get group members
     const members = await dbAsync.all(`
-      SELECT u.id, u.username, u.microsoft_access_token 
+      SELECT u.id, u.username, u.microsoft_access_token, u.microsoft_refresh_token 
       FROM users u
       JOIN group_members gm ON u.id = gm.user_id
       WHERE gm.group_id = ?
@@ -645,10 +758,11 @@ app.post('/group', authenticate, async (req, res) => {
         let microsoftId = null;
         let webLink = null;
 
-        // Try Outlook sync if linked
-        if (member.microsoft_access_token) {
+        // Try Outlook sync if linked (with auto-refresh)
+        const memberToken = await getValidAccessToken(member);
+        if (memberToken) {
           try {
-            const client = getAuthenticatedClient(member.microsoft_access_token);
+            const client = getAuthenticatedClient(memberToken);
             
             const newEvent = {
               subject: `[Grupo] ${title}`,
@@ -689,20 +803,30 @@ app.post('/group', authenticate, async (req, res) => {
             assignerUsername
         ]);
 
-        // Create Notification
+        // Create Notification (via notification-service for socket emit)
         try {
-          await dbAsync.run(`
-            INSERT INTO notifications (user_id, title, message, type, link) 
-            VALUES (?, ?, ?, ?, ?)
-          `, [
-            member.id,
-            'Nueva Tarea de Grupo',
-            `Se te ha asignado la tarea: ${title}`,
-            'task',
-            '/calendar'
-          ]);
+          const notifRes = await fetch('http://notification-service:5002/create', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              userId: member.id,
+              title: 'calendar_event_assigned',
+              message: `${assignerUsername}|${title}`,
+              type: 'task',
+              link: '/calendar',
+              metadata: { 
+                notifType: 'calendar_group',
+                from: assignerUsername, 
+                eventTitle: title,
+                start, end, allDay: allDay || false
+              }
+            })
+          });
+          if (!notifRes.ok) {
+            console.warn(`⚠️ Notification service error for ${member.username}:`, notifRes.status);
+          }
         } catch (notifError) {
-          console.error('Error creating notification:', notifError);
+          console.warn(`⚠️ Could not send notification to ${member.username}:`, notifError.message);
         }
 
         results.success++;
@@ -728,7 +852,7 @@ app.post('/assign-user', authenticate, async (req, res) => {
     
     // 1. Get target user
     const targetUser = await dbAsync.get(`
-      SELECT id, username, microsoft_access_token 
+      SELECT id, username, microsoft_access_token, microsoft_refresh_token 
       FROM users 
       WHERE id = ?
     `, [targetUserId]);
@@ -750,10 +874,11 @@ app.post('/assign-user', authenticate, async (req, res) => {
     let webLink = null;
     let syncError = null;
 
-    // 2. Create in Outlook if linked (optional - no longer required)
-    if (targetUser.microsoft_access_token) {
+    // 2. Create in Outlook if linked (with auto-refresh)
+    const validToken = await getValidAccessToken(targetUser);
+    if (validToken) {
       try {
-        const client = getAuthenticatedClient(targetUser.microsoft_access_token);
+        const client = getAuthenticatedClient(validToken);
         
         const newEvent = {
           subject: `[Asignado] ${title}`,
@@ -779,15 +904,9 @@ app.post('/assign-user', authenticate, async (req, res) => {
       } catch (e) {
         console.error('[OUTLOOK] Assign creation failed:', e.message);
         syncError = e.message;
-        
-        if (e.statusCode === 401 || (e.message && e.message.includes('JWT is not well formed'))) {
-          try {
-            await dbAsync.run('UPDATE users SET microsoft_access_token = NULL WHERE id = ?', [targetUser.id]);
-          } catch (dbErr) {}
-        }
       }
     } else {
-      console.log(`[ASSIGN] User ${targetUser.username} has no Outlook linked, saving locally only`);
+      console.log(`[ASSIGN] User ${targetUser.username} has no valid Outlook token, saving locally only`);
     }
 
     // 3. Always save to DB (with or without Outlook)
@@ -854,17 +973,19 @@ app.post('/events', authenticate, async (req, res) => {
       return res.status(400).json({ error: 'Missing required fields' });
     }
 
-    const user = await dbAsync.get('SELECT id, microsoft_access_token FROM users WHERE username = ?', [username]);
+    const user = await dbAsync.get('SELECT id, microsoft_access_token, microsoft_refresh_token FROM users WHERE username = ?', [username]);
     if (!user) return res.status(404).json({ error: 'User not found' });
 
     let microsoftId = null;
     let webLink = null;
     let syncError = null;
 
-    // 1. Create in Outlook if linked
+    // 1. Create in Outlook if linked (with auto-refresh)
     if (user.microsoft_access_token) {
       try {
-        const client = getAuthenticatedClient(user.microsoft_access_token);
+        const validToken = await getValidAccessToken(user);
+        if (!validToken) throw new Error('Token refresh failed');
+        const client = getAuthenticatedClient(validToken);
         const newEvent = {
           subject,
           body: {
@@ -891,15 +1012,7 @@ app.post('/events', authenticate, async (req, res) => {
       } catch (e) {
         console.error('[OUTLOOK] Creation failed:', e.message);
         syncError = e.message;
-        
-         // Auto-Disconnect if token is garbage
-        if (e.statusCode === 401 || (e.message && e.message.includes('JWT is not well formed'))) {
-             try {
-                console.log(`[OUTLOOK] Invalidating token for user ${username}`);
-                await dbAsync.run('UPDATE users SET microsoft_access_token = NULL WHERE username = ?', [username]);
-                syncError = "Tu sesión de Outlook ha caducado. Vuelve a vincular tu cuenta.";
-             } catch (dbErr) {}
-        }
+        // Token already attempted refresh in getValidAccessToken
       }
     }
 
@@ -946,7 +1059,8 @@ app.patch('/events/:id', authenticate, async (req, res) => {
     const { subject, body, startTime, endTime, location, isAllDay, categories } = req.body;
     const username = req.user.username;
 
-    const user = await dbAsync.get('SELECT id, microsoft_access_token FROM users WHERE username = ?', [username]);
+    const user = await dbAsync.get('SELECT id, microsoft_access_token, microsoft_refresh_token, role FROM users WHERE username = ?', [username]);
+    const isAdminOrBoss = user.role === 'admin' || user.role === 'boss';
     
     // Check if event exists
     let event = null;
@@ -962,14 +1076,32 @@ app.patch('/events/:id', authenticate, async (req, res) => {
         event = await dbAsync.get('SELECT * FROM calendar_events WHERE microsoft_id = ? AND user_id = ?', [id, user.id]);
     }
 
+    // If not found and user is admin/boss, search without user_id filter
+    if (!event && isAdminOrBoss) {
+        if (!isNaN(id)) {
+            try {
+                event = await dbAsync.get('SELECT * FROM calendar_events WHERE id = ?', [id]);
+            } catch (e) { /* Ignore */ }
+        }
+        if (!event) {
+            event = await dbAsync.get('SELECT * FROM calendar_events WHERE microsoft_id = ?', [id]);
+        }
+    }
+
     if (!event) return res.status(404).json({ error: 'Event not found or not owned' });
 
     const isLocalOnly = !event.microsoft_id || event.microsoft_id.startsWith('local_');
 
-    // Update Outlook if linked
-    if (!isLocalOnly && user.microsoft_access_token) {
+    // Update Outlook using event OWNER's token if linked
+    const eventOwner = event.user_id === user.id 
+      ? user 
+      : await dbAsync.get('SELECT id, microsoft_access_token, microsoft_refresh_token FROM users WHERE id = ?', [event.user_id]);
+
+    if (!isLocalOnly && eventOwner && eventOwner.microsoft_access_token) {
         try {
-            const client = getAuthenticatedClient(user.microsoft_access_token);
+            const validToken = await getValidAccessToken(eventOwner);
+            if (!validToken) throw new Error('Token refresh failed');
+            const client = getAuthenticatedClient(validToken);
             const updateEvent = {};
             if (subject) updateEvent.subject = subject;
             if (body) updateEvent.body = { contentType: 'Text', content: body };
@@ -980,15 +1112,10 @@ app.patch('/events/:id', authenticate, async (req, res) => {
             if (categories) updateEvent.categories = Array.isArray(categories) ? categories : [categories];
 
             await client.api(`/me/events/${event.microsoft_id}`).patch(updateEvent);
-            console.log(`[OUTLOOK] Event updated in Cloud: ${event.microsoft_id}`);
+            console.log(`[OUTLOOK] Event updated in Cloud for user ${event.user_id}: ${event.microsoft_id}`);
         } catch (e) {
             console.error('[OUTLOOK] Update failed:', e.message);
-            // If token expired, invalidate
-            if (e.statusCode === 401 || (e.message && e.message.includes('JWT is not well formed'))) {
-                try {
-                    await dbAsync.run('UPDATE users SET microsoft_access_token = NULL, microsoft_refresh_token = NULL WHERE username = ?', [username]);
-                } catch (dbErr) {}
-            }
+            // Token already attempted refresh in getValidAccessToken
         }
     }
 
@@ -1025,9 +1152,10 @@ app.delete('/events/:id', authenticate, async (req, res) => {
   try {
     const { id } = req.params;
     const username = req.user.username;
-    const user = await dbAsync.get('SELECT id, microsoft_access_token FROM users WHERE username = ?', [username]);
+    const user = await dbAsync.get('SELECT id, microsoft_access_token, microsoft_refresh_token, role FROM users WHERE username = ?', [username]);
+    const isAdminOrBoss = user.role === 'admin' || user.role === 'boss';
 
-    // Find event
+    // Find event - first try with user_id filter
     let event = null;
     if (!isNaN(id)) {
         try {
@@ -1039,16 +1167,37 @@ app.delete('/events/:id', authenticate, async (req, res) => {
         event = await dbAsync.get('SELECT * FROM calendar_events WHERE microsoft_id = ? AND user_id = ?', [id, user.id]);
     }
 
+    // If not found and user is admin/boss, search without user_id filter (for assigned events)
+    if (!event && isAdminOrBoss) {
+        if (!isNaN(id)) {
+            try {
+                event = await dbAsync.get('SELECT * FROM calendar_events WHERE id = ?', [id]);
+            } catch (e) { /* Ignore */ }
+        }
+        if (!event) {
+            event = await dbAsync.get('SELECT * FROM calendar_events WHERE microsoft_id = ?', [id]);
+        }
+    }
+
     if (!event) return res.status(404).json({ error: 'Event not found' });
 
-    // Delete from Outlook
-    if (event.microsoft_id && user.microsoft_access_token) {
-        try {
-             const client = getAuthenticatedClient(user.microsoft_access_token);
-             await client.api(`/me/events/${event.microsoft_id}`).delete();
-             console.log(`[OUTLOOK] Event deleted in Cloud: ${event.microsoft_id}`);
-        } catch (e) {
-             console.error('[OUTLOOK] Delete failed (maybe already deleted):', e.message);
+    // Delete from Outlook using event OWNER's token (not admin's)
+    if (event.microsoft_id && !event.microsoft_id.startsWith('local_')) {
+        const eventOwner = event.user_id === user.id 
+          ? user 
+          : await dbAsync.get('SELECT id, microsoft_access_token, microsoft_refresh_token FROM users WHERE id = ?', [event.user_id]);
+        
+        if (eventOwner && eventOwner.microsoft_access_token) {
+            try {
+                 const validToken = await getValidAccessToken(eventOwner);
+                 if (validToken) {
+                   const client = getAuthenticatedClient(validToken);
+                   await client.api(`/me/events/${event.microsoft_id}`).delete();
+                   console.log(`[OUTLOOK] Event deleted in Cloud for user ${event.user_id}: ${event.microsoft_id}`);
+                 }
+            } catch (e) {
+                 console.error('[OUTLOOK] Delete failed (maybe already deleted):', e.message);
+            }
         }
     }
 

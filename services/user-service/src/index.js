@@ -1,7 +1,10 @@
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
+const jwt = require('jsonwebtoken');
 const { dbAsync } = require('./database/db');
+
+const JWT_SECRET = process.env.JWT_SECRET || 'fallback-secret-change-me';
 
 const app = express();
 const PORT = process.env.PORT || 5005;
@@ -27,11 +30,11 @@ const authenticate = (req, res, next) => {
 
   if (token) {
     try {
-      const userData = JSON.parse(Buffer.from(token, 'base64').toString());
+      const userData = jwt.verify(token, JWT_SECRET);
       req.user = userData;
       next();
     } catch (error) {
-      return res.status(401).json({ success: false, message: 'Token inválido' });
+      return res.status(401).json({ success: false, message: 'Token inválido o expirado' });
     }
   } else {
     return res.status(401).json({ success: false, message: 'No autorizado' });

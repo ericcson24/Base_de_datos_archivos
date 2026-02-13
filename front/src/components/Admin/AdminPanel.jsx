@@ -34,11 +34,24 @@ const AdminPanel = ({ user, onLogout, onBackToFolders, onThemeToggle, isDarkMode
   const [deleteModal, setDeleteModal] = useState({ isOpen: false, user: null });
   const [currentTime, setCurrentTime] = useState(Date.now());
 
+  // Security States
+  const [securityData, setSecurityData] = useState(null);
+  const [securityLogs, setSecurityLogs] = useState([]);
+  const [securityFilter, setSecurityFilter] = useState('security');
+  const [securityLoading, setSecurityLoading] = useState(false);
+
   useEffect(() => {
     loadInitialData();
     const timer = setInterval(() => setCurrentTime(Date.now()), 1000);
     return () => clearInterval(timer);
   }, []);
+
+  useEffect(() => {
+    if (activeTab === 'security') {
+      loadSecurityOverview();
+      loadSecurityLogs();
+    }
+  }, [activeTab]);
 
   const loadInitialData = async () => {
     setLoading(true);
@@ -122,6 +135,70 @@ const AdminPanel = ({ user, onLogout, onBackToFolders, onThemeToggle, isDarkMode
       const data = await res.json();
       if (data.success) setInboxMessages(Array.isArray(data.messages) ? data.messages : []);
     } catch (e) { console.error(e); }
+  };
+
+  const loadSecurityOverview = async () => {
+    try {
+      const res = await fetchWithAuth('/admin/api/security/overview');
+      const data = await res.json();
+      if (data.success) setSecurityData(data);
+    } catch (e) { console.error(e); }
+  };
+
+  const loadSecurityLogs = async (filter) => {
+    setSecurityLoading(true);
+    try {
+      const f = filter || securityFilter;
+      const res = await fetchWithAuth(`/admin/api/security/logs?filter=${f}&limit=100`);
+      const data = await res.json();
+      if (data.success) setSecurityLogs(data.logs || []);
+    } catch (e) { console.error(e); }
+    setSecurityLoading(false);
+  };
+
+  const handleUnblockIP = async (ip) => {
+    try {
+      const res = await fetchWithAuth(`/admin/api/security/rate-limits/${encodeURIComponent(ip)}`, { method: 'DELETE' });
+      const data = await res.json();
+      if (data.success) {
+        showAlert('success', data.message || t('admin.security.ipUnblocked'));
+        loadSecurityOverview();
+      } else {
+        showAlert('error', data.message);
+      }
+    } catch (e) {
+      showAlert('error', t('common.networkError'));
+    }
+  };
+
+  const handleClearAllRateLimits = async () => {
+    try {
+      const res = await fetchWithAuth('/admin/api/security/rate-limits', { method: 'DELETE' });
+      const data = await res.json();
+      if (data.success) {
+        showAlert('success', data.message || t('admin.security.allRateLimitsCleared'));
+        loadSecurityOverview();
+      } else {
+        showAlert('error', data.message);
+      }
+    } catch (e) {
+      showAlert('error', t('common.networkError'));
+    }
+  };
+
+  const handleUnlockAccount = async (userId) => {
+    try {
+      const res = await fetchWithAuth(`/admin/api/security/unlock-account/${userId}`, { method: 'POST' });
+      const data = await res.json();
+      if (data.success) {
+        showAlert('success', data.message || t('admin.security.accountUnlocked'));
+        loadSecurityOverview();
+      } else {
+        showAlert('error', data.message);
+      }
+    } catch (e) {
+      showAlert('error', t('common.networkError'));
+    }
   };
 
   const handleCreateUser = async (e) => {
@@ -314,6 +391,13 @@ const AdminPanel = ({ user, onLogout, onBackToFolders, onThemeToggle, isDarkMode
         >
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
           <span>{t('admin.logs')}</span>
+        </button>
+        <button 
+          className={`admin-nav-item ${activeTab === 'security' ? 'active' : ''}`}
+          onClick={() => setActiveTab('security')}
+        >
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+          <span>{t('admin.security.title')}</span>
         </button>
         <button 
           className={`admin-nav-item ${activeTab === 'rdp' ? 'active' : ''}`}
@@ -512,6 +596,245 @@ const AdminPanel = ({ user, onLogout, onBackToFolders, onThemeToggle, isDarkMode
     </div>
   );
 
+  const getActionBadgeClass = (action) => {
+    if (action === 'LOGIN') return 'success';
+    if (action === 'LOGIN_FAILED') return 'error';
+    if (action?.includes('LOCK') || action?.includes('RATE_LIMIT')) return 'warning';
+    if (action?.includes('UNLOCK') || action?.includes('CLEAR')) return 'info';
+    return '';
+  };
+
+  const formatTimestamp = (ts) => {
+    if (!ts) return '—';
+    try {
+      const d = new Date(ts);
+      return d.toLocaleString();
+    } catch { return ts; }
+  };
+
+  const renderSecurity = () => {
+    const stats = securityData?.stats || {};
+    const rateLimits = securityData?.rateLimits?.rateLimits || [];
+    const blockedAccounts = securityData?.blockedAccounts || [];
+    const recentFailures = securityData?.recentFailures || [];
+
+    return (
+      <div className="security-panel">
+        {/* Stats Cards */}
+        <div className="admin-grid security-stats-grid">
+          <div className="admin-card security-stat-card">
+            <div className="security-stat-icon success">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+            </div>
+            <div className="security-stat-content">
+              <div className="stat-value">{stats.logins_24h || 0}</div>
+              <div className="stat-label">{t('admin.security.logins24h')}</div>
+            </div>
+          </div>
+          <div className="admin-card security-stat-card">
+            <div className="security-stat-icon error">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>
+            </div>
+            <div className="security-stat-content">
+              <div className="stat-value">{stats.failures_24h || 0}</div>
+              <div className="stat-label">{t('admin.security.failures24h')}</div>
+            </div>
+          </div>
+          <div className="admin-card security-stat-card">
+            <div className="security-stat-icon warning">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+            </div>
+            <div className="security-stat-content">
+              <div className="stat-value">{securityData?.rateLimits?.blockedCount || 0}</div>
+              <div className="stat-label">{t('admin.security.blockedIPs')}</div>
+            </div>
+          </div>
+          <div className="admin-card security-stat-card">
+            <div className="security-stat-icon error">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+            </div>
+            <div className="security-stat-content">
+              <div className="stat-value">{securityData?.lockedAccounts || 0}</div>
+              <div className="stat-label">{t('admin.security.lockedAccounts')}</div>
+            </div>
+          </div>
+        </div>
+
+        {/* Rate Limited IPs */}
+        <div className="admin-card">
+          <div className="admin-card-header">
+            <h2 className="admin-card-title">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ verticalAlign: 'middle', marginRight: '8px' }}><circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/></svg>
+              {t('admin.security.rateLimits')}
+            </h2>
+            {rateLimits.length > 0 && (
+              <button className="admin-btn admin-btn-secondary admin-btn-small" onClick={handleClearAllRateLimits}>
+                {t('admin.security.clearAll')}
+              </button>
+            )}
+          </div>
+          {rateLimits.length > 0 ? (
+            <table className="admin-table">
+              <thead>
+                <tr>
+                  <th>IP</th>
+                  <th>{t('admin.security.attempts')}</th>
+                  <th>{t('admin.status')}</th>
+                  <th>{t('admin.security.expiresIn')}</th>
+                  <th>{t('admin.actions')}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {rateLimits.map((rl, i) => (
+                  <tr key={i}>
+                    <td><code>{rl.ip}</code></td>
+                    <td>{rl.attempts}/{rl.maxAttempts}</td>
+                    <td>
+                      <span className={`status-badge ${rl.isBlocked ? 'error' : 'warning'}`}>
+                        {rl.isBlocked ? t('admin.security.blocked') : t('admin.security.limited')}
+                      </span>
+                    </td>
+                    <td>{Math.ceil(rl.remainingSeconds / 60)} min</td>
+                    <td>
+                      <button className="admin-btn admin-btn-secondary admin-btn-small" onClick={() => handleUnblockIP(rl.ip)}>
+                        {t('admin.security.unblock')}
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          ) : (
+            <p className="security-empty-message">{t('admin.security.noRateLimits')}</p>
+          )}
+        </div>
+
+        {/* Blocked Accounts */}
+        <div className="admin-card">
+          <div className="admin-card-header">
+            <h2 className="admin-card-title">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ verticalAlign: 'middle', marginRight: '8px' }}><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+              {t('admin.security.blockedAccountsTitle')}
+            </h2>
+          </div>
+          {blockedAccounts.length > 0 ? (
+            <table className="admin-table">
+              <thead>
+                <tr>
+                  <th>{t('admin.user')}</th>
+                  <th>{t('admin.role')}</th>
+                  <th>{t('admin.security.failedAttempts')}</th>
+                  <th>{t('admin.status')}</th>
+                  <th>{t('admin.security.lockExpires')}</th>
+                  <th>{t('admin.actions')}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {blockedAccounts.map((acc, i) => (
+                  <tr key={i}>
+                    <td><strong>{acc.username}</strong></td>
+                    <td><span className="status-badge">{acc.role}</span></td>
+                    <td>{acc.failed_attempts}</td>
+                    <td>
+                      <span className={`status-badge ${acc.is_locked ? 'error' : 'warning'}`}>
+                        {acc.is_locked ? t('admin.locked') : t('admin.security.atRisk')}
+                      </span>
+                    </td>
+                    <td>{acc.lockout_until ? formatTimestamp(acc.lockout_until) : '—'}</td>
+                    <td>
+                      {acc.is_locked && (
+                        <button className="admin-btn admin-btn-secondary admin-btn-small" onClick={() => handleUnlockAccount(acc.id)}>
+                          {t('admin.unlock')}
+                        </button>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          ) : (
+            <p className="security-empty-message">{t('admin.security.noBlockedAccounts')}</p>
+          )}
+        </div>
+
+        {/* Top Failed Usernames */}
+        {recentFailures.length > 0 && (
+          <div className="admin-card">
+            <div className="admin-card-header">
+              <h2 className="admin-card-title">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ verticalAlign: 'middle', marginRight: '8px' }}><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+                {t('admin.security.recentFailures')}
+              </h2>
+            </div>
+            <table className="admin-table">
+              <thead>
+                <tr>
+                  <th>{t('admin.user')}</th>
+                  <th>{t('admin.security.failedAttempts')}</th>
+                  <th>{t('admin.security.lastAttempt')}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {recentFailures.map((f, i) => (
+                  <tr key={i}>
+                    <td><strong>{f.username}</strong></td>
+                    <td><span className="status-badge error">{f.attempt_count}</span></td>
+                    <td>{formatTimestamp(f.last_attempt)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+
+        {/* Security Audit Logs */}
+        <div className="admin-card">
+          <div className="admin-card-header">
+            <h2 className="admin-card-title">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ verticalAlign: 'middle', marginRight: '8px' }}><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+              {t('admin.security.auditLog')}
+            </h2>
+            <div className="security-log-controls">
+              <select 
+                className="admin-input security-filter-select"
+                value={securityFilter}
+                onChange={(e) => {
+                  setSecurityFilter(e.target.value);
+                  loadSecurityLogs(e.target.value);
+                }}
+              >
+                <option value="security">{t('admin.security.filterSecurity')}</option>
+                <option value="logins">{t('admin.security.filterLogins')}</option>
+                <option value="failures">{t('admin.security.filterFailures')}</option>
+                <option value="all">{t('admin.security.filterAll')}</option>
+              </select>
+              <button className="admin-btn admin-btn-secondary admin-btn-small" onClick={() => { loadSecurityOverview(); loadSecurityLogs(); }}>
+                {t('admin.refresh')}
+              </button>
+            </div>
+          </div>
+          <div className="admin-logs-list security-logs-list">
+            {securityLoading ? (
+              <div className="security-empty-message">{t('common.loading')}</div>
+            ) : securityLogs.length > 0 ? (
+              securityLogs.map((log, i) => (
+                <div key={i} className="admin-log-entry security-log-entry">
+                  <span className="admin-log-timestamp">{formatTimestamp(log.timestamp)}</span>
+                  <span className={`status-badge ${getActionBadgeClass(log.action)}`}>{log.action}</span>
+                  {log.username && <span className="admin-log-user">{log.username}</span>}
+                  <span className="admin-log-message">{log.details}</span>
+                  {log.ip_address && <span className="security-log-ip">{log.ip_address}</span>}
+                </div>
+              ))
+            ) : (
+              <div className="security-empty-message">{t('admin.noLogs')}</div>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   return (
     <div className="admin-panel">
       {renderSidebar()}
@@ -523,6 +846,7 @@ const AdminPanel = ({ user, onLogout, onBackToFolders, onThemeToggle, isDarkMode
             {activeTab === 'groups' && t('admin.groups')}
             {activeTab === 'system' && t('admin.system')}
             {activeTab === 'logs' && t('admin.logs')}
+            {activeTab === 'security' && t('admin.security.title')}
             {activeTab === 'rdp' && t('admin.rdpAdmin')}
           </h1>
           <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
@@ -544,6 +868,7 @@ const AdminPanel = ({ user, onLogout, onBackToFolders, onThemeToggle, isDarkMode
         {activeTab === 'groups' && <GroupManager />}
         {activeTab === 'system' && renderSystem()}
         {activeTab === 'logs' && renderLogs()}
+        {activeTab === 'security' && renderSecurity()}
         {activeTab === 'rdp' && <RDPManager />}
       </main>
 

@@ -173,3 +173,17 @@ CREATE TABLE IF NOT EXISTS event_attachments (
     file_size INTEGER DEFAULT 0,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
+
+-- Notifications
+CREATE TABLE IF NOT EXISTS notifications (
+    id SERIAL PRIMARY KEY,
+    user_id INTEGER NOT NULL,
+    title TEXT NOT NULL,
+    message TEXT,
+    type TEXT DEFAULT 'info',
+    is_read BOOLEAN DEFAULT FALSE,
+    link TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    metadata JSONB,
+    FOREIGN KEY(user_id) REFERENCES users(id)
+);

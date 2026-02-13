@@ -110,6 +110,7 @@ services:
       - PORT=5003
       - JWT_SECRET=${JWT_SECRET}
       - MS_CLIENT_ID=${MS_CLIENT_ID}
+      - MS_CLIENT_SECRET=${MICROSOFT_CLIENT_SECRET}
       - DB_PATH=/data/server.db
     volumes:
       - ../database_storage:/data
@@ -165,6 +166,7 @@ services:
       - JWT_SECRET=${JWT_SECRET}
       - DB_PATH=/data/server.db
       - EMAIL_SERVICE_URL=http://email-service:5007
+      - AUTH_SERVICE_URL=http://auth-service:5001
     volumes:
       - ../database_storage:/data
     networks:

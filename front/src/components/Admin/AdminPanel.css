@@ -598,3 +598,155 @@ select.admin-input {
   --primary-color-alpha: rgba(41, 151, 255, 0.25);
   --primary-hover: #40a9ff;
 }
+
+/* ==========================================
+   SECURITY TAB STYLES
+   ========================================== */
+
+.security-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.security-stats-grid {
+  grid-template-columns: repeat(4, 1fr) !important;
+}
+
+@media (max-width: 1024px) {
+  .security-stats-grid {
+    grid-template-columns: repeat(2, 1fr) !important;
+  }
+}
+
+@media (max-width: 600px) {
+  .security-stats-grid {
+    grid-template-columns: 1fr !important;
+  }
+}
+
+.security-stat-card {
+  display: flex !important;
+  flex-direction: row !important;
+  align-items: center;
+  gap: 16px;
+  padding: 20px !important;
+}
+
+.security-stat-icon {
+  width: 48px;
+  height: 48px;
+  border-radius: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.security-stat-icon.success {
+  background: rgba(52, 199, 89, 0.12);
+  color: #34c759;
+}
+
+.security-stat-icon.error {
+  background: rgba(255, 59, 48, 0.12);
+  color: #ff3b30;
+}
+
+.security-stat-icon.warning {
+  background: rgba(255, 159, 10, 0.12);
+  color: #ff9f0a;
+}
+
+.security-stat-icon.info {
+  background: rgba(0, 113, 227, 0.12);
+  color: #0071e3;
+}
+
+.security-stat-content {
+  display: flex;
+  flex-direction: column;
+}
+
+.security-stat-content .stat-value {
+  font-size: 28px;
+  font-weight: 700;
+  line-height: 1.1;
+}
+
+.security-stat-content .stat-label {
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  opacity: 0.6;
+  margin-top: 2px;
+}
+
+.security-empty-message {
+  text-align: center;
+  padding: 24px;
+  opacity: 0.5;
+  font-style: italic;
+  font-size: 14px;
+}
+
+.security-log-controls {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.security-filter-select {
+  padding: 6px 12px !important;
+  border-radius: 8px !important;
+  font-size: 13px !important;
+  min-width: 150px;
+}
+
+.security-logs-list {
+  max-height: 500px;
+  overflow-y: auto;
+}
+
+.security-log-entry {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.security-log-ip {
+  font-family: 'SF Mono', 'Fira Code', monospace;
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: 4px;
+  background: rgba(0, 0, 0, 0.05);
+  opacity: 0.6;
+}
+
+[data-theme='dark'] .security-log-ip {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+/* Status badge colors for security */
+.status-badge.warning {
+  background: rgba(255, 159, 10, 0.12);
+  color: #ff9f0a;
+}
+
+.status-badge.info {
+  background: rgba(0, 113, 227, 0.12);
+  color: #0071e3;
+}
+
+code {
+  font-family: 'SF Mono', 'Fira Code', monospace;
+  font-size: 13px;
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: rgba(0, 0, 0, 0.06);
+}
+
+[data-theme='dark'] code {
+  background: rgba(255, 255, 255, 0.1);
+}

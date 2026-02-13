@@ -4,7 +4,10 @@ const http = require('http');
 const { Server } = require("socket.io");
 const cors = require('cors');
 const { createClient } = require('redis');
+const jwt = require('jsonwebtoken');
 const db = require('./db');
+
+const JWT_SECRET = process.env.JWT_SECRET || 'fallback-secret-change-me';
 
 const app = express();
 const server = http.createServer(app);
@@ -20,7 +23,7 @@ const initDb = async () => {
             CREATE TABLE IF NOT EXISTS notifications (
                 id SERIAL PRIMARY KEY,
                 user_id INTEGER NOT NULL,
-                title TEXT,
+                title TEXT NOT NULL,
                 message TEXT,
                 type TEXT DEFAULT 'info',
                 is_read BOOLEAN DEFAULT FALSE,
@@ -28,6 +31,10 @@ const initDb = async () => {
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 metadata JSONB
             );
+        `);
+        // Ensure metadata column exists (migration for existing tables)
+        await db.query(`
+            ALTER TABLE notifications ADD COLUMN IF NOT EXISTS metadata JSONB;
         `);
         console.log('✅ Notifications table verified/created');
     } catch (err) {
@@ -52,11 +59,11 @@ const authenticate = (req, res, next) => {
   
     if (token) {
       try {
-        const userData = JSON.parse(Buffer.from(token, 'base64').toString());
+        const userData = jwt.verify(token, JWT_SECRET);
         req.user = userData;
         next();
       } catch (error) {
-        return res.status(401).json({ success: false, message: 'Token inválido' });
+        return res.status(401).json({ success: false, message: 'Token inválido o expirado' });
       }
     } else {
       return res.status(401).json({ success: false, message: 'No autorizado' });

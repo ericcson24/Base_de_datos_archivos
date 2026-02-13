@@ -5,14 +5,53 @@ const cookieParser = require('cookie-parser');
 const bcrypt = require('bcrypt');
 const path = require('path');
 const axios = require('axios');
+const jwt = require('jsonwebtoken');
 const { dbAsync } = require('./database/db');
 const { encrypt, decrypt } = require('./utils/cryptoUtils');
 const multer = require('multer');
 const fs = require('fs');
 
+const JWT_SECRET = process.env.JWT_SECRET || 'fallback-secret-change-me';
+
 const app = express();
 const PORT = process.env.PORT || 5001;
 const EMAIL_SERVICE_URL = process.env.EMAIL_SERVICE_URL || 'http://email-service:5007';
+
+// --- Rate Limiter (brute-force protection for /login) ---
+const loginAttempts = new Map(); // IP -> { count, resetTime }
+const RATE_LIMIT_WINDOW = 15 * 60 * 1000; // 15 minutos
+const RATE_LIMIT_MAX = 10; // max 10 intentos por ventana
+
+const loginRateLimiter = (req, res, next) => {
+  const ip = req.ip || req.headers['x-forwarded-for'] || req.connection.remoteAddress || 'unknown';
+  const now = Date.now();
+  const record = loginAttempts.get(ip);
+
+  if (record && now < record.resetTime) {
+    if (record.count >= RATE_LIMIT_MAX) {
+      const retryAfter = Math.ceil((record.resetTime - now) / 1000);
+      console.log(`🚫 Rate limit exceeded for IP: ${ip} (${record.count} attempts)`);
+      return res.status(429).json({
+        success: false,
+        message: 'Demasiados intentos de login. Intente de nuevo más tarde.',
+        retryAfter
+      });
+    }
+    record.count++;
+  } else {
+    loginAttempts.set(ip, { count: 1, resetTime: now + RATE_LIMIT_WINDOW });
+  }
+
+  next();
+};
+
+// Cleanup expired rate limit entries every 30 min
+setInterval(() => {
+  const now = Date.now();
+  for (const [ip, record] of loginAttempts) {
+    if (now >= record.resetTime) loginAttempts.delete(ip);
+  }
+}, 30 * 60 * 1000);
 
 // Ensure uploads directory exists
 const uploadDir = path.join(__dirname, '../uploads');
@@ -161,8 +200,8 @@ async function validateCredentials(username, password) {
   }
 }
 
-// Login endpoint
-app.post('/login', async (req, res) => {
+// Login endpoint (rate limited)
+app.post('/login', loginRateLimiter, async (req, res) => {
   const { username, password } = req.body;
 
   if (!username || !password) {
@@ -183,7 +222,7 @@ app.post('/login', async (req, res) => {
         username: username,
         role: result.info.role || 'user'
       };
-      const token = Buffer.from(JSON.stringify(userData)).toString('base64');
+      const token = jwt.sign(userData, JWT_SECRET, { expiresIn: '7d' });
 
       console.log(`✅ Login exitoso para: ${username}`);
 
@@ -274,11 +313,11 @@ const authenticate = (req, res, next) => {
 
   if (token) {
     try {
-      const userData = JSON.parse(Buffer.from(token, 'base64').toString());
+      const userData = jwt.verify(token, JWT_SECRET);
       req.user = userData;
       next();
     } catch (error) {
-      return res.status(401).json({ success: false, message: 'Token inválido' });
+      return res.status(401).json({ success: false, message: 'Token inválido o expirado' });
     }
   } else {
     return res.status(401).json({ success: false, message: 'No autorizado' });
@@ -291,10 +330,11 @@ app.get('/verify', async (req, res) => {
     const token = req.cookies.auth_token || req.headers.authorization?.split(' ')[1];
     if (!token) return res.status(401).json({ success: false, message: 'No hay sesión activa' });
 
-    const userData = JSON.parse(Buffer.from(token, 'base64').toString('utf-8'));
-    res.json({ success: true, user: userData });
+    const userData = jwt.verify(token, JWT_SECRET);
+    // Return clean user data (without JWT internal fields)
+    res.json({ success: true, user: { id: userData.id, username: userData.username, role: userData.role } });
   } catch (error) {
-    res.status(401).json({ success: false, message: 'Token inválido' });
+    res.status(401).json({ success: false, message: 'Token inválido o expirado' });
   }
 });
 
@@ -520,6 +560,139 @@ app.get('/avatars', async (req, res) => {
     // Return list of default avatars if any
     // For now return empty to let frontend use dicebear
     res.json({ success: true, avatars: [] });
+});
+
+// ==========================================
+// SECURITY MANAGEMENT ENDPOINTS (Admin only)
+// ==========================================
+
+// Middleware: require admin role
+const requireAdmin = (req, res, next) => {
+  if (!req.user || req.user.role !== 'admin') {
+    return res.status(403).json({ success: false, message: 'Acceso denegado: se requiere rol de administrador' });
+  }
+  next();
+};
+
+// GET /security/rate-limits - List all currently rate-limited IPs
+app.get('/security/rate-limits', authenticate, requireAdmin, (req, res) => {
+  try {
+    const now = Date.now();
+    const blocked = [];
+    for (const [ip, record] of loginAttempts) {
+      if (now < record.resetTime) {
+        blocked.push({
+          ip,
+          attempts: record.count,
+          maxAttempts: RATE_LIMIT_MAX,
+          isBlocked: record.count >= RATE_LIMIT_MAX,
+          expiresAt: new Date(record.resetTime).toISOString(),
+          remainingSeconds: Math.ceil((record.resetTime - now) / 1000)
+        });
+      }
+    }
+    res.json({ success: true, rateLimits: blocked, total: blocked.length, blockedCount: blocked.filter(b => b.isBlocked).length });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// DELETE /security/rate-limits/:ip - Unblock a specific IP
+app.delete('/security/rate-limits/:ip', authenticate, requireAdmin, (req, res) => {
+  try {
+    const ip = decodeURIComponent(req.params.ip);
+    if (loginAttempts.has(ip)) {
+      loginAttempts.delete(ip);
+      console.log(`🔓 Admin ${req.user.username} unblocked rate-limit for IP: ${ip}`);
+      // Log the action
+      dbAsync.run('INSERT INTO audit_logs (user_id, username, action, details, ip_address) VALUES (?, ?, ?, ?, ?)',
+        [req.user.id, req.user.username, 'RATE_LIMIT_CLEAR', `IP desbloqueada: ${ip}`, '::1']);
+      return res.json({ success: true, message: `IP ${ip} desbloqueada` });
+    }
+    res.status(404).json({ success: false, message: 'IP no encontrada en rate limits' });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// DELETE /security/rate-limits - Clear ALL rate limits
+app.delete('/security/rate-limits', authenticate, requireAdmin, (req, res) => {
+  try {
+    const count = loginAttempts.size;
+    loginAttempts.clear();
+    console.log(`🔓 Admin ${req.user.username} cleared all rate limits (${count} entries)`);
+    dbAsync.run('INSERT INTO audit_logs (user_id, username, action, details, ip_address) VALUES (?, ?, ?, ?, ?)',
+      [req.user.id, req.user.username, 'RATE_LIMIT_CLEAR_ALL', `Se limpiaron ${count} entradas de rate limit`, '::1']);
+    res.json({ success: true, message: `${count} entradas de rate limit eliminadas` });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// GET /security/blocked-accounts - List locked user accounts
+app.get('/security/blocked-accounts', authenticate, requireAdmin, async (req, res) => {
+  try {
+    const accounts = await dbAsync.all(`
+      SELECT u.id, u.username, u.role, uc.failed_attempts, uc.is_locked, uc.lockout_until, uc.last_login
+      FROM users u
+      JOIN user_credentials uc ON u.id = uc.user_id
+      WHERE uc.is_locked = TRUE OR uc.failed_attempts > 0
+      ORDER BY uc.failed_attempts DESC
+    `);
+    res.json({ success: true, accounts });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// POST /security/unlock-account/:userId - Unlock a user account
+app.post('/security/unlock-account/:userId', authenticate, requireAdmin, async (req, res) => {
+  try {
+    const { userId } = req.params;
+    await dbAsync.run('UPDATE user_credentials SET is_locked = FALSE, lockout_until = NULL, failed_attempts = 0 WHERE user_id = ?', [userId]);
+    const user = await dbAsync.get('SELECT username FROM users WHERE id = ?', [userId]);
+    console.log(`🔓 Admin ${req.user.username} unlocked account for user ID: ${userId}`);
+    await dbAsync.run('INSERT INTO audit_logs (user_id, username, action, details, ip_address) VALUES (?, ?, ?, ?, ?)',
+      [req.user.id, req.user.username, 'ACCOUNT_UNLOCK', `Cuenta desbloqueada: ${user?.username || userId}`, '::1']);
+    res.json({ success: true, message: `Cuenta desbloqueada` });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// GET /security/audit-logs - Get security-related audit logs
+app.get('/security/audit-logs', authenticate, requireAdmin, async (req, res) => {
+  try {
+    const limit = parseInt(req.query.limit) || 50;
+    const filter = req.query.filter || 'all'; // all, logins, failures, blocks, admin_actions
+    
+    let whereClause = '';
+    if (filter === 'logins') {
+      whereClause = "WHERE action IN ('LOGIN', 'LOGIN_FAILED')";
+    } else if (filter === 'failures') {
+      whereClause = "WHERE action = 'LOGIN_FAILED'";
+    } else if (filter === 'blocks') {
+      whereClause = "WHERE action IN ('ACCOUNT_UNLOCK', 'RATE_LIMIT_CLEAR', 'RATE_LIMIT_CLEAR_ALL')";
+    } else if (filter === 'admin_actions') {
+      whereClause = "WHERE action LIKE 'RATE_LIMIT%' OR action LIKE 'ACCOUNT_%' OR action = 'PASSWORD_RECOVERY_REQUEST'";
+    }
+    
+    const logs = await dbAsync.all(`SELECT * FROM audit_logs ${whereClause} ORDER BY timestamp DESC LIMIT ?`, [limit]);
+    
+    // Also get stats
+    const stats = await dbAsync.get(`
+      SELECT 
+        COUNT(*) FILTER (WHERE action = 'LOGIN' AND timestamp > NOW() - INTERVAL '24 hours') as logins_24h,
+        COUNT(*) FILTER (WHERE action = 'LOGIN_FAILED' AND timestamp > NOW() - INTERVAL '24 hours') as failures_24h,
+        COUNT(*) FILTER (WHERE action = 'LOGIN' AND timestamp > NOW() - INTERVAL '7 days') as logins_7d,
+        COUNT(*) FILTER (WHERE action = 'LOGIN_FAILED' AND timestamp > NOW() - INTERVAL '7 days') as failures_7d
+      FROM audit_logs
+    `);
+    
+    res.json({ success: true, logs, stats });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
 });
 
 app.get('/', (req, res) => {
