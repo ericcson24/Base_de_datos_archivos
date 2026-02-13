@@ -162,7 +162,11 @@
     "show": "Pokaż",
     "noSearchResults": "Nie znaleziono plików pasujących do \"{{query}}\"",
     "emptyFolder": "Brak plików w tym folderze",
-    "dropToView": "Upuść, aby zobaczyć/edytować"
+    "dropToView": "Upuść, aby zobaczyć/edytować",
+    "removedFromShared": "Usunięto z udostępnionych plików",
+    "savedToMyFiles": "\"{{name}}\" zapisano w twoich plikach",
+    "movedToPanel": "\"{{name}}\" przeniesiono do twojego panelu",
+    "unpinnedFromPanel": "Usunięto z twojego panelu"
   },
   "settings": {
     "title": "Ustawienia",
@@ -218,7 +222,10 @@
     "placeholder": "Np: uzytkownik123",
     "sharing": "Udostępnianie...",
     "share": "Udostępnij",
-    "error": "Błąd udostępniania"
+    "error": "Błąd udostępniania",
+    "unshare": "Cofnij udostępnianie",
+    "unshareSuccess": "Udostępnianie cofnięte pomyślnie",
+    "sharedWith": "Udostępniono"
   },
   "move": {
     "title": "Przenieś \"{{name}}\"",
@@ -290,6 +297,7 @@
     "assignMe": "Mnie",
     "assignGroup": "Grupa",
     "assignUser": "Użytkownik",
+    "assignedBy": "Przypisane przez",
     "selectUserPlaceholder": "Wybierz użytkownika...",
     "userEventNote": "Zostanie utworzone wydarzenie w kalendarzu tego użytkownika i otrzyma on powiadomienie.",
     "userEventCreated": "Zadanie przypisane do użytkownika pomyślnie",
@@ -323,7 +331,16 @@
     "aiProcess": "Przetwarzanie z AI...",
     "myself": "Ja",
     "specificUser": "Konkretny użytkownik",
-    "group": "Grupa"
+    "group": "Grupa",
+    "attachments": "Załączniki",
+    "attachFile": "Załącz plik",
+    "removeAttachment": "Usuń załącznik",
+    "noAttachments": "Brak załączników",
+    "selectFile": "Wybierz plik",
+    "searchFiles": "Szukaj plików...",
+    "noFilesFound": "Nie znaleziono plików",
+    "fileAttached": "Plik załączony pomyślnie",
+    "fileAttachError": "Błąd podczas załączania pliku"
   },
   "sidebar": {
     "errorLoadingFile": "Błąd podczas ładowania pliku",
@@ -670,7 +687,12 @@
     "delete": "Usuń",
     "from": "od {{owner}}",
     "shared": "Udostępnione",
-    "by": "przez {{owner}}"
+    "by": "przez {{owner}}",
+    "saveToMyFiles": "Przenieś do panelu",
+    "removeFromShared": "Usuń z udostępnionych",
+    "moveToPanel": "Przenieś do panelu",
+    "removeFromPanel": "Usuń z panelu",
+    "sharedWithUsers": "udostępnione dla {{users}}"
   },
   "aiResults": {
     "title": "Wyniki Wyszukiwania AI",
@@ -762,5 +784,17 @@
     "title": "Utwórz nowy plik",
     "description": "Wprowadź nazwę dla nowego pliku",
     "placeholder": "Nazwa pliku..."
+  },
+  "notifications": {
+    "title": "Powiadomienia",
+    "markAllRead": "Oznacz wszystkie jako przeczytane",
+    "empty": "Brak powiadomień",
+    "justNow": "Przed chwilą",
+    "minutesAgo": "{{count}} min temu",
+    "hoursAgo": "{{count}} godz. temu",
+    "fileSharedTitle": "Udostępniono plik",
+    "fileSharedMessage": "{{user}} udostępnił(a) \"{{file}}\"",
+    "eventAssignedTitle": "Przypisano wydarzenie",
+    "eventAssignedMessage": "{{user}} przypisał(a) \"{{event}}\" do twojego kalendarza"
   }
 }

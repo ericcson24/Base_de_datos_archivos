@@ -1,7 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import './EventModal.css';
 import LocationPickerModal from './LocationPickerModal';
 import { useLanguage } from '../../context/LanguageContext';
+import { getAuthToken, formatFileSize, getFileIcon } from '../../utils/fileUtils';
 
 const EventModal = ({
   isOpen,
@@ -42,6 +43,91 @@ const EventModal = ({
 
   const [errors, setErrors] = useState({});
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+
+  // Attachment State
+  const [attachments, setAttachments] = useState([]);
+  const [showFilePicker, setShowFilePicker] = useState(false);
+  const [userFiles, setUserFiles] = useState([]);
+  const [filesLoading, setFilesLoading] = useState(false);
+  const [fileSearch, setFileSearch] = useState('');
+
+  // Load attachments when viewing/editing an event
+  const loadAttachments = useCallback(async (eventId) => {
+    if (!eventId) return;
+    try {
+      const response = await fetch(`/api/events/${encodeURIComponent(eventId)}/attachments`, {
+        headers: { 'Authorization': `Bearer ${getAuthToken()}` }
+      });
+      if (response.ok) {
+        const data = await response.json();
+        setAttachments(data.attachments || []);
+      }
+    } catch (err) {
+      console.error('Error loading attachments:', err);
+    }
+  }, []);
+
+  // Load user files for the file picker
+  const loadUserFiles = useCallback(async (search = '') => {
+    setFilesLoading(true);
+    try {
+      const params = new URLSearchParams();
+      if (search) params.append('search', search);
+      const response = await fetch(`/api/files/user-files?${params.toString()}`, {
+        headers: { 'Authorization': `Bearer ${getAuthToken()}` }
+      });
+      if (response.ok) {
+        const data = await response.json();
+        setUserFiles(data.files || []);
+      }
+    } catch (err) {
+      console.error('Error loading user files:', err);
+    } finally {
+      setFilesLoading(false);
+    }
+  }, []);
+
+  // Attach file to event
+  const attachFile = async (file, eventId) => {
+    try {
+      const response = await fetch('/api/events/attachments', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${getAuthToken()}`
+        },
+        body: JSON.stringify({
+          eventId: eventId,
+          fileName: file.name,
+          filePath: file.path,
+          fileOwner: file.owner || '',
+          fileSize: file.size || 0
+        })
+      });
+      if (response.ok) {
+        const data = await response.json();
+        setAttachments(prev => [...prev, data.attachment]);
+        setShowFilePicker(false);
+      }
+    } catch (err) {
+      console.error('Error attaching file:', err);
+    }
+  };
+
+  // Remove attachment
+  const removeAttachment = async (attachmentId) => {
+    try {
+      const response = await fetch(`/api/events/attachments/${attachmentId}`, {
+        method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${getAuthToken()}` }
+      });
+      if (response.ok) {
+        setAttachments(prev => prev.filter(a => a.id !== attachmentId));
+      }
+    } catch (err) {
+      console.error('Error removing attachment:', err);
+    }
+  };
 
   // Update state when props change
   useEffect(() => {
@@ -163,7 +249,14 @@ const EventModal = ({
     }
     setErrors({});
     setShowDeleteConfirm(false);
-  }, [isOpen, event, mode, selectedDates, initialAssignMode, initialTargetUserId]);
+    setShowFilePicker(false);
+    setAttachments([]);
+    
+    // Load attachments for existing events
+    if (isOpen && event && (mode === 'view' || mode === 'edit')) {
+      loadAttachments(event.id);
+    }
+  }, [isOpen, event, mode, selectedDates, initialAssignMode, initialTargetUserId, loadAttachments]);
 
   const handleInputChange = (field, value) => {
     // Lógica especial para el cambio de "Todo el día"
@@ -389,6 +482,16 @@ const EventModal = ({
                   </div>
                 )}
 
+                {event?.extendedProps?.assignedBy && (
+                  <div className="detail-group">
+                    <label className="detail-label">{t('calendar.assignedBy') || 'Asignado por'}</label>
+                    <div className="detail-value" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                      <span style={{ fontSize: '1.1rem' }}>👤</span>
+                      <span style={{ fontWeight: 500, color: '#3b82f6' }}>{event.extendedProps.assignedBy}</span>
+                    </div>
+                  </div>
+                )}
+
                 {event?.extendedProps?.description && (
                   <div className="detail-group">
                     <label className="detail-label">{t('calendar.description')}</label>
@@ -423,6 +526,42 @@ const EventModal = ({
                     </div>
                   </div>
                 )}
+
+                {/* Attachments Section - View Mode */}
+                <div className="detail-group">
+                  <label className="detail-label">{t('calendar.attachments') || 'Adjuntos'}</label>
+                  <div className="detail-value">
+                    {attachments.length > 0 ? (
+                      <div className="attachments-list">
+                        {attachments.map(att => (
+                          <div key={att.id} className="attachment-item">
+                            <span className="attachment-icon">{getFileIcon(att.fileName)}</span>
+                            <div className="attachment-info">
+                              <span className="attachment-name">{att.fileName}</span>
+                              <span className="attachment-meta">{formatFileSize(att.fileSize)} • {att.attachedBy}</span>
+                            </div>
+                            <button 
+                              className="attachment-remove-btn"
+                              onClick={() => removeAttachment(att.id)}
+                              title={t('calendar.removeAttachment') || 'Quitar adjunto'}
+                            >
+                              ✕
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <span className="text-sm text-gray-400 italic">{t('calendar.noAttachments') || 'Sin adjuntos'}</span>
+                    )}
+                    <button 
+                      className="btn btn-sm btn-secondary mt-2"
+                      onClick={() => { setShowFilePicker(true); loadUserFiles(); }}
+                      style={{ fontSize: '0.8rem', padding: '4px 10px' }}
+                    >
+                      📎 {t('calendar.attachFile') || 'Adjuntar archivo'}
+                    </button>
+                  </div>
+                </div>
               </div>
             ) : (
               // EDIT/CREATE MODE
@@ -621,6 +760,39 @@ const EventModal = ({
                     )}
                   </div>
                 </div>
+
+                {/* Attachments Section - Edit/Create Mode */}
+                {currentMode === 'edit' && event?.id && (
+                  <div className="form-group">
+                    <label className="form-label">📎 {t('calendar.attachments') || 'Adjuntos'}</label>
+                    <div className="attachments-list">
+                      {attachments.map(att => (
+                        <div key={att.id} className="attachment-item">
+                          <span className="attachment-icon">{getFileIcon(att.fileName)}</span>
+                          <div className="attachment-info">
+                            <span className="attachment-name">{att.fileName}</span>
+                            <span className="attachment-meta">{formatFileSize(att.fileSize)}</span>
+                          </div>
+                          <button 
+                            className="attachment-remove-btn"
+                            onClick={() => removeAttachment(att.id)}
+                            title={t('calendar.removeAttachment') || 'Quitar'}
+                          >
+                            ✕
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                    <button 
+                      type="button"
+                      className="btn btn-sm btn-secondary mt-1"
+                      onClick={() => { setShowFilePicker(true); loadUserFiles(); }}
+                      style={{ fontSize: '0.8rem', padding: '4px 10px' }}
+                    >
+                      + {t('calendar.attachFile') || 'Adjuntar archivo'}
+                    </button>
+                  </div>
+                )}
               </form>
             )}
           </div>
@@ -703,6 +875,51 @@ const EventModal = ({
               >
                 {t('calendar.delete')}
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* File Picker Modal for Attachments */}
+      {showFilePicker && (
+        <div className="modal-backdrop show" style={{ zIndex: 1100 }} onClick={() => setShowFilePicker(false)}>
+          <div className="event-modal file-picker-modal" onClick={e => e.stopPropagation()} style={{ maxWidth: '500px' }}>
+            <div className="modal-header">
+              <h2 className="modal-title">📎 {t('calendar.selectFile') || 'Seleccionar archivo'}</h2>
+              <button className="close-modal" onClick={() => setShowFilePicker(false)}>&times;</button>
+            </div>
+            <div className="modal-body" style={{ maxHeight: '400px', overflowY: 'auto' }}>
+              <div className="form-group" style={{ marginBottom: '10px' }}>
+                <input
+                  type="text"
+                  className="form-input"
+                  value={fileSearch}
+                  onChange={(e) => { setFileSearch(e.target.value); loadUserFiles(e.target.value); }}
+                  placeholder={t('calendar.searchFiles') || 'Buscar archivos...'}
+                  autoFocus
+                />
+              </div>
+              {filesLoading ? (
+                <div className="text-center text-gray-400 py-4">{t('common.loading') || 'Cargando...'}</div>
+              ) : userFiles.length === 0 ? (
+                <div className="text-center text-gray-400 py-4">{t('calendar.noFilesFound') || 'No se encontraron archivos'}</div>
+              ) : (
+                <div className="file-picker-list">
+                  {userFiles.map(file => (
+                    <div 
+                      key={file.id} 
+                      className="file-picker-item"
+                      onClick={() => attachFile(file, event?.id)}
+                    >
+                      <span className="attachment-icon">{getFileIcon(file.name)}</span>
+                      <div className="attachment-info">
+                        <span className="attachment-name">{file.name}</span>
+                        <span className="attachment-meta">{formatFileSize(file.size)}</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
         </div>

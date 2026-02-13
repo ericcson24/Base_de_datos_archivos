@@ -1,8 +1,9 @@
 const NodeCache = require('node-cache');
 
 // Cache para resultados de búsqueda IA
-// TTL: 5 minutos, checkperiod: 10 minutos
-const aiCache = new NodeCache({ stdTTL: 300, checkperiod: 600 });
+// TTL: 30 segundos (solo para evitar doble-envío accidental)
+// checkperiod: 60 segundos
+const aiCache = new NodeCache({ stdTTL: 30, checkperiod: 60 });
 
 /**
  * Genera una clave única para el cache basada en userId y query

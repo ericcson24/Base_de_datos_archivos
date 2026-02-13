@@ -129,6 +129,8 @@
   align-items: center;
   gap: 1rem;
   flex: 1;
+  min-width: 0;
+  overflow: hidden;
 }
 
 .ai-results-modal .file-icon {
@@ -144,17 +146,31 @@
 
 .ai-results-modal .file-details {
   flex: 1;
+  min-width: 0;
+  overflow: hidden;
 }
 
 .ai-results-modal .file-name {
   font-weight: 500;
   margin-bottom: 0.25rem;
   opacity: 0.95;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .ai-results-modal .file-meta {
   font-size: 0.85rem;
   opacity: 0.6;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ai-results-modal .file-folder-path {
+  color: #60a5fa;
+  font-weight: 500;
+  opacity: 1;
 }
 
 .ai-results-modal .file-actions {

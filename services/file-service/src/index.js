@@ -147,12 +147,17 @@ app.get('/list', authenticate, async (req, res) => {
     
     // FETCH SHARED STATUS
     let sharedPaths = new Set();
+    let sharedWithMap = {}; // path -> [usernames]
     // Only check if we are viewing our own files (user is owner)
     if (!owner || owner === username) {
         try {
-             const shares = await dbAsync.all('SELECT path FROM shared_files WHERE owner_username = ?', [username]);
+             const shares = await dbAsync.all('SELECT path, shared_with_username FROM shared_files WHERE owner_username = ?', [username]);
              if (shares) {
-                shares.forEach(s => sharedPaths.add(s.path));
+                shares.forEach(s => {
+                    sharedPaths.add(s.path);
+                    if (!sharedWithMap[s.path]) sharedWithMap[s.path] = [];
+                    sharedWithMap[s.path].push(s.shared_with_username);
+                });
              }
         } catch (e) {
              console.error('Error fetching shared status:', e);
@@ -170,6 +175,7 @@ app.get('/list', authenticate, async (req, res) => {
       const normalizedPath = relativePath.replace(/\\/g, '/');
       const winPath = relativePath.replace(/\//g, '\\');
       const isShared = sharedPaths.has(normalizedPath) || sharedPaths.has(winPath) || sharedPaths.has(relativePath);
+      const sharedWith = sharedWithMap[normalizedPath] || sharedWithMap[winPath] || sharedWithMap[relativePath] || [];
 
       if (item.isDirectory()) {
         files.push({
@@ -180,6 +186,7 @@ app.get('/list', authenticate, async (req, res) => {
           modified: (await fs.stat(fullPath)).mtime,
           path: relativePath,
           shared: isShared,
+          sharedWith: isShared ? sharedWith : undefined,
           owner: owner || username
         });
       } else {
@@ -193,6 +200,7 @@ app.get('/list', authenticate, async (req, res) => {
           path: relativePath,
           extension: path.extname(item.name).toLowerCase(),
           shared: isShared,
+          sharedWith: isShared ? sharedWith : undefined,
           owner: owner || username
         });
       }
@@ -202,6 +210,45 @@ app.get('/list', authenticate, async (req, res) => {
     const searchQuery = req.query.search;
     if (searchQuery) {
         files = files.filter(file => file.name.toLowerCase().includes(searchQuery.toLowerCase()));
+    }
+
+    // Include pinned shared files in the main listing (only at root level, own files view)
+    if ((!requestedPath || requestedPath === '') && (!owner || owner === username)) {
+      try {
+        const pinnedShares = await dbAsync.all(
+          'SELECT * FROM shared_files WHERE shared_with_username = ? AND pinned_to_panel = TRUE',
+          [username]
+        );
+        if (pinnedShares && pinnedShares.length > 0) {
+          for (const share of pinnedShares) {
+            const fullPath = path.join(UPLOAD_DIR, share.owner_username, share.path);
+            try {
+              const stats = await fs.stat(fullPath);
+              const idString = `shared:${share.owner_username}:${share.path}`;
+              const pinnedFile = {
+                id: Buffer.from(idString).toString('base64'),
+                name: path.basename(share.path),
+                type: stats.isDirectory() ? 'folder' : 'file',
+                size: stats.size,
+                modified: stats.mtime,
+                path: share.path,
+                extension: path.extname(share.path).toLowerCase(),
+                owner: share.owner_username,
+                shared: true,
+                pinnedFromShared: true
+              };
+              // Apply search filter if active
+              if (!searchQuery || pinnedFile.name.toLowerCase().includes(searchQuery.toLowerCase())) {
+                files.push(pinnedFile);
+              }
+            } catch (e) {
+              // File might have been deleted by owner
+            }
+          }
+        }
+      } catch (e) {
+        console.error('Error loading pinned shared files:', e);
+      }
     }
 
     // Sorting
@@ -238,31 +285,65 @@ app.get('/list', authenticate, async (req, res) => {
   }
 });
 
+// Helper: resolve file path from base64 ID (supports own files and shared files)
+async function resolveFilePath(fileId, username) {
+    let decoded;
+    try {
+        decoded = Buffer.from(fileId, 'base64').toString();
+    } catch (e) {
+        return { error: 'ID inválido', status: 400 };
+    }
+
+    // Check if it's a shared file (shared:ownerUsername:path)
+    if (decoded.startsWith('shared:')) {
+        const parts = decoded.split(':');
+        if (parts.length < 3) return { error: 'ID compartido inválido', status: 400 };
+        const ownerUsername = parts[1];
+        const filePath = parts.slice(2).join(':'); // path may contain colons
+
+        // Verify the share exists in DB
+        const share = await dbAsync.get(
+            'SELECT * FROM shared_files WHERE owner_username = ? AND shared_with_username = ? AND path = ?',
+            [ownerUsername, username, filePath]
+        );
+        if (!share) {
+            return { error: 'No tienes acceso a este archivo compartido', status: 403 };
+        }
+
+        const fullPath = path.join(UPLOAD_DIR, ownerUsername, filePath);
+        if (!fullPath.startsWith(path.join(UPLOAD_DIR, ownerUsername))) {
+            return { error: 'Acceso denegado', status: 403 };
+        }
+
+        return { fullPath, filePath, ownerUsername, isShared: true };
+    }
+
+    // Own file
+    const fullPath = path.join(UPLOAD_DIR, username, decoded);
+    if (!fullPath.startsWith(path.join(UPLOAD_DIR, username))) {
+        return { error: 'Acceso denegado', status: 403 };
+    }
+
+    return { fullPath, filePath: decoded, ownerUsername: username, isShared: false };
+}
+
 // Descargar archivo
 app.get('/download/:fileId', authenticate, async (req, res) => {
   try {
     const { fileId } = req.params;
-    let filePath;
-    try {
-        filePath = Buffer.from(fileId, 'base64').toString();
-    } catch (e) {
-        return res.status(400).json({ success: false, message: 'ID inválido' });
-    }
-
-    const fullPath = path.join(UPLOAD_DIR, req.user.username, filePath);
+    const resolved = await resolveFilePath(fileId, req.user.username);
     
-    // Seguridad básica
-    if (!fullPath.startsWith(path.join(UPLOAD_DIR, req.user.username))) {
-        return res.status(403).json({ success: false, message: 'Acceso denegado' });
+    if (resolved.error) {
+        return res.status(resolved.status).json({ success: false, message: resolved.error });
     }
 
     try {
-        await fs.access(fullPath);
+        await fs.access(resolved.fullPath);
     } catch (e) {
         return res.status(404).json({ success: false, message: 'Archivo no encontrado' });
     }
 
-    res.download(fullPath);
+    res.download(resolved.fullPath);
   } catch (error) {
     console.error('Error downloading:', error);
     res.status(500).json({ success: false, message: 'Error al descargar' });
@@ -432,8 +513,13 @@ app.put('/:fileId/content', authenticate, async (req, res) => {
   try {
     const { fileId } = req.params;
     const { content, encoding } = req.body;
-    const filePath = Buffer.from(fileId, 'base64').toString();
-    const fullPath = path.join(UPLOAD_DIR, req.user.username, filePath);
+    
+    const resolved = await resolveFilePath(fileId, req.user.username);
+    if (resolved.error) {
+      return res.status(resolved.status).json({ success: false, message: resolved.error });
+    }
+    
+    const fullPath = resolved.fullPath;
 
     if (encoding === 'base64') {
       const base64Data = content.replace(/^data:([A-Za-z-+\/]+);base64,/, '');
@@ -442,7 +528,7 @@ app.put('/:fileId/content', authenticate, async (req, res) => {
       await fs.writeFile(fullPath, content, 'utf8');
     }
 
-    await logAction(req.user.username, 'FILE_EDIT', `Editado archivo: ${filePath}`);
+    await logAction(req.user.username, 'FILE_EDIT', `Editado archivo: ${resolved.filePath}${resolved.isShared ? ' (compartido por ' + resolved.ownerUsername + ')' : ''}`);
     res.json({ success: true, message: 'Guardado exitosamente' });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
@@ -462,12 +548,14 @@ app.put('/:fileId', authenticate, uploadTemp.single('file'), async (req, res) =>
 
     console.log('[PUT] File received:', req.file.originalname, 'Size:', req.file.size);
 
-    const filePath = Buffer.from(fileId, 'base64').toString();
-    const fullPath = path.join(UPLOAD_DIR, req.user.username, filePath);
-
-    if (!fullPath.startsWith(path.join(UPLOAD_DIR, req.user.username))) {
-      return res.status(403).json({ success: false, message: 'Access denied' });
+    const resolved = await resolveFilePath(fileId, req.user.username);
+    if (resolved.error) {
+      // Clean up temp file
+      try { await fs.unlink(req.file.path); } catch(e) {}
+      return res.status(resolved.status).json({ success: false, message: resolved.error });
     }
+    
+    const fullPath = resolved.fullPath;
 
     // Eliminar archivo existente si existe
     try {
@@ -487,7 +575,7 @@ app.put('/:fileId', authenticate, uploadTemp.single('file'), async (req, res) =>
     await fs.unlink(req.file.path);
     console.log('[PUT] File saved successfully');
 
-    await logAction(req.user.username, 'FILE_EDIT', `Updated file: ${filePath}`);
+    await logAction(req.user.username, 'FILE_EDIT', `Editado archivo: ${resolved.filePath}${resolved.isShared ? ' (compartido por ' + resolved.ownerUsername + ')' : ''}`);
     res.json({ success: true, message: 'File updated successfully' });
   } catch (error) {
     console.error('Error updating file:', error);
@@ -499,36 +587,48 @@ app.put('/:fileId', authenticate, uploadTemp.single('file'), async (req, res) =>
 app.get('/preview/:fileId', authenticate, async (req, res) => {
   try {
     const { fileId } = req.params;
-    let filePath;
-    try {
-        filePath = Buffer.from(fileId, 'base64').toString();
-        console.log('[PREVIEW] Decoded file path:', filePath);
-    } catch (e) {
-        return res.status(400).json({ success: false, message: 'ID inválido' });
-    }
-
-    const fullPath = path.join(UPLOAD_DIR, req.user.username, filePath);
-    console.log('[PREVIEW] Full path:', fullPath);
+    const resolved = await resolveFilePath(fileId, req.user.username);
     
-    if (!fullPath.startsWith(path.join(UPLOAD_DIR, req.user.username))) {
-        return res.status(403).json({ success: false, message: 'Acceso denegado' });
+    if (resolved.error) {
+        return res.status(resolved.status).json({ success: false, message: resolved.error });
     }
 
+    console.log('[PREVIEW] Full path:', resolved.fullPath);
+
     try {
-        await fs.access(fullPath);
+        await fs.access(resolved.fullPath);
     } catch (e) {
         return res.status(404).json({ success: false, message: 'Archivo no encontrado' });
     }
 
-    // Log file open
-    await logAction(req.user.username, 'FILE_OPEN', `Abierto archivo: ${filePath}`);
+    // NOTE: FILE_OPEN logging is handled by POST /log-open from frontend
+    // Do NOT log here to avoid duplicate entries (preview is also called for thumbnails, AI viewer, etc.)
 
-    // Determinar mime type básico o dejar que express/res.sendFile lo maneje
-    // Para preview, queremos que el navegador intente mostrarlo (inline)
-    res.sendFile(fullPath, { headers: { 'Content-Disposition': 'inline' } });
+    res.sendFile(resolved.fullPath, { headers: { 'Content-Disposition': 'inline' } });
   } catch (error) {
     console.error('Error previewing:', error);
     res.status(500).json({ success: false, message: 'Error al previsualizar' });
+  }
+});
+
+// Log file open from frontend (for recents tracking)
+app.post('/log-open', authenticate, async (req, res) => {
+  try {
+    const { fileId } = req.body;
+    if (!fileId) {
+      return res.status(400).json({ success: false, message: 'Missing fileId' });
+    }
+    
+    const resolved = await resolveFilePath(fileId, req.user.username);
+    if (resolved.error) {
+      return res.status(resolved.status).json({ success: false, message: resolved.error });
+    }
+    
+    await logAction(req.user.username, 'FILE_OPEN', `Abierto archivo: ${resolved.filePath}${resolved.isShared ? ' (compartido por ' + resolved.ownerUsername + ')' : ''}`);
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Error logging file open:', error);
+    res.status(200).json({ success: false }); // Don't block UI
   }
 });
 
@@ -549,7 +649,7 @@ app.get('/recent', authenticate, async (req, res) => {
     const logs = await dbAsync.all(
         `SELECT details, timestamp, action FROM audit_logs 
          WHERE user_id = ? AND action IN ('CREATE_FILE', 'FILE_UPLOAD', 'FILE_EDIT', 'FOLDER_UPLOAD', 'FILE_OPEN') 
-         ORDER BY timestamp DESC LIMIT 20`,
+         ORDER BY timestamp DESC LIMIT 30`,
         [user.id]
     );
 
@@ -558,11 +658,17 @@ app.get('/recent', authenticate, async (req, res) => {
 
     for (const log of logs) {
         let filePath = '';
+        let isShared = false;
+        let sharedOwner = '';
         
         if (log.action === 'FILE_EDIT') {
-             const match = log.details.match(/Editado archivo: (.+)/);
+             const match = log.details.match(/Editado archivo: (.+?)(?:\s*\(compartido por (.+)\))?$/);
              if (match) {
-                 filePath = match[1];
+                 filePath = match[1].trim();
+                 if (match[2]) {
+                   isShared = true;
+                   sharedOwner = match[2];
+                 }
              }
         } else if (log.action === 'CREATE_FILE') {
              const match = log.details.match(/Creado archivo: (.+)/);
@@ -574,24 +680,53 @@ app.get('/recent', authenticate, async (req, res) => {
              const match = log.details.match(/Subido archivo de carpeta: (.+)/);
              if (match) filePath = match[1];
         } else if (log.action === 'FILE_OPEN') {
-             const match = log.details.match(/Abierto archivo: (.+)/);
-             if (match) filePath = match[1];
+             const match = log.details.match(/Abierto archivo: (.+?)(?:\s*\(compartido por (.+)\))?$/);
+             if (match) {
+                 filePath = match[1].trim();
+                 if (match[2]) {
+                   isShared = true;
+                   sharedOwner = match[2];
+                 }
+             }
         }
 
-        if (filePath && !processedPaths.has(filePath)) {
-            const fullPath = path.join(UPLOAD_DIR, username, filePath);
+        const uniqueKey = isShared ? `shared:${sharedOwner}:${filePath}` : filePath;
+
+        if (filePath && !processedPaths.has(uniqueKey)) {
+            // Determine the actual full path based on whether it's shared
+            const ownerDir = isShared ? sharedOwner : username;
+            const fullPath = path.join(UPLOAD_DIR, ownerDir, filePath);
             try {
                 const stats = await fs.stat(fullPath);
-                recentFiles.push({
+                
+                if (isShared) {
+                  // For shared files, build the same ID format as shared-with-me
+                  const idString = `shared:${sharedOwner}:${filePath}`;
+                  recentFiles.push({
+                    id: Buffer.from(idString).toString('base64'),
+                    name: path.basename(filePath),
+                    type: 'file',
+                    size: stats.size,
+                    modified: stats.mtime,
+                    modifiedAt: stats.mtime,
+                    path: filePath,
+                    owner: sharedOwner,
+                    shared: true,
+                    extension: path.extname(filePath).toLowerCase()
+                  });
+                } else {
+                  recentFiles.push({
                     id: Buffer.from(filePath).toString('base64'),
                     name: path.basename(filePath),
                     type: 'file',
                     size: stats.size,
                     modified: stats.mtime,
+                    modifiedAt: stats.mtime,
                     path: filePath,
                     extension: path.extname(filePath).toLowerCase()
-                });
-                processedPaths.add(filePath);
+                  });
+                }
+                processedPaths.add(uniqueKey);
             } catch (e) {
                 // File might have been deleted
             }
@@ -644,9 +779,28 @@ app.get('/shared-with-me', authenticate, async (req, res) => {
     }
 });
 
-// Shared folders (Stub)
+// Shared folders (Returns distinct owners who share with current user)
 app.get('/shared-folders', authenticate, async (req, res) => {
-    res.json({ success: true, files: [] });
+    try {
+        const username = req.user.username;
+        const owners = await dbAsync.all(
+            'SELECT DISTINCT owner_username FROM shared_files WHERE shared_with_username = ?',
+            [username]
+        );
+        
+        const folders = (owners || []).map(o => ({
+            id: Buffer.from(`shared-owner:${o.owner_username}`).toString('base64'),
+            name: o.owner_username,
+            type: 'folder',
+            owner: o.owner_username,
+            shared: true
+        }));
+        
+        res.json({ success: true, files: folders });
+    } catch (error) {
+        console.error('Error listing shared folders:', error);
+        res.status(500).json({ success: false, message: error.message });
+    }
 });
 
 // Share
@@ -677,12 +831,37 @@ app.post('/share', authenticate, async (req, res) => {
     }
 
     // Insert into DB
-    // Check if dbAsync handles Postgres or SQLite differences?
-    // It seems dbAsync.run handles it.
     await dbAsync.run(
         'INSERT INTO shared_files (path, owner_username, shared_with_username) VALUES (?, ?, ?) ON CONFLICT DO NOTHING',
         [filePath, ownerUsername, targetUsername]
     );
+
+    // Send notification to the target user
+    const fileName = filePath.split('/').pop() || filePath;
+    try {
+        const notifRes = await fetch('http://notification-service:5002/create', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                userId: user.id,
+                title: 'file_shared',
+                message: `${ownerUsername}|${fileName}`,
+                type: 'info',
+                link: '/shared',
+                metadata: { 
+                    notifType: 'file_share',
+                    from: ownerUsername, 
+                    fileName: fileName,
+                    path: filePath 
+                }
+            })
+        });
+        if (!notifRes.ok) {
+            console.warn('⚠️ Notification service returned error:', notifRes.status);
+        }
+    } catch (notifErr) {
+        console.warn('⚠️ Could not send share notification:', notifErr.message);
+    }
 
     // Also Log
     await logAction(ownerUsername, 'FILE_SHARE', `Compartido ${filePath} con ${targetUsername}`);
@@ -690,6 +869,202 @@ app.post('/share', authenticate, async (req, res) => {
     res.json({ success: true, message: `Compartido con ${targetUsername}` });
   } catch (error) {
     console.error('Error sharing:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// Unshare - Remove a share
+app.post('/unshare', authenticate, async (req, res) => {
+  try {
+    const { path: filePath, username: targetUsername } = req.body;
+    const ownerUsername = req.user.username;
+
+    if (!filePath || !targetUsername) {
+      return res.status(400).json({ success: false, message: 'Faltan datos' });
+    }
+
+    const result = await dbAsync.run(
+      'DELETE FROM shared_files WHERE path = ? AND owner_username = ? AND shared_with_username = ?',
+      [filePath, ownerUsername, targetUsername]
+    );
+
+    if (result.changes === 0) {
+      return res.status(404).json({ success: false, message: 'Compartición no encontrada' });
+    }
+
+    await logAction(ownerUsername, 'FILE_UNSHARE', `Dejado de compartir ${filePath} con ${targetUsername}`);
+    res.json({ success: true, message: `Dejado de compartir con ${targetUsername}` });
+  } catch (error) {
+    console.error('Error unsharing:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// Remove shared file from recipient's view (recipient removes the share from their panel)
+app.post('/remove-shared', authenticate, async (req, res) => {
+  try {
+    const { path: filePath, ownerUsername } = req.body;
+    const username = req.user.username;
+
+    if (!filePath || !ownerUsername) {
+      return res.status(400).json({ success: false, message: 'Missing path or ownerUsername' });
+    }
+
+    const result = await dbAsync.run(
+      'DELETE FROM shared_files WHERE path = ? AND owner_username = ? AND shared_with_username = ?',
+      [filePath, ownerUsername, username]
+    );
+
+    if (result.changes === 0) {
+      return res.status(404).json({ success: false, message: 'Share not found' });
+    }
+
+    await logAction(username, 'REMOVE_SHARED', `Removed shared file ${filePath} from ${ownerUsername}`);
+    res.json({ success: true, message: 'Removed from shared' });
+  } catch (error) {
+    console.error('Error removing shared:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// Move shared file to own panel (pin it so it appears in main file listing)
+app.post('/save-to-my-files', authenticate, async (req, res) => {
+  try {
+    const { path: filePath, ownerUsername } = req.body;
+    const username = req.user.username;
+
+    if (!filePath || !ownerUsername) {
+      return res.status(400).json({ success: false, message: 'Missing path or ownerUsername' });
+    }
+
+    // Verify the share exists
+    const share = await dbAsync.get(
+      'SELECT * FROM shared_files WHERE path = ? AND owner_username = ? AND shared_with_username = ?',
+      [filePath, ownerUsername, username]
+    );
+
+    if (!share) {
+      return res.status(404).json({ success: false, message: 'Share not found' });
+    }
+
+    // Pin to panel (toggle)
+    await dbAsync.run(
+      'UPDATE shared_files SET pinned_to_panel = TRUE WHERE path = ? AND owner_username = ? AND shared_with_username = ?',
+      [filePath, ownerUsername, username]
+    );
+
+    await logAction(username, 'PIN_SHARED', `Pinned shared file ${filePath} from ${ownerUsername} to panel`);
+    res.json({ success: true, message: 'Moved to your panel', savedName: path.basename(filePath) });
+  } catch (error) {
+    console.error('Error pinning to panel:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// Unpin shared file from panel
+app.post('/unpin-from-panel', authenticate, async (req, res) => {
+  try {
+    const { path: filePath, ownerUsername } = req.body;
+    const username = req.user.username;
+
+    if (!filePath || !ownerUsername) {
+      return res.status(400).json({ success: false, message: 'Missing path or ownerUsername' });
+    }
+
+    await dbAsync.run(
+      'UPDATE shared_files SET pinned_to_panel = FALSE WHERE path = ? AND owner_username = ? AND shared_with_username = ?',
+      [filePath, ownerUsername, username]
+    );
+
+    res.json({ success: true, message: 'Unpinned from panel' });
+  } catch (error) {
+    console.error('Error unpinning from panel:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// Helper to recursively copy directory
+async function copyDir(src, dest) {
+  await fs.mkdir(dest, { recursive: true });
+  const entries = await fs.readdir(src, { withFileTypes: true });
+  for (const entry of entries) {
+    const srcPath = path.join(src, entry.name);
+    const destPath = path.join(dest, entry.name);
+    if (entry.isDirectory()) {
+      await copyDir(srcPath, destPath);
+    } else {
+      await fs.copyFile(srcPath, destPath);
+    }
+  }
+}
+
+// Get shares info for a specific file (who is it shared with)
+app.get('/shares', authenticate, async (req, res) => {
+  try {
+    const filePath = req.query.path;
+    const ownerUsername = req.user.username;
+
+    if (!filePath) {
+      return res.status(400).json({ success: false, message: 'Path requerido' });
+    }
+
+    const shares = await dbAsync.all(
+      'SELECT shared_with_username, created_at FROM shared_files WHERE path = ? AND owner_username = ?',
+      [filePath, ownerUsername]
+    );
+
+    res.json({ success: true, shares: shares || [] });
+  } catch (error) {
+    console.error('Error getting shares:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// List user's files (for external services like AI/calendar to browse)
+app.get('/user-files', authenticate, async (req, res) => {
+  try {
+    const username = req.user.username;
+    const requestedPath = req.query.path || '';
+    const searchQuery = req.query.search || '';
+
+    if (requestedPath.includes('..')) {
+      return res.status(400).json({ success: false, message: 'Ruta inválida' });
+    }
+
+    const targetDir = path.join(UPLOAD_DIR, username, requestedPath);
+
+    try {
+      await fs.access(targetDir);
+    } catch (e) {
+      return res.json({ success: true, files: [] });
+    }
+
+    const items = await fs.readdir(targetDir, { withFileTypes: true });
+    let files = [];
+
+    for (const item of items) {
+      const relativePath = path.join(requestedPath, item.name);
+      if (item.isDirectory()) continue; // Only return files for attachment selection
+
+      const stats = await fs.stat(path.join(targetDir, item.name));
+      files.push({
+        id: Buffer.from(relativePath).toString('base64'),
+        name: item.name,
+        path: relativePath,
+        size: stats.size,
+        modified: stats.mtime,
+        extension: path.extname(item.name).toLowerCase()
+      });
+    }
+
+    // Search filter
+    if (searchQuery) {
+      files = files.filter(f => f.name.toLowerCase().includes(searchQuery.toLowerCase()));
+    }
+
+    res.json({ success: true, files });
+  } catch (error) {
+    console.error('Error listing user files:', error);
     res.status(500).json({ success: false, message: error.message });
   }
 });

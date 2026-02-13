@@ -102,6 +102,8 @@ export const NotificationProvider = ({ children, user, onNavigate }) => {
   }, [user, fetchNotifications]);
 
   useEffect(() => {
+    if (!user) return;
+
     // Connect to socket
     // The path must match the nginx location for notifications
     const newSocket = io('/', {
@@ -111,17 +113,26 @@ export const NotificationProvider = ({ children, user, onNavigate }) => {
 
     newSocket.on('connect', () => {
       console.log('Connected to notification service');
+      // Join user-specific room for targeted notifications
+      if (userRef.current && userRef.current.id) {
+        newSocket.emit('join', userRef.current.id);
+      }
     });
 
     newSocket.on('notification', (data) => {
       console.log('Notification received:', data);
       
+      // Only process notifications for the current user
+      const currentUserId = userRef.current?.id;
+      if (data.user_id && currentUserId && data.user_id !== currentUserId) {
+        return; // Ignore notifications not for this user
+      }
+
       // Refresh notifications list
       fetchNotifications();
 
-      // Check if user wants notifications
-      // We use ref to access latest user state without re-running effect
-      if (userRef.current && userRef.current.notifications) {
+      // Show toast notification
+      if (userRef.current) {
         addToast({
           title: data.title || 'Notificación',
           message: data.message,
@@ -133,7 +144,7 @@ export const NotificationProvider = ({ children, user, onNavigate }) => {
     return () => {
       newSocket.disconnect();
     };
-  }, [addToast, fetchNotifications]);
+  }, [user, addToast, fetchNotifications]);
 
   return (
     <NotificationContext.Provider value={{ 

@@ -2,7 +2,6 @@ import React, { useState, useEffect, useCallback } from 'react';
 import FileEditorPanel from '../FileEditor/FileEditorPanel';
 import RecentFileItem from './RecentFileItem';
 import FileViewerModal from '../Modals/FileViewerModal';
-import HoverPreview from './HoverPreview';
 import CreateFolderModal from '../Modals/CreateFolderModal';
 import RenameModal from '../Modals/RenameModal';
 import MoveModal from '../Modals/MoveModal';
@@ -94,10 +93,9 @@ const UserPanel = ({ user, onLogout, onBackToFolders, onThemeToggle, isDarkMode,
     };
   }, []);
 
-  // Estados para viewer y hover
+  // Estados para viewer
   const [viewerFile, setViewerFile] = useState(null);
   const [showFileViewer, setShowFileViewer] = useState(false);
-  const [hoveredFile, setHoveredFile] = useState(null);
 
   // Nuevos estados para redimensionamiento y panel lateral
   const [sidebarPanelOpen, setSidebarPanelOpen] = useState(false);
@@ -381,7 +379,7 @@ const loadSharedFolders = useCallback(async () => {
       }
     });
     const data = await response.json();
-    setSharedFolders(data.folders || []);
+    setSharedFolders(data.files || data.folders || []);
   } catch (error) {
     console.error('Error loading shared folders:', error);
   }
@@ -698,6 +696,87 @@ useEffect(() => {
     }
   };
 
+  // Remove a shared file from recipient's view (does NOT delete the original)
+  const handleRemoveShared = async (item) => {
+    try {
+      const response = await fetch('/api/files/remove-shared', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${getAuthToken()}`
+        },
+        body: JSON.stringify({
+          path: item.path,
+          ownerUsername: item.owner
+        })
+      });
+      const result = await response.json();
+      if (result.success) {
+        loadFiles();
+        addToast(t('userPanel.removedFromShared'), 'success');
+      } else {
+        addToast(result.message || t('common.error'), 'error');
+      }
+    } catch (error) {
+      console.error('Error removing shared:', error);
+      addToast(t('common.error'), 'error');
+    }
+  };
+
+  // Save a shared file to own panel (pin it, not copy)
+  const handleSaveToMyFiles = async (item) => {
+    try {
+      const response = await fetch('/api/files/save-to-my-files', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${getAuthToken()}`
+        },
+        body: JSON.stringify({
+          path: item.path,
+          ownerUsername: item.owner
+        })
+      });
+      const result = await response.json();
+      if (result.success) {
+        addToast(t('userPanel.movedToPanel', { name: result.savedName || item.name }), 'success');
+        loadFiles(); // Refresh to show pinned file
+      } else {
+        addToast(result.message || t('common.error'), 'error');
+      }
+    } catch (error) {
+      console.error('Error moving to panel:', error);
+      addToast(t('common.error'), 'error');
+    }
+  };
+
+  // Unpin a shared file from own panel (remove from main listing, keep in shared)
+  const handleUnpinFromPanel = async (item) => {
+    try {
+      const response = await fetch('/api/files/unpin-from-panel', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${getAuthToken()}`
+        },
+        body: JSON.stringify({
+          path: item.path,
+          ownerUsername: item.owner
+        })
+      });
+      const result = await response.json();
+      if (result.success) {
+        addToast(t('userPanel.unpinnedFromPanel') || 'Removed from panel', 'success');
+        loadFiles();
+      } else {
+        addToast(result.message || t('common.error'), 'error');
+      }
+    } catch (error) {
+      console.error('Error unpinning from panel:', error);
+      addToast(t('common.error'), 'error');
+    }
+  };
+
   const handleMoveItem = async (item, destinationPath) => {
     try {
       const response = await fetch(`/api/files/${encodeURIComponent(item.id)}/move`, {
@@ -792,27 +871,28 @@ useEffect(() => {
   const openFileViewer = (file) => {
     setViewerFile(file);
     setShowFileViewer(true);
+    
+    // Log file open for recents tracking (fire and forget)
+    try {
+      fetch('/api/files/log-open', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${getAuthToken()}`
+        },
+        body: JSON.stringify({ fileId: file.id })
+      }).then(() => {
+        // Refresh recents after a short delay
+        setTimeout(() => loadRecentFiles(), 500);
+      }).catch(() => {});
+    } catch (e) {
+      // Don't block file viewer
+    }
   };
 
   const closeFileViewer = () => {
     setShowFileViewer(false);
     setViewerFile(null);
-  };
-
-  const handleFileHover = async (file) => {
-    if (!file || file.type === 'folder') return;
-
-    setHoveredFile(file);
-
-    // El preview se carga automáticamente en el componente FileItem
-    // No necesitamos hacer nada aquí
-  };
-
-  const handleFileLeave = () => {
-    // Añadir un pequeño delay para evitar bugs de hover
-    setTimeout(() => {
-      setHoveredFile(null);
-    }, 100);
   };
 
   const handleDragEnter = useCallback((e) => {
@@ -1448,16 +1528,16 @@ useEffect(() => {
                     onRename={openRenameModal}
                     onMove={openMoveModal}
                     onView={openFileViewer}
-                    onHover={handleFileHover}
-                    onLeave={handleFileLeave}
                     onOpenSidebar={openSidebarPanel}
                     onEdit={openEditorPanel}
                     onDuplicate={handleDuplicateItem}
                     onShare={openShareModal}
                     onDragStart={handleFileDragStart}
                     onDragEnd={handleFileDragEnd}
-                    isHovered={hoveredFile?.id === item.id}
                     viewMode={viewMode}
+                    isSharedView={currentView === 'shared' || item.pinnedFromShared}
+                    onSaveToMyFiles={currentView === 'shared' ? handleSaveToMyFiles : (item.pinnedFromShared ? handleUnpinFromPanel : undefined)}
+                    onRemoveShared={currentView === 'shared' ? handleRemoveShared : undefined}
                   />
                 ))}
 
@@ -1630,13 +1710,6 @@ useEffect(() => {
               setShowRDPViewer(false);
               setRdpConnectionId(null);
           }}
-        />
-      )}
-
-      {/* Hover Preview Tooltip */}
-      {hoveredFile && (
-        <HoverPreview
-          file={hoveredFile}
         />
       )}
 

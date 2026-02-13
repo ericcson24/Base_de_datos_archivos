@@ -127,11 +127,11 @@ const searchFiles = async (req, res) => {
     } else if (relevantFiles === null) {
       // Índice aún no está listo, intentamos búsqueda en BD
       console.log(`[AI SEARCH] Índice primario no listo, buscando en BD`);
-      // 1. Buscar por nombre
+      // 1. Buscar por nombre o ruta (incluye carpetas)
       const filesResult = await db.query(
         `SELECT id, name, physical_path, size, mime_type 
          FROM files 
-         WHERE owner_id = $1 AND name ILIKE $2
+         WHERE owner_id = $1 AND (name ILIKE $2 OR physical_path ILIKE $2)
          ORDER BY created_at DESC 
          LIMIT 20`,
         [userId, `%${query}%`]
@@ -188,6 +188,20 @@ const searchFiles = async (req, res) => {
       if (file.physical_path) {
         let containerPath = file.physical_path;
         
+        // Handle shared files: "shared:ownerUsername:fileName"
+        if (containerPath.startsWith('shared:')) {
+          const sharedParts = containerPath.split(':');
+          if (sharedParts.length >= 3) {
+            const ownerUsername = sharedParts[1];
+            const sharedFileName = sharedParts.slice(2).join(':'); // handle colons in filenames
+            containerPath = `/app/uploads/${ownerUsername}/${sharedFileName}`;
+            console.log(`[AI SEARCH] Shared file resolved: ${file.physical_path} -> ${containerPath}`);
+          } else {
+            console.warn(`[AI SEARCH] Skipping malformed shared path: ${containerPath}`);
+            continue;
+          }
+        }
+        
         containerPath = containerPath.replace(/\\/g, '/');
 
         if (containerPath.includes('/Datos/')) {
@@ -216,7 +230,10 @@ const searchFiles = async (req, res) => {
           exists = true;
 
           const fullText = await extractTextFromFile(containerPath, file.mime_type || '');
-          contentSnippet = fullText.substring(0, 1000).replace(/\s+/g, ' ');
+          // Give PDFs more context (they tend to have shorter meaningful text per page)
+          const isPdf = (file.mime_type || '').includes('pdf') || (file.name || '').toLowerCase().endsWith('.pdf');
+          const snippetLength = isPdf ? 3000 : 1000;
+          contentSnippet = fullText.substring(0, snippetLength).replace(/[ \t]+/g, ' ').replace(/\n{3,}/g, '\n\n').trim();
           
           // Add to valid list if it exists
           
@@ -224,6 +241,7 @@ const searchFiles = async (req, res) => {
           // file-service expects: Base64(relativePath) where relativePath starts from user folder
           // containerPath is likely /app/uploads/username/file.ext
           let downloadId = null;
+          let folderPath = file.folder_path || '';
           const uploadRoot = '/app/uploads';
           
           if (containerPath.startsWith(uploadRoot)) {
@@ -232,7 +250,16 @@ const searchFiles = async (req, res) => {
              const parts = rel.split(path.sep);
              if (parts.length > 1) {
                  // Discard username part -> "folder/file.ext"
-                 downloadId = Buffer.from(parts.slice(1).join('/')).toString('base64'); 
+                 const userRelative = parts.slice(1).join('/');
+                 downloadId = Buffer.from(userRelative).toString('base64'); 
+                 
+                 // Extract folder path if not already set
+                 if (!folderPath) {
+                   const lastSlash = userRelative.lastIndexOf('/');
+                   if (lastSlash > 0) {
+                     folderPath = userRelative.substring(0, lastSlash);
+                   }
+                 }
              } else {
                  downloadId = Buffer.from(rel).toString('base64');
              }
@@ -242,10 +269,13 @@ const searchFiles = async (req, res) => {
           }
 
           file.download_id = downloadId;
+          file.folder_path = folderPath;
           validFiles.push(file);
           
+          const locationStr = folderPath ? `📁 ${folderPath}/` : '📁 / (raíz)';
           contextParts.push(`ID: ${file.id}
 Nombre: "${file.name}"
+Ubicación: ${locationStr}
 Tipo: ${file.mime_type || 'desconocido'}
 Contenido (Extracto): "${contentSnippet || 'Contenido vacío o ilegible'}"
 ---`);
@@ -280,6 +310,7 @@ Contenido (Extracto): "${contentSnippet || 'Contenido vacío o ilegible'}"
 El usuario busca: "${query}"
 
 He encontrado estos archivos y he extraído parte de su contenido. 
+Cada archivo incluye su ubicación (carpeta) dentro del sistema de archivos del usuario.
 Analiza los extractos para responder.
 
 Documentos encontrados:
@@ -288,11 +319,13 @@ ${filesContext}
 Instrucciones:
 1. Responde a la pregunta basándote en el CONTENIDO de TODOS los documentos relevantes.
 2. Si la información aparece en múltiples archivos, CITA TODOS ellos.
-3. Si los documentos se contradicen, menciona ambas versiones.
-4. Genera una respuesta completa y sintetizada.
-5. POR FAVOR devuelve tu respuesta en formato JSON estrictamente:
+3. SIEMPRE menciona la ubicación/carpeta donde se encuentra cada archivo referenciado (ej: "en la carpeta Proyecto/docs").
+4. Si los documentos se contradicen, menciona ambas versiones.
+5. Si un archivo está dentro de una carpeta, menciónalo para que el usuario pueda encontrarlo fácilmente.
+6. Genera una respuesta completa y sintetizada.
+7. POR FAVOR devuelve tu respuesta en formato JSON estrictamente:
 {
-  "answer": "Tu respuesta completa aquí...",
+  "answer": "Tu respuesta completa aquí (incluyendo las rutas/carpetas de los archivos relevantes)...",
   "highlights": [
      { "fileId": 123, "text": "fragmento relevante del archivo 1" },
      { "fileId": 456, "text": "fragmento relevante del archivo 2" }

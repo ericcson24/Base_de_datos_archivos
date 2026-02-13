@@ -602,16 +602,65 @@ const SettingsModal = ({ onClose, user, onThemeToggle, isDarkMode, initialTab = 
                                 <span className={`px-2 py-1 rounded text-xs font-semibold ${
                                     aiStatus.progress && aiStatus.progress.state === 'indexing' 
                                     ? 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300' 
+                                    : aiStatus.progress && aiStatus.progress.state === 'error'
+                                    ? 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300'
                                     : 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300'
                                 }`}>
-                                    {aiStatus.progress && aiStatus.progress.state === 'indexing' ? 'CONSTRUYENDO' : 'ACTIVO'}
+                                    {aiStatus.progress && aiStatus.progress.state === 'indexing' ? 'CONSTRUYENDO' 
+                                     : aiStatus.progress && aiStatus.progress.state === 'error' ? 'ERROR'
+                                     : 'ACTIVO'}
                                 </span>
                             </div>
-                            <div className="text-sm text-gray-500 dark:text-gray-400 flex justify-between">
-                                <span>Archivos en nodo:</span>
-                                <span className="font-mono">{aiStatus.fileCount}</span>
+                            <div className="text-sm text-gray-500 dark:text-gray-400 space-y-1">
+                                <div className="flex justify-between">
+                                    <span>Archivos indexados:</span>
+                                    <span className="font-mono">{aiStatus.fileCount}</span>
+                                </div>
+                                {aiStatus.system && (
+                                    <>
+                                    <div className="flex justify-between">
+                                        <span>Entradas en índice:</span>
+                                        <span className="font-mono">{aiStatus.system.totalIndexedEntries}</span>
+                                    </div>
+                                    <div className="flex justify-between">
+                                        <span>Última sincronización:</span>
+                                        <span className="font-mono">
+                                            {aiStatus.system.lastUpdate 
+                                              ? new Date(aiStatus.system.lastUpdate).toLocaleTimeString()
+                                              : 'Nunca'}
+                                        </span>
+                                    </div>
+                                    <div className="flex justify-between">
+                                        <span>Servicio activo:</span>
+                                        <span className="font-mono">
+                                            {aiStatus.system.uptime 
+                                              ? `${Math.floor(aiStatus.system.uptime / 3600)}h ${Math.floor((aiStatus.system.uptime % 3600) / 60)}m`
+                                              : '-'}
+                                        </span>
+                                    </div>
+                                    </>
+                                )}
                             </div>
                         </div>
+
+                        {/* Cache de búsquedas */}
+                        {aiStatus.cache && (
+                            <div className="bg-white dark:bg-slate-700/50 p-4 rounded-lg border border-gray-200 dark:border-slate-600 shadow-sm">
+                                <div className="font-medium text-gray-700 dark:text-gray-200 mb-2">Caché de Búsquedas</div>
+                                <div className="text-sm text-gray-500 dark:text-gray-400 space-y-1">
+                                    <div className="flex justify-between">
+                                        <span>Consultas en caché:</span>
+                                        <span className="font-mono">{aiStatus.cache.keys}</span>
+                                    </div>
+                                    <div className="flex justify-between">
+                                        <span>Aciertos / Fallos:</span>
+                                        <span className="font-mono text-green-600 dark:text-green-400">{aiStatus.cache.hits}</span>
+                                        <span className="font-mono opacity-40">/</span>
+                                        <span className="font-mono text-orange-500 dark:text-orange-400">{aiStatus.cache.misses}</span>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
 
                         {/* Contenido en Progreso */}
                         {aiStatus.progress && aiStatus.progress.state === 'indexing' ? (
@@ -630,9 +679,9 @@ const SettingsModal = ({ onClose, user, onThemeToggle, isDarkMode, initialTab = 
                                     {aiStatus.progress.currentFile || 'Iniciando proceso...'}
                                 </div>
                                 
-                                {aiStatus.progress.timeRemaining && (
+                                {aiStatus.progress.processed > 0 && (
                                     <div className="mt-2 text-xs text-gray-400 text-right">
-                                        Tiempo estimado: ~{aiStatus.progress.timeRemaining}s
+                                        {aiStatus.progress.processed} / {aiStatus.progress.total} archivos
                                     </div>
                                 )}
                             </div>
@@ -640,7 +689,7 @@ const SettingsModal = ({ onClose, user, onThemeToggle, isDarkMode, initialTab = 
                              <div className="text-center py-6 text-gray-500 dark:text-gray-400 border-t border-gray-100 dark:border-slate-700 pt-6">
                                 <div className="text-4xl mb-3 opacity-80">🧠</div>
                                 <p className="text-sm">El nodo está sincronizado.</p>
-                                <p className="text-xs mt-1 opacity-70">Listo para detectar nuevos documentos.</p>
+                                <p className="text-xs mt-1 opacity-70">Se actualiza automáticamente cada 30 segundos.</p>
                              </div>
                         )}
                     </div>

@@ -49,7 +49,28 @@ async function extractTextFromFile(filePath, mimeType) {
       try {
           const dataBuffer = await fs.readFile(filePath);
           const data = await pdf(dataBuffer);
-          return data.text;
+          let text = data.text || '';
+          
+          // Clean up PDF text extraction issues:
+          // Some PDFs (especially scanned/OCR) return text with per-character newlines
+          // e.g. "H\ne\nl\nl\no" instead of "Hello"
+          // Detect this pattern: if avg word length < 2 chars, it's likely per-char split
+          const words = text.split(/\s+/).filter(w => w.length > 0);
+          if (words.length > 10) {
+            const avgWordLen = words.reduce((sum, w) => sum + w.length, 0) / words.length;
+            if (avgWordLen < 2.5) {
+              // Per-character newlines detected - rejoin characters
+              text = text.replace(/(\S)\n(\S)/g, '$1$2');
+              text = text.replace(/(\S)\r\n(\S)/g, '$1$2');
+            }
+          }
+          
+          // General cleanup: collapse excessive whitespace while preserving paragraph breaks
+          text = text.replace(/\n{3,}/g, '\n\n');  // Max 2 newlines (paragraph break)
+          text = text.replace(/[ \t]+/g, ' ');       // Collapse horizontal whitespace
+          text = text.replace(/\n /g, '\n');          // Remove leading spaces after newline
+          
+          return text;
       } catch (pdfError) {
           console.error(`[FILE PARSER] PDF Error en ${filePath}:`, pdfError.message);
           return ""; // PDF corrupto o encriptado

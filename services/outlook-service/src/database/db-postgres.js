@@ -89,6 +89,22 @@ const initDatabase = async () => {
     }
 
     try {
+        // Create event_attachments table outside transaction (may already exist from init schema)
+        try {
+            await client.query(`CREATE TABLE IF NOT EXISTS event_attachments (
+                id SERIAL PRIMARY KEY,
+                event_id TEXT NOT NULL,
+                file_name TEXT NOT NULL,
+                file_path TEXT NOT NULL,
+                file_owner TEXT,
+                attached_by TEXT,
+                file_size INTEGER DEFAULT 0,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )`);
+        } catch (eAtt) {
+            // Table already exists - ignore
+        }
+
         await client.query('BEGIN');
 
         // Users

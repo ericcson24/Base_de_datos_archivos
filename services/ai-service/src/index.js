@@ -72,7 +72,23 @@ app.post('/highlight-analysis', authenticateToken, documentController.highlightA
 // --- Indexing Status ---
 app.get('/indexing-status', authenticateToken, (req, res) => {
   const status = dualNodeIndexing.getUserStatus(req.user.id);
-  res.json(status);
+  const systemStats = dualNodeIndexing.getStats();
+  const cacheStats = getCacheStats();
+  
+  res.json({
+    ...status,
+    system: {
+      lastUpdate: systemStats.lastUpdate,
+      lastChangeDetection: systemStats.lastChangeDetection,
+      totalIndexedEntries: systemStats.primarySize,
+      uptime: Math.floor(process.uptime()),
+    },
+    cache: {
+      hits: cacheStats.hits || 0,
+      misses: cacheStats.misses || 0,
+      keys: cacheStats.keys || 0,
+    }
+  });
 });
 
 // --- System & Stats ---

@@ -218,7 +218,11 @@
     "show": "Mostrar",
     "noSearchResults": "No se encontraron archivos que coincidan con \"{{query}}\"",
     "emptyFolder": "No hay archivos en esta carpeta",
-    "dropToView": "Suelta para ver/editar"
+    "dropToView": "Suelta para ver/editar",
+    "removedFromShared": "Eliminado de archivos compartidos",
+    "savedToMyFiles": "\"{{name}}\" guardado en tus archivos",
+    "movedToPanel": "\"{{name}}\" movido a tu panel",
+    "unpinnedFromPanel": "Eliminado de tu panel"
   },
   "settings": {
     "title": "Ajustes",
@@ -274,7 +278,10 @@
     "placeholder": "Ej: usuario123",
     "sharing": "Compartiendo...",
     "share": "Compartir",
-    "error": "Error al compartir"
+    "error": "Error al compartir",
+    "unshare": "Dejar de compartir",
+    "unshareSuccess": "Se dejó de compartir correctamente",
+    "sharedWith": "Compartido con"
   },
   "move": {
     "title": "Mover \"{{name}}\"",
@@ -362,6 +369,7 @@
     "assignMe": "Mí mismo",
     "assignGroup": "Grupo",
     "assignUser": "Usuario",
+    "assignedBy": "Asignado por",
     "selectUserPlaceholder": "Seleccionar Usuario...",
     "userEventNote": "Se creará un evento en el calendario de este usuario y recibirá una notificación.",
     "userEventCreated": "Tarea asignada al usuario correctamente",
@@ -388,7 +396,16 @@
     "aiProcess": "Procesando con IA...",
     "myself": "Mí mismo",
     "specificUser": "Usuario específico",
-    "group": "Grupo"
+    "group": "Grupo",
+    "attachments": "Adjuntos",
+    "attachFile": "Adjuntar archivo",
+    "removeAttachment": "Quitar adjunto",
+    "noAttachments": "Sin adjuntos",
+    "selectFile": "Seleccionar archivo",
+    "searchFiles": "Buscar archivos...",
+    "noFilesFound": "No se encontraron archivos",
+    "fileAttached": "Archivo adjuntado correctamente",
+    "fileAttachError": "Error al adjuntar archivo"
   },
   "sidebar": {
     "errorLoadingFile": "Error al cargar el archivo",
@@ -754,7 +771,12 @@
     "delete": "Eliminar",
     "from": "de {{owner}}",
     "shared": "Compartido",
-    "by": "por {{owner}}"
+    "by": "por {{owner}}",
+    "saveToMyFiles": "Mover a mi panel",
+    "removeFromShared": "Quitar de compartidos",
+    "moveToPanel": "Mover a mi panel",
+    "removeFromPanel": "Quitar de mi panel",
+    "sharedWithUsers": "compartido con {{users}}"
   },
   "aiResults": {
     "title": "Resultados de Búsqueda IA",
@@ -778,5 +800,17 @@
     "title": "Crear Nuevo Archivo",
     "description": "Introduce un nombre para el nuevo archivo",
     "placeholder": "Nombre del archivo..."
+  },
+  "notifications": {
+    "title": "Notificaciones",
+    "markAllRead": "Marcar todas leídas",
+    "empty": "No tienes notificaciones",
+    "justNow": "Hace un momento",
+    "minutesAgo": "Hace {{count}} min",
+    "hoursAgo": "Hace {{count}} h",
+    "fileSharedTitle": "Archivo compartido",
+    "fileSharedMessage": "{{user}} ha compartido \"{{file}}\" contigo",
+    "eventAssignedTitle": "Evento asignado",
+    "eventAssignedMessage": "{{user}} te ha asignado \"{{event}}\" en tu calendario"
   }
 }

@@ -698,6 +698,8 @@ body {
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
   transition: box-shadow 0.25s ease, transform 0.25s ease;
+  position: relative;
+  z-index: 50;
 }
 
 [data-theme="dark"] .main-panel > .panel-header {
@@ -2668,6 +2670,16 @@ input[type="text"]:focus {
   font-weight: 400;
 }
 
+.recent-shared-badge {
+  display: block;
+  font-size: 10px;
+  color: var(--input-focus-border);
+  margin-bottom: 2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 /* Botón Ver todos - Rediseñado */
 .recent-view-all {
   min-width: 140px;
@@ -3251,8 +3263,23 @@ input[type="text"]:focus {
 }
 /* Shared Item Indicator */
 .shared-item {
-  border-bottom: 3px solid #4caf50 !important; /* Green border */
-  box-shadow: 0 4px 6px rgba(76, 175, 80, 0.1);
+  border-bottom: 3px solid #4caf50 !important;
+  box-shadow: 0 4px 6px rgba(76, 175, 80, 0.15);
+  position: relative;
+}
+
+.drive-file-row.shared-item {
+  border-bottom: 3px solid #4caf50 !important;
+  border-left: 3px solid #4caf50 !important;
+}
+
+.folder-chip.shared-item {
+  border-bottom: 3px solid #4caf50 !important;
+  border-left: 3px solid #4caf50 !important;
+}
+
+.shared-icon-svg {
+  flex-shrink: 0;
 }
 
 /* Avatar Selector in Settings */

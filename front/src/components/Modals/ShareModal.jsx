@@ -12,6 +12,7 @@ const ShareModal = ({ isOpen, onClose, onShare, item }) => {
   const [suggestions, setSuggestions] = useState([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const wrapperRef = useRef(null);
+  const justSelectedRef = useRef(false);
 
   useEffect(() => {
     const handleClickOutside = (event) => {
@@ -25,6 +26,12 @@ const ShareModal = ({ isOpen, onClose, onShare, item }) => {
 
   useEffect(() => {
     const fetchSuggestions = async () => {
+      // Skip search if user just selected a suggestion
+      if (justSelectedRef.current) {
+        justSelectedRef.current = false;
+        return;
+      }
+
       if (username.length < 2) {
         setSuggestions([]);
         setShowSuggestions(false);
@@ -41,27 +48,18 @@ const ShareModal = ({ isOpen, onClose, onShare, item }) => {
         
         if (response.ok) {
           const data = await response.json();
-          setSuggestions(data.users || []);
-          setShowSuggestions(true);
+          const results = data.users || [];
+          setSuggestions(results);
+          setShowSuggestions(results.length > 0);
         } else {
-           console.warn('API search failed, using mock data');
-           const mockSuggestions = [
-            { id: 1, username: 'usuario1', email: 'usuario1@example.com' },
-            { id: 2, username: 'admin', email: 'admin@example.com' },
-            { id: 3, username: 'test', email: 'test@example.com' }
-          ].filter(u => u.username.toLowerCase().includes(username.toLowerCase()));
-           setSuggestions(mockSuggestions);
-           setShowSuggestions(true);
+          console.warn('API search failed');
+          setSuggestions([]);
+          setShowSuggestions(false);
         }
       } catch (err) {
         console.error('Error fetching suggestions:', err);
-        const mockSuggestions = [
-          { id: 1, username: 'usuario1', email: 'usuario1@example.com' },
-          { id: 2, username: 'admin', email: 'admin@example.com' },
-          { id: 3, username: 'test', email: 'test@example.com' }
-        ].filter(u => u.username.toLowerCase().includes(username.toLowerCase()));
-        setSuggestions(mockSuggestions);
-        setShowSuggestions(true);
+        setSuggestions([]);
+        setShowSuggestions(false);
       } finally {
         setSearching(false);
       }
@@ -92,7 +90,9 @@ const ShareModal = ({ isOpen, onClose, onShare, item }) => {
   };
 
   const handleSelectSuggestion = (user) => {
+    justSelectedRef.current = true;
     setUsername(user.username);
+    setSuggestions([]);
     setShowSuggestions(false);
   };
 

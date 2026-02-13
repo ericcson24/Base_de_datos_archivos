@@ -122,6 +122,33 @@ subscriber.connect().then(() => {
 
 // REST API Routes
 
+// POST /create - Create a notification (internal service-to-service)
+app.post('/create', async (req, res) => {
+    try {
+        const { userId, title, message, type, link, metadata } = req.body;
+        if (!userId || !title) {
+            return res.status(400).json({ success: false, message: 'userId and title are required' });
+        }
+
+        const result = await db.query(
+            `INSERT INTO notifications (user_id, title, message, type, link, metadata)
+             VALUES ($1, $2, $3, $4, $5, $6)
+             RETURNING *`,
+            [userId, title, message || '', type || 'info', link || null, JSON.stringify(metadata || {})]
+        );
+
+        const savedNotification = result.rows[0];
+
+        // Emit via socket to the specific user room and broadcast
+        io.to(`user:${userId}`).emit('notification', savedNotification);
+
+        res.json({ success: true, notification: savedNotification });
+    } catch (err) {
+        console.error('Error creating notification:', err);
+        res.status(500).json({ success: false, error: 'Database error' });
+    }
+});
+
 // GET / - Get notifications for current user
 app.get('/', authenticate, async (req, res) => {
     try {

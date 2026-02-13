@@ -114,16 +114,29 @@ class DualNodeIndexing {
 
         const files = filesResult.rows;
         
+        // Extract folder path from physical_path for each file
+        files.forEach(file => {
+          file.folder_path = this.extractFolderPath(file.physical_path, file.name);
+        });
+        
         // Update user file list
         this.cache.set(`user_${userId}_files`, files);
 
         // Index each file for search
         files.forEach((file, index) => {
             const searchKey = `user_${userId}_search_${file.id}`;
+            
+            // Include folder path words in search index for folder-aware search
+            const folderWords = file.folder_path 
+              ? file.folder_path.toLowerCase().split(/[\s\-_./\\]+/).filter(w => w.length > 1)
+              : [];
+            
             this.cache.set(searchKey, {
               id: file.id,
               name: file.name,
               nameWords: file.name.toLowerCase().split(/[\s\-_.]+/),
+              folderWords: folderWords,
+              folder_path: file.folder_path || '',
               size: file.size,
               mime_type: file.mime_type,
               created_at: file.created_at
@@ -153,6 +166,45 @@ class DualNodeIndexing {
   }
 
   /**
+   * Extracts the user-relative folder path from a physical_path
+   * e.g. "/app/uploads/eric/Proyecto/docs/file.pdf" -> "Proyecto/docs"
+   * e.g. "/app/uploads/eric/file.pdf" -> "" (root)
+   */
+  extractFolderPath(physicalPath, fileName) {
+    if (!physicalPath) return '';
+    
+    let normalized = physicalPath.replace(/\\/g, '/');
+    
+    // Handle shared: prefix
+    if (normalized.startsWith('shared:')) return '';
+    
+    // Try to extract path after /uploads/username/
+    const uploadsMatch = normalized.match(/\/uploads\/[^/]+\/(.+)/);
+    if (uploadsMatch) {
+      const relativePath = uploadsMatch[1];
+      // Remove the filename from the end to get just the folder path
+      const lastSlash = relativePath.lastIndexOf('/');
+      if (lastSlash > 0) {
+        return relativePath.substring(0, lastSlash);
+      }
+      return ''; // File is at root level
+    }
+    
+    // Try Datos path pattern
+    const datosMatch = normalized.match(/\/Datos\/[^/]+\/(.+)/);
+    if (datosMatch) {
+      const relativePath = datosMatch[1];
+      const lastSlash = relativePath.lastIndexOf('/');
+      if (lastSlash > 0) {
+        return relativePath.substring(0, lastSlash);
+      }
+      return '';
+    }
+    
+    return '';
+  }
+
+  /**
    * API COMPATIBILITY METHODS
    */
 
@@ -176,15 +228,24 @@ class DualNodeIndexing {
 
       let totalScore = 0;
       for (const queryWord of queryWords) {
+        // Score by filename match
         for (const fileWord of indexedFile.nameWords) {
           if (fileWord === queryWord) totalScore += 100;
           else if (fileWord.includes(queryWord) || queryWord.includes(fileWord)) totalScore += 50;
           else if (fileWord.substring(0, 3) === queryWord.substring(0, 3)) totalScore += 25;
         }
+        // Score by folder path match (slightly lower weight than filename)
+        if (indexedFile.folderWords) {
+          for (const folderWord of indexedFile.folderWords) {
+            if (folderWord === queryWord) totalScore += 80;
+            else if (folderWord.includes(queryWord) || queryWord.includes(folderWord)) totalScore += 40;
+            else if (folderWord.substring(0, 3) === queryWord.substring(0, 3)) totalScore += 15;
+          }
+        }
       }
 
       if (totalScore > 0) {
-        results.push({ ...file, relevance: totalScore });
+        results.push({ ...file, folder_path: indexedFile.folder_path || file.folder_path || '', relevance: totalScore });
       }
     }
 

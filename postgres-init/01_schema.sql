@@ -108,6 +108,7 @@ CREATE TABLE IF NOT EXISTS calendar_events (
     location TEXT,
     web_link TEXT,
     categories TEXT,
+    assigned_by TEXT,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     last_synced TIMESTAMP,
     FOREIGN KEY(user_id) REFERENCES users(id)
@@ -160,3 +161,15 @@ CREATE TABLE IF NOT EXISTS rdp_settings (
 INSERT INTO rdp_settings (setting_key, setting_value)
 VALUES ('lan_only', 'false'), ('server_id', ''), ('maintenance_mode', 'false')
 ON CONFLICT (setting_key) DO NOTHING;
+
+-- Event Attachments (links files to calendar events)
+CREATE TABLE IF NOT EXISTS event_attachments (
+    id SERIAL PRIMARY KEY,
+    event_id VARCHAR(255) NOT NULL,
+    file_name VARCHAR(255) NOT NULL,
+    file_path TEXT NOT NULL,
+    file_owner VARCHAR(255) NOT NULL,
+    attached_by VARCHAR(255) NOT NULL,
+    file_size INTEGER DEFAULT 0,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);

@@ -1,12 +1,10 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState } from 'react';
 import ContextMenu from './ContextMenu';
-import { getFileType, getFileIcon, canPreview, canEdit, getAuthenticatedPreviewUrl, formatFileSize, downloadFile } from '../../utils/fileUtils';
+import { getFileIcon, canPreview, canEdit, formatFileSize, downloadFile } from '../../utils/fileUtils';
 import { useLanguage } from '../../context/LanguageContext';
 
-const FileItem = ({ item, onFolderClick, onDelete, onRename, onMove, onView, onHover, onLeave, isHovered, onOpenSidebar, onEdit, onDuplicate, onShare, onDragStart, onDragEnd, viewMode = 'list' }) => {
+const FileItem = ({ item, onFolderClick, onDelete, onRename, onMove, onView, onOpenSidebar, onEdit, onDuplicate, onShare, onDragStart, onDragEnd, viewMode = 'list', isSharedView = false, onSaveToMyFiles, onRemoveShared }) => {
   const [menuOpen, setMenuOpen] = useState(false);
-  const [previewUrl, setPreviewUrl] = useState(null);
-  const [previewLoading, setPreviewLoading] = useState(false);
   const [menuPosition, setMenuPosition] = useState({ top: 0, left: 0 });
   const { t } = useLanguage();
 
@@ -66,38 +64,83 @@ const FileItem = ({ item, onFolderClick, onDelete, onRename, onMove, onView, onH
     setMenuOpen(!menuOpen);
   };
 
-  const handleMouseEnter = () => {
-    onHover(item);
-    if (item.type === 'file' && canPreview(item.name) && !previewUrl && !previewLoading) {
-      loadPreview();
-    }
-  };
-
-  const handleMouseLeave = () => {
-    onLeave();
-  };
-
-  const loadPreview = useCallback(async () => {
-    setPreviewLoading(true);
-    try {
-      const url = await getAuthenticatedPreviewUrl(item.id, item.name);
-      console.log('🖼️ [FileItem] Preview URL:', url);
-      setPreviewUrl(url);
-    } catch (error) {
-      console.error('Error cargando preview:', error);
-    } finally {
-      setPreviewLoading(false);
-    }
-  }, [item.id, item.name]);
-
-  useEffect(() => {
-    if (item.type === 'file' && canPreview(item.name) && !previewUrl && !previewLoading) {
-      loadPreview();
-    }
-  }, [item.id, item.name, item.type, loadPreview, previewLoading, previewUrl]);
+  const handleMouseEnter = () => {};
+  const handleMouseLeave = () => {};
 
   const renderFileMenuItems = () => {
     const canShowPreview = canPreview(item.name);
+    const isShared = isSharedView || item.shared;
+    
+    // Shared files from another user: expanded context menu
+    if (isShared && item.owner && item.owner !== 'me') {
+      return (
+        <>
+          <button className="context-menu-item" onClick={(e) => { e.stopPropagation(); setMenuOpen(false); handleClick(); }}>
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+            </svg>
+            <span>{t('contextMenu.open')}</span>
+          </button>
+          {onEdit && (
+            <button className="context-menu-item" onClick={(e) => { e.stopPropagation(); setMenuOpen(false); onEdit(item); }}>
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+              </svg>
+              <span>{t('contextMenu.editInPanel')}</span>
+            </button>
+          )}
+          <button className="context-menu-item" onClick={(e) => { e.stopPropagation(); setMenuOpen(false); onOpenSidebar(item, 'info'); }}>
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            <span>{t('contextMenu.info')}</span>
+          </button>
+          {canShowPreview ? (
+            <button className="context-menu-item" onClick={(e) => { e.stopPropagation(); setMenuOpen(false); onView(item); }}>
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+              </svg>
+              <span>{t('contextMenu.preview')}</span>
+            </button>
+          ) : null}
+          <button className="context-menu-item" onClick={(e) => { e.stopPropagation(); setMenuOpen(false); downloadFile(item.id, item.name, t); }}>
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+            </svg>
+            <span>{t('contextMenu.download')}</span>
+          </button>
+          <button className="context-menu-item" onClick={(e) => { e.stopPropagation(); setMenuOpen(false); onDuplicate(item); }}>
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+            </svg>
+            <span>{t('contextMenu.duplicate')}</span>
+          </button>
+          <div className="border-t border-gray-200 dark:border-slate-600 my-1"></div>
+          {onSaveToMyFiles && (
+            <button className="context-menu-item" onClick={(e) => { e.stopPropagation(); setMenuOpen(false); onSaveToMyFiles(item); }}>
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                {item.pinnedFromShared ? (
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                ) : (
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" />
+                )}
+              </svg>
+              <span>{item.pinnedFromShared ? (t('contextMenu.removeFromPanel') || 'Remove from panel') : (t('contextMenu.moveToPanel') || t('contextMenu.saveToMyFiles'))}</span>
+            </button>
+          )}
+          {onRemoveShared && (
+            <button className="context-menu-danger" onClick={(e) => { e.stopPropagation(); setMenuOpen(false); onRemoveShared(item); }}>
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+              </svg>
+              <span>{t('contextMenu.removeFromShared')}</span>
+            </button>
+          )}
+        </>
+      );
+    }
+    
     return (
       <>
         <button className="context-menu-item" onClick={(e) => { e.stopPropagation(); setMenuOpen(false); handleClick(); }}>
@@ -218,13 +261,11 @@ const FileItem = ({ item, onFolderClick, onDelete, onRename, onMove, onView, onH
   );
 
   if (item.type === 'file') {
-    const fileType = getFileType(item.name);
-    const canShowPreview = canPreview(item.name);
 
     if (viewMode === 'grid') {
       return (
         <div
-          className={`group relative file-grid-item cursor-pointer overflow-hidden ${isHovered ? 'ring-2 ring-blue-500' : ''} ${item.shared ? 'shared-item' : ''}`}
+          className={`group relative file-grid-item cursor-pointer overflow-hidden ${item.shared ? 'shared-item' : ''}`}
           onClick={handleClick}
           onMouseEnter={handleMouseEnter}
           onMouseLeave={handleMouseLeave}
@@ -235,54 +276,7 @@ const FileItem = ({ item, onFolderClick, onDelete, onRename, onMove, onView, onH
             onDragStart={handleDragStart}
             onDragEnd={handleDragEnd}
           >
-            {canShowPreview && previewUrl ? (
-              <>
-                {fileType === 'image' && (
-                  <img
-                    src={previewUrl}
-                    alt={item.name}
-                    className="w-full h-full object-cover rounded-lg"
-                    onError={(e) => {
-                      console.error('❌ [FileItem] Image load error:', e);
-                      // e.target.style.display = 'none';
-                      // e.target.nextSibling.style.display = 'flex';
-                    }}
-                  />
-                )}
-                {fileType === 'video' && (
-                  <video
-                    muted
-                    className="w-full h-full object-cover rounded-lg"
-                    onMouseEnter={(e) => e.target.play()}
-                    onMouseLeave={(e) => e.target.pause()}
-                    onError={(e) => {
-                      e.target.style.display = 'none';
-                      e.target.nextSibling.style.display = 'flex';
-                    }}
-                  >
-                    <source src={previewUrl} />
-                  </video>
-                )}
-                {fileType === 'pdf' && (
-                  <iframe
-                    src={previewUrl}
-                    className="w-full h-full border-none rounded-lg"
-                    onError={(e) => {
-                      e.target.style.display = 'none';
-                      e.target.nextSibling.style.display = 'flex';
-                    }}
-                    title={item.name}
-                  />
-                )}
-                <div className="file-icon absolute inset-0 flex items-center justify-center bg-gray-100 rounded-lg fallback-icon-hidden">
-                  {getFileIcon(item.name)}
-                </div>
-              </>
-            ) : previewLoading ? (
-              <div className="file-icon animate-pulse">⟳</div>
-            ) : (
-              <div className="file-icon text-4xl">{getFileIcon(item.name)}</div>
-            )}
+            <div className="file-icon text-4xl">{getFileIcon(item.name)}</div>
           </div>
 
           <div className="p-2 grid-file-info">
@@ -291,8 +285,14 @@ const FileItem = ({ item, onFolderClick, onDelete, onRename, onMove, onView, onH
             </h3>
             {item.shared && (
               <div className="flex items-center text-xs text-gray-500 mt-1">
-                <span className="mr-1">🤝</span>
-                {item.owner && <span className="text-[10px] text-blue-500 truncate">{t('contextMenu.from', { owner: item.owner })}</span>}
+                <svg className="shared-icon-svg mr-1" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#4caf50" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>
+                {item.owner && item.owner !== 'me' && !item.sharedWith ? (
+                  <span className="text-[10px] text-blue-500 truncate">{t('contextMenu.from', { owner: item.owner })}</span>
+                ) : item.sharedWith && item.sharedWith.length > 0 ? (
+                  <span className="text-[10px] text-blue-500 truncate" title={item.sharedWith.join(', ')}>{t('contextMenu.sharedWithUsers', { users: item.sharedWith.join(', ') })}</span>
+                ) : (
+                  <span className="text-[10px] text-green-600">{t('contextMenu.shared')}</span>
+                )}
               </div>
             )}
             <p className="file-grid-size">
@@ -323,7 +323,7 @@ const FileItem = ({ item, onFolderClick, onDelete, onRename, onMove, onView, onH
     } else {
       return (
         <div
-          className={`drive-file-row ${isHovered ? 'hovered' : ''}`}
+          className={`drive-file-row ${item.shared ? 'shared-item' : ''}`}
           onClick={handleClick}
           onMouseEnter={handleMouseEnter}
           onMouseLeave={handleMouseLeave}
@@ -334,60 +334,22 @@ const FileItem = ({ item, onFolderClick, onDelete, onRename, onMove, onView, onH
             onDragStart={handleDragStart}
             onDragEnd={handleDragEnd}
           >
-            {canShowPreview && previewUrl ? (
-              <>
-                {fileType === 'image' && (
-                  <img
-                    src={previewUrl}
-                    alt={item.name}
-                    onError={(e) => {
-                      console.error('❌ [FileItem] Image load error (list):', e);
-                      // e.target.style.display = 'none';
-                      // e.target.nextSibling.style.display = 'flex';
-                    }}
-                  />
-                )}
-                {fileType === 'video' && (
-                  <video
-                    muted
-                    onMouseEnter={(e) => e.target.play()}
-                    onMouseLeave={(e) => e.target.pause()}
-                    onError={(e) => {
-                      e.target.style.display = 'none';
-                      e.target.nextSibling.style.display = 'flex';
-                    }}
-                  >
-                    <source src={previewUrl} />
-                  </video>
-                )}
-                {fileType === 'pdf' && (
-                  <iframe
-                    src={previewUrl}
-                    onError={(e) => {
-                      e.target.style.display = 'none';
-                      e.target.nextSibling.style.display = 'flex';
-                    }}
-                    title={item.name}
-                  />
-                )}
-                <div className="file-icon fallback-icon-hidden">
-                  {getFileIcon(item.name)}
-                </div>
-              </>
-            ) : previewLoading ? (
-              <div className="file-icon loading">⟳</div>
-            ) : (
-              <div className="file-icon">
-                {getFileIcon(item.name)}
-              </div>
-            )}
+            <div className="file-icon">
+              {getFileIcon(item.name)}
+            </div>
           </div>
           <div className="file-name" title={item.name}>
             {item.name}
             {item.shared && (
               <span className="shared-label ml-2 text-xs text-gray-500 flex items-center">
-                <span className="mr-1">🤝</span>
-                {item.owner && <span className="text-[10px] text-blue-500">{t('contextMenu.from', { owner: item.owner })}</span>}
+                <svg className="shared-icon-svg mr-1" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#4caf50" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>
+                {item.owner && item.owner !== 'me' && !item.sharedWith ? (
+                  <span className="text-[10px] text-blue-500">{t('contextMenu.from', { owner: item.owner })}</span>
+                ) : item.sharedWith && item.sharedWith.length > 0 ? (
+                  <span className="text-[10px] text-blue-500" title={item.sharedWith.join(', ')}>{t('contextMenu.sharedWithUsers', { users: item.sharedWith.join(', ') })}</span>
+                ) : (
+                  <span className="text-[10px] text-green-600">{t('contextMenu.shared')}</span>
+                )}
               </span>
             )}
           </div>
@@ -431,14 +393,18 @@ const FileItem = ({ item, onFolderClick, onDelete, onRename, onMove, onView, onH
           {item.shared && (
             <span className="folder-shared-badge flex flex-col items-start text-xs text-gray-500 mt-1">
               <span className="flex items-center">
-                <span className="mr-1">🤝</span>
+                <svg className="shared-icon-svg mr-1" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#4caf50" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>
                 {t('contextMenu.shared')}
               </span>
-              {item.owner && (
+              {item.owner && item.owner !== 'me' && !item.sharedWith ? (
                 <span className="text-[10px] text-blue-500">
                   {t('contextMenu.by', { owner: item.owner })}
                 </span>
-              )}
+              ) : item.sharedWith && item.sharedWith.length > 0 ? (
+                <span className="text-[10px] text-blue-500" title={item.sharedWith.join(', ')}>
+                  {t('contextMenu.sharedWithUsers', { users: item.sharedWith.join(', ') })}
+                </span>
+              ) : null}
             </span>
           )}
         </div>
@@ -464,7 +430,7 @@ const FileItem = ({ item, onFolderClick, onDelete, onRename, onMove, onView, onH
       </div>
     ) : (
       <div
-        className="folder-chip"
+        className={`folder-chip ${item.shared ? 'shared-item' : ''}`}
         onClick={handleClick}
         onMouseEnter={handleMouseEnter}
         onMouseLeave={handleMouseLeave}
@@ -474,7 +440,13 @@ const FileItem = ({ item, onFolderClick, onDelete, onRename, onMove, onView, onH
           {item.name}
           {item.shared && (
             <span className="shared-label ml-2 text-xs text-gray-500">
-              🤝 {item.owner ? t('contextMenu.from', { owner: item.owner }) : t('contextMenu.shared')}
+              <svg className="shared-icon-svg" style={{display:'inline',verticalAlign:'middle',marginRight:'4px'}} width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#4caf50" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>
+              {item.owner && item.owner !== 'me' && !item.sharedWith 
+                ? t('contextMenu.from', { owner: item.owner }) 
+                : item.sharedWith && item.sharedWith.length > 0
+                  ? t('contextMenu.sharedWithUsers', { users: item.sharedWith.join(', ') })
+                  : t('contextMenu.shared')
+              }
             </span>
           )}
         </span>

@@ -81,11 +81,29 @@ const AIResultsModal = ({ isOpen, onClose, results, onOpenFile, onDownloadFile }
 
     const ext = selectedFile.name.toLowerCase().split('.').pop();
     const isDocx = ext === 'docx' || ext === 'doc';
+    const isPdf = ext === 'pdf';
     
     // Build auth URL for WordEditor
     // AI adds download_id for compatibility with file-service
     const targetId = selectedFile.download_id || selectedFile.id;
     const fileUrl = `/api/files/preview/${targetId}?token=${encodeURIComponent(getAuthToken())}`;
+
+    if (isPdf) {
+      // Render PDF in an iframe
+      return (
+        <div className="viewer-wrapper h-full">
+          <div style={{ display: 'flex', alignItems: 'center', padding: '8px 12px', borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
+            <span style={{ fontSize: '1.2rem', marginRight: '8px' }}>📕</span>
+            <h3 style={{ margin: 0, fontSize: '0.95rem', opacity: 0.9 }}>{selectedFile.name}</h3>
+          </div>
+          <iframe 
+            src={fileUrl}
+            style={{ flex: 1, width: '100%', height: 'calc(100% - 42px)', border: 'none', borderRadius: '0 0 8px 8px', background: 'white' }}
+            title={selectedFile.name}
+          />
+        </div>
+      );
+    }
 
     if (isDocx || selectedFile.mime_type?.includes('word')) {
       return (
@@ -153,7 +171,12 @@ const AIResultsModal = ({ isOpen, onClose, results, onOpenFile, onDownloadFile }
                               <div className="file-details">
                                 <div className="file-name">{file.name}</div>
                                 <div className="file-meta">
-                                  {formatFileSize(file.size)} • {formatDate(file.upload_date)}
+                                  {file.folder_path && (
+                                    <span className="file-folder-path" title={file.folder_path}>
+                                      📁 {file.folder_path} •{' '}
+                                    </span>
+                                  )}
+                                  {formatFileSize(file.size)} • {formatDate(file.upload_date || file.created_at)}
                                 </div>
                               </div>
                             </div>

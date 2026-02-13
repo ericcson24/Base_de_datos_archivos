@@ -64,7 +64,13 @@ const dbAsync = {
       console.error('Postgres Query Error (RUN):', error.message, sql);
       throw error;
     }
-  }
+  },
+  // Expose raw pool.query for modules that need it (e.g. autoSync)
+  query: async (sql, params = []) => {
+    const res = await pool.query(sql, params);
+    return res;
+  },
+  isPostgres: true
 };
 
 // Init Database
@@ -89,6 +95,22 @@ const initDatabase = async () => {
     }
 
     try {
+        // Create event_attachments table outside transaction (may already exist from init schema)
+        try {
+            await client.query(`CREATE TABLE IF NOT EXISTS event_attachments (
+                id SERIAL PRIMARY KEY,
+                event_id TEXT NOT NULL,
+                file_name TEXT NOT NULL,
+                file_path TEXT NOT NULL,
+                file_owner TEXT,
+                attached_by TEXT,
+                file_size INTEGER DEFAULT 0,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )`);
+        } catch (eAtt) {
+            // Table already exists - ignore
+        }
+
         await client.query('BEGIN');
 
         // Users
@@ -221,9 +243,15 @@ const initDatabase = async () => {
             path TEXT NOT NULL,
             owner_username TEXT NOT NULL,
             shared_with_username TEXT NOT NULL,
+            pinned_to_panel BOOLEAN DEFAULT FALSE,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             UNIQUE(path, owner_username, shared_with_username)
         )`);
+        
+        // Migration: add pinned_to_panel column if it doesn't exist
+        await client.query(`DO $$ BEGIN
+          ALTER TABLE shared_files ADD COLUMN pinned_to_panel BOOLEAN DEFAULT FALSE;
+        EXCEPTION WHEN duplicate_column THEN END $$;`);
 
         // Default Admin
         const adminUser = 'administrador';

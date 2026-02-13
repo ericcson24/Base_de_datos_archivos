@@ -7,6 +7,7 @@ dotenv.config();
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || "dummy_key_for_startup");
 const OUTLOOK_SERVICE_URL = 'http://outlook-service:5003';
+const FILE_SERVICE_URL = 'http://file-service:5004';
 
 const GENERIC_TITLES = [
   'tarea', 'evento', 'reunion', 'reunión', 'cita', 'cosa', 'algo', 'recordatorio', 
@@ -70,6 +71,7 @@ Tu tarea:
    - "update": Modificar evento existente.
    - "delete": Eliminar evento.
    - "add_category": Crear/añadir una categoría nueva.
+   - "attach_file": Adjuntar un archivo a un evento existente.
 
 2. Extraer los detalles.
 
@@ -93,9 +95,9 @@ IMPORTANTE SOBRE UPDATES Y DELETES:
 
 Estructura JSON de Respuesta:
 {
-  "intent": "create", // "query", "update", "delete", "add_category"
+  "intent": "create", // "query", "update", "delete", "add_category", "attach_file"
   "title": "TÍTULO DEL EVENTO O NUEVO TÍTULO",
-  "searchTitle": "TÍTULO ACTUAL del evento (solo para update/delete)", 
+  "searchTitle": "TÍTULO ACTUAL del evento (solo para update/delete/attach_file)", 
   "startTimeUTC": "YYYY-MM-DDTHH:mm:ssZ", 
   "endTimeUTC": "YYYY-MM-DDTHH:mm:ssZ",
   "description": "Descripción opcional",
@@ -104,11 +106,13 @@ Estructura JSON de Respuesta:
   "categories": ["Categoría1"], // Array de nombres de categorías a asignar
   "categoryName": "Nombre de la categoría nueva (solo para add_category)",
   "categoryColor": "preset0-preset24 (solo para add_category)",
+  "fileName": "nombre del archivo a adjuntar (solo para attach_file, puede ser parcial)",
   "success": true
 }
 
 Si el usuario dice "elimina el evento de mañana", y no especifica título, asume que se refiere a cualquier evento en ese rango.
 Si hay ambigüedad extrema, devuelve success: false.
+Para "attach_file": el usuario quiere adjuntar un archivo a un evento. Extrae "fileName" (nombre parcial o completo del archivo) y "searchTitle" del evento. Ejemplo: "adjunta el informe al evento de mañana" -> fileName="informe", searchTitle="ANY", startTimeUTC=mañana.
 
 Query del usuario: "${query}"
 Responde SOLO el JSON.`;
@@ -189,81 +193,115 @@ Responde SOLO el JSON.`;
     if (eventData.intent === 'update' || eventData.intent === 'delete') {
         const searchTitle = eventData.searchTitle || eventData.title;
         const isGeneric = isGenericTitle(searchTitle);
-        let searchRes;
 
-        // Construcción de consulta dinámica y flexible
-        let queryStr = `SELECT * FROM calendar_events WHERE user_id = $1`;
-        let params = [userId];
-
-        // 1. Filtro por título (si no es genérico)
-        if (searchTitle && !isGeneric) {
-            queryStr += ` AND (subject ILIKE $${params.length + 1} OR body_preview ILIKE $${params.length + 1})`;
-            params.push(`%${searchTitle}%`);
+        // 1. Fetch ALL events from outlook-service (the source of truth for the frontend)
+        let allEvents = [];
+        try {
+            const now = new Date();
+            const start = new Date(now.getFullYear() - 1, 0, 1).toISOString();
+            const end = new Date(now.getFullYear() + 1, 11, 31).toISOString();
+            
+            const eventsRes = await fetch(`${OUTLOOK_SERVICE_URL}/?start=${encodeURIComponent(start)}&end=${encodeURIComponent(end)}`, {
+                headers: { 'Authorization': req.headers.authorization || '' }
+            });
+            
+            if (eventsRes.ok) {
+                allEvents = await eventsRes.json();
+                console.log(`[AI CALENDAR] Fetched ${allEvents.length} events from outlook-service for search`);
+            } else {
+                console.error(`[AI CALENDAR] Failed to fetch events from outlook-service: ${eventsRes.status}`);
+                return res.status(500).json({ error: 'No se pudieron obtener los eventos del calendario.' });
+            }
+        } catch (e) {
+            console.error('[AI CALENDAR] Error fetching events:', e.message);
+            return res.status(500).json({ error: 'Error conectando con el servicio de calendario.' });
         }
 
-        // 2. Filtro por fecha (si se proporciona)
-        if (eventData.startTimeUTC) {
-            // Buscamos en un rango generoso de 24h alrededor de la fecha indicada
-            // Si Gemini dice "mañana", suele poner las 00:00:00, cubriendo todo el día
-            queryStr += ` 
-                AND start_time >= $${params.length + 1}::timestamp 
-                AND start_time <= ($${params.length + 2}::timestamp + interval '24 hours')`;
-            params.push(eventData.startTimeUTC);
-            params.push(eventData.startTimeUTC);
+        if (allEvents.length === 0) {
+            return res.status(404).json({ error: 'No hay eventos en tu calendario.', success: false });
         }
 
-        // 3. Orden y Límite
-        // Priorizamos eventos más cercanos si hay una fecha, o el más reciente si no la hay
-        if (eventData.startTimeUTC) {
-            queryStr += ` ORDER BY ABS(EXTRACT(EPOCH FROM (start_time - $${params.length}::timestamp))) ASC LIMIT 1`;
-        } else {
-            queryStr += ` ORDER BY start_time DESC LIMIT 1`;
-        }
+        // 2. Smart search through events
+        let targetEvent = null;
+
+        // Parse AI date to compare
+        const aiDate = eventData.startTimeUTC ? new Date(eventData.startTimeUTC) : null;
+
+        // Score each event for relevance
+        const scored = allEvents.map(ev => {
+            let score = 0;
+            
+            // Title match (case-insensitive, partial)
+            if (searchTitle && !isGeneric) {
+                const t = (ev.title || '').toLowerCase();
+                const s = searchTitle.toLowerCase();
+                if (t === s) score += 100;        // Exact match
+                else if (t.includes(s)) score += 60;  // Partial match
+                else if (s.includes(t)) score += 40;  // Reverse partial
+                // Also search in preview/description
+                const p = (ev.preview || '').toLowerCase();
+                if (p.includes(s)) score += 20;
+            }
+
+            // Date match
+            if (aiDate) {
+                const evStart = new Date(ev.start);
+                const diffMs = Math.abs(evStart.getTime() - aiDate.getTime());
+                const diffHours = diffMs / (1000 * 60 * 60);
+                
+                if (diffHours < 1) score += 80;       // Within 1 hour
+                else if (diffHours < 6) score += 60;   // Within 6 hours
+                else if (diffHours < 24) score += 40;  // Same day
+                else if (diffHours < 48) score += 20;  // Next day
+                // Penalize very far events
+                else score -= Math.min(50, diffHours / 24);
+            }
+
+            return { event: ev, score };
+        });
+
+        // Sort by score descending, pick the best
+        scored.sort((a, b) => b.score - a.score);
         
-        // Si no hay ningún criterio, error
-        if (params.length === 1 && !eventData.startTimeUTC) {
-             return res.status(400).json({ error: "Necesito un título o fecha específica para encontrar el evento." });
+        if (scored.length > 0 && scored[0].score > 0) {
+            targetEvent = scored[0].event;
+            console.log(`[AI CALENDAR] Best match: "${targetEvent.title}" (score: ${scored[0].score}, id: ${targetEvent.id})`);
         }
 
-        searchRes = await db.query(queryStr, params);
-        
-        if (!searchRes || searchRes.rows.length === 0) {
-            // Segundo intento: Si falló con el título, intentamos solo con el tiempo si está disponible
-            if (!isGeneric && searchTitle && eventData.startTimeUTC) {
-                console.log(`[AI CALENDAR] No encontrado con título "${searchTitle}", reintentando solo con tiempo...`);
-                const retryRes = await db.query(
-                    `SELECT * FROM calendar_events 
-                     WHERE user_id = $1 
-                     AND start_time >= $2::timestamp 
-                     AND start_time <= ($3::timestamp + interval '36 hours')
-                     ORDER BY start_time ASC LIMIT 1`,
-                    [userId, eventData.startTimeUTC, eventData.startTimeUTC]
-                );
-                if (retryRes.rows.length > 0) {
-                    searchRes = retryRes;
-                }
+        // If no good match by title+date, try just by date proximity
+        if (!targetEvent && aiDate) {
+            const byDate = allEvents
+                .map(ev => ({ event: ev, diff: Math.abs(new Date(ev.start).getTime() - aiDate.getTime()) }))
+                .sort((a, b) => a.diff - b.diff);
+            
+            if (byDate.length > 0 && byDate[0].diff < 48 * 60 * 60 * 1000) { // Within 48h
+                targetEvent = byDate[0].event;
+                console.log(`[AI CALENDAR] Date fallback match: "${targetEvent.title}" (id: ${targetEvent.id})`);
             }
         }
-        
-        if (!searchRes || searchRes.rows.length === 0) {
+
+        if (!targetEvent) {
             return res.status(404).json({ 
                 error: `No encontré ningún evento para ${searchTitle && !isGeneric ? '"' + searchTitle + '"' : 'esa fecha'}.`, 
                 success: false 
             });
         }
         
-        const targetEvent = searchRes.rows[0];
-        
         if (eventData.intent === 'delete') {
              try {
-                 const delRes = await fetch(`${OUTLOOK_SERVICE_URL}/events/${targetEvent.id}`, {
+                 // Delete via outlook-service (handles both Outlook cloud + local SQLite)
+                 const delRes = await fetch(`${OUTLOOK_SERVICE_URL}/${targetEvent.id}`, {
                      method: 'DELETE',
                      headers: { 'Authorization': req.headers.authorization || '' }
                  });
+                 
                  if (delRes.ok) {
-                     return res.json({ success: true, message: `Evento "${targetEvent.subject}" eliminado.` });
+                     console.log(`[AI CALENDAR] Deleted event: "${targetEvent.title}" (id: ${targetEvent.id})`);
+                     return res.json({ success: true, message: `Evento "${targetEvent.title}" eliminado.` });
                  } else {
-                     throw new Error(await delRes.text());
+                     const errData = await delRes.json().catch(() => ({}));
+                     console.error(`[AI CALENDAR] Delete failed: ${delRes.status}`, errData);
+                     throw new Error(errData.error || 'Error eliminando');
                  }
              } catch (e) {
                  return res.status(500).json({ error: 'Error eliminando evento', details: e.message });
@@ -272,29 +310,41 @@ Responde SOLO el JSON.`;
         
         if (eventData.intent === 'update') {
              try {
-                 // Construct payload - only include fields that need changing
+                 // Build update payload for outlook-service PUT endpoint
+                 // The PUT /:id endpoint expects: title, start, end, allDay, location, description, categories
                  const updatePayload = {};
-                 // Only set new title if the AI explicitly provided one different from search
+                 
+                 // Title: only update if AI provides a new name different from current
+                 let newTitle = null;
                  if (eventData.title && eventData.title !== searchTitle) {
-                     updatePayload.subject = eventData.title;
+                     newTitle = eventData.title;
                  } else if (eventData.title && !eventData.searchTitle) {
-                     // Legacy: if no searchTitle, title might be the new title
-                     // but only if it differs from the found event
-                     if (eventData.title.toLowerCase() !== targetEvent.subject.toLowerCase()) {
-                         updatePayload.subject = eventData.title;
+                     if (eventData.title.toLowerCase() !== (targetEvent.title || '').toLowerCase()) {
+                         newTitle = eventData.title;
                      }
                  }
-                 if (eventData.startTimeUTC) updatePayload.startTime = eventData.startTimeUTC;
-                 if (eventData.endTimeUTC) updatePayload.endTime = eventData.endTimeUTC;
-                 if (eventData.location) updatePayload.location = eventData.location;
-                 if (eventData.description) updatePayload.body = eventData.description;
-                 if (eventData.isAllDay !== undefined) updatePayload.isAllDay = eventData.isAllDay;
+                 
+                 // Use existing event data as base, override with AI changes
+                 updatePayload.title = newTitle || targetEvent.title;
+                 updatePayload.start = eventData.startTimeUTC || targetEvent.start;
+                 updatePayload.end = eventData.endTimeUTC || targetEvent.end;
+                 updatePayload.allDay = eventData.isAllDay !== undefined ? eventData.isAllDay : (targetEvent.allDay || false);
+                 updatePayload.location = eventData.location || targetEvent.location || '';
+                 updatePayload.description = eventData.description || targetEvent.preview || '';
+                 
+                 // Categories - this is the key fix: always include categories in the update
                  if (eventData.categories && Array.isArray(eventData.categories) && eventData.categories.length > 0) {
                      updatePayload.categories = eventData.categories;
+                 } else {
+                     // Preserve existing categories
+                     updatePayload.categories = targetEvent.categories || [];
                  }
-                 
-                 const upRes = await fetch(`${OUTLOOK_SERVICE_URL}/events/${targetEvent.id}`, {
-                     method: 'PATCH',
+
+                 console.log(`[AI CALENDAR] Updating event "${targetEvent.title}" (id: ${targetEvent.id}), payload:`, JSON.stringify(updatePayload));
+
+                 // Use PUT endpoint which fully updates the event in outlook-service (cloud + local SQLite)
+                 const upRes = await fetch(`${OUTLOOK_SERVICE_URL}/${targetEvent.id}`, {
+                     method: 'PUT',
                      headers: { 
                          'Content-Type': 'application/json',
                          'Authorization': req.headers.authorization || '' 
@@ -303,14 +353,185 @@ Responde SOLO el JSON.`;
                  });
                  
                  if (upRes.ok) {
-                     const updatedTitle = updatePayload.subject || targetEvent.subject;
+                     const updatedTitle = newTitle || targetEvent.title;
+                     console.log(`[AI CALENDAR] Updated successfully: "${updatedTitle}"`);
                      return res.json({ success: true, message: `Evento "${updatedTitle}" actualizado.` });
                  } else {
-                     throw new Error(await upRes.text());
+                     const errData = await upRes.json().catch(() => ({}));
+                     console.error(`[AI CALENDAR] Update failed: ${upRes.status}`, errData);
+                     throw new Error(errData.error || 'Error actualizando');
                  }
              } catch (e) {
+                 console.error('[AI CALENDAR] Update error:', e);
                  return res.status(500).json({ error: 'Error actualizando evento', details: e.message });
              }
+        }
+    }
+
+    // --- ATTACH FILE ---
+    if (eventData.intent === 'attach_file') {
+        const searchTitle = eventData.searchTitle || eventData.title;
+        const fileName = eventData.fileName;
+        const isGeneric = isGenericTitle(searchTitle);
+        const attachUsername = req.user?.username || req.user?.name || 'unknown';
+
+        if (!fileName) {
+            return res.status(400).json({ error: 'No especificaste qué archivo adjuntar.', success: false });
+        }
+
+        // 1. Find the target event (same logic as update/delete)
+        let allEvents = [];
+        try {
+            const now = new Date();
+            const start = new Date(now.getFullYear() - 1, 0, 1).toISOString();
+            const end = new Date(now.getFullYear() + 1, 11, 31).toISOString();
+            
+            const eventsRes = await fetch(`${OUTLOOK_SERVICE_URL}/?start=${encodeURIComponent(start)}&end=${encodeURIComponent(end)}`, {
+                headers: { 'Authorization': req.headers.authorization || '' }
+            });
+            
+            if (eventsRes.ok) {
+                allEvents = await eventsRes.json();
+                console.log(`[AI CALENDAR] Attach: Fetched ${allEvents.length} events`);
+            } else {
+                return res.status(500).json({ error: 'No se pudieron obtener los eventos del calendario.' });
+            }
+        } catch (e) {
+            console.error('[AI CALENDAR] Attach - Error fetching events:', e.message);
+            return res.status(500).json({ error: 'Error conectando con el servicio de calendario.' });
+        }
+
+        if (allEvents.length === 0) {
+            return res.status(404).json({ error: 'No hay eventos en tu calendario.', success: false });
+        }
+
+        let targetEvent = null;
+        const aiDate = eventData.startTimeUTC ? new Date(eventData.startTimeUTC) : null;
+
+        const scored = allEvents.map(ev => {
+            let score = 0;
+            if (searchTitle && !isGeneric) {
+                const t = (ev.title || '').toLowerCase();
+                const s = searchTitle.toLowerCase();
+                if (t === s) score += 100;
+                else if (t.includes(s)) score += 60;
+                else if (s.includes(t)) score += 40;
+                const p = (ev.preview || '').toLowerCase();
+                if (p.includes(s)) score += 20;
+            }
+            if (aiDate) {
+                const evStart = new Date(ev.start);
+                const diffMs = Math.abs(evStart.getTime() - aiDate.getTime());
+                const diffHours = diffMs / (1000 * 60 * 60);
+                if (diffHours < 1) score += 80;
+                else if (diffHours < 6) score += 60;
+                else if (diffHours < 24) score += 40;
+                else if (diffHours < 48) score += 20;
+                else score -= Math.min(50, diffHours / 24);
+            }
+            return { event: ev, score };
+        });
+
+        scored.sort((a, b) => b.score - a.score);
+        if (scored.length > 0 && scored[0].score > 0) {
+            targetEvent = scored[0].event;
+            console.log(`[AI CALENDAR] Attach: Best event match: "${targetEvent.title}" (score: ${scored[0].score})`);
+        }
+
+        if (!targetEvent && aiDate) {
+            const byDate = allEvents
+                .map(ev => ({ event: ev, diff: Math.abs(new Date(ev.start).getTime() - aiDate.getTime()) }))
+                .sort((a, b) => a.diff - b.diff);
+            if (byDate.length > 0 && byDate[0].diff < 48 * 60 * 60 * 1000) {
+                targetEvent = byDate[0].event;
+                console.log(`[AI CALENDAR] Attach: Date fallback: "${targetEvent.title}"`);
+            }
+        }
+
+        if (!targetEvent) {
+            return res.status(404).json({ 
+                error: `No encontré ningún evento para ${searchTitle && !isGeneric ? '"' + searchTitle + '"' : 'esa fecha'}.`, 
+                success: false 
+            });
+        }
+
+        // 2. Search user's files via file-service
+        let matchedFile = null;
+        try {
+            const filesRes = await fetch(`${FILE_SERVICE_URL}/user-files?search=${encodeURIComponent(fileName)}`, {
+                headers: { 'Authorization': req.headers.authorization || '' }
+            });
+
+            if (filesRes.ok) {
+                const filesData = await filesRes.json();
+                const files = filesData.files || [];
+                console.log(`[AI CALENDAR] Attach: Found ${files.length} files matching "${fileName}"`);
+
+                if (files.length > 0) {
+                    // Score files by name similarity
+                    const searchLower = fileName.toLowerCase();
+                    const scoredFiles = files.map(f => {
+                        const fName = (f.name || '').toLowerCase();
+                        let fScore = 0;
+                        if (fName === searchLower) fScore = 100;
+                        else if (fName.startsWith(searchLower)) fScore = 80;
+                        else if (fName.includes(searchLower)) fScore = 60;
+                        else if (searchLower.includes(fName.replace(/\.[^.]+$/, ''))) fScore = 40;
+                        return { file: f, score: fScore };
+                    });
+                    scoredFiles.sort((a, b) => b.score - a.score);
+                    if (scoredFiles[0].score > 0) {
+                        matchedFile = scoredFiles[0].file;
+                    } else {
+                        matchedFile = files[0]; // Fallback to first result
+                    }
+                    console.log(`[AI CALENDAR] Attach: Best file match: "${matchedFile.name}"`);
+                }
+            } else {
+                console.error(`[AI CALENDAR] Attach: file-service returned ${filesRes.status}`);
+            }
+        } catch (e) {
+            console.error('[AI CALENDAR] Attach - Error searching files:', e.message);
+        }
+
+        if (!matchedFile) {
+            return res.status(404).json({ 
+                error: `No encontré ningún archivo que coincida con "${fileName}".`, 
+                success: false 
+            });
+        }
+
+        // 3. Create the attachment link via outlook-service
+        try {
+            const attachRes = await fetch(`${OUTLOOK_SERVICE_URL}/attachments`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': req.headers.authorization || ''
+                },
+                body: JSON.stringify({
+                    eventId: targetEvent.id,
+                    fileName: matchedFile.name,
+                    filePath: matchedFile.path || matchedFile.id || '',
+                    fileOwner: attachUsername,
+                    fileSize: matchedFile.size || 0
+                })
+            });
+
+            if (attachRes.ok) {
+                console.log(`[AI CALENDAR] Attached "${matchedFile.name}" to event "${targetEvent.title}"`);
+                return res.json({ 
+                    success: true, 
+                    message: `Archivo "${matchedFile.name}" adjuntado al evento "${targetEvent.title}".` 
+                });
+            } else {
+                const errData = await attachRes.json().catch(() => ({}));
+                console.error(`[AI CALENDAR] Attach failed: ${attachRes.status}`, errData);
+                throw new Error(errData.error || 'Error adjuntando archivo');
+            }
+        } catch (e) {
+            console.error('[AI CALENDAR] Attach error:', e);
+            return res.status(500).json({ error: 'Error adjuntando archivo al evento', details: e.message });
         }
     }
 

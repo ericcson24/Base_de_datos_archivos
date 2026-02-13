@@ -189,6 +189,18 @@ function initDatabase() {
       UNIQUE(path, owner_username, shared_with_username)
     )`);
 
+    // Tabla de Adjuntos de Eventos (Event Attachments)
+    db.run(`CREATE TABLE IF NOT EXISTS event_attachments (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      event_id TEXT NOT NULL,
+      file_name TEXT NOT NULL,
+      file_path TEXT NOT NULL,
+      file_owner TEXT NOT NULL,
+      attached_by TEXT NOT NULL,
+      file_size INTEGER DEFAULT 0,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    )`);
+
     // --- MIGRACIÓN DE CONTRASEÑAS ---
     // Si existen usuarios con contraseña en la tabla 'users' pero no en 'user_credentials', migrarlos.
     db.all("SELECT id, password FROM users", (err, rows) => {

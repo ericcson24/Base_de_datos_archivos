@@ -59,6 +59,16 @@
   padding: 0 10px;
 }
 
+.admin-nav-item svg {
+  flex-shrink: 0;
+  width: 18px;
+  height: 18px;
+}
+
+.admin-logo svg {
+  flex-shrink: 0;
+}
+
 .admin-nav {
   display: flex;
   flex-direction: column;
@@ -129,6 +139,8 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
+  position: relative;
+  z-index: 50;
 }
 
 .admin-title {
@@ -463,6 +475,28 @@ select.admin-input {
 
 .admin-log-message {
   word-break: break-word;
+  flex: 1;
+}
+
+.admin-log-user {
+  color: #007aff;
+  font-weight: 600;
+  white-space: nowrap;
+  font-size: 12px;
+}
+
+.admin-log-action {
+  background: rgba(0, 122, 255, 0.1);
+  color: #007aff;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 11px;
+  white-space: nowrap;
+  font-weight: 500;
+}
+
+[data-theme='dark'] .admin-log-action {
+  background: rgba(0, 122, 255, 0.2);
 }
 
 /* Alert */

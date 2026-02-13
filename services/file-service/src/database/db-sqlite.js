@@ -185,8 +185,28 @@ function initDatabase() {
       path TEXT NOT NULL,
       owner_username TEXT NOT NULL,
       shared_with_username TEXT NOT NULL,
+      pinned_to_panel INTEGER DEFAULT 0,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       UNIQUE(path, owner_username, shared_with_username)
+    )`);
+
+    // Migration: add pinned_to_panel column if it doesn't exist
+    db.run(`ALTER TABLE shared_files ADD COLUMN pinned_to_panel INTEGER DEFAULT 0`, (err) => {
+      if (err && !err.message.includes('duplicate column')) {
+        // Column already exists or other non-critical error
+      }
+    });
+
+    // Tabla de Adjuntos de Eventos (Event Attachments)
+    db.run(`CREATE TABLE IF NOT EXISTS event_attachments (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      event_id TEXT NOT NULL,
+      file_name TEXT NOT NULL,
+      file_path TEXT NOT NULL,
+      file_owner TEXT NOT NULL,
+      attached_by TEXT NOT NULL,
+      file_size INTEGER DEFAULT 0,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
     )`);
 
     // --- MIGRACIÓN DE CONTRASEÑAS ---

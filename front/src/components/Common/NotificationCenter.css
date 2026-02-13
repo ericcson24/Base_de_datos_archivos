@@ -1,6 +1,7 @@
 .notification-center {
   position: relative;
   display: inline-block;
+  z-index: 1100;
 }
 
 .notification-bell {

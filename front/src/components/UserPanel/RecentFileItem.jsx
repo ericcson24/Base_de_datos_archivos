@@ -26,6 +26,7 @@ const RecentFileItem = ({ file, isDarkMode, onFileClick }) => {
   }, [file.id, file.name, file.type]);
 
   const fileType = getFileType(file.name);
+  const displayDate = file.modifiedAt || file.modified;
   
   return (
     <div 
@@ -96,11 +97,16 @@ const RecentFileItem = ({ file, isDarkMode, onFileClick }) => {
           {file.name.length > 20 ? `${file.name.substring(0, 17)}...` : file.name}
         </p>
         <p className="recent-file-date">
-          {file.modifiedAt ? 
-            new Date(file.modifiedAt).toLocaleDateString(language === 'es' ? 'es-ES' : language === 'pl' ? 'pl-PL' : 'en-US', { 
+          {file.shared && file.owner && (
+            <span className="recent-shared-badge" title={`${t('contextMenu.from', { owner: file.owner })}`}>
+              👤 {file.owner}
+            </span>
+          )}
+          {displayDate ? 
+            new Date(displayDate).toLocaleDateString(language === 'es' ? 'es-ES' : language === 'pl' ? 'pl-PL' : 'en-US', { 
               month: 'short', 
               day: 'numeric',
-              year: new Date(file.modifiedAt).getFullYear() !== new Date().getFullYear() ? 'numeric' : undefined
+              year: new Date(displayDate).getFullYear() !== new Date().getFullYear() ? 'numeric' : undefined
             }) : 
             t('userPanel.recentLabel')
           }

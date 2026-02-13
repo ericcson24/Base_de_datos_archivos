@@ -163,7 +163,11 @@
     "show": "Show",
     "noSearchResults": "No files found matching \"{{query}}\"",
     "emptyFolder": "No files in this folder",
-    "dropToView": "Drop to view/edit"
+    "dropToView": "Drop to view/edit",
+    "removedFromShared": "Removed from shared files",
+    "savedToMyFiles": "\"{{name}}\" saved to your files",
+    "movedToPanel": "\"{{name}}\" moved to your panel",
+    "unpinnedFromPanel": "Removed from your panel"
   },
   "settings": {
     "title": "Settings",
@@ -219,7 +223,10 @@
     "placeholder": "Ex: user123",
     "sharing": "Sharing...",
     "share": "Share",
-    "error": "Error sharing"
+    "error": "Error sharing",
+    "unshare": "Unshare",
+    "unshareSuccess": "Unshared successfully",
+    "sharedWith": "Shared with"
   },
   "move": {
     "title": "Move \"{{name}}\"",
@@ -292,6 +299,7 @@
     "assignMe": "Myself",
     "assignGroup": "Group",
     "assignUser": "User",
+    "assignedBy": "Assigned by",
     "selectUserPlaceholder": "Select User...",
     "userEventNote": "An event will be created in this user's calendar and they will receive a notification.",
     "userEventCreated": "Task assigned to user successfully",
@@ -325,7 +333,16 @@
     "aiProcess": "Processing with AI...",
     "myself": "Myself",
     "specificUser": "Specific user",
-    "group": "Group"
+    "group": "Group",
+    "attachments": "Attachments",
+    "attachFile": "Attach file",
+    "removeAttachment": "Remove attachment",
+    "noAttachments": "No attachments",
+    "selectFile": "Select file",
+    "searchFiles": "Search files...",
+    "noFilesFound": "No files found",
+    "fileAttached": "File attached successfully",
+    "fileAttachError": "Error attaching file"
   },
   "sidebar": {
     "errorLoadingFile": "Error loading file",
@@ -680,7 +697,12 @@
     "delete": "Delete",
     "from": "from {{owner}}",
     "shared": "Shared",
-    "by": "by {{owner}}"
+    "by": "by {{owner}}",
+    "saveToMyFiles": "Move to my panel",
+    "removeFromShared": "Remove from shared",
+    "moveToPanel": "Move to my panel",
+    "removeFromPanel": "Remove from panel",
+    "sharedWithUsers": "shared with {{users}}"
   },
   "rdp": {
     "connectTitle": "Remote Desktop Connection",
@@ -759,5 +781,17 @@
     "title": "Create New File",
     "description": "Enter a name for the new file",
     "placeholder": "File name..."
+  },
+  "notifications": {
+    "title": "Notifications",
+    "markAllRead": "Mark all as read",
+    "empty": "No notifications",
+    "justNow": "Just now",
+    "minutesAgo": "{{count}} min ago",
+    "hoursAgo": "{{count}} h ago",
+    "fileSharedTitle": "File shared",
+    "fileSharedMessage": "{{user}} shared \"{{file}}\" with you",
+    "eventAssignedTitle": "Event assigned",
+    "eventAssignedMessage": "{{user}} assigned \"{{event}}\" to your calendar"
   }
 }
