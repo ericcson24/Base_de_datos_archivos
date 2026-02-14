@@ -89,19 +89,20 @@ const DailyTimeline = ({ events, headerActions }) => {
   const currentTimePos = getPosition(currentTime);
 
   return (
-    <div 
-      className="daily-timeline-container" 
-      ref={containerRef}
-      onMouseDown={handleMouseDown}
-      onMouseLeave={handleMouseLeave}
-      onMouseUp={handleMouseUp}
-      onMouseMove={handleMouseMove}
-    >
+    <div className="daily-timeline-wrapper">
       <div className="daily-timeline-header daily-timeline-header-sticky">
         <h3>{t('calendar.todayDate', { date: today.toLocaleDateString(language === 'es' ? 'es-ES' : language === 'pl' ? 'pl-PL' : 'en-US', { weekday: 'long', day: 'numeric', month: 'long' }) })}</h3>
         {headerActions && <div className="daily-timeline-actions">{headerActions}</div>}
       </div>
-      <div className="daily-timeline-track">
+      <div 
+        className="daily-timeline-container" 
+        ref={containerRef}
+        onMouseDown={handleMouseDown}
+        onMouseLeave={handleMouseLeave}
+        onMouseUp={handleMouseUp}
+        onMouseMove={handleMouseMove}
+      >
+        <div className="daily-timeline-track">
         {/* Overlay para el pasado */}
         <div className="timeline-past-overlay" style={{ width: `${currentTimePos}%` }}></div>
 
@@ -145,6 +146,7 @@ const DailyTimeline = ({ events, headerActions }) => {
         </div>
       </div>
     </div>
+  </div>
   );
 };
 

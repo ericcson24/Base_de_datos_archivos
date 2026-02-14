@@ -19,6 +19,13 @@
   --cal-primary-hover: #1976d2;
   --cal-radius: var(--border-radius, 12px);
   --cal-shadow: var(--shadow, 0 4px 20px rgba(0, 0, 0, 0.08));
+
+  /* Override FullCalendar default green bg-event color */
+  --fc-bg-event-color: rgba(66, 133, 244, 0.15);
+  --fc-bg-event-opacity: 0.3;
+  --fc-highlight-color: rgba(66, 133, 244, 0.1);
+  --fc-non-business-color: rgba(0, 0, 0, 0.03);
+  --fc-today-bg-color: rgba(66, 133, 244, 0.06);
 }
 
 [data-theme="dark"] {
@@ -27,6 +34,16 @@
   --cal-text: var(--text-color, #ffffff);
   --cal-text-secondary: var(--panel-secondary-text, #cccccc);
   --cal-border: var(--panel-border, rgba(255, 255, 255, 0.1));
+
+  /* Override FullCalendar defaults for dark theme */
+  --fc-bg-event-color: rgba(66, 133, 244, 0.2);
+  --fc-bg-event-opacity: 0.3;
+  --fc-highlight-color: rgba(66, 133, 244, 0.15);
+  --fc-non-business-color: rgba(255, 255, 255, 0.03);
+  --fc-today-bg-color: rgba(66, 133, 244, 0.08);
+  --fc-page-bg-color: #1e1e1e;
+  --fc-neutral-bg-color: rgba(255, 255, 255, 0.05);
+  --fc-border-color: rgba(255, 255, 255, 0.1);
 }
 
 /* Layout Principal */
@@ -333,6 +350,26 @@
   box-shadow: 0 4px 8px rgba(0,0,0,0.15);
 }
 
+/* Hide/fix FullCalendar background events (default green #8fdf82) */
+.fc .fc-bg-event {
+  background: var(--fc-bg-event-color) !important;
+  opacity: 0.15 !important;
+  border-radius: 4px;
+}
+
+.fc .fc-highlight {
+  background: var(--fc-highlight-color) !important;
+}
+
+.fc .fc-non-business {
+  background: var(--fc-non-business-color) !important;
+}
+
+/* Ensure timegrid bg harness doesn't show ugly tall bars */
+.fc .fc-timegrid-bg-harness {
+  opacity: 0.2;
+}
+
 /* Mobile Responsive */
 @media (max-width: 768px) {
   .calendar-sidebar {
@@ -357,12 +394,25 @@
 }
 
 /* Daily Timeline Styles */
-.daily-timeline-container {
+.daily-timeline-wrapper {
   padding: 1rem 2rem 0.5rem 2rem;
   border-bottom: 1px solid var(--cal-border);
   background: var(--cal-surface);
   position: relative;
   z-index: 50;
+  /* NO overflow here */
+}
+
+.daily-timeline-container {
+  /* Removed padding/border/bg from here because now wrapper has it */
+  position: relative;
+  overflow-x: auto;
+  padding-bottom: 10px; /* Espacio para scrollbar */
+  margin-bottom: 1rem;
+  scrollbar-width: thin;
+  scrollbar-color: var(--cal-border) transparent;
+  cursor: grab;
+  user-select: none;
 }
 
 .daily-timeline-header h3 {
