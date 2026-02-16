@@ -201,22 +201,36 @@ const FileItem = ({ item, onFolderClick, onDelete, onRename, onMove, onView, onO
     
     if (!menuOpen) {
       const rect = e.target.getBoundingClientRect();
-      const menuHeight = 300;
-      const menuWidth = 180;
+      // Usamos dimensiones estimadas un poco más generosas para los cálculos
+      const menuHeight = 350;
+      const menuWidth = 200;
       
       let top = rect.bottom + 8;
       let left = rect.right - menuWidth;
       
+      // Ajuste de altura - Si no cabe abajo, intentamos arriba
       if (top + menuHeight > window.innerHeight) {
-        top = rect.top - menuHeight - 8;
+        const spaceAbove = rect.top - 8;
+        const spaceBelow = window.innerHeight - rect.bottom - 8;
+        
+        if (spaceAbove > spaceBelow) {
+          // Si hay más espacio arriba, lo colocamos arriba
+          // Pero nos aseguramos de no salirnos por el borde superior
+          top = Math.max(8, rect.top - menuHeight - 8);
+        } else {
+          // Si hay más espacio abajo, lo dejamos abajo aunque sea apretado
+          // El CSS (max-height + overflow) se encargará del resto
+          top = rect.bottom + 8;
+        }
       }
       
+      // Ajuste horizontal
       if (left < 8) {
-        left = rect.left;
+        left = Math.max(8, rect.left);
       }
       
       if (left + menuWidth > window.innerWidth) {
-        left = window.innerWidth - menuWidth - 8;
+        left = Math.max(8, window.innerWidth - menuWidth - 8);
       }
       
       setMenuPosition({ top, left });

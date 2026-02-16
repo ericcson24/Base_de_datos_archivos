@@ -1,33 +1,627 @@
-.video-player {
+/* ============================================================
+   Modern Video Player — Netflix / YouTube style
+   ============================================================ */
+
+/* ── Container ──────────────────────────────────────── */
+.vp-container {
+  position: relative;
+  width: 100%;
+  height: 100%;
   background: #000;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  -webkit-user-select: none;
+  user-select: none;
+  border-radius: 8px;
 }
 
-.video-controls {
-  background: rgba(0, 0, 0, 0.8);
+.vp-fullscreen {
+  border-radius: 0;
 }
 
-.btn-speed {
-  padding: 4px 8px;
-  border: 1px solid rgba(59, 130, 246, 0.3);
-  border-radius: 6px;
-  background: rgba(255, 255, 255, 0.1);
-  color: #9ca3af;
+.vp-hide-cursor {
+  cursor: none;
+}
+
+.vp-video {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  display: block;
+}
+
+/* ── Loading spinner ────────────────────────────────── */
+.vp-loader {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  z-index: 5;
+}
+
+.vp-spinner {
+  width: 48px;
+  height: 48px;
+  border: 3px solid rgba(255, 255, 255, 0.2);
+  border-top-color: #fff;
+  border-radius: 50%;
+  animation: vpSpin 0.8s linear infinite;
+}
+
+@keyframes vpSpin {
+  to { transform: rotate(360deg); }
+}
+
+/* ── Big play button ────────────────────────────────── */
+.vp-big-play {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  z-index: 4;
+}
+
+.vp-big-play svg {
+  width: 72px;
+  height: 72px;
+  padding: 16px;
+  background: rgba(0, 0, 0, 0.45);
+  border-radius: 50%;
+  -webkit-backdrop-filter: blur(6px);
+  backdrop-filter: blur(6px);
+  transition: transform 0.2s, background 0.2s;
+  filter: drop-shadow(0 4px 12px rgba(0,0,0,0.4));
+}
+
+.vp-big-play:hover svg {
+  transform: scale(1.1);
+  background: rgba(0, 0, 0, 0.6);
+}
+
+/* ── Controls wrapper (bottom gradient) ─────────────── */
+.vp-controls-wrapper {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  padding: 60px 0 0 0;
+  background: linear-gradient(0deg, rgba(0,0,0,0.85) 0%, rgba(0,0,0,0.4) 50%, transparent 100%);
+  opacity: 0;
+  transform: translateY(4px);
+  transition: opacity 0.3s, transform 0.3s;
+  pointer-events: none;
+  z-index: 10;
+}
+
+.vp-controls-visible {
+  opacity: 1;
+  transform: translateY(0);
+  pointer-events: all;
+}
+
+/* ── Progress bar ───────────────────────────────────── */
+.vp-progress-container {
+  position: relative;
+  height: 20px;
+  padding: 7px 16px;
+  cursor: pointer;
+}
+
+.vp-progress-bar {
+  position: relative;
+  width: 100%;
+  height: 4px;
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 2px;
+  overflow: visible;
+  transition: height 0.15s;
+}
+
+.vp-progress-container:hover .vp-progress-bar {
+  height: 6px;
+}
+
+.vp-progress-buffered {
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 100%;
+  background: rgba(255, 255, 255, 0.3);
+  border-radius: 2px;
+  pointer-events: none;
+}
+
+.vp-progress-played {
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 100%;
+  background: #e53935;
+  border-radius: 2px;
+  pointer-events: none;
+  z-index: 1;
+}
+
+.vp-progress-thumb {
+  position: absolute;
+  right: -6px;
+  top: 50%;
+  transform: translateY(-50%) scale(0);
+  width: 14px;
+  height: 14px;
+  background: #e53935;
+  border-radius: 50%;
+  box-shadow: 0 0 4px rgba(0,0,0,0.4);
+  transition: transform 0.15s;
+}
+
+.vp-progress-container:hover .vp-progress-thumb {
+  transform: translateY(-50%) scale(1);
+}
+
+/* ── Progress tooltip ───────────────────────────────── */
+.vp-progress-tooltip {
+  position: absolute;
+  top: -28px;
+  transform: translateX(-50%);
+  background: rgba(0, 0, 0, 0.85);
+  color: #fff;
   font-size: 12px;
   font-weight: 500;
+  padding: 3px 8px;
+  border-radius: 4px;
+  pointer-events: none;
+  white-space: nowrap;
+  z-index: 20;
+}
+
+/* ── Control buttons row ────────────────────────────── */
+.vp-controls {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 4px 12px 10px;
+  gap: 4px;
+}
+
+.vp-controls-left,
+.vp-controls-right {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+/* ── Generic button ─────────────────────────────────── */
+.vp-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border: none;
+  background: transparent;
+  color: #fff;
   cursor: pointer;
-  transition: all 0.2s ease;
+  border-radius: 50%;
+  transition: background 0.15s, transform 0.1s;
+  position: relative;
+  flex-shrink: 0;
 }
 
-.btn-speed:hover {
-  background: rgba(255, 255, 255, 0.2);
+.vp-btn:hover {
+  background: rgba(255, 255, 255, 0.12);
 }
 
-.btn-speed.active {
-  background: rgba(59, 130, 246, 0.3);
-  color: #3b82f6;
-  border-color: #3b82f6;
+.vp-btn:active {
+  transform: scale(0.92);
 }
 
-[data-theme="dark"] .btn-speed.active {
-  color: #60a5fa;
+/* ── Skip buttons (10s) ─────────────────────────────── */
+.vp-btn-skip {
+  position: relative;
+}
+
+.vp-skip-label {
+  position: absolute;
+  font-size: 8px;
+  font-weight: 700;
+  color: #fff;
+  pointer-events: none;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  margin-top: 1px;
+}
+
+/* ── Volume group ───────────────────────────────────── */
+.vp-volume-group {
+  display: flex;
+  align-items: center;
+  gap: 0;
+}
+
+.vp-volume-slider-wrap {
+  width: 0;
+  overflow: hidden;
+  transition: width 0.2s ease;
+}
+
+.vp-volume-group:hover .vp-volume-slider-wrap {
+  width: 80px;
+}
+
+.vp-volume-slider {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 80px;
+  height: 4px;
+  background: rgba(255, 255, 255, 0.3);
+  border-radius: 2px;
+  outline: none;
+  cursor: pointer;
+}
+
+.vp-volume-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 12px;
+  height: 12px;
+  background: #fff;
+  border-radius: 50%;
+  cursor: pointer;
+  box-shadow: 0 0 3px rgba(0,0,0,0.3);
+}
+
+.vp-volume-slider::-moz-range-thumb {
+  width: 12px;
+  height: 12px;
+  background: #fff;
+  border: none;
+  border-radius: 50%;
+  cursor: pointer;
+}
+
+.vp-volume-slider::-webkit-slider-runnable-track {
+  height: 4px;
+  border-radius: 2px;
+}
+
+.vp-volume-slider::-moz-range-track {
+  height: 4px;
+  background: rgba(255, 255, 255, 0.3);
+  border-radius: 2px;
+  border: none;
+}
+
+/* ── Time display ───────────────────────────────────── */
+.vp-time {
+  color: rgba(255, 255, 255, 0.9);
+  font-size: 13px;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  margin-left: 8px;
+  letter-spacing: 0.3px;
+}
+
+/* ── Speed button & menu ────────────────────────────── */
+.vp-speed-group {
+  position: relative;
+}
+
+.vp-speed-btn {
+  font-size: 13px;
+  font-weight: 600;
+  width: auto;
+  min-width: 40px;
+  padding: 0 6px;
+}
+
+.vp-speed-menu {
+  position: absolute;
+  bottom: 48px;
+  right: 0;
+  background: rgba(20, 20, 20, 0.95);
+  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(12px);
+  border-radius: 10px;
+  padding: 6px 0;
+  min-width: 140px;
+  box-shadow: 0 8px 30px rgba(0,0,0,0.5);
+  z-index: 30;
+  animation: vpMenuIn 0.15s ease;
+}
+
+@keyframes vpMenuIn {
+  from { opacity: 0; transform: translateY(6px) scale(0.96); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.vp-speed-menu-title {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  color: rgba(255,255,255,0.4);
+  padding: 6px 14px 8px;
+}
+
+.vp-speed-option {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: 8px 14px;
+  border: none;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.8);
+  font-size: 13px;
+  cursor: pointer;
+  transition: background 0.12s;
+}
+
+.vp-speed-option:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.vp-speed-option.active {
+  color: #e53935;
+  font-weight: 600;
+}
+
+/* ── Responsive ─────────────────────────────────────── */
+@media (max-width: 600px) {
+  .vp-controls {
+    padding: 2px 6px 8px;
+  }
+
+  .vp-btn {
+    width: 34px;
+    height: 34px;
+  }
+
+  .vp-btn svg {
+    width: 18px;
+    height: 18px;
+  }
+
+  .vp-time {
+    font-size: 11px;
+    margin-left: 4px;
+  }
+
+  .vp-volume-group:hover .vp-volume-slider-wrap {
+    width: 50px;
+  }
+
+  .vp-volume-slider {
+    width: 50px;
+  }
+
+  .vp-progress-container {
+    padding: 7px 10px;
+  }
+
+  .vp-big-play svg {
+    width: 56px;
+    height: 56px;
+    padding: 12px;
+  }
+
+  .vp-skip-label {
+    font-size: 7px;
+  }
+}
+
+/* Edit Mode Styles */
+.vp-edit-overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+  z-index: 40;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  pointer-events: auto;
+}
+
+.vp-edit-panel {
+  background: rgba(20, 20, 20, 0.95);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  padding: 20px;
+  border-top: 1px solid #333;
+  animation: slideUp 0.2s ease-out;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.vp-edit-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.vp-edit-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: #fff;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.vp-edit-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.vp-trim-track {
+  position: relative;
+  height: 40px;
+  background: #333;
+  border-radius: 4px;
+  margin: 10px 0;
+  display: flex;
+  align-items: center;
+}
+
+.vp-trim-fill {
+  position: absolute;
+  height: 100%;
+  background: rgba(96, 165, 250, 0.2);
+  border-top: 2px solid #60a5fa;
+  border-bottom: 2px solid #60a5fa;
+  pointer-events: none;
+}
+
+.vp-trim-handle {
+  position: absolute;
+  top: 0;
+  height: 100%;
+  width: 12px;
+  background: #60a5fa;
+  cursor: ew-resize;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.vp-trim-handle::after {
+  content: '';
+  width: 2px;
+  height: 20px;
+  background: rgba(0,0,0,0.5);
+  border-radius: 1px;
+}
+
+.vp-trim-handle:hover {
+  filter: brightness(1.2);
+}
+
+.vp-trim-time {
+  position: absolute;
+  top: -24px;
+  font-size: 11px;
+  background: #000;
+  padding: 2px 4px;
+  border-radius: 3px;
+  transform: translateX(-50%);
+}
+
+.vp-filters-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 16px;
+}
+
+.vp-filter-item {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.vp-filter-label {
+  font-size: 12px;
+  color: #ccc;
+  display: flex;
+  justify-content: space-between;
+}
+
+.vp-filter-slider {
+  width: 100%;
+  height: 4px;
+  -webkit-appearance: none;
+  background: #444;
+  border-radius: 2px;
+}
+
+.vp-filter-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 12px;
+  height: 12px;
+  background: #60a5fa;
+  border-radius: 50%;
+  cursor: pointer;
+}
+
+.vp-save-modal {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background: #252525;
+  padding: 24px;
+  border-radius: 12px;
+  box-shadow: 0 10px 40px rgba(0,0,0,0.7);
+  z-index: 100;
+  text-align: center;
+  min-width: 300px;
+  border: 1px solid #444;
+}
+
+.vp-save-options {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 16px;
+}
+
+.vp-save-btn {
+  padding: 12px;
+  background: #333;
+  border: 1px solid #444;
+  color: #eee;
+  border-radius: 6px;
+  cursor: pointer;
+  text-align: left;
+}
+
+.vp-save-btn:hover {
+  background: #404040;
+}
+
+.vp-btn-primary { background: #2563eb; color: #fff; border: none; }
+.vp-btn-primary:hover { background: #1d4ed8; }
+.vp-btn-secondary { background: #4b5563; color: #fff; border: none; }
+.vp-btn-secondary:hover { background: #374151; }
+
+.vp-edit-toggle {
+    position: absolute;
+    top: 20px;
+    right: 60px; /* Left of close button if any, or general positioning */
+    z-index: 25;
+    background: rgba(0,0,0,0.6);
+    color: white;
+    border: none;
+    padding: 8px 12px;
+    border-radius: 4px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    transition: all 0.2s;
+}
+.vp-edit-toggle:hover { background: rgba(0,0,0,0.8); }
+
+.vp-spinner-overlay {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    background: rgba(0,0,0,0.8);
+    z-index: 50;
+    gap: 16px;
+    color: white;
 }

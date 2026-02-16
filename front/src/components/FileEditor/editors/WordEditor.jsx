@@ -1,12 +1,29 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import mammoth from 'mammoth';
-import ReactQuill from 'react-quill';
+import ReactQuill, { Quill } from 'react-quill';
 import 'react-quill/dist/quill.snow.css';
 import JSZip from 'jszip';
 import { getAuthToken } from '../../../utils/fileUtils';
 import { useLanguage } from '../../../context/LanguageContext';
 import { useToast } from '../../../context/ToastContext';
 import './WordEditor.css';
+
+// Register custom font sizes for Quill
+const Size = Quill.import('attributors/style/size');
+Size.whitelist = [
+  '8px', '9px', '10px', '11px', '12px', '14px', '16px', '18px',
+  '20px', '24px', '28px', '32px', '36px', '42px', '48px', '56px', '72px'
+];
+Quill.register(Size, true);
+
+// Register custom font families for Quill
+const Font = Quill.import('attributors/style/font');
+Font.whitelist = [
+  'arial', 'calibri', 'comic-sans', 'courier-new', 'georgia',
+  'helvetica', 'impact', 'lucida-console', 'tahoma', 'times-new-roman',
+  'trebuchet-ms', 'verdana'
+];
+Quill.register(Font, true);
 
 const WordEditor = ({ fileUrl, fileBlob, file, onClose, onFileSaved, highlightText }) => {
   const { t } = useLanguage();
@@ -212,6 +229,49 @@ const WordEditor = ({ fileUrl, fileBlob, file, onClose, onFileSaved, highlightTe
         return 'jpeg';
       };
 
+      // Helper: parse CSS color to hex (for OOXML)
+      const colorToHex = (color) => {
+        if (!color) return null;
+        // Already hex
+        if (/^#[0-9a-f]{6}$/i.test(color)) return color.slice(1).toUpperCase();
+        if (/^#[0-9a-f]{3}$/i.test(color)) {
+          const r = color[1], g = color[2], b = color[3];
+          return (r+r+g+g+b+b).toUpperCase();
+        }
+        // rgb(r,g,b)
+        const m = color.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/);
+        if (m) {
+          const hex = (n) => parseInt(n).toString(16).padStart(2, '0');
+          return (hex(m[1]) + hex(m[2]) + hex(m[3])).toUpperCase();
+        }
+        return null;
+      };
+
+      // Helper: parse font-size CSS value to OOXML half-point size
+      const cssSizeToHalfPt = (size) => {
+        if (!size) return null;
+        const px = parseFloat(size);
+        if (isNaN(px)) return null;
+        // 1px ≈ 0.75pt, OOXML uses half-points
+        return String(Math.round(px * 0.75 * 2));
+      };
+
+      // Helper: clean font family name from CSS value
+      const cleanFontFamily = (font) => {
+        if (!font) return null;
+        // take first family, strip quotes
+        const first = font.split(',')[0].trim().replace(/['"]/g, '');
+        if (!first) return null;
+        // Map CSS names back to proper names
+        const map = {
+          'arial': 'Arial', 'calibri': 'Calibri', 'comic-sans': 'Comic Sans MS',
+          'courier-new': 'Courier New', 'georgia': 'Georgia', 'helvetica': 'Helvetica',
+          'impact': 'Impact', 'lucida-console': 'Lucida Console', 'tahoma': 'Tahoma',
+          'times-new-roman': 'Times New Roman', 'trebuchet-ms': 'Trebuchet MS', 'verdana': 'Verdana'
+        };
+        return map[first.toLowerCase()] || first;
+      };
+
       // Build OOXML paragraph runs from inline nodes
       const runXml = (el) => {
         let xml = '';
@@ -223,11 +283,58 @@ const WordEditor = ({ fileUrl, fileBlob, file, onClose, onFileSaved, highlightTe
             const italic = el.closest('em, i') !== null || ['i','em'].includes(el.tagName?.toLowerCase());
             const underline = el.closest('u') !== null || el.tagName?.toLowerCase() === 'u';
             const strike = el.closest('s, strike, del') !== null;
-            let rPr = '<w:rPr><w:rFonts w:ascii="Calibri" w:hAnsi="Calibri"/><w:sz w:val="24"/>';
+
+            // Collect font/size/color from inline styles walking up the tree
+            let fontFamily = 'Calibri';
+            let fontSize = '24'; // half-points = 12pt
+            let fontColor = null;
+            let bgColor = null;
+            let ancestor = el;
+            while (ancestor && ancestor !== doc.body) {
+              const style = ancestor.getAttribute?.('style') || '';
+              if (style) {
+                const ffMatch = style.match(/font-family:\s*([^;]+)/i);
+                if (ffMatch && fontFamily === 'Calibri') {
+                  const cleaned = cleanFontFamily(ffMatch[1]);
+                  if (cleaned) fontFamily = cleaned;
+                }
+                const fsMatch = style.match(/font-size:\s*([^;]+)/i);
+                if (fsMatch && fontSize === '24') {
+                  const hp = cssSizeToHalfPt(fsMatch[1]);
+                  if (hp) fontSize = hp;
+                }
+                const fcMatch = style.match(/(?:^|[^-])color:\s*([^;]+)/i);
+                if (fcMatch && !fontColor) {
+                  fontColor = colorToHex(fcMatch[1].trim());
+                }
+                const bgMatch = style.match(/background-color:\s*([^;]+)/i);
+                if (bgMatch && !bgColor) {
+                  bgColor = colorToHex(bgMatch[1].trim());
+                }
+              }
+              // Check class-based Quill styles
+              if (ancestor.classList) {
+                ancestor.classList.forEach(cls => {
+                  if (cls.startsWith('ql-font-') && fontFamily === 'Calibri') {
+                    const cleaned = cleanFontFamily(cls.replace('ql-font-', ''));
+                    if (cleaned) fontFamily = cleaned;
+                  }
+                  if (cls.startsWith('ql-size-') && fontSize === '24') {
+                    const hp = cssSizeToHalfPt(cls.replace('ql-size-', ''));
+                    if (hp) fontSize = hp;
+                  }
+                });
+              }
+              ancestor = ancestor.parentElement;
+            }
+
+            let rPr = `<w:rPr><w:rFonts w:ascii="${esc(fontFamily)}" w:hAnsi="${esc(fontFamily)}"/><w:sz w:val="${fontSize}"/><w:szCs w:val="${fontSize}"/>`;
             if (bold) rPr += '<w:b/>';
             if (italic) rPr += '<w:i/>';
             if (underline) rPr += '<w:u w:val="single"/>';
             if (strike) rPr += '<w:strike/>';
+            if (fontColor) rPr += `<w:color w:val="${fontColor}"/>`;
+            if (bgColor) rPr += `<w:highlight w:val="yellow"/><w:shd w:val="clear" w:fill="${bgColor}"/>`;
             rPr += '</w:rPr>';
             xml += `<w:r>${rPr}<w:t xml:space="preserve">${esc(txt)}</w:t></w:r>`;
           } else if (node.nodeType === Node.ELEMENT_NODE) {
@@ -462,22 +569,33 @@ const WordEditor = ({ fileUrl, fileBlob, file, onClose, onFileSaved, highlightTe
 
   const modules = {
     toolbar: [
-      [{ 'header': [1, 2, 3, false] }],
+      [{ 'font': ['', 'arial', 'calibri', 'comic-sans', 'courier-new', 'georgia', 'helvetica', 'impact', 'lucida-console', 'tahoma', 'times-new-roman', 'trebuchet-ms', 'verdana'] }],
+      [{ 'size': ['8px', '9px', '10px', '11px', '12px', false, '16px', '18px', '20px', '24px', '28px', '32px', '36px', '42px', '48px', '56px', '72px'] }],
+      [{ 'header': [1, 2, 3, 4, 5, 6, false] }],
       ['bold', 'italic', 'underline', 'strike'],
-      [{ 'list': 'ordered'}, { 'list': 'bullet' }],
-      [{ 'align': [] }],
+      [{ 'script': 'sub' }, { 'script': 'super' }],
       [{ 'color': [] }, { 'background': [] }],
+      [{ 'list': 'ordered' }, { 'list': 'bullet' }],
+      [{ 'indent': '-1' }, { 'indent': '+1' }],
+      [{ 'align': [] }],
+      [{ 'direction': 'rtl' }],
+      ['blockquote', 'code-block'],
       ['link', 'image'],
       ['clean']
-    ]
+    ],
+    clipboard: {
+      matchVisual: false
+    }
   };
 
   const formats = [
-    'header',
+    'font', 'size', 'header',
     'bold', 'italic', 'underline', 'strike',
-    'list', 'bullet',
-    'align',
+    'script',
     'color', 'background',
+    'list', 'bullet', 'indent',
+    'align', 'direction',
+    'blockquote', 'code-block',
     'link', 'image'
   ];
 

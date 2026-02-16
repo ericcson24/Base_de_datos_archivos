@@ -1,6 +1,7 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import FileEditorPanel from '../FileEditor/FileEditorPanel';
 import RecentFileItem from './RecentFileItem';
+import UploadPopup from './UploadPopup';
 import FileViewerModal from '../Modals/FileViewerModal';
 import CreateFolderModal from '../Modals/CreateFolderModal';
 import FolderCustomizeModal from '../Modals/FolderCustomizeModal';
@@ -8,6 +9,7 @@ import RenameModal from '../Modals/RenameModal';
 import MoveModal from '../Modals/MoveModal';
 import ShareModal from '../Modals/ShareModal';
 import FileDeleteModal from '../Modals/FileDeleteModal';
+import DuplicateFilesModal from '../Modals/DuplicateFilesModal';
 import SettingsModal from '../Modals/SettingsModal';
 import RDPViewer from '../RDP/RDPViewer';
 import RDPConnectionModal from '../Modals/RDPConnectionModal';
@@ -109,8 +111,19 @@ const UserPanel = ({ user, onLogout, onBackToFolders, onThemeToggle, isDarkMode,
   // Estados para drag and drop
   const [isDragOver, setIsDragOver] = useState(false);
   
-  // Estado para progreso de subida
-  const [uploadProgress, setUploadProgress] = useState(null);
+  // Estado para progreso de subida (popup estilo Google Drive)
+  const [uploads, setUploads] = useState([]);
+  const uploadIdRef = useRef(0);
+  const xhrMapRef = useRef({});
+  const fileInputRef = useRef(null);
+  const folderInputRef = useRef(null);
+
+  // Estado para modal de archivos duplicados
+  const [duplicateModalData, setDuplicateModalData] = useState(null);
+
+  // Ref para acceder a la lista de archivos actual dentro de callbacks
+  const filesRef = useRef([]);
+  useEffect(() => { filesRef.current = files; }, [files]);
 
   // Estados para búsqueda y ordenamiento
   const [searchQuery, setSearchQuery] = useState('');
@@ -393,54 +406,148 @@ useEffect(() => {
       return;
     }
 
-    try {
-      setUploadProgress({ status: 'uploading', message: t('userPanel.uploadingFiles') });
-      
-      const formData = new FormData();
-      
-      // IMPORTANT: Append path BEFORE files so multer's destination callback can read it
-      formData.append('path', currentPath.map(p => p.name).join('/'));
-      
-      // Agregar todos los archivos al FormData
-      for (let file of files) {
-        formData.append('files', file);
-      }
+    let filesToUpload = Array.from(files);
 
-      const response = await fetch('/api/files/upload', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${getAuthToken()}`
-        },
-        body: formData
+    // ── Detección de archivos duplicados ──────────────────────
+    const existingNames = new Set(
+      (Array.isArray(filesRef.current) ? filesRef.current : [])
+        .filter(f => f.type !== 'folder')
+        .map(f => f.name.toLowerCase())
+    );
+    const dupNames = filesToUpload
+      .map(f => f.name)
+      .filter(n => existingNames.has(n.toLowerCase()));
+
+    let duplicateAction = null; // 'replace' | 'keepBoth' | 'skip' | null(cancel)
+    if (dupNames.length > 0) {
+      duplicateAction = await new Promise((resolve) => {
+        setDuplicateModalData({ names: dupNames, resolve });
       });
+      setDuplicateModalData(null);
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || t('userPanel.errorUploadingFiles'));
+      if (!duplicateAction) return; // user closed modal = cancel upload
+
+      if (duplicateAction === 'skip') {
+        const dupSet = new Set(dupNames.map(n => n.toLowerCase()));
+        filesToUpload = filesToUpload.filter(f => !dupSet.has(f.name.toLowerCase()));
+        if (filesToUpload.length === 0) return;
       }
-
-      const result = await response.json();
-      console.log('Upload result:', result);
-      
-      setUploadProgress({ status: 'success', message: t('userPanel.uploadSuccess', { count: files.length }) });
-      addToast(t('userPanel.uploadSuccess', { count: files.length }), 'success');
-      
-      // Recargar archivos y recientes después de subir
-      loadFiles();
-      loadRecentFiles();
-      
-      // Limpiar mensaje después de 3 segundos
-      setTimeout(() => setUploadProgress(null), 3000);
-      
-    } catch (error) {
-      console.error('Error uploading files:', error);
-      setUploadProgress({ status: 'error', message: t('userPanel.uploadError', { error: error.message }) });
-      addToast(t('userPanel.uploadError', { error: error.message }), 'error');
-      
-      // Limpiar mensaje de error después de 5 segundos
-      setTimeout(() => setUploadProgress(null), 5000);
+      // 'replace' → upload normally (multer overwrites)
+      // 'keepBoth' → we send duplicateAction header so backend renames
     }
-  }, [currentPath, loadFiles, loadRecentFiles]);
+
+    // Crear entradas de upload para cada archivo
+    const newUploads = filesToUpload.map((file) => {
+      uploadIdRef.current += 1;
+      return {
+        id: uploadIdRef.current,
+        name: file.name,
+        status: 'pending',
+        totalSize: file.size,
+        loadedSize: 0,
+        percent: 0,
+        speed: 0,
+        remainingTime: 0,
+        errorMessage: null,
+        _file: file,
+        _startTime: null,
+      };
+    });
+
+    setUploads(prev => [...prev, ...newUploads]);
+
+    const uploadPath = currentPath.map(p => p.name).join('/');
+
+    // Subir archivos uno a uno con XHR para tracking de progreso
+    let successCount = 0;
+    let failCount = 0;
+    for (const entry of newUploads) {
+      await new Promise((resolve) => {
+        const startTime = Date.now();
+        setUploads(prev => prev.map(u =>
+          u.id === entry.id ? { ...u, status: 'uploading', _startTime: startTime } : u
+        ));
+
+        const xhr = new XMLHttpRequest();
+        xhrMapRef.current[entry.id] = xhr;
+
+        xhr.upload.onprogress = (e) => {
+          if (e.lengthComputable) {
+            const now = Date.now();
+            const elapsed = (now - startTime) / 1000;
+            const speed = elapsed > 0 ? e.loaded / elapsed : 0;
+            const remaining = speed > 0 ? (e.total - e.loaded) / speed : 0;
+            setUploads(prev => prev.map(u =>
+              u.id === entry.id ? {
+                ...u,
+                loadedSize: e.loaded,
+                totalSize: e.total,
+                percent: Math.round((e.loaded / e.total) * 100),
+                speed,
+                remainingTime: remaining,
+              } : u
+            ));
+          }
+        };
+
+        xhr.onload = () => {
+          delete xhrMapRef.current[entry.id];
+          if (xhr.status >= 200 && xhr.status < 300) {
+            successCount++;
+            setUploads(prev => prev.map(u =>
+              u.id === entry.id ? { ...u, status: 'done', percent: 100, loadedSize: u.totalSize, speed: 0, remainingTime: 0 } : u
+            ));
+          } else {
+            failCount++;
+            let errMsg = t('userPanel.errorUploadingFiles');
+            try { errMsg = JSON.parse(xhr.responseText).message || errMsg; } catch (_) {}
+            setUploads(prev => prev.map(u =>
+              u.id === entry.id ? { ...u, status: 'error', errorMessage: errMsg } : u
+            ));
+          }
+          resolve();
+        };
+
+        xhr.onerror = () => {
+          delete xhrMapRef.current[entry.id];
+          failCount++;
+          setUploads(prev => prev.map(u =>
+            u.id === entry.id ? { ...u, status: 'error', errorMessage: t('userPanel.errorUploadingFiles') } : u
+          ));
+          resolve();
+        };
+
+        xhr.onabort = () => {
+          delete xhrMapRef.current[entry.id];
+          setUploads(prev => prev.filter(u => u.id !== entry.id));
+          resolve();
+        };
+
+        const formData = new FormData();
+        formData.append('path', uploadPath);
+        if (duplicateAction === 'keepBoth') {
+          formData.append('duplicateAction', 'rename');
+        }
+        formData.append('files', entry._file);
+
+        xhr.open('POST', '/api/files/upload');
+        xhr.setRequestHeader('Authorization', `Bearer ${getAuthToken()}`);
+        xhr.send(formData);
+      });
+    }
+
+    // Recargar archivos después de subir todo
+    loadFiles();
+    loadRecentFiles();
+
+    if (failCount === 0) {
+      addToast(t('userPanel.uploadSuccess', { count: successCount }), 'success');
+    } else if (successCount > 0) {
+      addToast(t('userPanel.uploadPartial', { count: successCount, errors: failCount }), 'warning');
+    } else {
+      addToast(t('userPanel.errorUploadingFiles'), 'error');
+    }
+  }, [currentPath, loadFiles, loadRecentFiles, addToast, t]);
 
   const handleFolderUpload = useCallback(async (files) => {
     if (!files || files.length === 0) return;
@@ -452,76 +559,117 @@ useEffect(() => {
       return;
     }
 
-    try {
-      setUploadProgress({ status: 'uploading', message: t('userPanel.uploadingFolder') });
-      
-      let uploadedCount = 0;
-      let failedCount = 0;
-      
-      // Procesar cada archivo de la carpeta
-      for (let i = 0; i < files.length; i++) {
-        const file = files[i];
-        const formData = new FormData();
-        // IMPORTANT: Append path and relativePath BEFORE file so multer can read them
-        formData.append('path', currentPath.map(p => p.name).join('/'));
-        
-        // Si el archivo tiene webkitRelativePath, usarlo
-        if (file.webkitRelativePath) {
-          formData.append('relativePath', file.webkitRelativePath);
-        }
-        
-        formData.append('file', file);
+    // Crear entradas de upload para cada archivo de la carpeta
+    const newUploads = Array.from(files).map((file) => {
+      uploadIdRef.current += 1;
+      return {
+        id: uploadIdRef.current,
+        name: file.webkitRelativePath || file.name,
+        status: 'pending',
+        totalSize: file.size,
+        loadedSize: 0,
+        percent: 0,
+        speed: 0,
+        remainingTime: 0,
+        errorMessage: null,
+        _file: file,
+        _startTime: null,
+      };
+    });
 
-        try {
-          const response = await fetch('/api/files/upload-folder', {
-            method: 'POST',
-            headers: {
-              'Authorization': `Bearer ${getAuthToken()}`
-            },
-            body: formData
-          });
+    setUploads(prev => [...prev, ...newUploads]);
 
-          if (!response.ok) {
-            const errorData = await response.json();
-            throw new Error(errorData.message || t('userPanel.errorUploadingFile'));
+    const uploadPath = currentPath.map(p => p.name).join('/');
+    let uploadedCount = 0;
+    let failedCount = 0;
+
+    // Subir archivos uno a uno con XHR
+    for (const entry of newUploads) {
+      await new Promise((resolve) => {
+        const startTime = Date.now();
+        setUploads(prev => prev.map(u =>
+          u.id === entry.id ? { ...u, status: 'uploading', _startTime: startTime } : u
+        ));
+
+        const xhr = new XMLHttpRequest();
+        xhrMapRef.current[entry.id] = xhr;
+
+        xhr.upload.onprogress = (e) => {
+          if (e.lengthComputable) {
+            const now = Date.now();
+            const elapsed = (now - startTime) / 1000;
+            const speed = elapsed > 0 ? e.loaded / elapsed : 0;
+            const remaining = speed > 0 ? (e.total - e.loaded) / speed : 0;
+            setUploads(prev => prev.map(u =>
+              u.id === entry.id ? {
+                ...u,
+                loadedSize: e.loaded,
+                totalSize: e.total,
+                percent: Math.round((e.loaded / e.total) * 100),
+                speed,
+                remainingTime: remaining,
+              } : u
+            ));
           }
-          
-          uploadedCount++;
-          
-          // Actualizar progreso
-          setUploadProgress({ 
-            status: 'uploading', 
-            message: t('userPanel.uploadingFolderProgress', { current: uploadedCount, total: files.length }) 
-          });
-          
-        } catch (fileError) {
-          console.error(`Error uploading ${file.name}:`, fileError);
-          failedCount++;
-        }
-      }
+        };
 
-      console.log(`Uploaded ${uploadedCount} files from folder, ${failedCount} failed`);
-      
-      if (failedCount === 0) {
-        setUploadProgress({ status: 'success', message: t('userPanel.folderUploadSuccess', { count: uploadedCount }) });
-        addToast(t('userPanel.folderUploadSuccess', { count: uploadedCount }), 'success');
-      } else {
-        setUploadProgress({ status: 'warning', message: t('userPanel.folderUploadPartial', { errors: failedCount }) });
-        addToast(t('userPanel.folderUploadPartial', { errors: failedCount }), 'warning');
-      }
-      
-      // Recargar archivos
-      loadFiles();
-      
-      setTimeout(() => setUploadProgress(null), 3000);
-      
-    } catch (error) {
-      console.error('Error uploading folder:', error);
-      setUploadProgress({ status: 'error', message: t('userPanel.folderUploadError', { error: error.message }) });
-      addToast(t('userPanel.folderUploadError', { error: error.message }), 'error');
-      setTimeout(() => setUploadProgress(null), 5000);
+        xhr.onload = () => {
+          delete xhrMapRef.current[entry.id];
+          if (xhr.status >= 200 && xhr.status < 300) {
+            uploadedCount++;
+            setUploads(prev => prev.map(u =>
+              u.id === entry.id ? { ...u, status: 'done', percent: 100, loadedSize: u.totalSize, speed: 0, remainingTime: 0 } : u
+            ));
+          } else {
+            failedCount++;
+            let errMsg = t('userPanel.errorUploadingFile');
+            try { errMsg = JSON.parse(xhr.responseText).message || errMsg; } catch (_) {}
+            setUploads(prev => prev.map(u =>
+              u.id === entry.id ? { ...u, status: 'error', errorMessage: errMsg } : u
+            ));
+          }
+          resolve();
+        };
+
+        xhr.onerror = () => {
+          delete xhrMapRef.current[entry.id];
+          failedCount++;
+          setUploads(prev => prev.map(u =>
+            u.id === entry.id ? { ...u, status: 'error', errorMessage: t('userPanel.errorUploadingFile') } : u
+          ));
+          resolve();
+        };
+
+        xhr.onabort = () => {
+          delete xhrMapRef.current[entry.id];
+          setUploads(prev => prev.filter(u => u.id !== entry.id));
+          resolve();
+        };
+
+        const formData = new FormData();
+        formData.append('path', uploadPath);
+        if (entry._file.webkitRelativePath) {
+          formData.append('relativePath', entry._file.webkitRelativePath);
+        }
+        formData.append('file', entry._file);
+
+        xhr.open('POST', '/api/files/upload-folder');
+        xhr.setRequestHeader('Authorization', `Bearer ${getAuthToken()}`);
+        xhr.send(formData);
+      });
     }
-  }, [currentPath, loadFiles, addToast]);
+
+    console.log(`Uploaded ${uploadedCount} files from folder, ${failedCount} failed`);
+
+    // Recargar archivos
+    loadFiles();
+
+    if (failedCount === 0) {
+      addToast(t('userPanel.folderUploadSuccess', { count: uploadedCount }), 'success');
+    } else {
+      addToast(t('userPanel.folderUploadPartial', { errors: failedCount }), 'warning');
+    }
+  }, [currentPath, loadFiles, addToast, t]);
 
   const handleCreateFile = useCallback(async (defaultName, type) => {
     setCreateFileDefaultName(defaultName);
@@ -1216,13 +1364,13 @@ useEffect(() => {
               <div className={`mini-menu-frosted show absolute top-12 left-0 z-50 w-64`}>
                 <button
                   className="mini-menu-item"
-                  onClick={() => document.getElementById('fileInput').click()}
+                  onClick={() => fileInputRef.current.click()}
                 >
                   {t('userPanel.uploadMenu.file')}
                 </button>
                 <button
                   className="mini-menu-item"
-                  onClick={() => document.getElementById('folderInput').click()}
+                  onClick={() => folderInputRef.current.click()}
                 >
                   {t('userPanel.uploadMenu.folder')}
                 </button>
@@ -1639,21 +1787,6 @@ useEffect(() => {
           </div>
         )}
 
-          {/* Upload Progress */}
-          {uploadProgress && (
-            <div className={`upload-progress ${uploadProgress.status}`}>
-              <div className="upload-progress-content">
-                <span className="upload-progress-icon">
-                  {uploadProgress.status === 'uploading' && ''}
-                  {uploadProgress.status === 'success' && ''}
-                  {uploadProgress.status === 'error' && ''}
-                  {uploadProgress.status === 'warning' && ''}
-                </span>
-                <span className="upload-progress-message">{uploadProgress.message}</span>
-              </div>
-            </div>
-          )}
-
           {/* Files and folders */}
           <div className={`files-container ${viewMode === 'grid' ? 'grid-view' : 'list-view'}`}>
             {loading ? (
@@ -1757,24 +1890,32 @@ useEffect(() => {
 
       {/* Hidden file inputs */}
       <input
+        ref={fileInputRef}
         type="file"
         id="fileInput"
         multiple
         className="hidden-input"
+        onClick={(e) => { e.target.value = null; }}
         onChange={(e) => {
-          handleFileUpload(Array.from(e.target.files));
-          e.target.value = ''; // Reset input
+          if (e.target.files && e.target.files.length > 0) {
+            handleFileUpload(Array.from(e.target.files));
+          }
+          e.target.value = null;
         }}
       />
       <input
+        ref={folderInputRef}
         type="file"
         id="folderInput"
         webkitdirectory=""
         multiple
         className="hidden-input"
+        onClick={(e) => { e.target.value = null; }}
         onChange={(e) => {
-          handleFolderUpload(Array.from(e.target.files));
-          e.target.value = ''; // Reset input
+          if (e.target.files && e.target.files.length > 0) {
+            handleFolderUpload(Array.from(e.target.files));
+          }
+          e.target.value = null;
         }}
       />
 
@@ -1907,6 +2048,26 @@ useEffect(() => {
         onClose={() => { setShowCustomizeModal(false); setCustomizeFolder(null); }}
         folder={customizeFolder}
         onSave={handleSaveFolderCustomization}
+      />
+
+      {/* Upload Progress Popup (Google Drive style) */}
+      <UploadPopup
+        uploads={uploads}
+        onClose={() => setUploads([])}
+        onCancel={(id) => {
+          const xhr = xhrMapRef.current[id];
+          if (xhr) xhr.abort();
+        }}
+      />
+
+      {/* Duplicate Files Modal */}
+      <DuplicateFilesModal
+        isOpen={!!duplicateModalData}
+        duplicateNames={duplicateModalData?.names || []}
+        onReplace={() => duplicateModalData?.resolve('replace')}
+        onKeepBoth={() => duplicateModalData?.resolve('keepBoth')}
+        onSkip={() => duplicateModalData?.resolve('skip')}
+        onClose={() => duplicateModalData?.resolve(null)}
       />
     </div>
   );

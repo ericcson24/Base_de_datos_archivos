@@ -253,6 +253,17 @@ const initDatabase = async () => {
           ALTER TABLE shared_files ADD COLUMN pinned_to_panel BOOLEAN DEFAULT FALSE;
         EXCEPTION WHEN duplicate_column THEN END $$;`);
 
+        // Folder Metadata (color/icon customization)
+        await client.query(`CREATE TABLE IF NOT EXISTS folder_metadata (
+            id SERIAL PRIMARY KEY,
+            username TEXT NOT NULL,
+            folder_path TEXT NOT NULL,
+            color TEXT DEFAULT '#5f9ee9',
+            icon TEXT DEFAULT 'default',
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE(username, folder_path)
+        )`);
+
         // Default Admin
         const adminUser = 'administrador';
         const adminPass = process.env.ADMIN_INITIAL_PASSWORD || 'admin123';

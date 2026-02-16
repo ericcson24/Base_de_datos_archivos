@@ -179,6 +179,17 @@ function initDatabase() {
       timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
     )`);
 
+    // Tabla de Metadatos de Carpetas (personalización color/icono)
+    db.run(`CREATE TABLE IF NOT EXISTS folder_metadata (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      username TEXT NOT NULL,
+      folder_path TEXT NOT NULL,
+      color TEXT DEFAULT '#5f9ee9',
+      icon TEXT DEFAULT 'default',
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE(username, folder_path)
+    )`);
+
     // Tabla de Archivos Compartidos (Legacy + New)
     db.run(`CREATE TABLE IF NOT EXISTS shared_files (
       id INTEGER PRIMARY KEY AUTOINCREMENT,

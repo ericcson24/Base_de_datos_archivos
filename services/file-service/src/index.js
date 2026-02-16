@@ -7,6 +7,7 @@ const fs = require('fs').promises;
 const fsSync = require('fs');
 const jwt = require('jsonwebtoken');
 const JSZip = require('jszip');
+const ffmpeg = require('fluent-ffmpeg');
 const { dbAsync } = require('./database/db');
 
 const JWT_SECRET = process.env.JWT_SECRET || 'fallback-secret-change-me';
@@ -88,7 +89,24 @@ const storage = multer.diskStorage({
     }
   },
   filename: (req, file, cb) => {
-    cb(null, file.originalname);
+    // Si se solicita renombrar duplicados, generar un nombre único
+    if (req.body.duplicateAction === 'rename') {
+      const username = req.user ? req.user.username : 'unknown';
+      const uploadPath = req.body.path || '';
+      const dir = path.join(UPLOAD_DIR, username, uploadPath);
+      const ext = path.extname(file.originalname);
+      const base = path.basename(file.originalname, ext);
+
+      let candidate = file.originalname;
+      let counter = 1;
+      while (fsSync.existsSync(path.join(dir, candidate))) {
+        candidate = `${base} (${counter})${ext}`;
+        counter++;
+      }
+      cb(null, candidate);
+    } else {
+      cb(null, file.originalname);
+    }
   }
 });
 
@@ -1275,6 +1293,145 @@ app.post('/upload-folder', authenticate, upload.single('file'), async (req, res)
         console.error('Error uploading folder file:', error);
         res.status(500).json({ success: false, message: error.message });
     }
+});
+
+// --- MEDIA EDITING ENDPOINTS ---
+
+// Helper to get absolute path safely
+const getAbsolutePath = (username, relativePath) => {
+    const safePath = path.normalize(relativePath).replace(/^(\.\.[\/\\])+/, '');
+    return path.join(UPLOAD_DIR, username, safePath);
+};
+
+// Save edited image (overwrite or copy)
+app.post('/image/save', authenticate, upload.single('file'), async (req, res) => {
+    try {
+        if (!req.file) {
+            return res.status(400).json({ success: false, message: 'No file uploaded.' });
+        }
+        
+        const { originalPath, saveAsCopy } = req.body;
+        const username = req.user.username;
+        const targetDir = getAbsolutePath(username, path.dirname(originalPath));
+        const originalName = path.basename(originalPath);
+        
+        let targetFilename = originalName;
+        if (saveAsCopy === 'true') {
+            const ext = path.extname(originalName);
+            const name = path.basename(originalName, ext);
+            targetFilename = `${name}_edited${ext}`;
+        }
+        
+        const targetPath = path.join(targetDir, targetFilename);
+        
+        // Move uploaded file to target
+        await fs.rename(req.file.path, targetPath);
+        
+        // Update DB if needed (AutoSync will catch it eventually, but we can log)
+        await logAction(username, 'IMAGE_EDIT', `Imagen editada: ${targetFilename}`);
+        
+        res.json({ success: true, message: 'Imagen guardada exitosamente' });
+
+    } catch (error) {
+        console.error('Error saving image:', error);
+        res.status(500).json({ success: false, message: error.message });
+    }
+});
+
+// Process video with FFmpeg
+app.post('/video/edit', authenticate, async (req, res) => {
+  try {
+    const { path: relativePath, startTime, endTime, filters, saveAsCopy, rotation } = req.body;
+    const username = req.user.username;
+    
+    // Construct absolute path securely
+    // Implementation assumption: getAbsolutePath helper exists or logic is inline
+    // Replicating safe join logic:
+    const safePath = path.normalize(relativePath).replace(/^(\.\.[\/\\])+/, '');
+    const inputPath = path.join(UPLOAD_DIR, username, safePath);
+    
+    if (!fsSync.existsSync(inputPath)) {
+        return res.status(404).json({ success: false, message: 'Video original no encontrado' });
+    }
+    
+    const ext = path.extname(inputPath);
+    const basename = path.basename(inputPath, ext);
+    // Create new filename
+    const outputFilename = saveAsCopy 
+        ? `${basename}_copy_${Date.now()}${ext}`
+        : `${basename}_temp_${Date.now()}${ext}`;
+        
+    const outputPath = path.join(path.dirname(inputPath), outputFilename);
+    const tempOutputPath = path.join(path.dirname(inputPath), `temp_${Date.now()}${ext}`);
+
+    let command = ffmpeg(inputPath);
+
+    // Apply Trim
+    if (startTime !== undefined && endTime !== undefined) {
+        command.setStartTime(startTime);
+        command.setDuration(endTime - startTime);
+    }
+    
+    const complexFilters = [];
+    
+    // Apply EQ (Brightness, Contrast, Saturation)
+    if (filters) {
+        const { brightness, contrast, saturation } = filters;
+        // Map 0-200 slider (100 default) to ffmpeg values
+        // brightness: -1.0 to 1.0 (default 0). (val - 100) / 100
+        // contrast: -2.0 to 2.0 (default 1). val / 100
+        // saturation: 0.0 to 3.0 (default 1). val / 100
+        
+        const b = (brightness !== undefined) ? (brightness - 100) / 100 : 0;
+        const c = (contrast !== undefined) ? contrast / 100 : 1;
+        const s = (saturation !== undefined) ? saturation / 100 : 1;
+        
+        if (b !== 0 || c !== 1 || s !== 1) {
+            complexFilters.push(`eq=brightness=${b}:contrast=${c}:saturation=${s}`);
+        }
+        
+        // Rotation (transpose)
+        // 90 = transpose=1 (clock)
+        // 180 = transpose=2,transpose=2 (counter-clock twice? = 180) OR transpose=1,transpose=1
+        // 270 = transpose=2 (counter-clock)
+        if (filters.rotation) {
+             const rot = parseInt(filters.rotation) % 360;
+             if (rot === 90) complexFilters.push('transpose=1');
+             else if (rot === 180) complexFilters.push('transpose=1,transpose=1');
+             else if (rot === 270) complexFilters.push('transpose=2');
+        }
+    }
+    
+    if (complexFilters.length > 0) {
+        command.complexFilter(complexFilters);
+    }
+    
+    // Run FFmpeg
+    command
+        .on('end', async () => {
+             if (saveAsCopy) {
+                 res.json({ success: true, message: 'Video guardado como copia' });
+             } else {
+                 // Overwrite: Delete original, rename output to original
+                 try {
+                     await fs.unlink(inputPath);
+                     await fs.rename(outputPath, inputPath);
+                     res.json({ success: true, message: 'Video original actualizado' });
+                 } catch (err) {
+                     res.status(500).json({ success: false, message: 'Error al sobrescribir archivo' });
+                 }
+             }
+        })
+        .on('error', (err) => {
+            console.error('FFmpeg error:', err);
+            res.status(500).json({ success: false, message: 'Error procesando video' });
+        })
+        .save(outputPath);
+        
+  } catch (err) {
+      console.error(err);
+      res.status(500).json({ success: false, message: 'Error de servidor' });
+  }
 });
 
 const AutoSyncService = require('./autoSync');

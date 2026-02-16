@@ -120,6 +120,7 @@
     "errorUploadingFiles": "Błąd podczas przesyłania plików",
     "errorUploadingFile": "Błąd podczas przesyłania pliku",
     "uploadSuccess": "✅ {{count}} plik(ów) przesłano pomyślnie",
+    "uploadPartial": "⚠️ {{count}} przesłano, {{errors}} błąd(ów)",
     "uploadError": "❌ Błąd podczas przesyłania plików: {{error}}",
     "uploadingFolder": "Przesyłanie folderu...",
     "uploadingFolderProgress": "Przesyłanie folderu... {{current}}/{{total}} plików",
@@ -523,9 +524,17 @@
     "loadErrorFallback": "Nie można załadować pliku. Włączono tryb edycji, aby zacząć od nowa."
   },
   "videoPlayer": {
+    "play": "Odtwórz",
+    "pause": "Pauza",
+    "mute": "Wycisz",
+    "unmute": "Włącz dźwięk",
+    "rewind": "Cofnij 10s",
+    "forward": "Przewiń 10s",
     "fullscreen": "Pełny ekran",
     "download": "Pobierz",
-    "speed": "Prędkość"
+    "speed": "Prędkość",
+    "normal": "Normalna",
+    "pip": "Obraz w obrazie"
   },
   "fileEditor": {
     "emptyFile": "Plik jest pusty",
@@ -558,7 +567,10 @@
     "size": "Rozmiar",
     "download": "Pobierz",
     "close": "Zamknij",
-    "downloadFile": "Pobierz plik"
+    "downloadFile": "Pobierz plik",
+    "clickToEditExcel": "Kliknij przycisk, aby otworzyć edytor arkuszy kalkulacyjnych.",
+    "clickToEditPowerPoint": "Kliknij przycisk, aby otworzyć edytor prezentacji.",
+    "enableEditing": "Otwórz Edytor"
   },
   "admin": {
     "loading": "Ładowanie panelu administratora...",
@@ -843,5 +855,26 @@
   "folderCustomize": {
     "saved": "Folder dostosowany pomyślnie",
     "error": "Błąd podczas dostosowywania folderu"
+  },
+  "upload": {
+    "uploading": "Przesyłanie {{current}} z {{total}}",
+    "allComplete": "Przesłano {{count}} plik(ów)",
+    "completedWithErrors": "{{done}} przesłano, {{errors}} błąd(ów)",
+    "remaining": "pozostało",
+    "expand": "Rozwiń",
+    "minimize": "Minimalizuj",
+    "close": "Zamknij",
+    "cancel": "Anuluj",
+    "error": "Błąd przesyłania",
+    "waiting": "Oczekiwanie"
+  },
+  "duplicateModal": {
+    "titleSingle": "Zduplikowany plik",
+    "titleMultiple": "{{count}} zduplikowanych plików",
+    "descriptionSingle": "Plik \"{{name}}\" już istnieje w tym folderze. Co chcesz zrobić?",
+    "descriptionMultiple": "{{count}} plików już istnieje w tym folderze. Co chcesz zrobić?",
+    "replace": "Zastąp",
+    "keepBoth": "Zachowaj oba",
+    "skip": "Pomiń"
   }
 }

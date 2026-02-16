@@ -58,15 +58,6 @@
   --hover-preview-border: rgba(0, 0, 0, 0.1);
   --hover-preview-text: #333;
   --hover-preview-secondary-text: #666;
-  --upload-progress-uploading-bg: rgba(255, 193, 7, 0.9);
-  --upload-progress-uploading-text: #333;
-  --upload-progress-success-bg: rgba(76, 175, 80, 0.9);
-  --upload-progress-success-text: white;
-  --upload-progress-error-bg: rgba(211, 47, 47, 0.9);
-  --upload-progress-error-text: white;
-  --upload-progress-warning-bg: rgba(255, 152, 0, 0.9);
-  --upload-progress-warning-text: white;
-  
   /* Controls (search, sort, filter) */
   --control-bg: rgba(255, 255, 255, 0.9);
   --control-border: rgba(0, 0, 0, 0.1);
@@ -163,15 +154,6 @@
   --hover-preview-border: rgba(255, 255, 255, 0.1);
   --hover-preview-text: #ffffff;
   --hover-preview-secondary-text: #cccccc;
-  --upload-progress-uploading-bg: rgba(255, 193, 7, 0.9);
-  --upload-progress-uploading-text: #000000;
-  --upload-progress-success-bg: rgba(76, 175, 80, 0.9);
-  --upload-progress-success-text: white;
-  --upload-progress-error-bg: rgba(211, 47, 47, 0.9);
-  --upload-progress-error-text: white;
-  --upload-progress-warning-bg: rgba(255, 152, 0, 0.9);
-  --upload-progress-warning-text: white;
-  
   /* Controls (search, sort, filter) - Dark Mode */
   --control-bg: rgba(40, 40, 40, 0.9);
   --control-border: rgba(255, 255, 255, 0.1);
@@ -554,6 +536,8 @@ body {
   padding: 0.5rem 0;
   display: flex;
   flex-direction: column;
+  max-height: calc(100vh - 40px);
+  overflow-y: auto;
   animation: fadeInMenu 0.2s ease;
   opacity: 0;
   visibility: hidden;
@@ -1023,68 +1007,6 @@ input[type="text"]:focus {
 }
 
 /* Panel header styles moved above to avoid duplicate definitions */
-
-/* UPLOAD PROGRESS */
-.upload-progress {
-  position: absolute;
-  top: 20px;
-  left: 50%;
-  transform: translateX(-50%);
-  z-index: 1001;
-  padding: 1rem 2rem;
-  border-radius: 12px;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
-  backdrop-filter: url(#frosted);
-  -webkit-backdrop-filter: url(#frosted);
-  border: 1px solid rgba(0, 0, 0, 0.1);
-  animation: slideDown 0.3s ease;
-}
-
-@keyframes slideDown {
-  from {
-    opacity: 0;
-    transform: translateX(-50%) translateY(-20px);
-  }
-  to {
-    opacity: 1;
-    transform: translateX(-50%) translateY(0);
-  }
-}
-
-.upload-progress.uploading {
-  background: var(--upload-progress-uploading-bg);
-  color: var(--upload-progress-uploading-text);
-}
-
-.upload-progress.success {
-  background: var(--upload-progress-success-bg);
-  color: var(--upload-progress-success-text);
-}
-
-.upload-progress.error {
-  background: var(--upload-progress-error-bg);
-  color: var(--upload-progress-error-text);
-}
-
-.upload-progress.warning {
-  background: var(--upload-progress-warning-bg);
-  color: var(--upload-progress-warning-text);
-}
-
-.upload-progress-content {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-  font-weight: 500;
-}
-
-.upload-progress-icon {
-  font-size: 1.2rem;
-}
-
-.upload-progress-message {
-  font-size: 0.9rem;
-}
 
 .file-grid::-webkit-scrollbar {
   width: 6px;

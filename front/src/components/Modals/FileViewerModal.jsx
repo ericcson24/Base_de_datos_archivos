@@ -153,7 +153,7 @@ const TextFileViewer = ({ fileId, fileName, onLoad, onError }) => {
 const FileViewerModal = ({ file, onClose, user }) => {
   const fileType = getFileType(file.name);
   // Word y archivos de Office se manejan internamente, no necesitan loading inicial
-  const [loading, setLoading] = useState(fileType !== 'word' && fileType !== 'text');
+  const [loading, setLoading] = useState(fileType !== 'word' && fileType !== 'text' && fileType !== 'powerpoint' && fileType !== 'excel');
   const [error, setError] = useState(null);
   const [authenticatedUrl, setAuthenticatedUrl] = useState(null);
   const { t } = useLanguage();
@@ -182,7 +182,7 @@ const FileViewerModal = ({ file, onClose, user }) => {
 
   useEffect(() => {
     // Solo mostrar loading para archivos que necesitan URL autenticada
-    if (fileType !== 'word' && fileType !== 'text') {
+    if (fileType !== 'word' && fileType !== 'text' && fileType !== 'powerpoint' && fileType !== 'excel') {
       setLoading(true);
     }
     setError(null);
@@ -194,7 +194,7 @@ const FileViewerModal = ({ file, onClose, user }) => {
   };
 
   const renderFileContent = () => {
-    if (!authenticatedUrl && (canPreview(file.name) || canEdit(file.name)) && fileType !== 'word') {
+    if (!authenticatedUrl && (canPreview(file.name) || canEdit(file.name)) && fileType !== 'word' && fileType !== 'powerpoint' && fileType !== 'excel') {
       return (
         <div className="viewer-content loading">
           <div className="loading-spinner"></div>
@@ -271,8 +271,10 @@ const FileViewerModal = ({ file, onClose, user }) => {
       case 'excel':
         return (
           <div className="w-full h-full">
-            <ExcelViewerWrapper 
+            <ExcelEditor 
               file={file}
+              fileUrl={`/api/files/preview/${file.id}?token=${encodeURIComponent(getAuthToken())}`}
+              onClose={() => {}}
               onFileSaved={() => {
                 addToast(t('fileViewer.fileSaved'), 'success');
               }}
@@ -283,8 +285,10 @@ const FileViewerModal = ({ file, onClose, user }) => {
       case 'powerpoint':
         return (
           <div className="w-full h-full">
-            <PowerPointViewerWrapper 
+            <PowerPointEditor 
               file={file}
+              fileUrl={`/api/files/preview/${file.id}?token=${encodeURIComponent(getAuthToken())}`}
+              onClose={() => {}}
               onFileSaved={() => {
                 addToast(t('fileViewer.fileSaved'), 'success');
               }}

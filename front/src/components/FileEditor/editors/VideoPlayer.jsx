@@ -1,196 +1,621 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { useLanguage } from '../../../context/LanguageContext';
+import { BiPlay, BiPause, BiRewind, BiFastForward, BiVolumeFull, BiVolumeMute, BiExpand, BiCollapse, BiLoaderAlt, BiCog, BiEdit, BiSave, BiX, BiCut, BiCheck } from 'react-icons/bi';
 import './VideoPlayer.css';
 
 const VideoPlayer = ({ fileUrl, file }) => {
   const { t } = useLanguage();
-  const [playing, setPlaying] = useState(false);
-  const [currentTime, setCurrentTime] = useState(0);
-  const [duration, setDuration] = useState(0);
-  const [volume, setVolume] = useState(1);
-  const [playbackRate, setPlaybackRate] = useState(1);
-  const [isFullscreen, setIsFullscreen] = useState(false);
   const videoRef = useRef(null);
   const containerRef = useRef(null);
+  
+  // Player State
+  const [playing, setPlaying] = useState(false);
+  const [volume, setVolume] = useState(1);
+  const [muted, setMuted] = useState(false);
+  const [currentTime, setCurrentTime] = useState(0);
+  const [duration, setDuration] = useState(0);
+  const [seeking, setSeeking] = useState(false);
+  const [buffered, setBuffered] = useState(0);
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  const [showControls, setShowControls] = useState(true);
+  const [loading, setLoading] = useState(true);
+  const [playbackRate, setPlaybackRate] = useState(1);
+  const [showSpeedMenu, setShowSpeedMenu] = useState(false);
+  const volumeBeforeMute = useRef(1);
+  const controlsTimeoutRef = useRef(null);
 
+  // Editor State
+  const [isEditing, setIsEditing] = useState(false);
+  const [editParams, setEditParams] = useState({
+      trimStart: 0,
+      trimEnd: 0,
+      brightness: 100,
+      contrast: 100,
+      saturation: 100,
+      rotation: 0
+  });
+  const [trimDragging, setTrimDragging] = useState(null); // 'start', 'end'
+  const [showSaveModal, setShowSaveModal] = useState(false);
+  const [processing, setProcessing] = useState(false);
+
+  // Initial Load
+  useEffect(() => {
+    if (videoRef.current) {
+      videoRef.current.load();
+      setLoading(true);
+      setPlaying(false);
+      setCurrentTime(0);
+      setIsEditing(false); // Reset edit mode on file change
+      setEditParams(p => ({ ...p, trimStart: 0, trimEnd: 0 }));
+    }
+  }, [fileUrl]);
+
+  // Handle Controls Visibility
+  const resetControlsTimeout = useCallback(() => {
+    setShowControls(true);
+    if (controlsTimeoutRef.current) clearTimeout(controlsTimeoutRef.current);
+    if (playing && !isEditing) {
+      controlsTimeoutRef.current = setTimeout(() => setShowControls(false), 3000);
+    }
+  }, [playing, isEditing]);
+
+  useEffect(() => {
+    const handleMouseMove = () => resetControlsTimeout();
+    const container = containerRef.current;
+    if (container) {
+      container.addEventListener('mousemove', handleMouseMove);
+      container.addEventListener('click', handleMouseMove);
+    }
+    return () => {
+      if (container) {
+        container.removeEventListener('mousemove', handleMouseMove);
+        container.removeEventListener('click', handleMouseMove);
+      }
+      if (controlsTimeoutRef.current) clearTimeout(controlsTimeoutRef.current);
+    };
+  }, [resetControlsTimeout]);
+
+  // Keyboard Shortcuts
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (isEditing) return; // Disable shortcuts while editing (except maybe space?)
+      
+      switch(e.key.toLowerCase()) {
+        case ' ':
+        case 'k':
+          e.preventDefault();
+          togglePlay();
+          break;
+        case 'f':
+          e.preventDefault();
+          toggleFullscreen();
+          break;
+        case 'm':
+          e.preventDefault();
+          toggleMute();
+          break;
+        case 'arrowleft':
+          skip(-5);
+          break;
+        case 'arrowright':
+          skip(5);
+          break;
+        case 'j':
+          skip(-10);
+          break;
+        case 'l':
+          skip(10);
+          break;
+        case 'arrowup':
+          e.preventDefault();
+          handleVolumeChange({ target: { value: Math.min(1, volume + 0.1) } });
+          break;
+        case 'arrowdown':
+          e.preventDefault();
+          handleVolumeChange({ target: { value: Math.max(0, volume - 0.1) } });
+          break;
+        case 'p':
+            togglePiP();
+            break;
+        default: break;
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [playing, volume, isEditing]); // dep update
+
+  // Video Events
+  const onTimeUpdate = () => {
+    if (videoRef.current) {
+      setCurrentTime(videoRef.current.currentTime);
+      // Auto-loop preview in edit mode?
+      if (isEditing && videoRef.current.currentTime >= editParams.trimEnd && editParams.trimEnd > 0) {
+          videoRef.current.currentTime = editParams.trimStart;
+      }
+    }
+  };
+
+  const onLoadedMetadata = () => {
+    setDuration(videoRef.current.duration);
+    setLoading(false);
+    setEditParams(p => ({ ...p, trimEnd: videoRef.current.duration }));
+  };
+
+  const onProgress = () => {
+    if (videoRef.current && videoRef.current.buffered.length > 0) {
+      setBuffered(videoRef.current.buffered.end(videoRef.current.buffered.length - 1));
+    }
+  };
+
+  // Actions
   const togglePlay = () => {
     if (videoRef.current) {
-      if (playing) {
-        videoRef.current.pause();
-      } else {
-        videoRef.current.play();
-      }
+      if (playing) videoRef.current.pause();
+      else videoRef.current.play();
       setPlaying(!playing);
     }
   };
 
-  const handleTimeUpdate = () => {
+  const skip = (seconds) => {
     if (videoRef.current) {
-      setCurrentTime(videoRef.current.currentTime);
-    }
-  };
-
-  const handleLoadedMetadata = () => {
-    if (videoRef.current) {
-      setDuration(videoRef.current.duration);
-    }
-  };
-
-  const handleSeek = (e) => {
-    const time = parseFloat(e.target.value);
-    if (videoRef.current) {
-      videoRef.current.currentTime = time;
-      setCurrentTime(time);
+      videoRef.current.currentTime += seconds;
     }
   };
 
   const handleVolumeChange = (e) => {
-    const vol = parseFloat(e.target.value);
-    if (videoRef.current) {
-      videoRef.current.volume = vol;
-      setVolume(vol);
-    }
+    const val = parseFloat(e.target.value);
+    setVolume(val);
+    if (videoRef.current) videoRef.current.volume = val;
+    setMuted(val === 0);
   };
 
-  const handlePlaybackRateChange = (rate) => {
-    if (videoRef.current) {
-      videoRef.current.playbackRate = rate;
-      setPlaybackRate(rate);
+  const toggleMute = () => {
+    if (muted) {
+      setVolume(volumeBeforeMute.current);
+      if (videoRef.current) videoRef.current.volume = volumeBeforeMute.current;
+      setMuted(false);
+    } else {
+      volumeBeforeMute.current = volume;
+      setVolume(0);
+      if (videoRef.current) videoRef.current.volume = 0;
+      setMuted(true);
     }
   };
 
   const toggleFullscreen = () => {
-    if (!isFullscreen) {
-      if (containerRef.current.requestFullscreen) {
-        containerRef.current.requestFullscreen();
-      }
-      setIsFullscreen(true);
+    if (!containerRef.current) return;
+    if (!document.fullscreenElement) {
+      containerRef.current.requestFullscreen().catch(err => console.error(err));
     } else {
-      if (document.exitFullscreen) {
-        document.exitFullscreen();
-      }
-      setIsFullscreen(false);
+      document.exitFullscreen();
     }
   };
-
-  const formatTime = (seconds) => {
-    const mins = Math.floor(seconds / 60);
-    const secs = Math.floor(seconds % 60);
-    return `${mins}:${secs.toString().padStart(2, '0')}`;
+  
+  const togglePiP = async () => {
+      if (document.pictureInPictureElement) {
+          await document.exitPictureInPicture();
+      } else if (videoRef.current && videoRef.current.requestPictureInPicture) {
+          await videoRef.current.requestPictureInPicture();
+      }
   };
 
-  const handleDownload = () => {
-    const link = document.createElement('a');
-    link.href = fileUrl;
-    link.download = file.name;
-    link.click();
+  useEffect(() => {
+    const handleFSChange = () => setIsFullscreen(!!document.fullscreenElement);
+    document.addEventListener('fullscreenchange', handleFSChange);
+    return () => document.removeEventListener('fullscreenchange', handleFSChange);
+  }, []);
+
+  const handleSeek = (e) => {
+    const time = parseFloat(e.target.value);
+    setCurrentTime(time);
+    if (videoRef.current) videoRef.current.currentTime = time;
   };
+
+  const handleSeekStart = () => {
+      setSeeking(true);
+      if(playing) videoRef.current.pause();
+  };
+  
+  const handleSeekEnd = () => {
+      setSeeking(false);
+      if(playing) videoRef.current.play();
+  };
+
+  const handleSpeedSelect = (rate) => {
+    setPlaybackRate(rate);
+    if (videoRef.current) videoRef.current.playbackRate = rate;
+    setShowSpeedMenu(false);
+  };
+
+  // --- EDITING LOGIC ---
+
+  const toggleEditMode = () => {
+      if (isEditing) {
+          // Cancel edit
+          setIsEditing(false);
+          // Reset params
+          setEditParams(p => ({
+              ...p,
+              trimStart: 0,
+              trimEnd: duration,
+              brightness: 100,
+              contrast: 100,
+              saturation: 100
+          }));
+      } else {
+          setIsEditing(true);
+          videoRef.current.pause();
+          setPlaying(false);
+      }
+  };
+
+  // Trim Logic
+  const handleTrimDragStart = (e, handle) => {
+      e.stopPropagation();
+      setTrimDragging(handle);
+      if (playing) { videoRef.current.pause(); setPlaying(false); }
+  };
+
+  const handleTrimMouseMove = (e) => {
+      if (!trimDragging || !containerRef.current) return;
+      const rect = containerRef.current.getBoundingClientRect(); // Use container or track relative?
+      // Better to use document mouse move and calculate % relative to track width
+      // Simplified: Assume track is full width minus padding
+      // Let's use the track element ref if possible, but state update is global mouse move
+      const track = document.getElementById('vp-trim-track');
+      if(track) {
+          const trackRect = track.getBoundingClientRect();
+          let percent = (e.clientX - trackRect.left) / trackRect.width;
+          percent = Math.max(0, Math.min(1, percent));
+          const time = percent * duration;
+          
+          if (trimDragging === 'start') {
+              const newStart = Math.min(time, editParams.trimEnd - 1); // min 1 sec diff
+              setEditParams(p => ({ ...p, trimStart: newStart }));
+              videoRef.current.currentTime = newStart;
+          } else {
+              const newEnd = Math.max(time, editParams.trimStart + 1);
+              setEditParams(p => ({ ...p, trimEnd: newEnd }));
+              videoRef.current.currentTime = newEnd;
+          }
+      }
+  };
+
+  const handleTrimMouseUp = () => {
+      setTrimDragging(null);
+  };
+
+  // Save Logic
+  const handleSaveVideo = async (saveAsCopy) => {
+      setShowSaveModal(false);
+      setProcessing(true);
+      
+      try {
+          const token = localStorage.getItem('auth_token');
+          const res = await fetch('/api/files/video/edit', {
+              method: 'POST',
+              headers: {
+                  'Content-Type': 'application/json',
+                  'Authorization': `Bearer ${token}`
+              },
+              body: JSON.stringify({
+                  path: file.path, // We need relative path or ID? Endpoint expects path
+                  startTime: editParams.trimStart,
+                  endTime: editParams.trimEnd,
+                  filters: {
+                      brightness: editParams.brightness,
+                      contrast: editParams.contrast,
+                      saturation: editParams.saturation,
+                      rotation: editParams.rotation
+                  },
+                  saveAsCopy
+              })
+          });
+          
+          const data = await res.json();
+          if (data.success) {
+              alert(t('videoPlayer.saveSuccess') || "Video processed successfully");
+              if (!saveAsCopy) {
+                  // Reload video
+                  videoRef.current.load();
+              }
+              setIsEditing(false);
+          } else {
+              alert(t('videoPlayer.saveError') + ": " + data.message);
+          }
+      } catch (err) {
+          console.error(err);
+          alert(t('videoPlayer.saveErrorGeneric') || "Error processing video");
+      } finally {
+          setProcessing(false);
+      }
+  };
+
+  // Computed styles for filter preview
+  const videoStyle = {
+      filter: `brightness(${editParams.brightness}%) contrast(${editParams.contrast}%) saturate(${editParams.saturation}%)`,
+      transform: `rotate(${editParams.rotation}deg)`
+      // Note: Rotation via CSS transform works for preview, but controls might get misaligned if not handled.
+      // For simplicity, we rotate the VIDEO element inside the container.
+      // Might strictly clip if container has overflow hidden.
+      // For now, simple standard rotation.
+  };
+
+  const formatTime = (time) => {
+    if (isNaN(time)) return '0:00';
+    const minutes = Math.floor(time / 60);
+    const seconds = Math.floor(time % 60);
+    return `${minutes}:${seconds < 10 ? '0' : ''}${seconds}`;
+  };
+
+  const bufferedPercent = duration > 0 ? (buffered / duration) * 100 : 0;
+  const progressPercent = duration > 0 ? (currentTime / duration) * 100 : 0;
+
+  // Trim percentages
+  const trimStartPct = duration > 0 ? (editParams.trimStart / duration) * 100 : 0;
+  const trimEndPct = duration > 0 ? (editParams.trimEnd / duration) * 100 : 100;
 
   return (
-    <div className="video-player h-full flex flex-col" ref={containerRef}>
-      {/* Toolbar */}
-      <div className="toolbar glassmorphism-strong p-4 border-b border-gray-200 dark:border-gray-700">
-        <div className="flex flex-wrap gap-3 items-center">
-          {/* Playback Rate */}
-          <div className="tool-group flex items-center gap-2">
-            <label className="text-xs font-medium text-gray-700 dark:text-gray-300">
-              {t('videoPlayer.speed')}:
-            </label>
-            <div className="flex gap-1">
-              {[0.5, 0.75, 1, 1.25, 1.5, 2].map(rate => (
-                <button
-                  key={rate}
-                  className={`btn-speed ${playbackRate === rate ? 'active' : ''}`}
-                  onClick={() => handlePlaybackRateChange(rate)}
-                >
-                  {rate}x
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Volume */}
-          <div className="tool-group flex items-center gap-2">
-            <label className="text-xs font-medium text-gray-700 dark:text-gray-300">
-              🔊 {Math.round(volume * 100)}%
-            </label>
-            <input
-              type="range"
-              min="0"
-              max="1"
-              step="0.1"
-              value={volume}
-              onChange={handleVolumeChange}
-              className="slider w-24"
-            />
-          </div>
-
-          {/* Actions */}
-          <div className="flex gap-2 ml-auto">
-            <button className="btn-secondary" onClick={toggleFullscreen}>
-              {isFullscreen ? '🗗' : '⛶'} {t('videoPlayer.fullscreen')}
-            </button>
-            <button className="btn-primary" onClick={handleDownload}>
-              💾 {t('videoPlayer.download')}
-            </button>
-          </div>
+    <div 
+      className={`vp-container ${isFullscreen ? 'vp-fullscreen' : ''} ${isEditing ? 'vp-editing' : ''}`} 
+      ref={containerRef}
+      onMouseMove={isEditing ? handleTrimMouseMove : undefined}
+      onMouseUp={isEditing ? handleTrimMouseUp : undefined}
+    >
+      
+      {/* Loading Spinner */}
+      {(loading || processing) && (
+        <div className="vp-spinner-overlay">
+           <div className="vp-spinner"></div>
+           {processing && <span>{t('common.processing') || 'Processing...'}</span>}
         </div>
-      </div>
+      )}
 
-      {/* Video Area */}
-      <div className="flex-1 bg-black flex items-center justify-center relative">
-        <video
-          ref={videoRef}
-          src={fileUrl}
-          className="max-w-full max-h-full"
-          onTimeUpdate={handleTimeUpdate}
-          onLoadedMetadata={handleLoadedMetadata}
-          onEnded={() => setPlaying(false)}
-        />
+      {/* Main Video */}
+      <video
+        ref={videoRef}
+        src={fileUrl}
+        className="vp-video"
+        onClick={isEditing ? null : togglePlay}
+        onDoubleClick={toggleFullscreen}
+        onTimeUpdate={onTimeUpdate}
+        onLoadedMetadata={onLoadedMetadata}
+        onProgress={onProgress}
+        onEnded={() => setPlaying(false)}
+        style={videoStyle}
+      />
 
-        {/* Play/Pause Overlay */}
-        <div 
-          className="absolute inset-0 flex items-center justify-center cursor-pointer"
-          onClick={togglePlay}
-        >
-          {!playing && (
-            <div className="w-20 h-20 bg-white/30 backdrop-blur-sm rounded-full flex items-center justify-center hover:bg-white/40 transition-all">
-              <svg className="w-12 h-12 text-white ml-1" fill="currentColor" viewBox="0 0 24 24">
-                <path d="M8 5v14l11-7z"/>
-              </svg>
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* Controls */}
-      <div className="video-controls glassmorphism-strong p-4 border-t border-gray-200 dark:border-gray-700">
-        <div className="flex items-center gap-3">
-          {/* Play/Pause */}
-          <button className="btn-icon" onClick={togglePlay}>
-            {playing ? '⏸️' : '▶️'}
+      {/* Edit Toggle Button */}
+      {!loading && !processing && (
+          <button className="vp-edit-toggle" onClick={toggleEditMode}>
+              {isEditing ? <BiX size={20} /> : <BiEdit size={20} />}
+              {isEditing ? t('common.cancel') : t('videoPlayer.edit')}
           </button>
+      )}
 
-          {/* Progress */}
-          <div className="flex-1 flex items-center gap-2">
-            <span className="text-xs text-gray-600 dark:text-gray-400 min-w-[45px]">
-              {formatTime(currentTime)}
-            </span>
-            <input
-              type="range"
-              min="0"
-              max={duration || 0}
-              step="0.1"
-              value={currentTime}
-              onChange={handleSeek}
-              className="slider flex-1"
-            />
-            <span className="text-xs text-gray-600 dark:text-gray-400 min-w-[45px]">
-              {formatTime(duration)}
-            </span>
+      {/* Standard Controls (Hide in edit mode, or keep?)
+          Let's hide standard controls overlay in edit mode to avoid clutter, 
+          but show standard play/pause in editor panel if needed.
+      */}
+      {!isEditing && (
+          <>
+            {/* Big Play Button Overlay */}
+            {!playing && !loading && (
+                <div className="vp-big-play" onClick={togglePlay}>
+                <svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+                </div>
+            )}
+
+            {/* Bottom Controls */}
+            <div className={`vp-controls-wrapper ${showControls || !playing ? 'visible' : ''}`}>
+                
+                {/* Progress Bar */}
+                <div className="vp-progress-container" onClick={(e) => {
+                    const rect = e.currentTarget.getBoundingClientRect();
+                    const percent = (e.clientX - rect.left) / rect.width;
+                    if(videoRef.current) {
+                        videoRef.current.currentTime = percent * duration;
+                        setCurrentTime(percent * duration);
+                    }
+                }}>
+                    <div className="vp-progress-bar">
+                        <div className="vp-progress-buffered" style={{ width: `${bufferedPercent}%` }} />
+                        <div className="vp-progress-played" style={{ width: `${progressPercent}%` }}>
+                            <div className="vp-progress-thumb" />
+                        </div>
+                    </div>
+                </div>
+
+                <div className="vp-controls">
+                    <div className="vp-controls-left">
+                        <button className="vp-btn" onClick={togglePlay} title={playing ? t('videoPlayer.pause') : t('videoPlayer.play')}>
+                            {playing ? <BiPause size={24} /> : <BiPlay size={24} />}
+                        </button>
+
+                        <button className="vp-btn vp-btn-skip" onClick={() => skip(-10)} title={t('videoPlayer.rewind')}>
+                            <BiRewind size={20} />
+                            <span className="vp-skip-label">10</span>
+                        </button>
+                        <button className="vp-btn vp-btn-skip" onClick={() => skip(10)} title={t('videoPlayer.forward')}>
+                            <BiFastForward size={20} />
+                            <span className="vp-skip-label">10</span>
+                        </button>
+
+                        <div className="vp-volume-group">
+                            <button className="vp-btn" onClick={toggleMute} title={muted ? t('videoPlayer.unmute') : t('videoPlayer.mute')}>
+                                {muted || volume === 0 ? <BiVolumeMute size={20} /> : <BiVolumeFull size={20} />}
+                            </button>
+                            <div className="vp-volume-slider-wrap">
+                                <input
+                                    type="range"
+                                    min="0"
+                                    max="1"
+                                    step="0.05"
+                                    value={muted ? 0 : volume}
+                                    onChange={handleVolumeChange}
+                                    className="vp-volume-slider"
+                                />
+                            </div>
+                        </div>
+
+                        <span className="vp-time">
+                            {formatTime(currentTime)} / {formatTime(duration)}
+                        </span>
+                    </div>
+
+                    <div className="vp-controls-right">
+                        <div className="vp-speed-control">
+                            <button className="vp-btn vp-speed-btn" onClick={() => setShowSpeedMenu(!showSpeedMenu)}>
+                                {playbackRate}x
+                            </button>
+                            {showSpeedMenu && (
+                                <div className="vp-speed-menu">
+                                    {[0.25, 0.5, 0.75, 1, 1.25, 1.5, 1.75, 2].map(rate => (
+                                        <div 
+                                            key={rate} 
+                                            className={`vp-speed-item ${playbackRate === rate ? 'active' : ''}`}
+                                            onClick={() => handleSpeedSelect(rate)}
+                                        >
+                                            {rate}x
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+
+                        <button className="vp-btn" onClick={togglePiP} title={t('videoPlayer.pip')}>
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                <rect x="2" y="4" width="20" height="14" rx="2" />
+                                <rect x="12" y="11" width="8" height="5" rx="1" fill="currentColor" fillOpacity="0.3" stroke="none" />
+                            </svg>
+                        </button>
+
+                        <button className="vp-btn" onClick={toggleFullscreen} title={t('videoPlayer.fullscreen')}>
+                            {isFullscreen ? <BiCollapse size={20} /> : <BiExpand size={20} />}
+                        </button>
+                    </div>
+                </div>
+            </div>
+          </>
+      )}
+
+      {/* Editor Overlay */}
+      {isEditing && (
+          <div className="vp-edit-overlay">
+              <div className="vp-edit-panel">
+                  
+                  <div className="vp-edit-header">
+                      <div className="vp-edit-title">
+                          <BiCut /> {t('videoPlayer.trim')}
+                      </div>
+                      <div className="vp-edit-actions">
+                          <button className="vp-btn-secondary" style={{ padding: '6px 12px' }} onClick={togglePlay}>
+                              {playing ? <BiPause /> : <BiPlay />}
+                          </button>
+                      </div>
+                  </div>
+
+                  {/* Trim Track */}
+                  <div className="vp-trim-track" id="vp-trim-track">
+                      {/* Range Fill */}
+                      <div 
+                          className="vp-trim-fill" 
+                          style={{ left: `${trimStartPct}%`, width: `${trimEndPct - trimStartPct}%` }}
+                      />
+                      
+                      {/* Start Handle */}
+                      <div 
+                          className="vp-trim-handle"
+                          style={{ left: `${trimStartPct}%` }}
+                          onMouseDown={(e) => handleTrimDragStart(e, 'start')}
+                      >
+                          <div className="vp-trim-time">{formatTime(editParams.trimStart)}</div>
+                      </div>
+
+                      {/* End Handle */}
+                      <div 
+                           className="vp-trim-handle"
+                           style={{ left: `${trimEndPct}%`, transform: 'translateX(-100%)' }} // Align right side? No, pure left is better but handle width matters
+                           // Better: left is position, but visual center.
+                           // Handle is 12px. center is 6px.
+                           // Actually let's assume left position matches time exactly.
+                           onMouseDown={(e) => handleTrimDragStart(e, 'end')}
+                       >
+                           <div className="vp-trim-time">{formatTime(editParams.trimEnd)}</div>
+                       </div>
+                  </div>
+
+                  {/* Filters */}
+                  <div className="vp-filters-grid">
+                      <div className="vp-filter-item">
+                          <div className="vp-filter-label">
+                              <span>{t('imageEditor.brightness')}</span>
+                              <span>{editParams.brightness}%</span>
+                          </div>
+                          <input 
+                              type="range" className="vp-filter-slider" 
+                              min="0" max="200" value={editParams.brightness}
+                              onChange={(e) => setEditParams({...editParams, brightness: parseInt(e.target.value)})}
+                          />
+                      </div>
+                      <div className="vp-filter-item">
+                          <div className="vp-filter-label">
+                              <span>{t('imageEditor.contrast')}</span>
+                              <span>{editParams.contrast}%</span>
+                          </div>
+                          <input 
+                              type="range" className="vp-filter-slider" 
+                              min="0" max="200" value={editParams.contrast}
+                              onChange={(e) => setEditParams({...editParams, contrast: parseInt(e.target.value)})}
+                          />
+                      </div>
+                      <div className="vp-filter-item">
+                          <div className="vp-filter-label">
+                              <span>{t('imageEditor.saturation')}</span>
+                              <span>{editParams.saturation}%</span>
+                          </div>
+                          <input 
+                              type="range" className="vp-filter-slider" 
+                              min="0" max="200" value={editParams.saturation}
+                              onChange={(e) => setEditParams({...editParams, saturation: parseInt(e.target.value)})}
+                          />
+                      </div>
+                  </div>
+
+                  {/* Action Buttons */}
+                  <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 10 }}>
+                      <button className="vp-btn-secondary" style={{ padding: '8px 16px', borderRadius: 6 }} onClick={toggleEditMode}>
+                          {t('common.cancel')}
+                      </button>
+                      <button className="vp-btn-primary" style={{ padding: '8px 16px', borderRadius: 6 }} onClick={() => setShowSaveModal(true)}>
+                          <BiSave style={{marginRight: 6, display:'inline-block', verticalAlign:'middle'}} /> 
+                          {t('imageEditor.save')}
+                      </button>
+                  </div>
+              </div>
+
+              {/* Save Modal */}
+              {showSaveModal && (
+                  <div className="vp-save-modal">
+                      <h3>{t('imageEditor.saveOptions')}</h3>
+                      <div className="vp-save-options">
+                          <button className="vp-save-btn" onClick={() => handleSaveVideo(false)}>
+                              <b>{t('imageEditor.overwrite')}</b>
+                              <div style={{fontSize:11, color:'#aaa'}}>{t('imageEditor.overwriteDesc')}</div>
+                          </button>
+                          <button className="vp-save-btn" onClick={() => handleSaveVideo(true)}>
+                              <b>{t('imageEditor.saveAsCopy')}</b>
+                              <div style={{fontSize:11, color:'#aaa'}}>{t('imageEditor.saveAsCopyDesc')}</div>
+                          </button>
+                          <button className="vp-save-btn" style={{textAlign:'center', marginTop:10}} onClick={() => setShowSaveModal(false)}>
+                              {t('common.cancel')}
+                          </button>
+                      </div>
+                  </div>
+              )}
           </div>
-        </div>
-      </div>
+      )}
+
     </div>
   );
 };

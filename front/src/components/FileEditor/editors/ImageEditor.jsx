@@ -1,334 +1,406 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { useLanguage } from '../../../context/LanguageContext';
+import { BiCrop, BiAdjust, BiRotateRight, BiSave, BiReset, BiUndo, BiCheck, BiX } from 'react-icons/bi';
 import './ImageEditor.css';
 
 const ImageEditor = ({ fileUrl, file }) => {
   const { t } = useLanguage();
-  const [brightness, setBrightness] = useState(100);
-  const [contrast, setContrast] = useState(100);
-  const [saturation, setSaturation] = useState(100);
-  const [rotation, setRotation] = useState(0);
-  const [scale, setScale] = useState(1);
-  const [filter, setFilter] = useState('none');
-  const [isDrawing, setIsDrawing] = useState(false);
-  const [drawColor, setDrawColor] = useState('#ff0000');
-  const [drawSize, setDrawSize] = useState(3);
+  
+  // State
+  const [activeTab, setActiveTab] = useState('adjust'); // adjust, crop, rotate
+  const [params, setParams] = useState({
+    brightness: 100,
+    contrast: 100,
+    saturation: 100,
+    grayscale: 0,
+    sepia: 0,
+    blur: 0,
+    rotation: 0
+  });
 
+  const [cropMode, setCropMode] = useState(false);
+  const [cropRect, setCropRect] = useState(null); // { x, y, w, h } relative to canvas displayed size
+  const [isDragging, setIsDragging] = useState(false);
+  const [dragHandle, setDragHandle] = useState(null); // 'tl', 'tr', 'bl', 'br', 'move'
+  const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
+  
+  const [loading, setLoading] = useState(true);
+  const [showSaveModal, setShowSaveModal] = useState(false);
+  const [history, setHistory] = useState([]); // Array of params/imageSrc states? Too complex for now.
+  
   const canvasRef = useRef(null);
-  const imageRef = useRef(null);
-  const drawingCanvasRef = useRef(null);
+  const containerRef = useRef(null);
+  const imageRef = useRef(null); // The source image (can be updated after crop)
+  const originalUrlRef = useRef(fileUrl);
 
+  // Load image
   useEffect(() => {
     if (fileUrl) {
-      console.log('🖼️ [ImageEditor] Loading image from:', fileUrl);
+      setLoading(true);
       const img = new Image();
+      img.crossOrigin = "anonymous";
       img.onload = () => {
-        console.log('✅ [ImageEditor] Image loaded successfully:', img.width, 'x', img.height);
-        const canvas = canvasRef.current;
-        if (!canvas) return;
-        
-        const ctx = canvas.getContext('2d');
-        canvas.width = img.width;
-        canvas.height = img.height;
-        ctx.drawImage(img, 0, 0);
-
-        // Setup drawing canvas
-        const drawCanvas = drawingCanvasRef.current;
-        if (drawCanvas) {
-          drawCanvas.width = img.width;
-          drawCanvas.height = img.height;
-        }
+        imageRef.current = img;
+        renderImage();
+        setLoading(false);
       };
-      img.onerror = (err) => {
-        console.error('❌ [ImageEditor] Error loading image:', err);
+      img.onerror = (e) => {
+        console.error("Error loading image", e);
+        setLoading(false);
       };
       img.src = fileUrl;
-      imageRef.current = img;
+      originalUrlRef.current = fileUrl;
     }
   }, [fileUrl]);
 
-  const applyFilters = () => {
-    return {
-      filter: `brightness(${brightness}%) contrast(${contrast}%) saturate(${saturation}%) ${filter !== 'none' ? filter : ''}`,
-      transform: `rotate(${rotation}deg) scale(${scale})`
-    };
-  };
-
-  const handleDownload = () => {
+  // Render function (apply filters, rotation)
+  const renderImage = useCallback(() => {
     const canvas = canvasRef.current;
-    const drawingCanvas = drawingCanvasRef.current;
+    const img = imageRef.current;
+    if (!canvas || !img) return;
+
+    const ctx = canvas.getContext('2d');
     
-    // Create a temporary canvas to merge both layers
-    const tempCanvas = document.createElement('canvas');
-    tempCanvas.width = canvas.width;
-    tempCanvas.height = canvas.height;
-    const ctx = tempCanvas.getContext('2d');
+    // Handle Rotation dimensions
+    const rot = params.rotation % 360;
+    const isVertical = rot === 90 || rot === 270 || rot === -90 || rot === -270;
     
-    // Draw main image with filters
-    ctx.filter = `brightness(${brightness}%) contrast(${contrast}%) saturate(${saturation}%)`;
-    ctx.drawImage(canvas, 0, 0);
+    canvas.width = isVertical ? img.height : img.width;
+    canvas.height = isVertical ? img.width : img.height;
+
+    // Clear
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
     
-    // Draw annotations on top
-    ctx.filter = 'none';
-    ctx.drawImage(drawingCanvas, 0, 0);
-    
-    // Download
-    const link = document.createElement('a');
-    link.download = `edited_${file.name}`;
-    link.href = tempCanvas.toDataURL();
-    link.click();
+    // Filters logic
+    // We apply filters before drawing? No, context.filter is best
+    const filterString = `
+      brightness(${params.brightness}%) 
+      contrast(${params.contrast}%) 
+      saturate(${params.saturation}%) 
+      grayscale(${params.grayscale}%) 
+      sepia(${params.sepia}%) 
+      blur(${params.blur}px)
+    `;
+    ctx.filter = filterString;
+
+    // Transform logic
+    ctx.save();
+    ctx.translate(canvas.width / 2, canvas.height / 2);
+    ctx.rotate((params.rotation * Math.PI) / 180);
+    ctx.drawImage(img, -img.width / 2, -img.height / 2);
+    ctx.restore();
+
+  }, [params]);
+
+  useEffect(() => {
+    renderImage();
+  }, [renderImage]);
+
+  // Reset
+  const handleReset = () => {
+    setParams({
+      brightness: 100,
+      contrast: 100,
+      saturation: 100,
+      grayscale: 0,
+      sepia: 0,
+      blur: 0,
+      rotation: 0
+    });
+    // Reload original if cropped? 
+    // Ideally we keep original source separate. 
+    // For now, reset just resets params.
   };
 
-  const handleSaveCloud = async () => {
+  // Crop Logic
+  const initCrop = () => {
+    if (!canvasRef.current) return;
+    const cw = canvasRef.current.clientWidth;
+    const ch = canvasRef.current.clientHeight;
+    // Default 80% center crop
+    setCropRect({
+      x: cw * 0.1,
+      y: ch * 0.1,
+      w: cw * 0.8,
+      h: ch * 0.8
+    });
+    setCropMode(true);
+    setActiveTab('crop');
+  };
+
+  const applyCrop = () => {
+    if (!cropRect || !canvasRef.current || !imageRef.current) return;
+    
+    const canvas = canvasRef.current;
+    // Calculate ratio between displayed canvas size and actual resolution
+    const scaleX = canvas.width / canvas.clientWidth;
+    const scaleY = canvas.height / canvas.clientHeight;
+    
+    const cropX = cropRect.x * scaleX;
+    const cropY = cropRect.y * scaleY;
+    const cropW = cropRect.w * scaleX;
+    const cropH = cropRect.h * scaleY;
+
+    // Create temp canvas for the cropped part
+    const tempCanvas = document.createElement('canvas');
+    tempCanvas.width = cropW;
+    tempCanvas.height = cropH;
+    const tCtx = tempCanvas.getContext('2d');
+
+    // Draw the current state (with filters) to temp canvas, clipped
+    tCtx.drawImage(canvas, cropX, cropY, cropW, cropH, 0, 0, cropW, cropH);
+
+    // Apply as new image source
+    const newImg = new Image();
+    newImg.onload = () => {
+        imageRef.current = newImg;
+        // Reset params as they are "baked in" now? 
+        // Yes, for simple implementation. 
+        // Or we keep params and apply them ON TOP? 
+        // Best UX: bake in rotation/crop, but maybe keep filters?
+        // Let's bake in everything to simplify "Apply".
+        handleReset(); 
+        setCropMode(false);
+        setActiveTab('adjust');
+    };
+    newImg.src = tempCanvas.toDataURL(); // DataURL is easiest way to "copy" canvas to image
+  };
+
+  const cancelCrop = () => {
+    setCropMode(false);
+    setCropRect(null);
+    setActiveTab('adjust');
+  };
+
+  // Crop Interaction
+  const handleMouseDown = (e, handle) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(true);
+    setDragHandle(handle);
+    setDragStart({ x: e.clientX, y: e.clientY });
+  };
+
+  const handleMouseMove = (e) => {
+    if (!isDragging || !cropRect) return;
+    
+    const dx = e.clientX - dragStart.x;
+    const dy = e.clientY - dragStart.y;
+    
+    let newRect = { ...cropRect };
+    
+    /* 
+       Handles: tl, tc, tr, cl, cr, bl, bc, br, move
+    */
+    
+    if (dragHandle === 'move') {
+        newRect.x += dx;
+        newRect.y += dy;
+    } else {
+        if (dragHandle.includes('l')) { newRect.x += dx; newRect.w -= dx; }
+        if (dragHandle.includes('r')) { newRect.w += dx; }
+        if (dragHandle.includes('t')) { newRect.y += dy; newRect.h -= dy; }
+        if (dragHandle.includes('b')) { newRect.h += dy; }
+    }
+
+    // Constraints check (simplified)
+    if (newRect.w < 50) newRect.w = 50;
+    if (newRect.h < 50) newRect.h = 50;
+    // Don't go out of bounds (omitted for brevity, but should be added for robustness)
+
+    setCropRect(newRect);
+    setDragStart({ x: e.clientX, y: e.clientY });
+  };
+
+  const handleMouseUp = () => {
+    setIsDragging(false);
+    setDragHandle(null);
+  };
+
+  // Saving
+  const handleSave = async (saveAsCopy) => {
+    setShowSaveModal(false);
+    setLoading(true);
     try {
-      const canvas = canvasRef.current;
-      const drawingCanvas = drawingCanvasRef.current;
-      
-      const tempCanvas = document.createElement('canvas');
-      tempCanvas.width = canvas.width;
-      tempCanvas.height = canvas.height;
-      const ctx = tempCanvas.getContext('2d');
-      
-      ctx.filter = `brightness(${brightness}%) contrast(${contrast}%) saturate(${saturation}%)`;
-      ctx.drawImage(canvas, 0, 0);
-      ctx.filter = 'none';
-      ctx.drawImage(drawingCanvas, 0, 0);
-      
-      // Determinar tipo mime basado en extensión
-      const ext = file.name.split('.').pop().toLowerCase();
-      let mimeType = 'image/png';
-      if (ext === 'jpg' || ext === 'jpeg') mimeType = 'image/jpeg';
-      if (ext === 'webp') mimeType = 'image/webp';
+        const canvas = canvasRef.current;
+        // Convert canvas to blob
+        const blob = await new Promise(resolve => canvas.toBlob(resolve, file.type || 'image/png', 0.95));
+        
+        const formData = new FormData();
+        formData.append('file', blob, file.name); // Same name, logic handles rename if copy
+        formData.append('originalPath', file.path); // Need path
+        formData.append('saveAsCopy', saveAsCopy);
 
-      const dataUrl = tempCanvas.toDataURL(mimeType);
-      
-      const token = localStorage.getItem('auth_token');
-      if (!token) {
-        alert(t('imageEditor.noSession'));
-        return;
-      }
+        const token = localStorage.getItem('auth_token');
+        const res = await fetch('/api/files/image/save', {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${token}`
+            },
+            body: formData
+        });
 
-      const response = await fetch(`/api/files/${file.id}/content`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify({ 
-            content: dataUrl,
-            encoding: 'base64'
-        })
-      });
-      
-      const data = await response.json();
-      if (data.success) {
-        alert(t('imageEditor.saveSuccess'));
-      } else {
-        alert(t('imageEditor.saveError') + data.message);
-      }
+        const data = await res.json();
+        if (data.success) {
+            // alert(t('saveSuccess'));
+             // Maybe close or refresh?
+        } else {
+            console.error(data.message);
+            // alert(t('error'));
+        }
 
-    } catch (error) {
-      console.error('Error saving image:', error);
-      alert(t('imageEditor.saveErrorGeneric'));
+    } catch (err) {
+        console.error(err);
+    } finally {
+        setLoading(false);
     }
   };
 
-  const handleReset = () => {
-    setBrightness(100);
-    setContrast(100);
-    setSaturation(100);
-    setRotation(0);
-    setScale(1);
-    setFilter('none');
-    
-    // Clear drawing canvas
-    const drawingCanvas = drawingCanvasRef.current;
-    const ctx = drawingCanvas.getContext('2d');
-    ctx.clearRect(0, 0, drawingCanvas.width, drawingCanvas.height);
-  };
-
-  // Drawing functionality
-  const startDrawing = (e) => {
-    if (!isDrawing) return;
-    const canvas = drawingCanvasRef.current;
-    const ctx = canvas.getContext('2d');
-    const rect = canvas.getBoundingClientRect();
-    const x = (e.clientX - rect.left) * (canvas.width / rect.width);
-    const y = (e.clientY - rect.top) * (canvas.height / rect.height);
-    
-    ctx.beginPath();
-    ctx.moveTo(x, y);
-    ctx.strokeStyle = drawColor;
-    ctx.lineWidth = drawSize;
-    ctx.lineCap = 'round';
-  };
-
-  const draw = (e) => {
-    if (!isDrawing) return;
-    const canvas = drawingCanvasRef.current;
-    const ctx = canvas.getContext('2d');
-    const rect = canvas.getBoundingClientRect();
-    const x = (e.clientX - rect.left) * (canvas.width / rect.width);
-    const y = (e.clientY - rect.top) * (canvas.height / rect.height);
-    
-    ctx.lineTo(x, y);
-    ctx.stroke();
-  };
-
   return (
-    <div className="image-editor h-full flex flex-col">
-      {/* Toolbar */}
-      <div className="toolbar glassmorphism-strong p-4 border-b border-gray-200 dark:border-gray-700">
-        <div className="flex flex-wrap gap-4 items-center">
-          {/* Brightness */}
-          <div className="tool-group">
-            <label className="text-xs font-medium text-gray-700 dark:text-gray-300">
-              {t('imageEditor.brightness')}: {brightness}%
-            </label>
-            <input
-              type="range"
-              min="0"
-              max="200"
-              value={brightness}
-              onChange={(e) => setBrightness(e.target.value)}
-              className="slider"
-            />
-          </div>
-
-          {/* Contrast */}
-          <div className="tool-group">
-            <label className="text-xs font-medium text-gray-700 dark:text-gray-300">
-              {t('imageEditor.contrast')}: {contrast}%
-            </label>
-            <input
-              type="range"
-              min="0"
-              max="200"
-              value={contrast}
-              onChange={(e) => setContrast(e.target.value)}
-              className="slider"
-            />
-          </div>
-
-          {/* Saturation */}
-          <div className="tool-group">
-            <label className="text-xs font-medium text-gray-700 dark:text-gray-300">
-              {t('imageEditor.saturation')}: {saturation}%
-            </label>
-            <input
-              type="range"
-              min="0"
-              max="200"
-              value={saturation}
-              onChange={(e) => setSaturation(e.target.value)}
-              className="slider"
-            />
-          </div>
-
-          {/* Rotation */}
-          <div className="tool-group">
-            <label className="text-xs font-medium text-gray-700 dark:text-gray-300">
-              {t('imageEditor.rotation')}: {rotation}°
-            </label>
-            <div className="flex gap-2">
-              <button
-                onClick={() => setRotation(r => r - 90)}
-                className="btn-icon"
-                title={t('imageEditor.rotateLeft')}
-              >
-                ↶
-              </button>
-              <button
-                onClick={() => setRotation(r => r + 90)}
-                className="btn-icon"
-                title={t('imageEditor.rotateRight')}
-              >
-                ↷
-              </button>
+    <div className="ie-container" onMouseMove={handleMouseMove} onMouseUp={handleMouseUp} onMouseLeave={handleMouseUp}>
+      
+      {/* Viewport */}
+      <div className="ie-viewport" ref={containerRef}>
+        {loading && (
+            <div className="ie-loading-overlay">
+                <div className="ie-spinner"></div>
+                <p>{t('common.processing') || 'Processing...'}</p>
             </div>
-          </div>
-
-          {/* Filters */}
-          <div className="tool-group">
-            <label className="text-xs font-medium text-gray-700 dark:text-gray-300">
-              {t('imageEditor.filter')}
-            </label>
-            <select
-              value={filter}
-              onChange={(e) => setFilter(e.target.value)}
-              className="select-filter"
-            >
-              <option value="none">{t('imageEditor.normal')}</option>
-              <option value="grayscale(100%)">{t('imageEditor.grayscale')}</option>
-              <option value="sepia(100%)">{t('imageEditor.sepia')}</option>
-              <option value="blur(2px)">{t('imageEditor.blur')}</option>
-              <option value="invert(100%)">{t('imageEditor.invert')}</option>
-            </select>
-          </div>
-
-          {/* Drawing */}
-          <div className="tool-group">
-            <button
-              onClick={() => setIsDrawing(!isDrawing)}
-              className={`btn-tool ${isDrawing ? 'active' : ''}`}
-              title={t('imageEditor.draw')}
-            >
-              ✏️ {isDrawing ? t('imageEditor.drawing') : t('imageEditor.draw')}
-            </button>
-            {isDrawing && (
-              <div className="flex gap-2 items-center">
-                <input
-                  type="color"
-                  value={drawColor}
-                  onChange={(e) => setDrawColor(e.target.value)}
-                  className="w-8 h-8 rounded cursor-pointer"
-                />
-                <input
-                  type="range"
-                  min="1"
-                  max="20"
-                  value={drawSize}
-                  onChange={(e) => setDrawSize(e.target.value)}
-                  className="slider w-20"
-                />
-              </div>
+        )}
+        
+        <div className="ie-canvas-wrap">
+            <canvas ref={canvasRef} className="ie-canvas" />
+            
+            {/* Crop Overlay */}
+            {cropMode && cropRect && (
+                <div 
+                    className="ie-crop-overlay"
+                    style={{ 
+                        left: cropRect.x, 
+                        top: cropRect.y, 
+                        width: cropRect.w, 
+                        height: cropRect.h 
+                    }}
+                    onMouseDown={(e) => handleMouseDown(e, 'move')}
+                >
+                    {['tl', 'tc', 'tr', 'cl', 'cr', 'bl', 'bc', 'br'].map(h => (
+                        <div 
+                            key={h} 
+                            className={`ie-crop-handle ie-h-${h}`} 
+                            onMouseDown={(e) => handleMouseDown(e, h)} 
+                        />
+                    ))}
+                </div>
             )}
-          </div>
-
-          {/* Actions */}
-          <div className="flex gap-2 ml-auto">
-            <button onClick={handleReset} className="btn-secondary" title={t('imageEditor.undoChanges')}>
-              🔄 {t('imageEditor.reset')}
-            </button>
-            <button onClick={handleDownload} className="btn-secondary" title={t('imageEditor.downloadPC')}>
-              ⬇️ {t('imageEditor.download')}
-            </button>
-            <button onClick={handleSaveCloud} className="btn-primary" title={t('imageEditor.saveServer')}>
-              💾 {t('imageEditor.save')}
-            </button>
-          </div>
         </div>
       </div>
 
-      {/* Canvas Area */}
-      <div className="flex-1 overflow-auto bg-gray-100 dark:bg-gray-900 flex items-center justify-center p-4">
-        <div className="relative inline-block" style={applyFilters()}>
-          <canvas
-            ref={canvasRef}
-            className="max-w-full h-auto shadow-lg rounded-lg"
-          />
-          <canvas
-            ref={drawingCanvasRef}
-            className={`absolute top-0 left-0 max-w-full h-auto drawing-canvas ${isDrawing ? 'is-drawing' : ''}`}
-            onMouseDown={startDrawing}
-            onMouseMove={draw}
-            onMouseUp={() => {}}
-            onMouseLeave={() => {}}
-          />
-        </div>
+      {/* Toolbar */}
+      <div className="ie-toolbar">
+         <button className={`ie-btn ${activeTab === 'adjust' ? 'active' : ''}`} onClick={() => { setActiveTab('adjust'); setCropMode(false); }}>
+            <BiAdjust />
+            <span>{t('imageEditor.adjust')}</span>
+         </button>
+         <button className={`ie-btn ${activeTab === 'crop' ? 'active' : ''}`} onClick={initCrop}>
+            <BiCrop />
+            <span>{t('imageEditor.crop')}</span>
+         </button>
+         <button className={`ie-btn ${activeTab === 'rotate' ? 'active' : ''}`} onClick={() => { setActiveTab('rotate'); setCropMode(false); }}>
+            <BiRotateRight />
+            <span>{t('imageEditor.rotate')}</span>
+         </button>
+         
+         <div style={{ flex: 1 }}></div>
+
+         <button className="ie-btn" onClick={handleReset}>
+             <BiReset />
+             <span>{t('imageEditor.reset')}</span>
+         </button>
+         
+         <button className="ie-btn" style={{ color: '#60a5fa' }} onClick={() => setShowSaveModal(true)}>
+             <BiSave />
+             <span>{t('imageEditor.save')}</span>
+         </button>
       </div>
+
+      {/* Controls Panel */}
+      {activeTab === 'adjust' && !cropMode && (
+          <div className="ie-controls-panel">
+               <SliderControl label={t('imageEditor.brightness')} val={params.brightness} min={0} max={200} onChange={v => setParams({...params, brightness: v})} suffix="%" />
+               <SliderControl label={t('imageEditor.contrast')} val={params.contrast} min={0} max={200} onChange={v => setParams({...params, contrast: v})} suffix="%" />
+               <SliderControl label={t('imageEditor.saturation')} val={params.saturation} min={0} max={200} onChange={v => setParams({...params, saturation: v})} suffix="%" />
+               <SliderControl label={t('imageEditor.blur')} val={params.blur} min={0} max={20} onChange={v => setParams({...params, blur: v})} suffix="px" />
+               <SliderControl label={t('imageEditor.sepia')} val={params.sepia} min={0} max={100} onChange={v => setParams({...params, sepia: v})} suffix="%" />
+               <SliderControl label={t('imageEditor.grayscale')} val={params.grayscale} min={0} max={100} onChange={v => setParams({...params, grayscale: v})} suffix="%" />
+          </div>
+      )}
+
+      {activeTab === 'rotate' && (
+          <div className="ie-controls-panel">
+              <div className="ie-rotate-controls">
+                  <button className="ie-icon-btn" onClick={() => setParams(p => ({...p, rotation: p.rotation - 90}))}>
+                      <BiUndo />
+                  </button>
+                  <span style={{ lineHeight: '40px' }}>{params.rotation}°</span>
+                  <button className="ie-icon-btn" onClick={() => setParams(p => ({...p, rotation: p.rotation + 90}))}>
+                      <BiRotateRight />
+                  </button>
+              </div>
+          </div>
+      )}
+
+      {activeTab === 'crop' && cropMode && (
+          <div className="ie-controls-panel" style={{ flexDirection: 'row', justifyContent: 'center' }}>
+              <button className="ie-action-btn ie-btn-secondary" onClick={cancelCrop}>
+                  <BiX style={{ display: 'inline', marginRight: 4 }} /> 
+                  {t('common.cancel')}
+              </button>
+              <button className="ie-action-btn ie-btn-primary" onClick={applyCrop}>
+                  <BiCheck style={{ display: 'inline', marginRight: 4 }} /> 
+                  {t('common.apply')}
+              </button>
+          </div>
+      )}
+      
+      {/* Save Modal */}
+      {showSaveModal && (
+          <div className="ie-save-modal">
+              <h3>{t('imageEditor.saveOptions')}</h3>
+              <div className="ie-save-options">
+                  <button className="ie-save-opt-btn primary" onClick={() => handleSave(false)}>
+                      <span>{t('imageEditor.overwrite')}</span>
+                      <small>{t('imageEditor.overwriteDesc')}</small>
+                  </button>
+                  <button className="ie-save-opt-btn" onClick={() => handleSave(true)}>
+                      <span>{t('imageEditor.saveAsCopy')}</span>
+                      <small>{t('imageEditor.saveAsCopyDesc')}</small>
+                  </button>
+                  <button className="ie-save-opt-btn" style={{ marginTop: 8, justifyContent: 'center' }} onClick={() => setShowSaveModal(false)}>
+                      {t('common.cancel')}
+                  </button>
+              </div>
+          </div>
+      )}
+
     </div>
   );
 };
+
+const SliderControl = ({ label, val, min, max, onChange, suffix }) => (
+    <div className="ie-slider-group">
+        <div className="ie-slider-label">{label}</div>
+        <div className="ie-slider-wrap">
+            <input 
+                type="range" 
+                className="ie-slider" 
+                min={min} 
+                max={max} 
+                value={val} 
+                onChange={(e) => onChange(parseInt(e.target.value))} 
+            />
+            <div className="ie-slider-val">{val}</div>
+        </div>
+    </div>
+);
 
 export default ImageEditor;

@@ -121,6 +121,7 @@
     "errorUploadingFiles": "Error uploading files",
     "errorUploadingFile": "Error uploading file",
     "uploadSuccess": "✅ {{count}} file(s) uploaded successfully",
+    "uploadPartial": "⚠️ {{count}} uploaded, {{errors}} error(s)",
     "uploadError": "❌ Error uploading files: {{error}}",
     "uploadingFolder": "Uploading folder...",
     "uploadingFolderProgress": "Uploading folder... {{current}}/{{total}} files",
@@ -543,9 +544,17 @@
     "saving": "Saving..."
   },
   "videoPlayer": {
+    "play": "Play",
+    "pause": "Pause",
+    "mute": "Mute",
+    "unmute": "Unmute",
+    "rewind": "Rewind 10s",
+    "forward": "Forward 10s",
     "fullscreen": "Fullscreen",
     "download": "Download",
-    "speed": "Speed"
+    "speed": "Speed",
+    "normal": "Normal",
+    "pip": "Picture in picture"
   },
   "fileViewer": {
     "errorLoading": "Error loading file",
@@ -568,7 +577,10 @@
     "size": "Size",
     "download": "Download",
     "close": "Close",
-    "downloadFile": "Download file"
+    "downloadFile": "Download file",
+    "clickToEditExcel": "Click the button to open the spreadsheet editor.",
+    "clickToEditPowerPoint": "Click the button to open the presentation editor.",
+    "enableEditing": "Open Editor"
   },
   "admin": {
     "loading": "Loading admin panel...",
@@ -840,5 +852,26 @@
   "folderCustomize": {
     "saved": "Folder customized successfully",
     "error": "Error customizing folder"
+  },
+  "upload": {
+    "uploading": "Uploading {{current}} of {{total}}",
+    "allComplete": "{{count}} file(s) uploaded",
+    "completedWithErrors": "{{done}} uploaded, {{errors}} error(s)",
+    "remaining": "remaining",
+    "expand": "Expand",
+    "minimize": "Minimize",
+    "close": "Close",
+    "cancel": "Cancel",
+    "error": "Upload failed",
+    "waiting": "Waiting"
+  },
+  "duplicateModal": {
+    "titleSingle": "Duplicate file",
+    "titleMultiple": "{{count}} duplicate files",
+    "descriptionSingle": "The file \"{{name}}\" already exists in this folder. What would you like to do?",
+    "descriptionMultiple": "{{count}} files already exist in this folder. What would you like to do?",
+    "replace": "Replace",
+    "keepBoth": "Keep both",
+    "skip": "Skip"
   }
 }

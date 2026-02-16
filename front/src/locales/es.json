@@ -176,6 +176,7 @@
     "errorUploadingFiles": "Error al subir archivos",
     "errorUploadingFile": "Error al subir archivo",
     "uploadSuccess": "✅ {{count}} archivo(s) subido(s) exitosamente",
+    "uploadPartial": "⚠️ {{count}} subido(s), {{errors}} error(es)",
     "uploadError": "❌ Error al subir archivos: {{error}}",
     "uploadingFolder": "Subiendo carpeta...",
     "uploadingFolderProgress": "Subiendo carpeta... {{current}}/{{total}} archivos",
@@ -523,7 +524,15 @@
     "saveSuccess": "Imagen guardada exitosamente en el servidor",
     "saveError": "Error al guardar: ",
     "saveErrorGeneric": "Error al guardar la imagen",
-    "noSession": "No hay sesión activa"
+    "noSession": "No hay sesión activa",
+    "adjust": "Ajustes",
+    "crop": "Recortar",
+    "rotate": "Rotar",
+    "saveOptions": "Opciones de guardado",
+    "overwrite": "Sobrescribir",
+    "overwriteDesc": "Reemplaza el archivo original",
+    "saveAsCopy": "Guardar como copia",
+    "saveAsCopyDesc": "Crea un nuevo archivo con prefijo copy_"
   },
   "pdfEditor": {
     "enterAnnotation": "Ingrese el texto de la anotación:",
@@ -604,9 +613,22 @@
     "saving": "Guardando..."
   },
   "videoPlayer": {
+    "play": "Reproducir",
+    "pause": "Pausar",
+    "mute": "Silenciar",
+    "unmute": "Activar sonido",
+    "rewind": "Retroceder 10s",
+    "forward": "Avanzar 10s",
     "fullscreen": "Pantalla completa",
     "download": "Descargar",
-    "speed": "Velocidad"
+    "speed": "Velocidad",
+    "normal": "Normal",
+    "pip": "Imagen en imagen",
+    "edit": "Editar",
+    "trim": "Recortar / Filtros",
+    "saveSuccess": "Video procesado correctamente",
+    "saveError": "Error al procesar el video",
+    "saveErrorGeneric": "Ocurrió un error inesperado al guardar"
   },
   "fileEditor": {
     "emptyFile": "El archivo está vacío",
@@ -642,7 +664,10 @@
     "size": "Tamaño",
     "download": "Descargar",
     "close": "Cerrar",
-    "downloadFile": "Descargar archivo"
+    "downloadFile": "Descargar archivo",
+    "clickToEditExcel": "Haz clic en el botón para abrir el editor de hojas de cálculo.",
+    "clickToEditPowerPoint": "Haz clic en el botón para abrir el editor de presentaciones.",
+    "enableEditing": "Abrir Editor"
   },
   "admin": {
     "loading": "Cargando panel de administración...",
@@ -859,5 +884,26 @@
   "folderCustomize": {
     "saved": "Carpeta personalizada correctamente",
     "error": "Error al personalizar la carpeta"
+  },
+  "upload": {
+    "uploading": "Subiendo {{current}} de {{total}}",
+    "allComplete": "{{count}} archivo(s) subido(s)",
+    "completedWithErrors": "{{done}} subido(s), {{errors}} error(es)",
+    "remaining": "restante",
+    "expand": "Expandir",
+    "minimize": "Minimizar",
+    "close": "Cerrar",
+    "cancel": "Cancelar",
+    "error": "Error al subir",
+    "waiting": "En espera"
+  },
+  "duplicateModal": {
+    "titleSingle": "Archivo duplicado",
+    "titleMultiple": "{{count}} archivos duplicados",
+    "descriptionSingle": "El archivo \"{{name}}\" ya existe en esta carpeta. ¿Qué deseas hacer?",
+    "descriptionMultiple": "{{count}} archivos ya existen en esta carpeta. ¿Qué deseas hacer?",
+    "replace": "Reemplazar",
+    "keepBoth": "Conservar ambos",
+    "skip": "Omitir"
   }
 }

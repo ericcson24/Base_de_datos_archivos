@@ -9,6 +9,8 @@
   box-shadow: 0 12px 40px rgba(0, 0, 0, 0.35);
   padding: 8px 0;
   min-width: 180px;
+  max-height: calc(100vh - 40px);
+  overflow-y: auto;
   animation: fadeInScale 0.2s ease-out;
 }
 

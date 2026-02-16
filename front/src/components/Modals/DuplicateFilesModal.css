@@ -1,0 +1,172 @@
+/* ── Overlay ───────────────────────────────────────── */
+.dup-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  backdrop-filter: blur(5px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1100;          /* above UploadPopup (z-index 1050) */
+  animation: dupFadeIn 0.2s ease;
+}
+
+/* ── Modal Card ───────────────────────────────────── */
+.dup-modal {
+  background: var(--bg-secondary);
+  border-radius: 14px;
+  width: 420px;
+  max-width: 92vw;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+  animation: dupSlideIn 0.25s ease;
+  overflow: hidden;
+}
+
+/* ── Header ───────────────────────────────────────── */
+.dup-modal-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 20px 24px 12px;
+  color: #e8a317;
+}
+
+.dup-modal-header h2 {
+  margin: 0;
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+/* ── Content ──────────────────────────────────────── */
+.dup-modal-content {
+  padding: 0 24px 12px;
+}
+
+.dup-modal-description {
+  margin: 0 0 12px;
+  font-size: 0.9rem;
+  color: var(--text-secondary);
+  line-height: 1.45;
+}
+
+/* ── File list ────────────────────────────────────── */
+.dup-modal-file-list {
+  max-height: 200px;
+  overflow-y: auto;
+  border: 1px solid var(--border-color, rgba(128, 128, 128, 0.2));
+  border-radius: 8px;
+  padding: 6px;
+  background: var(--bg-primary, #f5f5f5);
+}
+
+.dup-modal-file-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  border-radius: 6px;
+  font-size: 0.85rem;
+  color: var(--text-primary);
+  transition: background 0.15s;
+}
+
+.dup-modal-file-item:hover {
+  background: var(--bg-hover, rgba(128, 128, 128, 0.1));
+}
+
+.dup-modal-file-item svg {
+  flex-shrink: 0;
+  color: var(--text-secondary);
+}
+
+.dup-modal-file-item span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ── Actions ──────────────────────────────────────── */
+.dup-modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 14px 24px 20px;
+  border-top: 1px solid var(--border-color, rgba(128, 128, 128, 0.15));
+}
+
+.dup-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 16px;
+  border: none;
+  border-radius: 8px;
+  font-size: 0.85rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.15s, transform 0.1s;
+}
+
+.dup-btn:hover {
+  transform: translateY(-1px);
+}
+
+.dup-btn:active {
+  transform: translateY(0);
+}
+
+/* Skip */
+.dup-btn-skip {
+  background: var(--bg-hover, #e5e5e5);
+  color: var(--text-secondary);
+}
+
+.dup-btn-skip:hover {
+  background: var(--bg-hover-dark, #d5d5d5);
+}
+
+/* Keep Both */
+.dup-btn-keep {
+  background: #2563eb;
+  color: #fff;
+}
+
+.dup-btn-keep:hover {
+  background: #1d4ed8;
+}
+
+/* Replace */
+.dup-btn-replace {
+  background: #e8a317;
+  color: #fff;
+}
+
+.dup-btn-replace:hover {
+  background: #ca8a04;
+}
+
+/* ── Animations ───────────────────────────────────── */
+@keyframes dupFadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+@keyframes dupSlideIn {
+  from { opacity: 0; transform: scale(0.95) translateY(8px); }
+  to   { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+/* ── Dark mode ────────────────────────────────────── */
+[data-theme="dark"] .dup-modal-file-list {
+  background: var(--bg-tertiary, #1e1e1e);
+}
+
+[data-theme="dark"] .dup-btn-skip {
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--text-secondary);
+}
+
+[data-theme="dark"] .dup-btn-skip:hover {
+  background: rgba(255, 255, 255, 0.14);
+}
