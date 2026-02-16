@@ -7,7 +7,7 @@ import FolderCustomizeModal from '../Modals/FolderCustomizeModal';
 import RenameModal from '../Modals/RenameModal';
 import MoveModal from '../Modals/MoveModal';
 import ShareModal from '../Modals/ShareModal';
-import DeleteConfirmationModal from '../Modals/DeleteConfirmationModal';
+import FileDeleteModal from '../Modals/FileDeleteModal';
 import SettingsModal from '../Modals/SettingsModal';
 import RDPViewer from '../RDP/RDPViewer';
 import RDPConnectionModal from '../Modals/RDPConnectionModal';
@@ -1835,11 +1835,12 @@ useEffect(() => {
       )}
 
       {/* Delete Confirmation Modal */}
-      <DeleteConfirmationModal
+      <FileDeleteModal
         isOpen={showDeleteModal}
         onClose={() => setShowDeleteModal(false)}
         onConfirm={executeDelete}
         itemName={itemToDelete ? itemToDelete.name : ''}
+        itemType={itemToDelete ? itemToDelete.type : 'file'}
       />
 
       {/* File Viewer Modal */}

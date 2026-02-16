@@ -133,6 +133,8 @@
     "folderCreatedSuccess": "Folder utworzony pomyślnie",
     "errorCreatingFolder": "Błąd podczas tworzenia folderu",
     "confirmDelete": "Czy na pewno chcesz usunąć \"{{name}}\"?",
+    "deleteItem": "Usuń element",
+    "deleteFolderWarning": "Wszystkie pliki i podfoldery w tym folderze zostaną usunięte.",
     "itemDeletedSuccess": "Element usunięty pomyślnie",
     "errorDeleting": "Błąd podczas usuwania",
     "enterNewName": "Proszę podać nową nazwę",

@@ -134,6 +134,8 @@
     "folderCreatedSuccess": "Folder created successfully",
     "errorCreatingFolder": "Error creating folder",
     "confirmDelete": "Are you sure you want to delete \"{{name}}\"?",
+    "deleteItem": "Delete item",
+    "deleteFolderWarning": "All files and subfolders inside this folder will be deleted.",
     "itemDeletedSuccess": "Item deleted successfully",
     "errorDeleting": "Error deleting",
     "enterNewName": "Please enter a new name",

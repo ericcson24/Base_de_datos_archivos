@@ -189,6 +189,8 @@
     "folderCreatedSuccess": "Carpeta creada exitosamente",
     "errorCreatingFolder": "Error al crear carpeta",
     "confirmDelete": "¿Estás seguro de que quieres eliminar \"{{name}}\"?",
+    "deleteItem": "Eliminar elemento",
+    "deleteFolderWarning": "Se eliminarán todos los archivos y subcarpetas dentro de esta carpeta.",
     "itemDeletedSuccess": "Elemento eliminado exitosamente",
     "errorDeleting": "Error al eliminar",
     "enterNewName": "Por favor ingresa un nuevo nombre",
