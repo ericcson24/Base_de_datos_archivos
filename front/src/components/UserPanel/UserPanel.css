@@ -748,21 +748,22 @@ body {
   display: flex;
   flex-direction: row;
   gap: 1rem;
-  overflow: visible;
+  overflow: hidden;
   position: relative;
   height: 100%;
-  padding: 0; /* Clean padding */
+  padding: 0;
   margin-top: 0.5rem;
+  min-height: 0;
 }
 
 .file-grid {
-  flex: 1;
-  width: 100%;
+  flex: 1 1 0;
+  min-width: 280px;
   display: flex;
   flex-direction: column;
   align-items: stretch;
   gap: 0.5rem;
-  overflow: visible;
+  overflow: hidden;
   border-radius: 0.5rem;
   padding: 0.5rem;
   color: var(--text-color);
@@ -1570,6 +1571,15 @@ input[type="text"]:focus {
   .file-grid {
     max-height: 90vh; /* Aumentado de 60vh a 90vh también para móviles */
   }
+
+  .main-content-container {
+    flex-direction: column;
+  }
+
+  .editor-panels-container {
+    max-width: 100%;
+    min-width: 0;
+  }
 }
 
 /* SEARCH CONTROLS BAR (outer toolbar wrapper) */
@@ -2259,17 +2269,20 @@ input[type="text"]:focus {
 /* .file-grid removed - merged with above */
 
 .editor-panels-container {
-  flex: 1;
+  flex: 1.2 1 0;
+  min-width: 350px;
+  max-width: 60%;
   display: flex;
   flex-direction: column;
   gap: 1rem;
   overflow-y: auto;
+  overflow-x: hidden;
   padding-right: 0.5rem;
 }
 
 .editor-panel-inline {
-  min-height: 500px;
-  max-height: 80vh;
+  min-height: 400px;
+  flex: 1;
   animation: slide-in-right 0.3s ease-out;
 }
 

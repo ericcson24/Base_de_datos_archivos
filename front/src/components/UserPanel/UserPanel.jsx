@@ -1731,9 +1731,9 @@ useEffect(() => {
 
         {/* Editor Panels Container - Al lado del file-grid */}
         {editorPanels.length > 0 && (
-          <div className="editor-panels-container flex-1 flex flex-col gap-4 overflow-y-auto p-4 transition-all duration-300">
+          <div className="editor-panels-container transition-all duration-300">
             {editorPanels.map(panel => (
-              <div key={panel.id} className="editor-panel-inline glassmorphism rounded-2xl shadow-xl overflow-hidden border border-gray-200 dark:border-gray-700 h-full">
+              <div key={panel.id} className="editor-panel-inline glassmorphism rounded-2xl shadow-xl overflow-hidden border border-gray-200 dark:border-gray-700">
                 <FileEditorPanel
                   file={panel.file}
                   position={{x:0,y:0}}
