@@ -80,6 +80,10 @@ const DailyTimeline = ({ events, headerActions }) => {
     return eventStart < endOfDay && eventEnd > startOfDay;
   });
 
+  // Separate all-day vs timed events
+  const allDayEvents = todaysEvents.filter(e => e.allDay);
+  const timedEvents = todaysEvents.filter(e => !e.allDay);
+
   const getPosition = (date) => {
     const d = new Date(date);
     const minutes = d.getHours() * 60 + d.getMinutes();
@@ -94,6 +98,21 @@ const DailyTimeline = ({ events, headerActions }) => {
         <h3>{t('calendar.todayDate', { date: today.toLocaleDateString(language === 'es' ? 'es-ES' : language === 'pl' ? 'pl-PL' : 'en-US', { weekday: 'long', day: 'numeric', month: 'long' }) })}</h3>
         {headerActions && <div className="daily-timeline-actions">{headerActions}</div>}
       </div>
+      {/* All-day events shown as compact tags above the timeline */}
+      {allDayEvents.length > 0 && (
+        <div className="timeline-allday-bar">
+          {allDayEvents.map((event, idx) => (
+            <span
+              key={event.id || idx}
+              className="timeline-allday-tag"
+              style={{ backgroundColor: event.backgroundColor || '#3788d8' }}
+              title={event.title}
+            >
+              {event.title}
+            </span>
+          ))}
+        </div>
+      )}
       <div 
         className="daily-timeline-container" 
         ref={containerRef}
@@ -112,7 +131,7 @@ const DailyTimeline = ({ events, headerActions }) => {
            </div>
         ))}
         
-        {todaysEvents.map((event, idx) => {
+        {timedEvents.map((event, idx) => {
             const start = new Date(event.start);
             const end = new Date(event.end || event.start);
             
@@ -432,7 +451,19 @@ const Calendar = ({ user, onLogout, onBackToPanel, onBackToFolders, onGoToRemote
     eventsCacheRef.current.clear();
     loadedRangesRef.current = [];
     isFetchingRef.current = false;
-    await loadEvents();
+
+    // Use the currently visible range from FullCalendar (if available) to reload
+    const api = calendarRef.current?.getApi();
+    if (api) {
+      const view = api.view;
+      const bufferStart = new Date(view.activeStart);
+      bufferStart.setMonth(bufferStart.getMonth() - 1);
+      const bufferEnd = new Date(view.activeEnd);
+      bufferEnd.setMonth(bufferEnd.getMonth() + 1);
+      await loadEvents(bufferStart, bufferEnd);
+    } else {
+      await loadEvents();
+    }
   }, [loadEvents]);
 
   useEffect(() => {
@@ -555,7 +586,7 @@ const Calendar = ({ user, onLogout, onBackToPanel, onBackToFolders, onGoToRemote
         })
       });
       if (!response.ok) throw new Error('Error updating event');
-      reloadEvents();
+      await reloadEvents();
       addToast(t('calendar.eventUpdated'), 'success');
     } catch (error) {
       console.error('Error updating event:', error);
@@ -602,7 +633,12 @@ const Calendar = ({ user, onLogout, onBackToPanel, onBackToFolders, onGoToRemote
         </div>
 
         <div className="sidebar-content">
-          <button className="create-event-btn" onClick={() => setModalState({ isOpen: true, mode: 'create', selectedDates: { start: new Date(), end: new Date(), allDay: true } })}>
+          <button className="create-event-btn" onClick={() => {
+            const now = new Date();
+            const tomorrow = new Date(now);
+            tomorrow.setDate(tomorrow.getDate() + 1);
+            setModalState({ isOpen: true, mode: 'create', selectedDates: { start: now, end: tomorrow, allDay: true } });
+          }}>
             <span>+</span> {t('calendar.newEvent')}
           </button>
           
@@ -886,6 +922,7 @@ const Calendar = ({ user, onLogout, onBackToPanel, onBackToFolders, onGoToRemote
           user={user}
           onThemeToggle={onThemeToggle}
           isDarkMode={isDarkMode}
+          isCalendar={true}
         />
       )}
 
@@ -951,7 +988,7 @@ const Calendar = ({ user, onLogout, onBackToPanel, onBackToFolders, onGoToRemote
 
               setModalState({ ...modalState, isOpen: false });
               calendarRef.current?.getApi()?.unselect(); // Clear selection
-              reloadEvents();
+              await reloadEvents();
               
               if (eventData.assignMode === 'group') {
                  addToast(t('calendar.groupEventCreated', { 
@@ -982,7 +1019,7 @@ const Calendar = ({ user, onLogout, onBackToPanel, onBackToFolders, onGoToRemote
               if (!response.ok) throw new Error('Error deleting event');
               setModalState({ ...modalState, isOpen: false });
               calendarRef.current?.getApi()?.unselect(); // Clear selection
-              reloadEvents();
+              await reloadEvents();
               addToast(t('calendar.eventDeleted'), 'success');
             } catch (error) {
               console.error('Error deleting event:', error);

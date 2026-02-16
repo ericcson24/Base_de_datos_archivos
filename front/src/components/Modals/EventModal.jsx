@@ -235,12 +235,20 @@ const EventModal = ({
   useEffect(() => {
     if (isOpen && event && (mode === 'view' || mode === 'edit')) {
       const startDate = event.start;
-      const endDate = event.end;
+      let displayEndDate = event.end;
+
+      // FullCalendar uses exclusive end for allDay events;
+      // subtract 1 day to show the inclusive end date to the user
+      if (event.allDay && displayEndDate) {
+        const d = new Date(displayEndDate);
+        d.setDate(d.getDate() - 1);
+        displayEndDate = d;
+      }
 
       setFormData({
         title: event.title || '',
         start: event.allDay ? formatDateForDateInput(startDate) : formatDateForInput(startDate),
-        end: event.allDay ? formatDateForDateInput(endDate) : formatDateForInput(endDate),
+        end: event.allDay ? formatDateForDateInput(displayEndDate) : formatDateForInput(event.end),
         allDay: event.allDay || false,
         location: event.extendedProps?.location || '',
         description: event.extendedProps?.description || '',
@@ -253,11 +261,17 @@ const EventModal = ({
       if (selectedDates) {
         // Use selected dates from calendar
         const startDate = selectedDates.allDay
-          ? selectedDates.start.toISOString().split('T')[0]
+          ? formatDateForDateInput(selectedDates.start)
           : formatDateForInput(selectedDates.start);
-        const endDate = selectedDates.allDay
-          ? selectedDates.end.toISOString().split('T')[0]
-          : formatDateForInput(selectedDates.end);
+        let endDate;
+        if (selectedDates.allDay) {
+          // FullCalendar uses exclusive end for allDay; subtract 1 day for inclusive display
+          const inclusiveEnd = new Date(selectedDates.end);
+          inclusiveEnd.setDate(inclusiveEnd.getDate() - 1);
+          endDate = formatDateForDateInput(inclusiveEnd);
+        } else {
+          endDate = formatDateForInput(selectedDates.end);
+        }
 
         setFormData({
           title: '',
@@ -414,8 +428,13 @@ const EventModal = ({
       let finalStart = formData.start;
       let finalEnd = formData.end;
 
-      // Fix timezone issue: Convert local input time to ISO UTC
-      if (!formData.allDay) {
+      if (formData.allDay) {
+          // Convert inclusive end date back to exclusive for backend/Graph API (add 1 day)
+          const [y, m, d] = formData.end.split('-').map(Number);
+          const nextDay = new Date(y, m - 1, d + 1);
+          finalEnd = `${nextDay.getFullYear()}-${String(nextDay.getMonth() + 1).padStart(2, '0')}-${String(nextDay.getDate()).padStart(2, '0')}`;
+      } else {
+          // Fix timezone issue: Convert local input time to ISO UTC
           if (formData.start && formData.start.includes('T')) {
               finalStart = new Date(formData.start).toISOString();
           }

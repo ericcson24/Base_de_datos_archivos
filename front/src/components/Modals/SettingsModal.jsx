@@ -1,13 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import Button from '../Common/Button';
 import Input from '../Common/Input';
+import ExportCalendarModal from './ExportCalendarModal';
 import { getAuthToken } from '../../utils/fileUtils';
 import { useToast } from '../../context/ToastContext';
 import { useLanguage } from '../../context/LanguageContext';
 import { useFetch } from '../../hooks/useFetch';
 import './SettingsModal.css';
 
-const SettingsModal = ({ onClose, user, onThemeToggle, isDarkMode, initialTab = 'general', onUserUpdate }) => {
+const SettingsModal = ({ onClose, user, onThemeToggle, isDarkMode, initialTab = 'general', onUserUpdate, isCalendar = false }) => {
   const { addToast } = useToast();
   const fetchWithNotify = useFetch();
   const { t, changeLanguage, language: currentLanguage } = useLanguage();
@@ -23,14 +24,13 @@ const SettingsModal = ({ onClose, user, onThemeToggle, isDarkMode, initialTab = 
     notifications: user?.notifications ?? true,
     microsoftAccount: null // { email: '...', name: '...' }
   });
-  const [newPassword, setNewPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
-  const [activeTab, setActiveTab] = useState(initialTab); // general, security, integrations, ia
+  const [activeTab, setActiveTab] = useState(initialTab); // general, integrations, ia
   const [showAvatarSelector, setShowAvatarSelector] = useState(false);
   const [defaultAvatars, setDefaultAvatars] = useState([]);
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
   const [deletingAvatar, setDeletingAvatar] = useState(false);
   const [aiStatus, setAiStatus] = useState(null);
+  const [showExportModal, setShowExportModal] = useState(false);
 
   useEffect(() => {
     fetchSettings();
@@ -183,11 +183,6 @@ const SettingsModal = ({ onClose, user, onThemeToggle, isDarkMode, initialTab = 
   };
 
   const handleSave = async () => {
-    if (newPassword && newPassword !== confirmPassword) {
-      addToast(t('settings.passwordsDoNotMatch'), 'warning');
-      return;
-    }
-
     setSaving(true);
     try {
       const response = await fetch('/api/auth/settings', {
@@ -201,7 +196,7 @@ const SettingsModal = ({ onClose, user, onThemeToggle, isDarkMode, initialTab = 
           avatarUrl: settings.avatarUrl,
           language: settings.language,
           notifications: settings.notifications,
-          newPassword: newPassword || undefined
+
         })
       });
 
@@ -315,14 +310,7 @@ const SettingsModal = ({ onClose, user, onThemeToggle, isDarkMode, initialTab = 
           >
             {t('settings.general')}
           </button>
-          {settings.role === 'admin' && (
-            <button
-              className={`settings-tab ${activeTab === 'security' ? 'active' : ''}`}
-              onClick={() => setActiveTab('security')}
-            >
-              {t('settings.security')}
-            </button>
-          )}
+
           <button
             className={`settings-tab ${activeTab === 'integrations' ? 'active' : ''}`}
             onClick={() => setActiveTab('integrations')}
@@ -455,32 +443,26 @@ const SettingsModal = ({ onClose, user, onThemeToggle, isDarkMode, initialTab = 
                   </button>
                 </div>
               </div>
-            </div>
-          )}
-          
-          {activeTab === 'security' && (
-            <div className="settings-section">
-              <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-4">{t('settings.changePassword')}</h3>
-              <div className="mb-4">
-                <label className="settings-label">{t('settings.newPassword')}</label>
-                <Input
-                  type="password"
-                  value={newPassword}
-                  onChange={(e) => setNewPassword(e.target.value)}
-                  placeholder="••••••••"
-                  className="w-full"
-                />
-              </div>
-              <div>
-                <label className="settings-label">{t('settings.confirmPassword')}</label>
-                <Input
-                  type="password"
-                  value={confirmPassword}
-                  onChange={(e) => setConfirmPassword(e.target.value)}
-                  placeholder="••••••••"
-                  className="w-full"
-                />
-              </div>
+
+              {/* Export Calendar - solo visible desde Calendar */}
+              {isCalendar && (
+                <div className="mt-6 pt-6" style={{ borderTop: '1px solid var(--border-color, #e5e7eb)' }}>
+                  <label className="settings-label mb-2">{t('export.sectionTitle')}</label>
+                  <button
+                    className="export-calendar-btn"
+                    onClick={() => setShowExportModal(true)}
+                  >
+                    <div className="export-calendar-btn-icon">📤</div>
+                    <div className="export-calendar-btn-info">
+                      <span className="export-calendar-btn-title">{t('export.title')}</span>
+                      <span className="export-calendar-btn-desc">{t('export.subtitle')}</span>
+                    </div>
+                    <svg className="w-5 h-5 export-calendar-btn-arrow" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                    </svg>
+                  </button>
+                </div>
+              )}
             </div>
           )}
 
@@ -693,6 +675,10 @@ const SettingsModal = ({ onClose, user, onThemeToggle, isDarkMode, initialTab = 
           </Button>
         </div>
       </div>
+
+      {showExportModal && (
+        <ExportCalendarModal onClose={() => setShowExportModal(false)} />
+      )}
     </div>
   );
 };

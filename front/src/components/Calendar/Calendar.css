@@ -403,6 +403,31 @@
   /* NO overflow here */
 }
 
+/* All-day events bar (above the scrollable timeline) */
+.timeline-allday-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 6px 0 8px 0;
+  margin-bottom: 4px;
+}
+
+.timeline-allday-tag {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 12px;
+  border-radius: 12px;
+  color: #fff;
+  font-size: 0.78rem;
+  font-weight: 600;
+  white-space: nowrap;
+  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.15);
+  letter-spacing: 0.01em;
+}
+
 .daily-timeline-container {
   /* Removed padding/border/bg from here because now wrapper has it */
   position: relative;

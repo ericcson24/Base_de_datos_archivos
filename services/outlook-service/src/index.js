@@ -147,37 +147,61 @@ function convertToSpainTime(dateStr, isAllDay = false) {
   return dateStr;
 }
 
+/**
+ * Convert a UTC dateTime string from Graph API to the correct date (YYYY-MM-DD) in Europe/Madrid.
+ * Graph API with Prefer: outlook.timezone="UTC" shifts all-day event midnight from Madrid to UTC,
+ * causing the date to move back one day. This converts it back to the correct Madrid date.
+ */
+function utcDateTimeToMadridDate(dateTimeStr) {
+  if (!dateTimeStr) return null;
+  if (!dateTimeStr.includes('T')) return dateTimeStr;
+  const utc = new Date(dateTimeStr.endsWith('Z') ? dateTimeStr : dateTimeStr + 'Z');
+  return utc.toLocaleDateString('en-CA', { timeZone: 'Europe/Madrid' });
+}
+
+/**
+ * Ensure a value from DB is a date-only string (YYYY-MM-DD) for all-day events.
+ * PostgreSQL TIMESTAMP columns return JS Date objects via the pg driver.
+ */
+function toDateOnly(val) {
+  if (!val) return null;
+  if (val instanceof Date) return val.toLocaleDateString('en-CA', { timeZone: 'UTC' });
+  if (typeof val === 'string' && val.includes('T')) return val.split('T')[0];
+  return val;
+}
+
 // Función para convertir colores de Outlook a hexadecimal
 function getOutlookCategoryColor(outlookColor) {
+  // Microsoft Outlook category preset colors (official mapping)
   const colorMap = {
-    'preset0': '#ff1a1a',   // Rojo
-    'preset1': '#ff8c00',   // Naranja
-    'preset2': '#8b4513',   // Marrón
-    'preset3': '#ffd700',   // Amarillo
-    'preset4': '#32cd32',   // Verde
-    'preset5': '#008080',   // Turquesa
-    'preset6': '#2563eb',   // Azul
-    'preset7': '#800080',   // Púrpura
-    'preset8': '#c0c0c0',   // Gris
-    'preset9': '#696969',   // Gris oscuro
-    'preset10': '#dc143c',  // Crimson
-    'preset11': '#ff69b4',  // Rosa
-    'preset12': '#3b82f6',  // Azul real
-    'preset13': '#228b22',  // Verde bosque
-    'preset14': '#ff4500',  // Rojo naranja
-    'preset15': '#9932cc',  // Orquídea oscura
-    'preset16': '#8b0000',  // Rojo oscuro
-    'preset17': '#556b2f',  // Verde oliva oscuro
-    'preset18': '#2f4f4f',  // Gris pizarra oscuro
-    'preset19': '#b22222',  // Ladrillo
-    'preset20': '#8fbc8f',  // Verde marino oscuro
-    'preset21': '#1e40af',  // Azul pizarra oscuro
-    'preset22': '#2e8b57',  // Verde marino
-    'preset23': '#800000',  // Granate
-    'preset24': '#9acd32'   // Verde amarillo
+    'preset0': '#e74856',   // Red
+    'preset1': '#ff8c00',   // Orange
+    'preset2': '#f7b262',   // Peach / Brown
+    'preset3': '#f8db3e',   // Yellow
+    'preset4': '#3da848',   // Green
+    'preset5': '#47a5a5',   // Teal
+    'preset6': '#9cac36',   // Olive
+    'preset7': '#4585ed',   // Blue
+    'preset8': '#b085dc',   // Purple
+    'preset9': '#c44569',   // Cranberry
+    'preset10': '#647687',  // Steel
+    'preset11': '#4b5d6e',  // DarkSteel
+    'preset12': '#98a8b4',  // Gray
+    'preset13': '#636c73',  // DarkGray
+    'preset14': '#4a4c4f',  // Black
+    'preset15': '#8f3a40',  // DarkRed
+    'preset16': '#c06000',  // DarkOrange
+    'preset17': '#c18c4a',  // DarkPeach
+    'preset18': '#b39e35',  // DarkYellow
+    'preset19': '#2f7635',  // DarkGreen
+    'preset20': '#377b7b',  // DarkTeal
+    'preset21': '#72852b',  // DarkOlive
+    'preset22': '#304da5',  // DarkBlue
+    'preset23': '#8459a5',  // DarkPurple
+    'preset24': '#96314c'   // DarkCranberry
   };
 
-  return colorMap[outlookColor] || '#4285f4';
+  return colorMap[outlookColor] || '#4585ed';
 }
 
 // --- Rutas ---
@@ -223,12 +247,13 @@ app.get('/', authenticate, async (req, res) => {
             }
         } catch (err) {}
 
+        const isAllDay = e.is_all_day === 1 || e.is_all_day === true;
         return {
             id: e.microsoft_id || e.id.toString(),
             title: e.subject,
-            start: e.start_time,
-            end: e.end_time,
-            allDay: e.is_all_day === 1 || e.is_all_day === true,
+            start: isAllDay ? toDateOnly(e.start_time) : e.start_time,
+            end: isAllDay ? toDateOnly(e.end_time) : e.end_time,
+            allDay: isAllDay,
             location: e.location,
             description: e.body_preview,
             url: e.web_link,
@@ -264,8 +289,15 @@ app.get('/', authenticate, async (req, res) => {
                 const eventsResponse = await msQuery.get();
 
                 for (const event of eventsResponse.value) {
-                    const startTime = event.start.dateTime.endsWith('Z') ? event.start.dateTime : event.start.dateTime + 'Z';
-                    const endTime = event.end.dateTime.endsWith('Z') ? event.end.dateTime : event.end.dateTime + 'Z';
+                    // For all-day events, convert UTC dateTime back to Madrid date (Prefer UTC header shifts midnight)
+                    let startTime, endTime;
+                    if (event.isAllDay) {
+                        startTime = utcDateTimeToMadridDate(event.start.dateTime);
+                        endTime = utcDateTimeToMadridDate(event.end.dateTime);
+                    } else {
+                        startTime = event.start.dateTime.endsWith('Z') ? event.start.dateTime : event.start.dateTime + 'Z';
+                        endTime = event.end.dateTime.endsWith('Z') ? event.end.dateTime : event.end.dateTime + 'Z';
+                    }
 
                     await dbAsync.run(`
                         INSERT INTO calendar_events (microsoft_id, user_id, subject, body_preview, start_time, end_time, is_all_day, location, web_link, categories, last_synced)
@@ -420,8 +452,15 @@ app.post('/sync', authenticate, async (req, res) => {
 
     let syncedCount = 0;
     for (const event of eventsResponse.value) {
-        const startTime = event.start.dateTime.endsWith('Z') ? event.start.dateTime : event.start.dateTime + 'Z';
-        const endTime = event.end.dateTime.endsWith('Z') ? event.end.dateTime : event.end.dateTime + 'Z';
+        // For all-day events, convert UTC dateTime back to Madrid date (Prefer UTC header shifts midnight)
+        let startTime, endTime;
+        if (event.isAllDay) {
+            startTime = utcDateTimeToMadridDate(event.start.dateTime);
+            endTime = utcDateTimeToMadridDate(event.end.dateTime);
+        } else {
+            startTime = event.start.dateTime.endsWith('Z') ? event.start.dateTime : event.start.dateTime + 'Z';
+            endTime = event.end.dateTime.endsWith('Z') ? event.end.dateTime : event.end.dateTime + 'Z';
+        }
 
         await dbAsync.run(`
             INSERT INTO calendar_events (microsoft_id, user_id, subject, body_preview, start_time, end_time, is_all_day, location, web_link, categories, last_synced)
@@ -471,17 +510,17 @@ app.post('/', authenticate, async (req, res) => {
 
     if (allDay) {
       newEvent.isAllDay = true;
-      const startDate = start.split('T')[0];
-      let endDate = end.split('T')[0];
+      const startDateStr = start.split('T')[0];
+      let endDateStr = end.split('T')[0];
       // Graph API requires end date to be the day AFTER the last day for all-day events
-      if (endDate <= startDate) {
-        const d = new Date(startDate);
+      if (endDateStr <= startDateStr) {
+        const d = new Date(startDateStr);
         d.setDate(d.getDate() + 1);
-        endDate = d.toISOString().split('T')[0];
+        endDateStr = d.toISOString().split('T')[0];
       }
-      // All-day events use "date" property WITHOUT timeZone (Graph API rejects timeZone with date)
-      newEvent.start = { dateTime: startDate + 'T00:00:00', timeZone: 'Europe/Madrid' };
-      newEvent.end = { dateTime: endDate + 'T00:00:00', timeZone: 'Europe/Madrid' };
+      // All-day events: use dateTime with T00:00:00 (Graph API DateTimeTimeZone has no 'date' property)
+      newEvent.start = { dateTime: `${startDateStr}T00:00:00`, timeZone: 'Europe/Madrid' };
+      newEvent.end = { dateTime: `${endDateStr}T00:00:00`, timeZone: 'Europe/Madrid' };
     } else {
       newEvent.isAllDay = false;
       newEvent.start = { dateTime: start, timeZone: 'Europe/Madrid' };
@@ -498,8 +537,9 @@ app.post('/', authenticate, async (req, res) => {
 
     let startDate, endDate;
     if (createdEvent.isAllDay) {
-      startDate = createdEvent.start.date;
-      endDate = createdEvent.end.date;
+      // All-day events: extract correct Madrid date from response dateTime
+      startDate = utcDateTimeToMadridDate(createdEvent.start.dateTime) || start.split('T')[0];
+      endDate = utcDateTimeToMadridDate(createdEvent.end.dateTime) || end.split('T')[0];
     } else {
       startDate = createdEvent.start.dateTime.endsWith('Z') ? createdEvent.start.dateTime : createdEvent.start.dateTime + 'Z';
       endDate = createdEvent.end.dateTime.endsWith('Z') ? createdEvent.end.dateTime : createdEvent.end.dateTime + 'Z';
@@ -519,13 +559,21 @@ app.post('/', authenticate, async (req, res) => {
     };
 
     try {
+      // For all-day events, store the correct Madrid date
+      const dbStartTime = createdEvent.isAllDay
+        ? (utcDateTimeToMadridDate(createdEvent.start.dateTime) || start.split('T')[0])
+        : (createdEvent.start.dateTime || start);
+      const dbEndTime = createdEvent.isAllDay
+        ? (utcDateTimeToMadridDate(createdEvent.end.dateTime) || end.split('T')[0])
+        : (createdEvent.end.dateTime || end);
       await dbAsync.run(`
-          INSERT INTO calendar_events (microsoft_id, user_id, subject, body_preview, start_time, end_time, is_all_day, location, web_link, last_synced)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+          INSERT INTO calendar_events (microsoft_id, user_id, subject, body_preview, start_time, end_time, is_all_day, location, web_link, categories, last_synced)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
       `, [
           createdEvent.id, user.id, createdEvent.subject, createdEvent.bodyPreview,
-          createdEvent.start.dateTime, createdEvent.end.dateTime, createdEvent.isAllDay ? 1 : 0,
-          createdEvent.location?.displayName, createdEvent.webLink
+          dbStartTime, dbEndTime, createdEvent.isAllDay ? 1 : 0,
+          createdEvent.location?.displayName, createdEvent.webLink,
+          JSON.stringify(createdEvent.categories || [])
       ]);
     } catch (e) {}
 
@@ -649,8 +697,8 @@ app.put('/:id', authenticate, async (req, res) => {
 
         if (allDay) {
           updatedEvent.isAllDay = true;
-          updatedEvent.start = { date: start.split('T')[0], timeZone: 'Europe/Madrid' };
-          updatedEvent.end = { date: end.split('T')[0], timeZone: 'Europe/Madrid' };
+          updatedEvent.start = { dateTime: `${start.split('T')[0]}T00:00:00`, timeZone: 'Europe/Madrid' };
+          updatedEvent.end = { dateTime: `${end.split('T')[0]}T00:00:00`, timeZone: 'Europe/Madrid' };
         } else {
           updatedEvent.isAllDay = false;
           updatedEvent.start = { dateTime: start, timeZone: 'Europe/Madrid' };
@@ -660,13 +708,20 @@ app.put('/:id', authenticate, async (req, res) => {
         const response = await client.api(`/me/events/${dbEvent.microsoft_id}`).patch(updatedEvent);
 
         // Update local DB with Microsoft response
+        // For all-day events, convert UTC dateTime back to correct Madrid date
+        const dbStartTime = response.isAllDay
+          ? (utcDateTimeToMadridDate(response.start.dateTime) || start.split('T')[0])
+          : (response.start.dateTime || start);
+        const dbEndTime = response.isAllDay
+          ? (utcDateTimeToMadridDate(response.end.dateTime) || end.split('T')[0])
+          : (response.end.dateTime || end);
         await dbAsync.run(`
             UPDATE calendar_events SET
             subject = ?, body_preview = ?, start_time = ?, end_time = ?, is_all_day = ?,
             location = ?, web_link = ?, categories = ?, last_synced = CURRENT_TIMESTAMP
             WHERE id = ?
         `, [
-            response.subject, response.bodyPreview, response.start.dateTime, response.end.dateTime,
+            response.subject, response.bodyPreview, dbStartTime, dbEndTime,
             response.isAllDay ? 1 : 0, response.location?.displayName, response.webLink,
             categoriesJson, dbEvent.id
         ]);
@@ -713,8 +768,9 @@ app.get('/:id', authenticate, async (req, res) => {
     
     let startDate, endDate;
     if (event.isAllDay) {
-      startDate = event.start.date;
-      endDate = event.end.date;
+      // All-day events: convert dateTime back to correct Madrid date
+      startDate = utcDateTimeToMadridDate(event.start.dateTime) || (event.start.dateTime ? event.start.dateTime.split('T')[0] : null);
+      endDate = utcDateTimeToMadridDate(event.end.dateTime) || (event.end.dateTime ? event.end.dateTime.split('T')[0] : null);
     } else {
       startDate = convertToSpainTime(event.start.dateTime);
       endDate = convertToSpainTime(event.end.dateTime);
@@ -791,8 +847,9 @@ app.post('/group', authenticate, async (req, res) => {
                 d.setDate(d.getDate() + 1);
                 endDate = d.toISOString().split('T')[0];
               }
-              newEvent.start = { dateTime: startDate + 'T00:00:00', timeZone: 'Europe/Madrid' };
-              newEvent.end = { dateTime: endDate + 'T00:00:00', timeZone: 'Europe/Madrid' };
+              // All-day events: use dateTime with T00:00:00 (Graph API DateTimeTimeZone has no 'date' property)
+              newEvent.start = { dateTime: `${startDate}T00:00:00`, timeZone: 'Europe/Madrid' };
+              newEvent.end = { dateTime: `${endDate}T00:00:00`, timeZone: 'Europe/Madrid' };
             } else {
               newEvent.isAllDay = false;
               newEvent.start = { dateTime: start, timeZone: 'Europe/Madrid' };
@@ -914,8 +971,9 @@ app.post('/assign-user', authenticate, async (req, res) => {
             d.setDate(d.getDate() + 1);
             endDate = d.toISOString().split('T')[0];
           }
-          newEvent.start = { dateTime: startDate + 'T00:00:00', timeZone: 'Europe/Madrid' };
-          newEvent.end = { dateTime: endDate + 'T00:00:00', timeZone: 'Europe/Madrid' };
+          // All-day events: use dateTime with T00:00:00 (Graph API DateTimeTimeZone has no 'date' property)
+          newEvent.start = { dateTime: `${startDate}T00:00:00`, timeZone: 'Europe/Madrid' };
+          newEvent.end = { dateTime: `${endDate}T00:00:00`, timeZone: 'Europe/Madrid' };
         } else {
           newEvent.isAllDay = false;
           newEvent.start = { dateTime: start, timeZone: 'Europe/Madrid' };
@@ -1130,10 +1188,19 @@ app.patch('/events/:id', authenticate, async (req, res) => {
             const updateEvent = {};
             if (subject) updateEvent.subject = subject;
             if (body) updateEvent.body = { contentType: 'Text', content: body };
-            if (startTime) updateEvent.start = { dateTime: startTime, timeZone: 'UTC' };
-            if (endTime) updateEvent.end = { dateTime: endTime, timeZone: 'UTC' };
-            if (location) updateEvent.location = { displayName: location };
             if (isAllDay !== undefined) updateEvent.isAllDay = isAllDay;
+            // For all-day events, use dateTime with T00:00:00 (DateTimeTimeZone has no 'date' property)
+            if (startTime) {
+                updateEvent.start = isAllDay
+                    ? { dateTime: `${startTime.split('T')[0]}T00:00:00`, timeZone: 'Europe/Madrid' }
+                    : { dateTime: startTime, timeZone: 'UTC' };
+            }
+            if (endTime) {
+                updateEvent.end = isAllDay
+                    ? { dateTime: `${endTime.split('T')[0]}T00:00:00`, timeZone: 'Europe/Madrid' }
+                    : { dateTime: endTime, timeZone: 'UTC' };
+            }
+            if (location) updateEvent.location = { displayName: location };
             if (categories) updateEvent.categories = Array.isArray(categories) ? categories : [categories];
 
             await client.api(`/me/events/${event.microsoft_id}`).patch(updateEvent);
