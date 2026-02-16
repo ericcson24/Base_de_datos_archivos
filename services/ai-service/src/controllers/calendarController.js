@@ -58,11 +58,30 @@ const createEvent = async (req, res) => {
     
     console.log(`[AI CALENDAR] Usuario ${userId}: "${query}" [UserTZ: ${nowInUserTZ}]`);
 
+    // 2.1 Fetch available categories from Outlook so AI can match correctly
+    let availableCategories = [];
+    try {
+      const catRes = await fetch(`${OUTLOOK_SERVICE_URL}/categories`, {
+        headers: { 'Authorization': req.headers.authorization || '' }
+      });
+      if (catRes.ok) {
+        const catData = await catRes.json();
+        availableCategories = catData.map(c => c.name);
+        console.log(`[AI CALENDAR] Categorías disponibles: ${availableCategories.join(', ')}`);
+      }
+    } catch (e) {
+      console.warn('[AI CALENDAR] No se pudieron obtener categorías:', e.message);
+    }
+
+    const categoriesContext = availableCategories.length > 0
+      ? `\n- Categorías disponibles del usuario: ${JSON.stringify(availableCategories)}\n- IMPORTANTE: Cuando el usuario mencione una categoría, usa el nombre EXACTO de esta lista. Por ejemplo si dice "roja" y existe "Categoría roja", usa "Categoría roja". Si no coincide con ninguna existente, usa el texto tal cual.`
+      : '';
+
     // 2. Prompt para Gemini (Inteligente con Zonas Horarias)
     const prompt = `Eres un asistente de calendario inteligente.
 Contexto Actual:
 - Fecha y hora actual en formato DD/MM/YYYY HH:mm:ss (zona ${userTimeZone}): ${nowInUserTZ}
-- El usuario quiere gestionar su calendario.
+- El usuario quiere gestionar su calendario.${categoriesContext}
 
 Tu tarea:
 1. Analizar la intención del usuario: 
@@ -101,7 +120,7 @@ Estructura JSON de Respuesta:
   "startTimeUTC": "YYYY-MM-DDTHH:mm:ssZ", 
   "endTimeUTC": "YYYY-MM-DDTHH:mm:ssZ",
   "description": "Descripción opcional",
-  "location": "Ubicación opcional",
+  "location": "Nombre del lugar o dirección completa. Ej: 'Starbucks Gran Vía', 'Calle Mayor 12, Madrid', 'Oficina central'. Usa el nombre real del establecimiento si se menciona.",
   "isAllDay": false,
   "categories": ["Categoría1"], // Array de nombres de categorías a asignar
   "categoryName": "Nombre de la categoría nueva (solo para add_category)",
@@ -595,11 +614,9 @@ Responde SOLO el JSON.`;
     for (const targetId of targetUserIds) {
       let createdEvent = null;
 
-      // INTENTO 1: Usar Outlook Service (Solo si es para mí mismo, para usar mis credenciales)
+      // INTENTO 1: Usar Outlook Service (para mí mismo - usa mis credenciales)
       if (targetId === userId) {
         try {
-            // Reenviamos el token del request actual (Bearer ...)
-            // fetch es global en Node 18
             const outlookRes = await fetch(`${OUTLOOK_SERVICE_URL}/events`, {
                 method: 'POST',
                 headers: {
@@ -609,7 +626,7 @@ Responde SOLO el JSON.`;
                 body: JSON.stringify({
                     subject: eventData.title,
                     body: finalDescription,
-                    startTime: eventData.startTimeUTC, // Enviamos UTC directo
+                    startTime: eventData.startTimeUTC,
                     endTime: eventData.endTimeUTC,
                     location: eventData.location,
                     isAllDay: eventData.isAllDay,
@@ -629,9 +646,6 @@ Responde SOLO el JSON.`;
                     
                     if (!outData.syncedToCloud) {
                         console.warn(`[AI CALENDAR] Event created LOCALLY only. Sync error: ${outData.syncError}`);
-                        // Add warning to message
-                        finalDescription += "\n(⚠️ No sincronizado con Outlook: " + (outData.syncError ? "Error de conexión" : "Cuenta no vinculada") + ")";
-                        // We could try to update the event body in DB with this warning, but simpler to just let user know via UI
                     } else {
                         console.log(`[AI CALENDAR] Evento creado via Outlook Service y Cloud: ${createdEvent.id}`);
                     }
@@ -642,9 +656,47 @@ Responde SOLO el JSON.`;
         } catch (e) {
             console.error('[AI CALENDAR] Error contactando Outlook Service:', e.message);
         }
+      } else {
+        // ASIGNACIÓN A OTRO USUARIO: Usar endpoint /assign-user del outlook-service
+        // Esto crea el evento en el Outlook del usuario destino y envía notificación
+        try {
+            const assignRes = await fetch(`${OUTLOOK_SERVICE_URL}/assign-user`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': req.headers.authorization || ''
+                },
+                body: JSON.stringify({
+                    targetUserId: targetId,
+                    title: eventData.title,
+                    start: eventData.startTimeUTC,
+                    end: eventData.endTimeUTC,
+                    allDay: eventData.isAllDay || false,
+                    location: eventData.location,
+                    description: finalDescription,
+                    categories: eventData.categories || []
+                })
+            });
+
+            if (assignRes.ok) {
+                const assignData = await assignRes.json();
+                createdEvent = {
+                    id: assignData.eventId || `assigned_${targetId}_${Date.now()}`,
+                    subject: eventData.title,
+                    start_time: eventData.startTimeUTC,
+                    source: 'outlook-assign',
+                    syncedToCloud: assignData.syncedToCloud
+                };
+                console.log(`[AI CALENDAR] Evento asignado a usuario ${targetId} via outlook-service (cloud: ${assignData.syncedToCloud})`);
+            } else {
+                console.warn(`[AI CALENDAR] assign-user falló (${assignRes.status}), usando fallback local.`);
+            }
+        } catch (e) {
+            console.error('[AI CALENDAR] Error en assign-user:', e.message);
+        }
       }
 
-      // INTENTO 2: Fallback Local (Si falló Outlook o es para otro usuario)
+      // FALLBACK: Inserción local directa (si todos los intentos anteriores fallaron)
       if (!createdEvent) {
           const insertResult = await db.query(
             `INSERT INTO calendar_events (user_id, subject, body_preview, start_time, end_time, location, is_all_day, created_at)
@@ -654,32 +706,32 @@ Responde SOLO el JSON.`;
               targetId,
               eventData.title,
               finalDescription,
-              eventData.startTimeUTC, // Postgres guardará este string ISO. Si es timestamptz, respetará la Z.
+              eventData.startTimeUTC,
               eventData.endTimeUTC,
               eventData.location,
               eventData.isAllDay ? 1 : 0
             ]
           );
           createdEvent = insertResult.rows[0];
+
+          // Notificar manualmente si es para otro (ya que no pasó por assign-user)
+          if (targetId !== userId) {
+            try {
+              await sendNotification({
+                userId: targetId,
+                title: '📅 Nuevo Evento Asignado',
+                message: `"${eventData.title}" para el ${new Date(eventData.startTimeUTC).toLocaleDateString()}`,
+                type: 'info',
+                link: '/calendar',
+                metadata: { eventId: createdEvent.id || createdEvent.microsoft_id }
+              });
+            } catch (notifError) { 
+                // Ignorar error notif
+            }
+          }
       }
 
       createdEvents.push(createdEvent);
-
-      // Notificar (Si es para otro)
-      if (targetId !== userId) {
-        try {
-          await sendNotification({
-            userId: targetId,
-            title: '📅 Nuevo Evento Asignado',
-            message: `"${eventData.title}" para el ${new Date(eventData.startTimeUTC).toLocaleDateString()}`,
-            type: 'info',
-            link: '/calendar',
-            metadata: { eventId: createdEvent.id || createdEvent.microsoft_id }
-          });
-        } catch (notifError) { 
-            // Ignorar error notif
-        }
-      }
     }
 
     res.json({
@@ -694,6 +746,167 @@ Responde SOLO el JSON.`;
   }
 };
 
+// ===========================
+// SUGGEST FILES FOR AN EVENT
+// ===========================
+const suggestFiles = async (req, res) => {
+  try {
+    const { title, description, location, categories } = req.body;
+    const userId = req.user.id;
+
+    if (!title && !description) {
+      return res.json({ success: true, suggestions: [] });
+    }
+
+    // 1. Fetch ALL user files (no search filter - we want everything)
+    let allFiles = [];
+    try {
+      const filesRes = await fetch(`${FILE_SERVICE_URL}/user-files`, {
+        headers: { 'Authorization': req.headers.authorization || '' }
+      });
+      if (filesRes.ok) {
+        const data = await filesRes.json();
+        allFiles = data.files || [];
+      }
+    } catch (e) {
+      console.error('[AI SUGGEST] Error fetching files:', e.message);
+    }
+
+    // Also fetch files from subfolders by listing directories
+    try {
+      const dirsRes = await fetch(`${FILE_SERVICE_URL}/list?path=`, {
+        headers: { 'Authorization': req.headers.authorization || '' }
+      });
+      if (dirsRes.ok) {
+        const dirsData = await dirsRes.json();
+        const folders = (dirsData.files || []).filter(f => f.isDirectory);
+        
+        // Fetch files from each subfolder (max 5 folders deep)
+        for (const folder of folders.slice(0, 10)) {
+          try {
+            const subRes = await fetch(`${FILE_SERVICE_URL}/user-files?path=${encodeURIComponent(folder.name)}`, {
+              headers: { 'Authorization': req.headers.authorization || '' }
+            });
+            if (subRes.ok) {
+              const subData = await subRes.json();
+              const subFiles = (subData.files || []).map(f => ({
+                ...f,
+                name: `${folder.name}/${f.name}`,
+                path: `${folder.name}/${f.path || f.name}`
+              }));
+              allFiles = [...allFiles, ...subFiles];
+            }
+          } catch (e) { /* skip folder */ }
+        }
+      }
+    } catch (e) { /* skip subfolders */ }
+
+    if (allFiles.length === 0) {
+      return res.json({ success: true, suggestions: [] });
+    }
+
+    // 2. Build file list for AI (limit to prevent token overflow)
+    const fileList = allFiles.slice(0, 200).map((f, i) => 
+      `${i + 1}. "${f.name}" (${formatSize(f.size)}, ${f.extension || '?'})`
+    ).join('\n');
+
+    // 3. Ask Gemini to pick relevant files
+    const eventContext = [
+      title && `Título: ${title}`,
+      description && `Descripción: ${description}`,
+      location && `Ubicación: ${location}`,
+      categories?.length > 0 && `Categorías: ${categories.join(', ')}`
+    ].filter(Boolean).join('\n');
+
+    const prompt = `Eres un asistente inteligente. El usuario está creando un evento en su calendario con estos datos:
+
+${eventContext}
+
+Aquí está la lista completa de archivos del usuario:
+${fileList}
+
+Tu tarea: Identifica qué archivos podrían estar relacionados con este evento. Piensa en:
+- Nombres de archivos que coincidan con el tema del evento (ej: "cena" → "menu_cena.pdf", "receta_san_valentin.docx")
+- Archivos que podrían ser útiles como referencia o preparación
+- Documentos, imágenes, PDFs, presentaciones relacionados
+- Sé creativo pero relevante. NO incluyas archivos claramente irrelevantes.
+
+Responde SOLO un JSON array con los números de los archivos relevantes y una razón corta:
+[{"index": 1, "reason": "Razón breve de por qué es relevante"}]
+
+Si no hay archivos relevantes, responde: []
+Máximo 5 sugerencias. SOLO responde el JSON, nada más.`;
+
+    const model = genAI.getGenerativeModel({ model: 'gemini-flash-latest' });
+    
+    let aiResponse;
+    let retryCount = 0;
+    while (retryCount < 2) {
+      try {
+        aiResponse = await model.generateContent(prompt);
+        break;
+      } catch (e) {
+        if (e.status === 429) {
+          retryCount++;
+          await new Promise(r => setTimeout(r, 2000));
+        } else {
+          throw e;
+        }
+      }
+    }
+
+    if (!aiResponse) {
+      return res.json({ success: true, suggestions: [] });
+    }
+
+    const responseText = aiResponse.response.text();
+    
+    // Parse AI response
+    let parsed = [];
+    try {
+      const jsonMatch = responseText.match(/\[[\s\S]*\]/);
+      if (jsonMatch) {
+        parsed = JSON.parse(jsonMatch[0]);
+      }
+    } catch (e) {
+      console.error('[AI SUGGEST] Parse error:', e.message, responseText);
+      return res.json({ success: true, suggestions: [] });
+    }
+
+    // 4. Map back to actual files
+    const suggestions = parsed
+      .filter(s => s.index >= 1 && s.index <= allFiles.length)
+      .slice(0, 5)
+      .map(s => {
+        const file = allFiles[s.index - 1];
+        return {
+          id: file.id,
+          name: file.name,
+          path: file.path,
+          size: file.size,
+          extension: file.extension,
+          reason: s.reason || ''
+        };
+      });
+
+    console.log(`[AI SUGGEST] Event "${title}" → ${suggestions.length} suggestions from ${allFiles.length} files`);
+    
+    return res.json({ success: true, suggestions });
+
+  } catch (error) {
+    console.error('[AI SUGGEST] Error:', error);
+    return res.json({ success: true, suggestions: [] }); // Fail silently
+  }
+};
+
+function formatSize(bytes) {
+  if (!bytes) return '?';
+  if (bytes < 1024) return bytes + 'B';
+  if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(0) + 'KB';
+  return (bytes / (1024 * 1024)).toFixed(1) + 'MB';
+}
+
 module.exports = {
-    createEvent
+    createEvent,
+    suggestFiles
 };

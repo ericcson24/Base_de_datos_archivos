@@ -166,6 +166,7 @@
       "rename": "Renombrar",
       "move": "Mover",
       "share": "Compartir",
+      "unshare": "Dejar de compartir",
       "delete": "Eliminar",
       "properties": "Propiedades"
     },
@@ -358,8 +359,9 @@
     "irreversibleAction": "Esta acción no se puede deshacer.",
     "searchMap": "Buscar en mapa",
     "selectLocation": "📍 Seleccionar Ubicación",
-    "searchLocationPlaceholder": "Buscar ciudad, calle...",
+    "searchLocationPlaceholder": "Buscar dirección, restaurante, tienda...",
     "confirmLocation": "Confirmar Ubicación",
+    "myLocation": "Mi ubicación",
     "disconnectedMessage": "⚠️ No estás conectado a Outlook. Tus eventos y correos no se están sincronizando.",
     "connectButton": "Conectar / Sincronizar",
     "connectionStatus": "Estado de Conexión",
@@ -405,7 +407,13 @@
     "searchFiles": "Buscar archivos...",
     "noFilesFound": "No se encontraron archivos",
     "fileAttached": "Archivo adjuntado correctamente",
-    "fileAttachError": "Error al adjuntar archivo"
+    "fileAttachError": "Error al adjuntar archivo",
+    "suggestFiles": "Sugerir archivos",
+    "suggestedFiles": "Archivos sugeridos por IA",
+    "analyzingFiles": "Analizando tus archivos...",
+    "attach": "Adjuntar",
+    "saveFirstToAttach": "Guarda el evento primero para adjuntar",
+    "dismiss": "Descartar"
   },
   "sidebar": {
     "errorLoadingFile": "Error al cargar el archivo",
@@ -802,11 +810,14 @@
     "from": "de {{owner}}",
     "shared": "Compartido",
     "by": "por {{owner}}",
-    "saveToMyFiles": "Mover a mi panel",
+    "saveToMyFiles": "Guardar en mis archivos",
     "removeFromShared": "Quitar de compartidos",
-    "moveToPanel": "Mover a mi panel",
+    "moveToPanel": "Guardar en mis archivos",
     "removeFromPanel": "Quitar de mi panel",
-    "sharedWithUsers": "compartido con {{users}}"
+    "sharedWithUsers": "compartido con {{users}}",
+    "customizeFolder": "Personalizar carpeta",
+    "folderColor": "Color",
+    "folderIcon": "Icono"
   },
   "aiResults": {
     "title": "Resultados de Búsqueda IA",
@@ -842,5 +853,9 @@
     "fileSharedMessage": "{{user}} ha compartido \"{{file}}\" contigo",
     "eventAssignedTitle": "Evento asignado",
     "eventAssignedMessage": "{{user}} te ha asignado \"{{event}}\" en tu calendario"
+  },
+  "folderCustomize": {
+    "saved": "Carpeta personalizada correctamente",
+    "error": "Error al personalizar la carpeta"
   }
 }

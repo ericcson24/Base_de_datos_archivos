@@ -100,26 +100,32 @@ subscriber.connect().then(() => {
     subscriber.subscribe('notifications', async (message) => {
         try {
             const data = JSON.parse(message);
-            console.log('📨 Notification Received (Redis):', data.title);
+            console.log('📨 Notification Received (Redis):', data.title, '| userId:', data.userId);
             
-            // 1. Save to Database
-            let savedNotification = data;
-            if (data.userId) { 
-                try {
-                    const result = await db.query(
-                        `INSERT INTO notifications (user_id, title, message, type, link, metadata)
-                         VALUES ($1, $2, $3, $4, $5, $6)
-                         RETURNING *`,
-                        [data.userId, data.title, data.message, data.type || 'info', data.link || null, data.metadata || {}] // Cast metadata to jsonb handled by pg driver usually or stringify
-                    );
-                    savedNotification = result.rows[0];
-                } catch (dbErr) {
-                    console.error('Error saving notification to DB:', dbErr);
-                }
+            // Validate userId is a proper integer
+            const userId = parseInt(data.userId, 10);
+            if (isNaN(userId)) {
+                console.error('❌ Invalid userId in Redis notification:', data.userId);
+                return;
             }
 
-            // 2. Emit to Socket (Broadcast for now until room logic strict)
-            io.emit('notification', savedNotification);
+            // 1. Save to Database
+            let savedNotification = data;
+            try {
+                const result = await db.query(
+                    `INSERT INTO notifications (user_id, title, message, type, link, metadata)
+                     VALUES ($1, $2, $3, $4, $5, $6)
+                     RETURNING *`,
+                    [userId, data.title || '', data.message || '', data.type || 'info', data.link || null, JSON.stringify(data.metadata || {})]
+                );
+                savedNotification = result.rows[0];
+            } catch (dbErr) {
+                console.error('Error saving notification to DB:', dbErr);
+            }
+
+            // 2. Emit to Socket - targeted to user room + broadcast
+            io.to(`user:${userId}`).emit('notification', savedNotification);
+            console.log(`📤 Notification emitted to user:${userId}`);
 
         } catch (err) {
             console.error('Error processing redis message:', err);

@@ -6,6 +6,7 @@ const path = require('path');
 const fs = require('fs').promises;
 const fsSync = require('fs');
 const jwt = require('jsonwebtoken');
+const JSZip = require('jszip');
 const { dbAsync } = require('./database/db');
 
 const JWT_SECRET = process.env.JWT_SECRET || 'fallback-secret-change-me';
@@ -92,14 +93,12 @@ const storage = multer.diskStorage({
 });
 
 const upload = multer({ 
-  storage: storage,
-  limits: { fileSize: 100 * 1024 * 1024 }
+  storage: storage
 });
 
 // Configuración de multer para actualización de archivos (usa carpeta temporal)
 const uploadTemp = multer({ 
-  dest: '/tmp/uploads',
-  limits: { fileSize: 100 * 1024 * 1024 }
+  dest: '/tmp/uploads'
 });
 
 // --- Rutas ---
@@ -170,6 +169,15 @@ app.get('/list', authenticate, async (req, res) => {
     console.log(`[DEBUG] Found ${items.length} items`);
     let files = [];
 
+    // Fetch folder metadata (colors/icons)
+    let folderMeta = {};
+    try {
+      const metas = await dbAsync.all('SELECT folder_path, color, icon FROM folder_metadata WHERE username = ?', [owner || username]);
+      if (metas) {
+        metas.forEach(m => { folderMeta[m.folder_path] = { color: m.color, icon: m.icon }; });
+      }
+    } catch (e) { /* table might not exist yet */ }
+
     for (const item of items) {
       const fullPath = path.join(targetDir, item.name);
       const relativePath = path.join(requestedPath, item.name);
@@ -181,6 +189,7 @@ app.get('/list', authenticate, async (req, res) => {
       const sharedWith = sharedWithMap[normalizedPath] || sharedWithMap[winPath] || sharedWithMap[relativePath] || [];
 
       if (item.isDirectory()) {
+        const meta = folderMeta[normalizedPath] || folderMeta[winPath] || folderMeta[relativePath] || {};
         files.push({
           id: Buffer.from(relativePath).toString('base64'),
           name: item.name,
@@ -190,7 +199,9 @@ app.get('/list', authenticate, async (req, res) => {
           path: relativePath,
           shared: isShared,
           sharedWith: isShared ? sharedWith : undefined,
-          owner: owner || username
+          owner: owner || username,
+          folder_color: meta.color || null,
+          folder_icon: meta.icon || null
         });
       } else {
         const stats = await fs.stat(fullPath);
@@ -384,7 +395,46 @@ app.post('/create', authenticate, async (req, res) => {
         return res.status(400).json({ success: false, message: 'El archivo ya existe' });
     } catch (e) {}
 
-    await fs.writeFile(fullPath, '');
+    // Create proper Office documents instead of empty files
+    const ext = path.extname(fileName).toLowerCase();
+    if (ext === '.docx') {
+      const zip = new JSZip();
+      zip.file('[Content_Types].xml', '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/></Types>');
+      zip.folder('_rels').file('.rels', '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/></Relationships>');
+      zip.folder('word').file('document.xml', '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p><w:r><w:t></w:t></w:r></w:p></w:body></w:document>');
+      const buf = await zip.generateAsync({ type: 'nodebuffer' });
+      await fs.writeFile(fullPath, buf);
+    } else if (ext === '.xlsx') {
+      const zip = new JSZip();
+      zip.file('[Content_Types].xml', '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/></Types>');
+      zip.folder('_rels').file('.rels', '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>');
+      const xl = zip.folder('xl');
+      xl.folder('_rels').file('workbook.xml.rels', '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/></Relationships>');
+      xl.file('workbook.xml', '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets><sheet name="Sheet1" sheetId="1" r:id="rId1"/></sheets></workbook>');
+      xl.folder('worksheets').file('sheet1.xml', '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData/></worksheet>');
+      const buf = await zip.generateAsync({ type: 'nodebuffer' });
+      await fs.writeFile(fullPath, buf);
+    } else if (ext === '.pptx') {
+      const zip = new JSZip();
+      zip.file('[Content_Types].xml', '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/ppt/presentation.xml" ContentType="application/vnd.openxmlformats-officedocument.presentationml.presentation.main+xml"/><Override PartName="/ppt/slides/slide1.xml" ContentType="application/vnd.openxmlformats-officedocument.presentationml.slide+xml"/><Override PartName="/ppt/slideLayouts/slideLayout1.xml" ContentType="application/vnd.openxmlformats-officedocument.presentationml.slideLayout+xml"/><Override PartName="/ppt/slideMasters/slideMaster1.xml" ContentType="application/vnd.openxmlformats-officedocument.presentationml.slideMaster+xml"/></Types>');
+      zip.folder('_rels').file('.rels', '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="ppt/presentation.xml"/></Relationships>');
+      const ppt = zip.folder('ppt');
+      ppt.folder('_rels').file('presentation.xml.rels', '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/slideMaster" Target="slideMasters/slideMaster1.xml"/><Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/slide" Target="slides/slide1.xml"/></Relationships>');
+      ppt.file('presentation.xml', '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<p:presentation xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><p:sldMasterIdLst><p:sldMasterId r:id="rId1"/></p:sldMasterIdLst><p:sldIdLst><p:sldId id="256" r:id="rId2"/></p:sldIdLst><p:sldSz cx="9144000" cy="6858000"/></p:presentation>');
+      const smFolder = ppt.folder('slideMasters');
+      smFolder.file('slideMaster1.xml', '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<p:sldMaster xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><p:cSld><p:spTree><p:nvGrpSpPr><p:cNvPr id="1" name=""/><p:cNvGrpSpPr/><p:nvPr/></p:nvGrpSpPr><p:grpSpPr/></p:spTree></p:cSld><p:sldLayoutIdLst><p:sldLayoutId r:id="rId1"/></p:sldLayoutIdLst></p:sldMaster>');
+      smFolder.folder('_rels').file('slideMaster1.xml.rels', '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/slideLayout" Target="../slideLayouts/slideLayout1.xml"/></Relationships>');
+      const slFolder = ppt.folder('slideLayouts');
+      slFolder.file('slideLayout1.xml', '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<p:sldLayout xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" type="blank"><p:cSld><p:spTree><p:nvGrpSpPr><p:cNvPr id="1" name=""/><p:cNvGrpSpPr/><p:nvPr/></p:nvGrpSpPr><p:grpSpPr/></p:spTree></p:cSld></p:sldLayout>');
+      slFolder.folder('_rels').file('slideLayout1.xml.rels', '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/slideMaster" Target="../slideMasters/slideMaster1.xml"/></Relationships>');
+      const slideFolder = ppt.folder('slides');
+      slideFolder.file('slide1.xml', '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<p:sld xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><p:cSld><p:spTree><p:nvGrpSpPr><p:cNvPr id="1" name=""/><p:cNvGrpSpPr/><p:nvPr/></p:nvGrpSpPr><p:grpSpPr/></p:spTree></p:cSld></p:sld>');
+      slideFolder.folder('_rels').file('slide1.xml.rels', '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/slideLayout" Target="../slideLayouts/slideLayout1.xml"/></Relationships>');
+      const buf = await zip.generateAsync({ type: 'nodebuffer' });
+      await fs.writeFile(fullPath, buf);
+    } else {
+      await fs.writeFile(fullPath, '');
+    }
     await logAction(username, 'CREATE_FILE', `Creado archivo: ${fileName}`);
 
     res.json({
@@ -444,6 +494,47 @@ app.post('/folder', authenticate, async (req, res) => {
 
     res.json({ success: true, message: 'Carpeta creada' });
   } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// Customize folder (color/icon)
+app.patch('/folder-customize', authenticate, async (req, res) => {
+  try {
+    const { folderPath, color, icon } = req.body;
+    const username = req.user.username;
+    
+    if (!folderPath) return res.status(400).json({ success: false, message: 'folderPath requerido' });
+    
+    // Normalize the path
+    const normalizedPath = folderPath.replace(/\\/g, '/');
+    
+    // Verify folder exists
+    const fullPath = path.join(UPLOAD_DIR, username, normalizedPath);
+    try {
+      const stats = await fs.stat(fullPath);
+      if (!stats.isDirectory()) {
+        return res.status(400).json({ success: false, message: 'No es una carpeta' });
+      }
+    } catch (e) {
+      return res.status(404).json({ success: false, message: 'Carpeta no encontrada' });
+    }
+    
+    // Upsert metadata
+    await dbAsync.run(`
+      INSERT INTO folder_metadata (username, folder_path, color, icon, updated_at)
+      VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)
+      ON CONFLICT (username, folder_path)
+      DO UPDATE SET color = COALESCE(?, folder_metadata.color), 
+                    icon = COALESCE(?, folder_metadata.icon),
+                    updated_at = CURRENT_TIMESTAMP
+    `, [username, normalizedPath, color || '#5f9ee9', icon || 'default', color, icon]);
+    
+    await logAction(username, 'FOLDER_CUSTOMIZE', `Carpeta personalizada: ${normalizedPath}`);
+    
+    res.json({ success: true, message: 'Carpeta personalizada', color: color || '#5f9ee9', icon: icon || 'default' });
+  } catch (error) {
+    console.error('Error customizing folder:', error);
     res.status(500).json({ success: false, message: error.message });
   }
 });
@@ -930,10 +1021,10 @@ app.post('/remove-shared', authenticate, async (req, res) => {
   }
 });
 
-// Move shared file to own panel (pin it so it appears in main file listing)
+// Save shared file to own files (actually copy the file and remove the share)
 app.post('/save-to-my-files', authenticate, async (req, res) => {
   try {
-    const { path: filePath, ownerUsername } = req.body;
+    const { path: filePath, ownerUsername, destinationPath } = req.body;
     const username = req.user.username;
 
     if (!filePath || !ownerUsername) {
@@ -950,16 +1041,65 @@ app.post('/save-to-my-files', authenticate, async (req, res) => {
       return res.status(404).json({ success: false, message: 'Share not found' });
     }
 
-    // Pin to panel (toggle)
+    // Source: owner's file
+    const sourcePath = path.join(UPLOAD_DIR, ownerUsername, filePath);
+    
+    // Destination: user's own directory (root or specified destination)
+    const destFolder = destinationPath || '';
+    const fileName = path.basename(filePath);
+    let destPath = path.join(UPLOAD_DIR, username, destFolder, fileName);
+
+    // Verify source exists
+    try {
+      await fs.access(sourcePath);
+    } catch (e) {
+      return res.status(404).json({ success: false, message: 'Source file no longer exists' });
+    }
+
+    // Handle name collision - add (1), (2) etc.
+    const destDir = path.dirname(destPath);
+    await fs.mkdir(destDir, { recursive: true });
+    
+    const ext = path.extname(fileName);
+    const baseName = path.basename(fileName, ext);
+    let finalName = fileName;
+    let counter = 1;
+    
+    try {
+      await fs.access(destPath);
+      // File exists, find unique name
+      while (true) {
+        finalName = `${baseName} (${counter})${ext}`;
+        destPath = path.join(destDir, finalName);
+        try {
+          await fs.access(destPath);
+          counter++;
+        } catch {
+          break; // Name is available
+        }
+      }
+    } catch {
+      // Destination doesn't exist, good to go
+    }
+
+    // Copy the file or directory
+    const sourceStats = await fs.stat(sourcePath);
+    if (sourceStats.isDirectory()) {
+      await copyDir(sourcePath, destPath);
+    } else {
+      await fs.copyFile(sourcePath, destPath);
+    }
+
+    // Remove the share record (no longer shared, user has their own copy)
     await dbAsync.run(
-      'UPDATE shared_files SET pinned_to_panel = TRUE WHERE path = ? AND owner_username = ? AND shared_with_username = ?',
+      'DELETE FROM shared_files WHERE path = ? AND owner_username = ? AND shared_with_username = ?',
       [filePath, ownerUsername, username]
     );
 
-    await logAction(username, 'PIN_SHARED', `Pinned shared file ${filePath} from ${ownerUsername} to panel`);
-    res.json({ success: true, message: 'Moved to your panel', savedName: path.basename(filePath) });
+    await logAction(username, 'SAVE_SHARED_TO_MY_FILES', `Copied shared file ${filePath} from ${ownerUsername} to own files as ${finalName}`);
+    res.json({ success: true, message: 'File saved to your files', savedName: finalName });
   } catch (error) {
-    console.error('Error pinning to panel:', error);
+    console.error('Error saving to my files:', error);
     res.status(500).json({ success: false, message: error.message });
   }
 });

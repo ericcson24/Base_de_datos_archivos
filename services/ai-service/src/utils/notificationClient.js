@@ -13,23 +13,46 @@ const initRedis = async () => {
     }
 };
 
-const sendNotification = async (userId, title, message, type = 'info') => {
+const sendNotification = async (data) => {
     if (!publisher) {
-        console.warn('⚠️ Redis publisher not initialized. Notification skipped:', title);
+        console.warn('⚠️ Redis publisher not initialized. Notification skipped:', data.title || data);
+        // Fallback: try HTTP call to notification-service
+        try {
+            const payload = typeof data === 'object' ? data : { userId: arguments[0], title: arguments[1], message: arguments[2], type: arguments[3] || 'info' };
+            const res = await fetch('http://notification-service:5002/create', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+            if (res.ok) console.log('[NOTIFICATION] Sent via HTTP fallback');
+        } catch (e) {
+            console.warn('[NOTIFICATION] HTTP fallback also failed:', e.message);
+        }
         return;
     }
 
+    // Support both object and positional args for backward compat
+    let payload;
+    if (typeof data === 'object' && data !== null && data.userId) {
+        payload = data;
+    } else {
+        // Legacy: sendNotification(userId, title, message, type)
+        payload = {
+            userId: data,
+            title: arguments[1],
+            message: arguments[2],
+            type: arguments[3] || 'info'
+        };
+    }
+
     const notificationPayload = JSON.stringify({
-        userId,
-        title,
-        message,
-        type,
+        ...payload,
         timestamp: new Date().toISOString()
     });
 
     try {
         await publisher.publish('notifications', notificationPayload);
-        console.log(`[NOTIFICATION SENT] User: ${userId} | Title: ${title}`);
+        console.log(`[NOTIFICATION SENT] User: ${payload.userId} | Title: ${payload.title}`);
     } catch (error) {
         console.error('Error sending notification:', error);
     }

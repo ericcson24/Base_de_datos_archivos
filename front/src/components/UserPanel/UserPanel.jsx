@@ -3,6 +3,7 @@ import FileEditorPanel from '../FileEditor/FileEditorPanel';
 import RecentFileItem from './RecentFileItem';
 import FileViewerModal from '../Modals/FileViewerModal';
 import CreateFolderModal from '../Modals/CreateFolderModal';
+import FolderCustomizeModal from '../Modals/FolderCustomizeModal';
 import RenameModal from '../Modals/RenameModal';
 import MoveModal from '../Modals/MoveModal';
 import ShareModal from '../Modals/ShareModal';
@@ -58,6 +59,8 @@ const UserPanel = ({ user, onLogout, onBackToFolders, onThemeToggle, isDarkMode,
   const [showRDPViewer, setShowRDPViewer] = useState(false);
   const [showRDPModal, setShowRDPModal] = useState(false);
   const [rdpConnectionId, setRdpConnectionId] = useState(null);
+  const [showCustomizeModal, setShowCustomizeModal] = useState(false);
+  const [customizeFolder, setCustomizeFolder] = useState(null);
 
   // Check for URL parameters on mount
   useEffect(() => {
@@ -122,6 +125,7 @@ const UserPanel = ({ user, onLogout, onBackToFolders, onThemeToggle, isDarkMode,
   const [highestZIndex, setHighestZIndex] = useState(1000);
   const [showDropZone, setShowDropZone] = useState(false);
   const [fileDragging, setFileDragging] = useState(null);
+  const [backBtnDragOver, setBackBtnDragOver] = useState(false);
 
   // Estados para archivos recientes y IA
   const [recentFiles, setRecentFiles] = useState([]);
@@ -225,25 +229,13 @@ const UserPanel = ({ user, onLogout, onBackToFolders, onThemeToggle, isDarkMode,
   };
 
   const validateFiles = (files) => {
-    const maxFileSize = 100 * 1024 * 1024; // 100MB por archivo
-    const maxTotalSize = 500 * 1024 * 1024; // 500MB total
     const invalidFiles = [];
-    let totalSize = 0;
 
     for (let file of files) {
-      // Validar tamaño máximo
-      if (file.size > maxFileSize) {
-        invalidFiles.push(t('userPanel.fileTooBig', { name: file.name }));
-      }
       // Validar que el archivo no esté vacío
       if (file.size === 0) {
         invalidFiles.push(t('userPanel.fileEmpty', { name: file.name }));
       }
-      totalSize += file.size;
-    }
-
-    if (totalSize > maxTotalSize) {
-      invalidFiles.push(t('userPanel.totalSizeTooBig'));
     }
 
     return invalidFiles;
@@ -406,13 +398,13 @@ useEffect(() => {
       
       const formData = new FormData();
       
+      // IMPORTANT: Append path BEFORE files so multer's destination callback can read it
+      formData.append('path', currentPath.map(p => p.name).join('/'));
+      
       // Agregar todos los archivos al FormData
       for (let file of files) {
         formData.append('files', file);
       }
-      
-      // Agregar el path actual
-      formData.append('path', currentPath.map(p => p.name).join('/'));
 
       const response = await fetch('/api/files/upload', {
         method: 'POST',
@@ -470,13 +462,15 @@ useEffect(() => {
       for (let i = 0; i < files.length; i++) {
         const file = files[i];
         const formData = new FormData();
-        formData.append('file', file);
+        // IMPORTANT: Append path and relativePath BEFORE file so multer can read them
         formData.append('path', currentPath.map(p => p.name).join('/'));
         
         // Si el archivo tiene webkitRelativePath, usarlo
         if (file.webkitRelativePath) {
           formData.append('relativePath', file.webkitRelativePath);
         }
+        
+        formData.append('file', file);
 
         try {
           const response = await fetch('/api/files/upload-folder', {
@@ -723,7 +717,39 @@ useEffect(() => {
     }
   };
 
-  // Save a shared file to own panel (pin it, not copy)
+  // Save a shared file to own files (copies the file, removes from shared)
+  // Unshare - Owner removes sharing for a file (removes ALL shares for that file)
+  const handleUnshare = async (item) => {
+    if (!item.sharedWith || item.sharedWith.length === 0) return;
+    try {
+      let allSuccess = true;
+      for (const targetUsername of item.sharedWith) {
+        const response = await fetch('/api/files/unshare', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${getAuthToken()}`
+          },
+          body: JSON.stringify({
+            path: item.path,
+            username: targetUsername
+          })
+        });
+        const result = await response.json();
+        if (!result.success) allSuccess = false;
+      }
+      loadFiles();
+      if (allSuccess) {
+        addToast(t('share.unshareSuccess') || 'Se dejó de compartir correctamente', 'success');
+      } else {
+        addToast(t('common.error'), 'error');
+      }
+    } catch (error) {
+      console.error('Error unsharing:', error);
+      addToast(t('common.error'), 'error');
+    }
+  };
+
   const handleSaveToMyFiles = async (item) => {
     try {
       const response = await fetch('/api/files/save-to-my-files', {
@@ -739,13 +765,13 @@ useEffect(() => {
       });
       const result = await response.json();
       if (result.success) {
-        addToast(t('userPanel.movedToPanel', { name: result.savedName || item.name }), 'success');
-        loadFiles(); // Refresh to show pinned file
+        addToast(t('userPanel.savedToMyFiles', { name: result.savedName || item.name }) || `"${result.savedName || item.name}" guardado en tus archivos`, 'success');
+        loadFiles(); // Refresh - file now appears as own file, removed from shared
       } else {
         addToast(result.message || t('common.error'), 'error');
       }
     } catch (error) {
-      console.error('Error moving to panel:', error);
+      console.error('Error saving to my files:', error);
       addToast(t('common.error'), 'error');
     }
   };
@@ -849,6 +875,32 @@ useEffect(() => {
     setShowMoveModal(true);
   };
 
+  const openCustomizeFolder = (item) => {
+    setCustomizeFolder(item);
+    setShowCustomizeModal(true);
+  };
+
+  const handleSaveFolderCustomization = async (folderPath, color, icon) => {
+    try {
+      const res = await fetch('/api/files/folder-customize', {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${getAuthToken()}`
+        },
+        body: JSON.stringify({ folderPath, color, icon })
+      });
+      if (!res.ok) throw new Error('Error saving folder customization');
+      setShowCustomizeModal(false);
+      setCustomizeFolder(null);
+      loadFiles();
+      addToast(t('folderCustomize.saved') || 'Folder customized', 'success');
+    } catch (err) {
+      console.error('Error customizing folder:', err);
+      addToast(t('folderCustomize.error') || 'Error customizing folder', 'error');
+    }
+  };
+
   const changeView = (view) => {
     setCurrentView(view);
     setCurrentPath([]);
@@ -898,7 +950,10 @@ useEffect(() => {
   const handleDragEnter = useCallback((e) => {
     e.preventDefault();
     e.stopPropagation();
-    setIsDragOver(true);
+    // Only show upload drag-over for external files (not internal file moves)
+    if (!e.dataTransfer.types.includes('application/x-internal-file')) {
+      setIsDragOver(true);
+    }
   }, []);
 
   const handleDragLeave = useCallback((e) => {
@@ -917,9 +972,13 @@ useEffect(() => {
     e.stopPropagation();
     setIsDragOver(false);
 
+    // Ignore internal file drags (those are handled by folder drop targets)
+    const internalData = e.dataTransfer.getData('application/x-internal-file');
+    if (internalData) return;
+
     const files = Array.from(e.dataTransfer.files);
     if (files.length > 0) {
-      // Verificar si son archivos de carpeta (webkitRelativePath)
+      // External files from desktop/system → upload to current folder
       const hasFolders = files.some(file => file.webkitRelativePath && file.webkitRelativePath.includes('/'));
       
       if (hasFolders) {
@@ -929,6 +988,94 @@ useEffect(() => {
       }
     }
   }, [handleFileUpload, handleFolderUpload]);
+
+  // Handle dropping a file onto a folder to move it
+  const handleDropToFolder = useCallback(async (draggedFile, targetFolder) => {
+    try {
+      // Build the destination path: currentPath + target folder name
+      const basePath = currentPath.map(p => p.name).join('/');
+      const destinationPath = basePath ? `${basePath}/${targetFolder.name}` : targetFolder.name;
+      
+      const response = await fetch(`/api/files/${encodeURIComponent(draggedFile.id)}/move`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${getAuthToken()}`
+        },
+        body: JSON.stringify({ destinationPath })
+      });
+
+      const result = await response.json();
+      
+      if (result.success) {
+        addToast(t('userPanel.itemMovedSuccess') || `"${draggedFile.name}" movido a "${targetFolder.name}"`, 'success');
+        loadFiles();
+        loadRecentFiles();
+      } else {
+        addToast(t('userPanel.errorMoving') + ': ' + result.message, 'error');
+      }
+    } catch (error) {
+      console.error('Error moving file to folder:', error);
+      addToast(t('userPanel.errorMoving'), 'error');
+    }
+    // Clean up drag state
+    setFileDragging(null);
+    setShowDropZone(false);
+  }, [currentPath, loadFiles, loadRecentFiles, addToast, t]);
+
+  // Handle dropping a file onto the back button to move it to the parent folder
+  const handleDropToParent = useCallback(async (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setBackBtnDragOver(false);
+    
+    const internalData = e.dataTransfer.getData('application/x-internal-file');
+    if (!internalData || currentPath.length === 0) return;
+    
+    try {
+      const draggedFile = JSON.parse(internalData);
+      // Parent path is one level up from current
+      const parentPath = currentPath.slice(0, -1).map(p => p.name).join('/');
+      
+      const response = await fetch(`/api/files/${encodeURIComponent(draggedFile.id)}/move`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${getAuthToken()}`
+        },
+        body: JSON.stringify({ destinationPath: parentPath || '' })
+      });
+
+      const result = await response.json();
+      
+      if (result.success) {
+        addToast(t('userPanel.itemMovedSuccess') || `"${draggedFile.name}" movido al nivel superior`, 'success');
+        loadFiles();
+        loadRecentFiles();
+      } else {
+        addToast(t('userPanel.errorMoving') + ': ' + result.message, 'error');
+      }
+    } catch (error) {
+      console.error('Error moving file to parent:', error);
+      addToast(t('userPanel.errorMoving'), 'error');
+    }
+    setFileDragging(null);
+    setShowDropZone(false);
+  }, [currentPath, loadFiles, loadRecentFiles, addToast, t]);
+
+  const handleBackBtnDragOver = useCallback((e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (e.dataTransfer.types.includes('application/x-internal-file')) {
+      setBackBtnDragOver(true);
+    }
+  }, []);
+
+  const handleBackBtnDragLeave = useCallback((e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setBackBtnDragOver(false);
+  }, []);
 
   // Funciones para el panel lateral
   const openSidebarPanel = (file, action = 'view') => {
@@ -986,11 +1133,13 @@ useEffect(() => {
     setHighestZIndex(newZIndex);
   };
 
-  // Drag and Drop para abrir archivos en paneles
+  // Drag and Drop para archivos internos
   const handleFileDragStart = useCallback((file, e) => {
     setFileDragging(file);
-    setShowDropZone(true);
-    e.dataTransfer.effectAllowed = 'copy';
+    // Don't show drop zone overlay — it blocks folder drop targets
+    e.dataTransfer.effectAllowed = 'move';
+    // Set internal drag marker
+    e.dataTransfer.setData('application/x-internal-file', JSON.stringify({ id: file.id, name: file.name, path: file.path }));
   }, []);
 
   const handleFileDragEnd = useCallback(() => {
@@ -1508,13 +1657,23 @@ useEffect(() => {
           {/* Files and folders */}
           <div className={`files-container ${viewMode === 'grid' ? 'grid-view' : 'list-view'}`}>
             {loading ? (
-              <div className="loading">{t('common.loading')}</div>
+              <div className="files-loading-container">
+                <div className="files-loading-spinner"></div>
+                <p className="files-loading-text">{t('common.loading')}</p>
+              </div>
             ) : (
               <>
-                {/* Back button */}
+                {/* Back button — also a drop target for moving files up one level */}
                 {currentPath.length > 0 && (
-                  <button className="back-btn" onClick={goBack}>
-                    {t('common.back')}
+                  <button 
+                    className={`back-btn${backBtnDragOver ? ' back-btn-drag-over' : ''}`}
+                    onClick={goBack}
+                    onDragOver={handleBackBtnDragOver}
+                    onDragEnter={handleBackBtnDragOver}
+                    onDragLeave={handleBackBtnDragLeave}
+                    onDrop={handleDropToParent}
+                  >
+                    ← {t('common.back')}
                   </button>
                 )}
 
@@ -1532,12 +1691,15 @@ useEffect(() => {
                     onEdit={openEditorPanel}
                     onDuplicate={handleDuplicateItem}
                     onShare={openShareModal}
+                    onUnshare={currentView !== 'shared' ? handleUnshare : undefined}
                     onDragStart={handleFileDragStart}
                     onDragEnd={handleFileDragEnd}
+                    onDropToFolder={handleDropToFolder}
                     viewMode={viewMode}
                     isSharedView={currentView === 'shared' || item.pinnedFromShared}
                     onSaveToMyFiles={currentView === 'shared' ? handleSaveToMyFiles : (item.pinnedFromShared ? handleUnpinFromPanel : undefined)}
                     onRemoveShared={currentView === 'shared' ? handleRemoveShared : undefined}
+                    onCustomizeFolder={openCustomizeFolder}
                   />
                 ))}
 
@@ -1713,24 +1875,6 @@ useEffect(() => {
         />
       )}
 
-      {/* Drop Zone for Editor Panels - Inline */}
-      {showDropZone && fileDragging && (
-        <div 
-          className="editor-drop-zone-inline"
-          onDragOver={handleDropZoneDragOver}
-          onDrop={handleDropZoneDrop}
-          onDragLeave={() => setShowDropZone(false)}
-        >
-          <div className="drop-zone-content">
-            <svg className="w-12 h-12 mb-3 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 15l-2 5L9 9l11 4-5 2zm0 0l5 5M7.188 2.239l.777 2.897M5.136 7.965l-2.898-.777M13.95 4.05l-2.122 2.122m-5.657 5.656l-2.12 2.122" />
-            </svg>
-            <p className="text-base font-semibold">{t('userPanel.dropToView')}</p>
-            <p className="text-xs opacity-75">{fileDragging?.name}</p>
-          </div>
-        </div>
-      )}
-
       {/* Create File Modal */}
       <CreateFileModal
         isOpen={showCreateFileModal}
@@ -1755,6 +1899,14 @@ useEffect(() => {
           </div>
         </div>
       )}
+
+      {/* Folder Customize Modal */}
+      <FolderCustomizeModal
+        isOpen={showCustomizeModal}
+        onClose={() => { setShowCustomizeModal(false); setCustomizeFolder(null); }}
+        folder={customizeFolder}
+        onSave={handleSaveFolderCustomization}
+      />
     </div>
   );
 };

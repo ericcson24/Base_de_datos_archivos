@@ -1,5 +1,6 @@
 {
     "chat.tools.terminal.autoApprove": {
+        "autoApprove": true,
         "/^python tests/e2e/test_calendar_flow\\.py$/": {
             "approve": true,
             "matchCommandLine": true

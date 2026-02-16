@@ -73,7 +73,7 @@ export const getFileIcon = (filename) => {
 
 export const canPreview = (filename) => {
   const type = getFileType(filename);
-  return ['image', 'video', 'pdf', 'text'].includes(type);
+  return ['image', 'video', 'pdf', 'text', 'word', 'excel', 'powerpoint'].includes(type);
 };
 
 export const canEdit = (filename) => {

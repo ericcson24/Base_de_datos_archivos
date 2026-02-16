@@ -111,6 +111,7 @@
       "rename": "Rename",
       "move": "Move",
       "share": "Share",
+      "unshare": "Unshare",
       "delete": "Delete",
       "properties": "Properties"
     },
@@ -288,8 +289,9 @@
     "irreversibleAction": "This action cannot be undone.",
     "searchMap": "Search on map",
     "selectLocation": "📍 Select Location",
-    "searchLocationPlaceholder": "Search city, street...",
+    "searchLocationPlaceholder": "Search address, restaurant, shop...",
     "confirmLocation": "Confirm Location",
+    "myLocation": "My location",
     "disconnectedMessage": "⚠️ You are disconnected from Outlook. Your events and emails are not syncing.",
     "connectButton": "Connect / Sync",
     "connectionStatus": "Connection Status",
@@ -342,7 +344,13 @@
     "searchFiles": "Search files...",
     "noFilesFound": "No files found",
     "fileAttached": "File attached successfully",
-    "fileAttachError": "Error attaching file"
+    "fileAttachError": "Error attaching file",
+    "suggestFiles": "Suggest files",
+    "suggestedFiles": "AI suggested files",
+    "analyzingFiles": "Analyzing your files...",
+    "attach": "Attach",
+    "saveFirstToAttach": "Save event first to attach",
+    "dismiss": "Dismiss"
   },
   "sidebar": {
     "errorLoadingFile": "Error loading file",
@@ -728,11 +736,14 @@
     "from": "from {{owner}}",
     "shared": "Shared",
     "by": "by {{owner}}",
-    "saveToMyFiles": "Move to my panel",
+    "saveToMyFiles": "Save to my files",
     "removeFromShared": "Remove from shared",
-    "moveToPanel": "Move to my panel",
+    "moveToPanel": "Save to my files",
     "removeFromPanel": "Remove from panel",
-    "sharedWithUsers": "shared with {{users}}"
+    "sharedWithUsers": "shared with {{users}}",
+    "customizeFolder": "Customize folder",
+    "folderColor": "Color",
+    "folderIcon": "Icon"
   },
   "rdp": {
     "connectTitle": "Remote Desktop Connection",
@@ -823,5 +834,9 @@
     "fileSharedMessage": "{{user}} shared \"{{file}}\" with you",
     "eventAssignedTitle": "Event assigned",
     "eventAssignedMessage": "{{user}} assigned \"{{event}}\" to your calendar"
+  },
+  "folderCustomize": {
+    "saved": "Folder customized successfully",
+    "error": "Error customizing folder"
   }
 }

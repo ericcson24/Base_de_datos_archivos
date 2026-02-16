@@ -325,7 +325,10 @@ function App() {
   if (isLoading) {
     return (
       <div className="App app-loading-container">
-        <div>Cargando...</div>
+        <div className="app-loading-content">
+          <img className="app-loading-logo" src="/icons/nube.svg" alt="Logo" />
+          <div className="app-loading-spinner"></div>
+        </div>
       </div>
     );
   }

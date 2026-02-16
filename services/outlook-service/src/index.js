@@ -455,11 +455,11 @@ app.post('/', authenticate, async (req, res) => {
     const username = req.user.username;
     const user = await dbAsync.get('SELECT id, microsoft_access_token, microsoft_refresh_token FROM users WHERE username = ?', [username]);
 
-    if (!user || !user.microsoft_access_token) return res.status(401).json({ error: 'No vinculado' });
+    if (!user || !user.microsoft_access_token) return res.status(401).json({ error: 'No vinculado', message: 'Conecta tu cuenta de Microsoft para crear eventos' });
 
     const { title, start, end, allDay, location, description, attendees, categories } = req.body;
     const validToken = await getValidAccessToken(user);
-    if (!validToken) return res.status(401).json({ error: 'Token expirado, reconecta tu cuenta' });
+    if (!validToken) return res.status(401).json({ error: 'Token expirado', message: 'Token expirado, reconecta tu cuenta de Microsoft' });
     const client = getAuthenticatedClient(validToken);
 
     const newEvent = {
@@ -471,8 +471,17 @@ app.post('/', authenticate, async (req, res) => {
 
     if (allDay) {
       newEvent.isAllDay = true;
-      newEvent.start = { date: start.split('T')[0], timeZone: 'Europe/Madrid' };
-      newEvent.end = { date: end.split('T')[0], timeZone: 'Europe/Madrid' };
+      const startDate = start.split('T')[0];
+      let endDate = end.split('T')[0];
+      // Graph API requires end date to be the day AFTER the last day for all-day events
+      if (endDate <= startDate) {
+        const d = new Date(startDate);
+        d.setDate(d.getDate() + 1);
+        endDate = d.toISOString().split('T')[0];
+      }
+      // All-day events use "date" property WITHOUT timeZone (Graph API rejects timeZone with date)
+      newEvent.start = { dateTime: startDate + 'T00:00:00', timeZone: 'Europe/Madrid' };
+      newEvent.end = { dateTime: endDate + 'T00:00:00', timeZone: 'Europe/Madrid' };
     } else {
       newEvent.isAllDay = false;
       newEvent.start = { dateTime: start, timeZone: 'Europe/Madrid' };
@@ -523,7 +532,7 @@ app.post('/', authenticate, async (req, res) => {
     res.status(201).json(formattedEvent);
   } catch (error) {
     console.error('Error creating event:', error);
-    res.status(500).json({ error: 'Error creando evento' });
+    res.status(500).json({ error: 'Error creando evento', message: error.message || 'Error creando evento' });
   }
 });
 
@@ -775,8 +784,15 @@ app.post('/group', authenticate, async (req, res) => {
 
             if (allDay) {
               newEvent.isAllDay = true;
-              newEvent.start = { date: start.split('T')[0], timeZone: 'Europe/Madrid' };
-              newEvent.end = { date: end.split('T')[0], timeZone: 'Europe/Madrid' };
+              const startDate = start.split('T')[0];
+              let endDate = end.split('T')[0];
+              if (endDate <= startDate) {
+                const d = new Date(startDate);
+                d.setDate(d.getDate() + 1);
+                endDate = d.toISOString().split('T')[0];
+              }
+              newEvent.start = { dateTime: startDate + 'T00:00:00', timeZone: 'Europe/Madrid' };
+              newEvent.end = { dateTime: endDate + 'T00:00:00', timeZone: 'Europe/Madrid' };
             } else {
               newEvent.isAllDay = false;
               newEvent.start = { dateTime: start, timeZone: 'Europe/Madrid' };
@@ -891,8 +907,15 @@ app.post('/assign-user', authenticate, async (req, res) => {
 
         if (allDay) {
           newEvent.isAllDay = true;
-          newEvent.start = { date: start.split('T')[0], timeZone: 'Europe/Madrid' };
-          newEvent.end = { date: end.split('T')[0], timeZone: 'Europe/Madrid' };
+          const startDate = start.split('T')[0];
+          let endDate = end.split('T')[0];
+          if (endDate <= startDate) {
+            const d = new Date(startDate);
+            d.setDate(d.getDate() + 1);
+            endDate = d.toISOString().split('T')[0];
+          }
+          newEvent.start = { dateTime: startDate + 'T00:00:00', timeZone: 'Europe/Madrid' };
+          newEvent.end = { dateTime: endDate + 'T00:00:00', timeZone: 'Europe/Madrid' };
         } else {
           newEvent.isAllDay = false;
           newEvent.start = { dateTime: start, timeZone: 'Europe/Madrid' };
@@ -1215,7 +1238,31 @@ app.delete('/events/:id', authenticate, async (req, res) => {
 
 // --- EVENT ATTACHMENTS ---
 
-// Attach a file to an event
+// Helper: Get MIME type from filename
+function getMimeType(fileName) {
+  const ext = (fileName || '').split('.').pop().toLowerCase();
+  const mimeTypes = {
+    pdf: 'application/pdf',
+    doc: 'application/msword',
+    docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    xls: 'application/vnd.ms-excel',
+    xlsx: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    ppt: 'application/vnd.ms-powerpoint',
+    pptx: 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+    txt: 'text/plain',
+    csv: 'text/csv',
+    jpg: 'image/jpeg', jpeg: 'image/jpeg',
+    png: 'image/png', gif: 'image/gif', svg: 'image/svg+xml', webp: 'image/webp',
+    mp3: 'audio/mpeg', wav: 'audio/wav',
+    mp4: 'video/mp4', avi: 'video/x-msvideo',
+    zip: 'application/zip', rar: 'application/x-rar-compressed',
+    json: 'application/json', xml: 'application/xml',
+    html: 'text/html', css: 'text/css', js: 'application/javascript',
+  };
+  return mimeTypes[ext] || 'application/octet-stream';
+}
+
+// Attach a file to an event (saves locally + uploads to Outlook if linked)
 app.post('/attachments', authenticate, async (req, res) => {
   try {
     const { eventId, fileName, filePath, fileOwner, fileSize } = req.body;
@@ -1225,23 +1272,86 @@ app.post('/attachments', authenticate, async (req, res) => {
       return res.status(400).json({ error: 'Missing required fields (eventId, fileName, filePath)' });
     }
 
+    // Save to local DB first
     const result = await dbAsync.run(
       `INSERT INTO event_attachments (event_id, file_name, file_path, file_owner, attached_by, file_size)
        VALUES (?, ?, ?, ?, ?, ?)`,
       [eventId, fileName, filePath, fileOwner || username, username, fileSize || 0]
     );
 
+    const attachmentRecord = {
+      id: result.lastID,
+      eventId,
+      fileName,
+      filePath,
+      fileOwner: fileOwner || username,
+      attachedBy: username,
+      fileSize: fileSize || 0
+    };
+
+    // Try to upload to Microsoft Outlook via Graph API
+    try {
+      // Check if event has a microsoft_id (not local-only)
+      const dbEvent = await dbAsync.get(
+        'SELECT microsoft_id, user_id FROM calendar_events WHERE microsoft_id = ?',
+        [eventId]
+      );
+
+      if (dbEvent && dbEvent.microsoft_id && !dbEvent.microsoft_id.startsWith('local_')) {
+        const eventOwner = await dbAsync.get(
+          'SELECT id, username, microsoft_access_token, microsoft_refresh_token FROM users WHERE id = ?',
+          [dbEvent.user_id]
+        );
+
+        if (eventOwner && eventOwner.microsoft_access_token) {
+          const validToken = await getValidAccessToken(eventOwner);
+          
+          if (validToken) {
+            // Download file from file-service (internal docker network)
+            const fileOwnerName = fileOwner || username;
+            const fileId = Buffer.from(filePath).toString('base64');
+            const internalToken = jwt.sign(
+              { username: fileOwnerName, role: 'admin' },
+              JWT_SECRET,
+              { expiresIn: '1m' }
+            );
+            
+            const fileResponse = await fetch(
+              `http://file-service:5004/download/${encodeURIComponent(fileId)}?token=${encodeURIComponent(internalToken)}`
+            );
+
+            if (fileResponse.ok) {
+              const fileBuffer = await fileResponse.buffer();
+              const base64Content = fileBuffer.toString('base64');
+              const contentType = getMimeType(fileName);
+
+              // Upload to Graph API (files < 3MB use simple attachment)
+              if (fileBuffer.length < 3 * 1024 * 1024) {
+                const client = getAuthenticatedClient(validToken);
+                await client.api(`/me/events/${dbEvent.microsoft_id}/attachments`).post({
+                  '@odata.type': '#microsoft.graph.fileAttachment',
+                  name: fileName,
+                  contentType: contentType,
+                  contentBytes: base64Content
+                });
+                console.log(`[OUTLOOK] Uploaded attachment "${fileName}" to event ${dbEvent.microsoft_id}`);
+              } else {
+                console.log(`[OUTLOOK] File "${fileName}" too large for simple attachment (${fileBuffer.length} bytes), skipping Graph upload`);
+              }
+            } else {
+              console.warn(`[OUTLOOK] Could not download file from file-service: ${fileResponse.status}`);
+            }
+          }
+        }
+      }
+    } catch (graphError) {
+      // Don't fail the whole request if Graph upload fails - attachment is saved locally
+      console.error('[OUTLOOK] Error uploading attachment to Graph:', graphError.message);
+    }
+
     res.status(201).json({ 
       success: true, 
-      attachment: {
-        id: result.lastID,
-        eventId,
-        fileName,
-        filePath,
-        fileOwner: fileOwner || username,
-        attachedBy: username,
-        fileSize: fileSize || 0
-      }
+      attachment: attachmentRecord
     });
   } catch (error) {
     console.error('Error attaching file:', error);

@@ -9,6 +9,7 @@ export const NotificationProvider = ({ children, user, onNavigate }) => {
   const userRef = useRef(user);
   const [notifications, setNotifications] = useState([]);
   const [unreadCount, setUnreadCount] = useState(0);
+  const recentNotifIds = useRef(new Set()); // Dedup guard for socket events
 
   useEffect(() => {
     userRef.current = user;
@@ -125,17 +126,43 @@ export const NotificationProvider = ({ children, user, onNavigate }) => {
       // Only process notifications for the current user
       const currentUserId = userRef.current?.id;
       if (data.user_id && currentUserId && data.user_id !== currentUserId) {
-        return; // Ignore notifications not for this user
+        return;
       }
 
-      // Refresh notifications list
+      // Dedup: skip if we already processed this notification ID recently
+      const notifId = data.id || `${data.title}_${data.created_at}`;
+      if (recentNotifIds.current.has(notifId)) {
+        return;
+      }
+      recentNotifIds.current.add(notifId);
+      // Clean up old IDs after 10 seconds
+      setTimeout(() => recentNotifIds.current.delete(notifId), 10000);
+
+      // Refresh notifications list (this updates the bell icon + dropdown)
       fetchNotifications();
 
-      // Show toast notification
+      // Show a translated toast notification
       if (userRef.current) {
+        const meta = data.metadata || {};
+        let toastTitle = data.title || 'Notificación';
+        let toastMessage = data.message || '';
+
+        // Translate known notification types for the toast
+        if (meta.notifType === 'file_share') {
+          toastTitle = '📁 Archivo compartido';
+          toastMessage = meta.from && meta.fileName 
+            ? `${meta.from} compartió "${meta.fileName}" contigo`
+            : toastMessage;
+        } else if (meta.notifType === 'calendar_assign' || meta.notifType === 'calendar_group') {
+          toastTitle = '📅 Evento asignado';
+          toastMessage = meta.from && meta.eventTitle
+            ? `${meta.from} te asignó "${meta.eventTitle}"`
+            : toastMessage;
+        }
+
         addToast({
-          title: data.title || 'Notificación',
-          message: data.message,
+          title: toastTitle,
+          message: toastMessage,
           type: data.type || 'info'
         });
       }

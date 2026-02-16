@@ -1,8 +1,9 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import './EventModal.css';
 import LocationPickerModal from './LocationPickerModal';
 import { useLanguage } from '../../context/LanguageContext';
-import { getAuthToken, formatFileSize, getFileIcon } from '../../utils/fileUtils';
+import { getAuthToken, formatFileSize, getFileType } from '../../utils/fileUtils';
+import FileTypeIcon from '../Common/FileTypeIcon';
 
 const EventModal = ({
   isOpen,
@@ -51,6 +52,13 @@ const EventModal = ({
   const [filesLoading, setFilesLoading] = useState(false);
   const [fileSearch, setFileSearch] = useState('');
 
+  // AI File Suggestions State
+  const [suggestedFiles, setSuggestedFiles] = useState([]);
+  const [suggestionsLoading, setSuggestionsLoading] = useState(false);
+  const [suggestionsShown, setSuggestionsShown] = useState(false);
+  const [dismissedSuggestions, setDismissedSuggestions] = useState(new Set());
+  const suggestionsTimerRef = useRef(null);
+
   // Load attachments when viewing/editing an event
   const loadAttachments = useCallback(async (eventId) => {
     if (!eventId) return;
@@ -84,6 +92,43 @@ const EventModal = ({
       console.error('Error loading user files:', err);
     } finally {
       setFilesLoading(false);
+    }
+  }, []);
+
+  // Fetch AI-suggested files for the current event
+  const fetchSuggestions = useCallback(async (eventTitle, eventDescription, eventLocation, eventCategories) => {
+    if (!eventTitle || eventTitle.trim().length < 3) {
+      setSuggestedFiles([]);
+      return;
+    }
+    setSuggestionsLoading(true);
+    try {
+      const response = await fetch('/api/ai/suggest-files', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${getAuthToken()}`
+        },
+        body: JSON.stringify({
+          title: eventTitle,
+          description: eventDescription || '',
+          location: eventLocation || '',
+          categories: eventCategories || []
+        })
+      });
+      if (response.ok) {
+        const data = await response.json();
+        if (data.suggestions?.length > 0) {
+          setSuggestedFiles(data.suggestions);
+          setSuggestionsShown(true);
+        } else {
+          setSuggestedFiles([]);
+        }
+      }
+    } catch (err) {
+      console.error('Error fetching file suggestions:', err);
+    } finally {
+      setSuggestionsLoading(false);
     }
   }, []);
 
@@ -251,6 +296,9 @@ const EventModal = ({
     setShowDeleteConfirm(false);
     setShowFilePicker(false);
     setAttachments([]);
+    setSuggestedFiles([]);
+    setSuggestionsShown(false);
+    setDismissedSuggestions(new Set());
     
     // Load attachments for existing events
     if (isOpen && event && (mode === 'view' || mode === 'edit')) {
@@ -302,6 +350,17 @@ const EventModal = ({
         ...prev,
         [field]: null
       }));
+    }
+
+    // Debounced AI suggestions when title or description changes
+    if (field === 'title' || field === 'description') {
+      if (suggestionsTimerRef.current) clearTimeout(suggestionsTimerRef.current);
+      suggestionsTimerRef.current = setTimeout(() => {
+        const updatedForm = { ...formData, [field]: value };
+        if (updatedForm.title && updatedForm.title.trim().length >= 3) {
+          fetchSuggestions(updatedForm.title, updatedForm.description, updatedForm.location, updatedForm.categories);
+        }
+      }, 1500);
     }
   };
 
@@ -478,7 +537,18 @@ const EventModal = ({
                 {event?.extendedProps?.location && (
                   <div className="detail-group">
                     <label className="detail-label">{t('calendar.location')}</label>
-                    <div className="detail-value">{event.extendedProps.location}</div>
+                    <div className="detail-value location-detail">
+                      <a 
+                        href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(event.extendedProps.location)}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="location-link"
+                      >
+                        <span className="location-link-icon">📍</span>
+                        <span className="location-link-text">{event.extendedProps.location}</span>
+                        <span className="location-link-arrow">↗</span>
+                      </a>
+                    </div>
                   </div>
                 )}
 
@@ -535,7 +605,7 @@ const EventModal = ({
                       <div className="attachments-list">
                         {attachments.map(att => (
                           <div key={att.id} className="attachment-item">
-                            <span className="attachment-icon">{getFileIcon(att.fileName)}</span>
+                            <span className="attachment-icon"><FileTypeIcon type={getFileType(att.fileName)} size={20} /></span>
                             <div className="attachment-info">
                               <span className="attachment-name">{att.fileName}</span>
                               <span className="attachment-meta">{formatFileSize(att.fileSize)} • {att.attachedBy}</span>
@@ -761,6 +831,66 @@ const EventModal = ({
                   </div>
                 </div>
 
+                {/* AI File Suggestions */}
+                {(currentMode === 'create' || currentMode === 'edit') && (suggestionsLoading || (suggestedFiles.length > 0 && suggestionsShown)) && (
+                  <div className="form-group ai-suggestions-section">
+                    <label className="form-label ai-suggestions-label">
+                      <span className="ai-sparkle">✨</span>
+                      {t('calendar.suggestedFiles') || 'Archivos sugeridos por IA'}
+                      {!suggestionsLoading && suggestedFiles.length > 0 && (
+                        <button 
+                          className="ai-suggestions-dismiss"
+                          onClick={() => setSuggestionsShown(false)}
+                          title={t('common.close') || 'Cerrar'}
+                        >✕</button>
+                      )}
+                    </label>
+                    {suggestionsLoading ? (
+                      <div className="ai-suggestions-loading">
+                        <div className="ai-suggestions-spinner" />
+                        <span>{t('calendar.analyzingFiles') || 'Analizando tus archivos...'}</span>
+                      </div>
+                    ) : (
+                      <div className="ai-suggestions-list">
+                        {suggestedFiles
+                          .filter(f => !dismissedSuggestions.has(f.id))
+                          .map(file => (
+                          <div key={file.id} className="ai-suggestion-item">
+                            <div className="ai-suggestion-main">
+                              <span className="attachment-icon"><FileTypeIcon type={getFileType(file.name)} size={20} /></span>
+                              <div className="ai-suggestion-info">
+                                <span className="attachment-name">{file.name.split('/').pop()}</span>
+                                <span className="ai-suggestion-reason">{file.reason}</span>
+                              </div>
+                            </div>
+                            <div className="ai-suggestion-actions">
+                              <button
+                                className="ai-suggestion-attach-btn"
+                                onClick={() => {
+                                  if (event?.id) {
+                                    attachFile(file, event.id);
+                                    setDismissedSuggestions(prev => new Set([...prev, file.id]));
+                                  }
+                                }}
+                                disabled={!event?.id && currentMode === 'create'}
+                                title={currentMode === 'create' 
+                                  ? (t('calendar.saveFirstToAttach') || 'Guarda el evento primero para adjuntar') 
+                                  : (t('calendar.attachFile') || 'Adjuntar')}
+                              >
+                                📎 {t('calendar.attach') || 'Adjuntar'}
+                              </button>
+                              <button
+                                className="ai-suggestion-dismiss-btn"
+                                onClick={() => setDismissedSuggestions(prev => new Set([...prev, file.id]))}
+                              >✕</button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+
                 {/* Attachments Section - Edit/Create Mode */}
                 {currentMode === 'edit' && event?.id && (
                   <div className="form-group">
@@ -768,7 +898,7 @@ const EventModal = ({
                     <div className="attachments-list">
                       {attachments.map(att => (
                         <div key={att.id} className="attachment-item">
-                          <span className="attachment-icon">{getFileIcon(att.fileName)}</span>
+                          <span className="attachment-icon"><FileTypeIcon type={getFileType(att.fileName)} size={20} /></span>
                           <div className="attachment-info">
                             <span className="attachment-name">{att.fileName}</span>
                             <span className="attachment-meta">{formatFileSize(att.fileSize)}</span>
@@ -790,6 +920,15 @@ const EventModal = ({
                       style={{ fontSize: '0.8rem', padding: '4px 10px' }}
                     >
                       + {t('calendar.attachFile') || 'Adjuntar archivo'}
+                    </button>
+                    <button 
+                      type="button"
+                      className="btn btn-sm mt-1 ai-suggest-btn"
+                      onClick={() => fetchSuggestions(formData.title, formData.description, formData.location, formData.categories)}
+                      disabled={suggestionsLoading || !formData.title || formData.title.trim().length < 3}
+                      style={{ fontSize: '0.8rem', padding: '4px 10px', marginLeft: '6px' }}
+                    >
+                      ✨ {t('calendar.suggestFiles') || 'Sugerir archivos'}
                     </button>
                   </div>
                 )}
@@ -911,7 +1050,7 @@ const EventModal = ({
                       className="file-picker-item"
                       onClick={() => attachFile(file, event?.id)}
                     >
-                      <span className="attachment-icon">{getFileIcon(file.name)}</span>
+                      <span className="attachment-icon"><FileTypeIcon type={getFileType(file.name)} size={20} /></span>
                       <div className="attachment-info">
                         <span className="attachment-name">{file.name}</span>
                         <span className="attachment-meta">{formatFileSize(file.size)}</span>

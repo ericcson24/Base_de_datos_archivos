@@ -64,6 +64,7 @@ app.post('/analyze-file', authenticateToken, searchController.analyzeFile);
 
 // --- Calendar ---
 app.post('/create-event', authenticateToken, calendarController.createEvent);
+app.post('/suggest-files', authenticateToken, calendarController.suggestFiles);
 
 // --- Document Editor ---
 app.post('/analyze-document', authenticateToken, documentController.analyzeDocument);

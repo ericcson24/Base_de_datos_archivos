@@ -110,6 +110,7 @@
       "rename": "Zmień nazwę",
       "move": "Przenieś",
       "share": "Udostępnij",
+      "unshare": "Cofnij udostępnianie",
       "delete": "Usuń",
       "properties": "Właściwości"
     },
@@ -286,8 +287,9 @@
     "irreversibleAction": "Tej operacji nie można cofnąć.",
     "searchMap": "Szukaj na mapie",
     "selectLocation": "📍 Wybierz lokalizację",
-    "searchLocationPlaceholder": "Szukaj miasta, ulicy...",
+    "searchLocationPlaceholder": "Szukaj adresu, restauracji, sklepu...",
     "confirmLocation": "Potwierdź lokalizację",
+    "myLocation": "Moja lokalizacja",
     "disconnectedMessage": "⚠️ Nie jesteś połączony z Outlookiem. Twoje wydarzenia i e-maile nie są synchronizowane.",
     "connectButton": "Połącz / Synchronizuj",
     "connectionStatus": "Stan połączenia",
@@ -340,7 +342,13 @@
     "searchFiles": "Szukaj plików...",
     "noFilesFound": "Nie znaleziono plików",
     "fileAttached": "Plik załączony pomyślnie",
-    "fileAttachError": "Błąd podczas załączania pliku"
+    "fileAttachError": "Błąd podczas załączania pliku",
+    "suggestFiles": "Zasugeruj pliki",
+    "suggestedFiles": "Pliki sugerowane przez AI",
+    "analyzingFiles": "Analizowanie Twoich plików...",
+    "attach": "Załącz",
+    "saveFirstToAttach": "Najpierw zapisz wydarzenie, aby załączyć",
+    "dismiss": "Odrzuć"
   },
   "sidebar": {
     "errorLoadingFile": "Błąd podczas ładowania pliku",
@@ -718,11 +726,14 @@
     "from": "od {{owner}}",
     "shared": "Udostępnione",
     "by": "przez {{owner}}",
-    "saveToMyFiles": "Przenieś do panelu",
+    "saveToMyFiles": "Zapisz w moich plikach",
     "removeFromShared": "Usuń z udostępnionych",
-    "moveToPanel": "Przenieś do panelu",
+    "moveToPanel": "Zapisz w moich plikach",
     "removeFromPanel": "Usuń z panelu",
-    "sharedWithUsers": "udostępnione dla {{users}}"
+    "sharedWithUsers": "udostępnione dla {{users}}",
+    "customizeFolder": "Dostosuj folder",
+    "folderColor": "Kolor",
+    "folderIcon": "Ikona"
   },
   "aiResults": {
     "title": "Wyniki Wyszukiwania AI",
@@ -826,5 +837,9 @@
     "fileSharedMessage": "{{user}} udostępnił(a) \"{{file}}\"",
     "eventAssignedTitle": "Przypisano wydarzenie",
     "eventAssignedMessage": "{{user}} przypisał(a) \"{{event}}\" do twojego kalendarza"
+  },
+  "folderCustomize": {
+    "saved": "Folder dostosowany pomyślnie",
+    "error": "Błąd podczas dostosowywania folderu"
   }
 }

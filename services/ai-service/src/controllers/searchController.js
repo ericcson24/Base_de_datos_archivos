@@ -173,6 +173,23 @@ const searchFiles = async (req, res) => {
       });
     }
 
+    // Deduplicate files by name + physical_path to avoid reporting the same file multiple times
+    {
+      const seen = new Set();
+      const deduped = [];
+      for (const file of relevantFiles) {
+        const key = `${(file.name || '').toLowerCase()}::${(file.physical_path || '')}`;
+        if (!seen.has(key)) {
+          seen.add(key);
+          deduped.push(file);
+        }
+      }
+      if (deduped.length < relevantFiles.length) {
+        console.log(`[AI SEARCH] Deduped ${relevantFiles.length} -> ${deduped.length} files`);
+      }
+      relevantFiles = deduped;
+    }
+
     // 2. ENRIQUECER CON CONTENIDO REAL (Lectura de archivos)
     // Filtramos archivos irrelevantes o inexistentes. Analizamos hasta 10 archivos para mayor contexto.
     const topFiles = relevantFiles.slice(0, 10);
@@ -323,7 +340,8 @@ Instrucciones:
 4. Si los documentos se contradicen, menciona ambas versiones.
 5. Si un archivo está dentro de una carpeta, menciónalo para que el usuario pueda encontrarlo fácilmente.
 6. Genera una respuesta completa y sintetizada.
-7. POR FAVOR devuelve tu respuesta en formato JSON estrictamente:
+7. NO reportes archivos duplicados o idénticos. Si ves archivos con el mismo nombre y contenido, cuéntalos como UNO solo.
+8. POR FAVOR devuelve tu respuesta en formato JSON estrictamente:
 {
   "answer": "Tu respuesta completa aquí (incluyendo las rutas/carpetas de los archivos relevantes)...",
   "highlights": [

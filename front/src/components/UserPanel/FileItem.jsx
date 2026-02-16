@@ -1,15 +1,126 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import ContextMenu from './ContextMenu';
-import { getFileIcon, canPreview, canEdit, formatFileSize, downloadFile } from '../../utils/fileUtils';
+import { getFileType, canPreview, canEdit, formatFileSize, downloadFile, getAuthenticatedPreviewUrl, getAuthToken } from '../../utils/fileUtils';
 import { useLanguage } from '../../context/LanguageContext';
+import FolderIcon from '../Common/FolderIcon';
+import FileTypeIcon from '../Common/FileTypeIcon';
 
-const FileItem = ({ item, onFolderClick, onDelete, onRename, onMove, onView, onOpenSidebar, onEdit, onDuplicate, onShare, onDragStart, onDragEnd, viewMode = 'list', isSharedView = false, onSaveToMyFiles, onRemoveShared }) => {
+// Lazy-loaded Office preview for grid thumbnails
+const OfficePreview = React.memo(({ fileId, fileType, fileName }) => {
+  const [content, setContent] = useState(null);
+  const [error, setError] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    const load = async () => {
+      try {
+        const token = getAuthToken();
+        const url = `/api/files/preview/${encodeURIComponent(fileId)}?token=${encodeURIComponent(token)}`;
+        const resp = await fetch(url, { headers: { 'Authorization': `Bearer ${token}` } });
+        if (!resp.ok) throw new Error('Failed');
+        const buf = await resp.arrayBuffer();
+
+        if (fileType === 'word') {
+          const mammothModule = await import('mammoth');
+          const mammoth = mammothModule.default || mammothModule;
+          const result = await mammoth.convertToHtml({ arrayBuffer: buf });
+          if (!cancelled) setContent({ type: 'html', data: result.value });
+        } else if (fileType === 'excel') {
+          const XLSX = await import('xlsx');
+          const wb = XLSX.read(new Uint8Array(buf), { type: 'array' });
+          const ws = wb.Sheets[wb.SheetNames[0]];
+          const html = XLSX.utils.sheet_to_html(ws, { editable: false });
+          if (!cancelled) setContent({ type: 'html', data: html });
+        } else if (fileType === 'powerpoint') {
+          // Extract text from pptx using JSZip
+          const JSZipModule = await import('jszip');
+          const JSZip = JSZipModule.default || JSZipModule;
+          const zip = await JSZip.loadAsync(buf);
+          let texts = [];
+          // Look for slide XML files
+          const slideFiles = Object.keys(zip.files).filter(f => f.match(/ppt\/slides\/slide\d+\.xml/)).sort();
+          for (const sf of slideFiles.slice(0, 3)) { // First 3 slides
+            const xml = await zip.file(sf).async('text');
+            // Extract text from <a:t> tags
+            const matches = xml.match(/<a:t[^>]*>([^<]*)<\/a:t>/g);
+            if (matches) {
+              const slideTexts = matches.map(m => m.replace(/<[^>]+>/g, '')).filter(t => t.trim());
+              texts.push(...slideTexts);
+            }
+          }
+          if (texts.length > 0 && !cancelled) {
+            const html = `<div style="padding:8px;font-size:10px;line-height:1.4;color:#444"><p style="font-weight:600;font-size:12px;margin-bottom:4px">${texts[0]}</p>${texts.slice(1, 6).map(t => `<p style="margin:2px 0">${t}</p>`).join('')}</div>`;
+            setContent({ type: 'html', data: html });
+          } else {
+            if (!cancelled) setError(true);
+          }
+        }
+      } catch (e) {
+        if (!cancelled) setError(true);
+      }
+    };
+    load();
+    return () => { cancelled = true; };
+  }, [fileId, fileType, fileName]);
+
+  if (error || !content) {
+    return (
+      <div className="office-preview-fallback">
+        <FileTypeIcon type={fileType} size={48} />
+      </div>
+    );
+  }
+
+  return (
+    <div className="office-preview-content">
+      <div
+        className={`office-preview-html ${fileType === 'excel' ? 'excel-preview' : 'word-preview'}`}
+        dangerouslySetInnerHTML={{ __html: content.data }}
+      />
+    </div>
+  );
+});
+
+const FileItem = ({ item, onFolderClick, onDelete, onRename, onMove, onView, onOpenSidebar, onEdit, onDuplicate, onShare, onUnshare, onDragStart, onDragEnd, onDropToFolder, viewMode = 'list', isSharedView = false, onSaveToMyFiles, onRemoveShared, onCustomizeFolder }) => {
   const [menuOpen, setMenuOpen] = useState(false);
   const [menuPosition, setMenuPosition] = useState({ top: 0, left: 0 });
+  const [previewUrl, setPreviewUrl] = useState(null);
+  const [previewLoading, setPreviewLoading] = useState(false);
+  const [previewError, setPreviewError] = useState(false);
+  const [isDragOverFolder, setIsDragOverFolder] = useState(false);
   const { t } = useLanguage();
+
+  const fileType = item.type === 'file' ? getFileType(item.name) : null;
+  const isOfficeType = ['word', 'excel', 'powerpoint'].includes(fileType);
+
+  // Load preview thumbnails for previewable files (images, PDFs, videos)
+  useEffect(() => {
+    if (item.type !== 'file' || !canPreview(item.name)) return;
+    
+    let cancelled = false;
+    const loadPreview = async () => {
+      setPreviewLoading(true);
+      setPreviewError(false);
+      try {
+        const url = await getAuthenticatedPreviewUrl(item.id, item.name);
+        if (!cancelled && url) {
+          setPreviewUrl(url);
+        }
+      } catch (err) {
+        if (!cancelled) setPreviewError(true);
+      } finally {
+        if (!cancelled) setPreviewLoading(false);
+      }
+    };
+    loadPreview();
+    return () => { cancelled = true; };
+  }, [item.id, item.name, item.type]);
 
   const handleDragStart = (e) => {
     if (item.type === 'file') {
+      // Set internal drag data so we can identify this as an internal file drag
+      e.dataTransfer.setData('application/x-internal-file', JSON.stringify({ id: item.id, name: item.name, path: item.path }));
+      e.dataTransfer.effectAllowed = 'move';
       onDragStart(item, e);
     }
   };
@@ -17,6 +128,56 @@ const FileItem = ({ item, onFolderClick, onDelete, onRename, onMove, onView, onO
   const handleDragEnd = (e) => {
     if (item.type === 'file') {
       onDragEnd(e);
+    }
+  };
+
+  // Folder drop target handlers - for receiving files dragged onto folders
+  const handleFolderDragOver = (e) => {
+    if (item.type !== 'folder') return;
+    e.preventDefault();
+    e.stopPropagation();
+    // Only accept internal file drags
+    if (e.dataTransfer.types.includes('application/x-internal-file')) {
+      e.dataTransfer.dropEffect = 'move';
+      setIsDragOverFolder(true);
+    }
+  };
+
+  const handleFolderDragEnter = (e) => {
+    if (item.type !== 'folder') return;
+    e.preventDefault();
+    e.stopPropagation();
+    if (e.dataTransfer.types.includes('application/x-internal-file')) {
+      setIsDragOverFolder(true);
+    }
+  };
+
+  const handleFolderDragLeave = (e) => {
+    if (item.type !== 'folder') return;
+    e.preventDefault();
+    e.stopPropagation();
+    // Only reset if we're leaving the folder element itself, not a child
+    const rect = e.currentTarget.getBoundingClientRect();
+    const { clientX, clientY } = e;
+    if (clientX < rect.left || clientX > rect.right || clientY < rect.top || clientY > rect.bottom) {
+      setIsDragOverFolder(false);
+    }
+  };
+
+  const handleFolderDrop = (e) => {
+    if (item.type !== 'folder') return;
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragOverFolder(false);
+    
+    const internalData = e.dataTransfer.getData('application/x-internal-file');
+    if (internalData && onDropToFolder) {
+      try {
+        const draggedFile = JSON.parse(internalData);
+        onDropToFolder(draggedFile, item);
+      } catch (err) {
+        console.error('Error parsing drag data:', err);
+      }
     }
   };
 
@@ -120,13 +281,9 @@ const FileItem = ({ item, onFolderClick, onDelete, onRename, onMove, onView, onO
           {onSaveToMyFiles && (
             <button className="context-menu-item" onClick={(e) => { e.stopPropagation(); setMenuOpen(false); onSaveToMyFiles(item); }}>
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                {item.pinnedFromShared ? (
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                ) : (
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" />
-                )}
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" />
               </svg>
-              <span>{item.pinnedFromShared ? (t('contextMenu.removeFromPanel') || 'Remove from panel') : (t('contextMenu.moveToPanel') || t('contextMenu.saveToMyFiles'))}</span>
+              <span>{t('contextMenu.saveToMyFiles') || 'Guardar en mis archivos'}</span>
             </button>
           )}
           {onRemoveShared && (
@@ -194,6 +351,14 @@ const FileItem = ({ item, onFolderClick, onDelete, onRename, onMove, onView, onO
           </svg>
           <span>{t('contextMenu.share')}</span>
         </button>
+        {item.shared && item.sharedWith && item.sharedWith.length > 0 && onUnshare && (
+          <button className="context-menu-item" onClick={(e) => { e.stopPropagation(); setMenuOpen(false); onUnshare(item); }}>
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />
+            </svg>
+            <span>{t('contextMenu.unshare') || 'Dejar de compartir'}</span>
+          </button>
+        )}
         <div className="border-t border-gray-200 dark:border-slate-600 my-1"></div>
         <button className="context-menu-item" onClick={(e) => { e.stopPropagation(); setMenuOpen(false); onRename(item); }}>
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -251,6 +416,14 @@ const FileItem = ({ item, onFolderClick, onDelete, onRename, onMove, onView, onO
         </svg>
         <span>{t('contextMenu.rename')}</span>
       </button>
+      {onCustomizeFolder && (
+        <button className="context-menu-item" onClick={(e) => { e.stopPropagation(); setMenuOpen(false); onCustomizeFolder(item); }}>
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zm0 0h12a2 2 0 002-2v-4a2 2 0 00-2-2h-2.343M11 7.343l1.657-1.657a2 2 0 012.828 0l2.829 2.829a2 2 0 010 2.828l-8.486 8.485M7 17h.01" />
+          </svg>
+          <span>{t('contextMenu.customizeFolder') || 'Personalizar carpeta'}</span>
+        </button>
+      )}
       <button className="context-menu-danger" onClick={(e) => { e.stopPropagation(); setMenuOpen(false); onDelete(item); }}>
         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
@@ -259,6 +432,103 @@ const FileItem = ({ item, onFolderClick, onDelete, onRename, onMove, onView, onO
       </button>
     </>
   );
+
+  // Render file preview thumbnail or fallback icon
+  const renderFilePreview = (size = 'grid') => {
+    const iconSize = size === 'grid' ? 48 : 28;
+    const containerClass = size === 'grid' ? 'grid-preview-container' : 'list-preview-container';
+
+    if (previewLoading && !isOfficeType) {
+      return (
+        <div className={`${containerClass} preview-loading`}>
+          <div className="preview-spinner" />
+        </div>
+      );
+    }
+
+    // Office documents (Word, Excel, PowerPoint) — grid: rich preview, list: icon
+    if (isOfficeType) {
+      if (size === 'grid') {
+        return (
+          <div className={containerClass}>
+            <OfficePreview fileId={item.id} fileType={fileType} fileName={item.name} />
+            <div className="preview-ext-badge">
+              {item.name.split('.').pop()?.toUpperCase()}
+            </div>
+          </div>
+        );
+      }
+      // List view: just show the icon with type color
+      return <FileTypeIcon type={fileType} size={iconSize} />;
+    }
+
+    if (previewUrl && !previewError && canPreview(item.name)) {
+      return (
+        <div className={containerClass}>
+          {fileType === 'image' && (
+            <img
+              src={previewUrl}
+              alt={item.name}
+              className="item-preview-image"
+              loading="lazy"
+              onError={() => setPreviewError(true)}
+            />
+          )}
+          {fileType === 'pdf' && (
+            <img
+              src={`${previewUrl}&page=1`}
+              alt={item.name}
+              className="item-preview-pdf"
+              loading="lazy"
+              onError={(e) => {
+                if (size === 'grid') {
+                  e.target.style.display = 'none';
+                  e.target.nextSibling && (e.target.nextSibling.style.display = 'block');
+                } else {
+                  setPreviewError(true);
+                }
+              }}
+            />
+          )}
+          {fileType === 'pdf' && size === 'grid' && (
+            <iframe
+              src={previewUrl}
+              className="item-preview-pdf-iframe"
+              title={item.name}
+              style={{ display: 'none' }}
+            />
+          )}
+          {fileType === 'video' && (
+            <video
+              className="item-preview-video"
+              muted
+              preload="metadata"
+              onError={() => setPreviewError(true)}
+            >
+              <source src={previewUrl} />
+            </video>
+          )}
+          {fileType === 'text' && size === 'grid' && (
+            <iframe
+              src={previewUrl}
+              className="item-preview-text"
+              title={item.name}
+            />
+          )}
+          {fileType === 'text' && size === 'list' && (
+            <FileTypeIcon type={fileType} size={iconSize} />
+          )}
+          {/* Extension badge */}
+          <div className="preview-ext-badge">
+            {item.name.split('.').pop()?.toUpperCase()}
+          </div>
+        </div>
+      );
+    }
+
+    // Fallback: SVG icon
+    return <FileTypeIcon type={fileType} size={iconSize} />;
+  };
 
   if (item.type === 'file') {
 
@@ -276,7 +546,7 @@ const FileItem = ({ item, onFolderClick, onDelete, onRename, onMove, onView, onO
             onDragStart={handleDragStart}
             onDragEnd={handleDragEnd}
           >
-            <div className="file-icon text-4xl">{getFileIcon(item.name)}</div>
+            {renderFilePreview('grid')}
           </div>
 
           <div className="p-2 grid-file-info">
@@ -335,7 +605,7 @@ const FileItem = ({ item, onFolderClick, onDelete, onRename, onMove, onView, onO
             onDragEnd={handleDragEnd}
           >
             <div className="file-icon">
-              {getFileIcon(item.name)}
+              {renderFilePreview('list')}
             </div>
           </div>
           <div className="file-name" title={item.name}>
@@ -377,13 +647,17 @@ const FileItem = ({ item, onFolderClick, onDelete, onRename, onMove, onView, onO
   return (
     viewMode === 'grid' ? (
       <div
-        className={`group relative folder-grid-item cursor-pointer overflow-hidden ${item.shared ? 'shared-item' : ''}`}
+        className={`group relative folder-grid-item cursor-pointer overflow-hidden ${item.shared ? 'shared-item' : ''} ${isDragOverFolder ? 'folder-drop-target' : ''}`}
         onClick={handleClick}
         onMouseEnter={handleMouseEnter}
         onMouseLeave={handleMouseLeave}
+        onDragOver={handleFolderDragOver}
+        onDragEnter={handleFolderDragEnter}
+        onDragLeave={handleFolderDragLeave}
+        onDrop={handleFolderDrop}
       >
         <div className="aspect-square p-2 flex items-center justify-center grid-folder-thumbnail">
-          <div className="text-5xl">📁</div>
+          <FolderIcon color={item.folder_color} icon={item.folder_icon} size={56} />
         </div>
 
         <div className="p-1 grid-folder-info">
@@ -430,12 +704,16 @@ const FileItem = ({ item, onFolderClick, onDelete, onRename, onMove, onView, onO
       </div>
     ) : (
       <div
-        className={`folder-chip ${item.shared ? 'shared-item' : ''}`}
+        className={`folder-chip ${item.shared ? 'shared-item' : ''} ${isDragOverFolder ? 'folder-drop-target' : ''}`}
         onClick={handleClick}
         onMouseEnter={handleMouseEnter}
         onMouseLeave={handleMouseLeave}
+        onDragOver={handleFolderDragOver}
+        onDragEnter={handleFolderDragEnter}
+        onDragLeave={handleFolderDragLeave}
+        onDrop={handleFolderDrop}
       >
-        <span className="folder-icon">📁</span>
+        <span className="folder-icon"><FolderIcon color={item.folder_color} icon={item.folder_icon} size={22} /></span>
         <span className="folder-name" title={item.name}>
           {item.name}
           {item.shared && (

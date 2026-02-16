@@ -1,15 +1,92 @@
 import React, { useState, useEffect } from 'react';
-import { getFileType, getFileIcon, canPreview, getAuthenticatedPreviewUrl } from '../../utils/fileUtils';
+import { getFileType, canPreview, getAuthenticatedPreviewUrl, getAuthToken } from '../../utils/fileUtils';
 import { useLanguage } from '../../context/LanguageContext';
+import FolderIcon from '../Common/FolderIcon';
+import FileTypeIcon from '../Common/FileTypeIcon';
+
+// Office preview component for recents
+const RecentOfficePreview = React.memo(({ fileId, fileType, fileName }) => {
+  const [content, setContent] = useState(null);
+  const [error, setError] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    const load = async () => {
+      try {
+        const token = getAuthToken();
+        const url = `/api/files/preview/${encodeURIComponent(fileId)}?token=${encodeURIComponent(token)}`;
+        const resp = await fetch(url, { headers: { 'Authorization': `Bearer ${token}` } });
+        if (!resp.ok) throw new Error('Failed');
+        const buf = await resp.arrayBuffer();
+
+        if (fileType === 'word') {
+          const mammothModule = await import('mammoth');
+          const mammoth = mammothModule.default || mammothModule;
+          const result = await mammoth.convertToHtml({ arrayBuffer: buf });
+          if (!cancelled) setContent({ type: 'html', data: result.value });
+        } else if (fileType === 'excel') {
+          const XLSX = await import('xlsx');
+          const wb = XLSX.read(new Uint8Array(buf), { type: 'array' });
+          const ws = wb.Sheets[wb.SheetNames[0]];
+          const html = XLSX.utils.sheet_to_html(ws, { editable: false });
+          if (!cancelled) setContent({ type: 'html', data: html });
+        } else if (fileType === 'powerpoint') {
+          const JSZipModule = await import('jszip');
+          const JSZip = JSZipModule.default || JSZipModule;
+          const zip = await JSZip.loadAsync(buf);
+          let texts = [];
+          const slideFiles = Object.keys(zip.files).filter(f => f.match(/ppt\/slides\/slide\d+\.xml/)).sort();
+          for (const sf of slideFiles.slice(0, 3)) {
+            const xml = await zip.file(sf).async('text');
+            const matches = xml.match(/<a:t[^>]*>([^<]*)<\/a:t>/g);
+            if (matches) {
+              const slideTexts = matches.map(m => m.replace(/<[^>]+>/g, '')).filter(t => t.trim());
+              texts.push(...slideTexts);
+            }
+          }
+          if (texts.length > 0 && !cancelled) {
+            const html = `<div style="padding:6px;font-size:9px;line-height:1.3;color:#444"><p style="font-weight:600;font-size:10px;margin-bottom:3px">${texts[0]}</p>${texts.slice(1, 5).map(t => `<p style="margin:1px 0">${t}</p>`).join('')}</div>`;
+            setContent({ type: 'html', data: html });
+          } else {
+            if (!cancelled) setError(true);
+          }
+        } else {
+          if (!cancelled) setError(true);
+        }
+      } catch (e) {
+        if (!cancelled) setError(true);
+      }
+    };
+    load();
+    return () => { cancelled = true; };
+  }, [fileId, fileType, fileName]);
+
+  if (error || !content) {
+    return <FileTypeIcon type={fileType} size={36} />;
+  }
+
+  return (
+    <div className="office-preview-content" style={{ borderRadius: 8 }}>
+      <div
+        className={`office-preview-html ${fileType === 'excel' ? 'excel-preview' : 'word-preview'}`}
+        dangerouslySetInnerHTML={{ __html: content.data }}
+      />
+    </div>
+  );
+});
 
 const RecentFileItem = ({ file, isDarkMode, onFileClick }) => {
   const [previewUrl, setPreviewUrl] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
   const { t, language } = useLanguage();
+  
+  const fileType = getFileType(file.name);
+  const isOfficeType = ['word', 'excel', 'powerpoint'].includes(fileType);
 
   useEffect(() => {
     const loadPreview = async () => {
-      if (file.type === 'folder' || !canPreview(file.name)) return;
+      // Don't load preview URL for office types (they use OfficePreview component)
+      if (file.type === 'folder' || !canPreview(file.name) || isOfficeType) return;
       
       setIsLoading(true);
       try {
@@ -23,9 +100,8 @@ const RecentFileItem = ({ file, isDarkMode, onFileClick }) => {
     };
 
     loadPreview();
-  }, [file.id, file.name, file.type]);
+  }, [file.id, file.name, file.type, isOfficeType]);
 
-  const fileType = getFileType(file.name);
   const displayDate = file.modifiedAt || file.modified;
   
   return (
@@ -36,7 +112,11 @@ const RecentFileItem = ({ file, isDarkMode, onFileClick }) => {
     >
       <div className="recent-file-preview">
         {file.type === 'folder' ? (
-          <div className="folder-icon">📁</div>
+          <div className="folder-icon"><FolderIcon color={file.folder_color} icon={file.folder_icon} size={32} /></div>
+        ) : isOfficeType ? (
+          <div className="file-preview-container">
+            <RecentOfficePreview fileId={file.id} fileType={fileType} fileName={file.name} />
+          </div>
         ) : isLoading ? (
           <div className="loading-preview">⟳</div>
         ) : previewUrl && canPreview(file.name) ? (
@@ -77,12 +157,12 @@ const RecentFileItem = ({ file, isDarkMode, onFileClick }) => {
             )}
             {/* Fallback icon */}
             <div className="file-fallback-icon fallback-icon-hidden">
-              {getFileIcon(file.name)}
+              <FileTypeIcon type={fileType} size={36} />
             </div>
           </div>
         ) : (
           <div className="file-icon-large">
-            {getFileIcon(file.name)}
+            <FileTypeIcon type={fileType} size={42} />
           </div>
         )}
         

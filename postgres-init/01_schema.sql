@@ -187,3 +187,14 @@ CREATE TABLE IF NOT EXISTS notifications (
     metadata JSONB,
     FOREIGN KEY(user_id) REFERENCES users(id)
 );
+
+-- Folder Metadata (color/icon customization)
+CREATE TABLE IF NOT EXISTS folder_metadata (
+    id SERIAL PRIMARY KEY,
+    username TEXT NOT NULL,
+    folder_path TEXT NOT NULL,
+    color TEXT DEFAULT '#5f9ee9',
+    icon TEXT DEFAULT 'default',
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(username, folder_path)
+);
