@@ -12,7 +12,7 @@ import SettingsModal from '../Modals/SettingsModal';
 import RDPConnectionModal from '../Modals/RDPConnectionModal';
 import NotificationCenter from '../Common/NotificationCenter';
 import DayPanel from './DayPanel';
-import { FiArrowLeft, FiLayout, FiMonitor, FiSettings, FiLogOut } from 'react-icons/fi';
+import { FiArrowLeft, FiLayout, FiMonitor, FiSettings, FiLogOut, FiMap, FiChevronDown } from 'react-icons/fi';
 import { useToast } from '../../context/ToastContext';
 import { useLanguage } from '../../context/LanguageContext';
 import { getAuthToken } from '../../utils/fileUtils';
@@ -169,7 +169,7 @@ const DailyTimeline = ({ events, headerActions }) => {
   );
 };
 
-const Calendar = ({ user, onLogout, onBackToPanel, onBackToFolders, onGoToRemote, onThemeToggle, isDarkMode }) => {
+const Calendar = ({ user, onLogout, onBackToPanel, onBackToFolders, onGoToRemote, onGoToRoadmap, onThemeToggle, isDarkMode }) => {
   const { t, language } = useLanguage();
   const calendarRef = useRef(null);
   const { addToast } = useToast();
@@ -197,6 +197,120 @@ const Calendar = ({ user, onLogout, onBackToPanel, onBackToFolders, onGoToRemote
   const [selectedGroupId, setSelectedGroupId] = useState(''); // For "View All" group context
   const [calendarViewMode, setCalendarViewMode] = useState('mine'); // 'mine' or 'others'
   const [expandedGroups, setExpandedGroups] = useState({}); // { groupId: boolean }
+
+  // Roadmap layer state
+  const [showRoadmapLayer, setShowRoadmapLayer] = useState(false);
+  const [roadmapTasks, setRoadmapTasks] = useState([]);
+  const [roadmapProjects, setRoadmapProjects] = useState([]);
+  const [selectedRoadmapProjects, setSelectedRoadmapProjects] = useState(new Set());
+  const [showRoadmapPicker, setShowRoadmapPicker] = useState(false);
+
+  // Load roadmap projects + tasks when layer is toggled on
+  useEffect(() => {
+    if (!showRoadmapLayer) return;
+    const fetchRoadmapTasks = async () => {
+      try {
+        const token = getAuthToken();
+        const headers = {};
+        if (token) headers['Authorization'] = `Bearer ${token}`;
+        
+        // Fetch all projects first
+        const projRes = await fetch('/api/roadmap/projects', { headers });
+        if (!projRes.ok) return;
+        const projects = await projRes.json();
+        setRoadmapProjects(projects);
+        
+        // Select all projects by default if none selected
+        if (selectedRoadmapProjects.size === 0) {
+          setSelectedRoadmapProjects(new Set(projects.map(p => p.id)));
+        }
+        
+        // Fetch issues for all projects
+        const allTasks = [];
+        for (const proj of projects) {
+          const issRes = await fetch(`/api/roadmap/projects/${proj.id}/issues`, { headers });
+          if (issRes.ok) {
+            const issues = await issRes.json();
+            issues.filter(i => i.due_date || i.start_date).forEach(issue => {
+              allTasks.push({
+                id: `roadmap-${issue.id}`,
+                title: `📋 [${issue.issue_key || ''}] ${issue.title}`,
+                start: issue.start_date || issue.due_date,
+                end: issue.due_date || issue.start_date,
+                allDay: true,
+                backgroundColor: issue.priority === 'critical' ? '#dc2626' : issue.priority === 'high' ? '#f59e0b' : issue.priority === 'low' ? '#22c55e' : '#6366f1',
+                borderColor: issue.priority === 'critical' ? '#dc2626' : issue.priority === 'high' ? '#f59e0b' : issue.priority === 'low' ? '#22c55e' : '#6366f1',
+                display: 'block',
+                extendedProps: {
+                  isRoadmap: true,
+                  roadmapIssueId: issue.id,
+                  projectId: proj.id,
+                  projectName: proj.name,
+                  priority: issue.priority,
+                  status: issue.status,
+                  issueKey: issue.issue_key,
+                  issueType: issue.issue_type,
+                  assignedUsername: issue.assigned_username,
+                  description: issue.description
+                }
+              });
+            });
+          }
+        }
+        setRoadmapTasks(allTasks);
+      } catch (err) {
+        console.error('Error loading roadmap tasks:', err);
+      }
+    };
+    fetchRoadmapTasks();
+  }, [showRoadmapLayer]);
+
+  const toggleRoadmapProject = (projId) => {
+    setSelectedRoadmapProjects(prev => {
+      const next = new Set(prev);
+      if (next.has(projId)) next.delete(projId);
+      else next.add(projId);
+      return next;
+    });
+  };
+
+  // Filter roadmap tasks by selected projects
+  const filteredRoadmapTasks = roadmapTasks.filter(t => 
+    selectedRoadmapProjects.has(t.extendedProps?.projectId)
+  );
+
+  // Handle creating a calendar event from a roadmap task
+  const handleCreateFromRoadmap = async (roadmapIssueId) => {
+    try {
+      const token = getAuthToken();
+      const res = await fetch('/api/roadmap/issue-to-calendar', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+        body: JSON.stringify({ issue_id: roadmapIssueId })
+      });
+      if (res.ok) {
+        const eventData = await res.json();
+        // Open the event modal with pre-filled data from the roadmap task
+        setModalState({
+          isOpen: true,
+          mode: 'create',
+          event: null,
+          selectedDates: {
+            start: new Date(eventData.start),
+            end: new Date(eventData.end),
+            allDay: true
+          },
+          prefill: {
+            title: eventData.title,
+            description: eventData.description,
+            roadmapIssueId: roadmapIssueId
+          }
+        });
+      }
+    } catch (err) {
+      console.error('Error preparing roadmap event:', err);
+    }
+  };
 
   useEffect(() => {
     if (user.role === 'admin' || user.role === 'boss') {
@@ -528,8 +642,21 @@ const Calendar = ({ user, onLogout, onBackToPanel, onBackToFolders, onGoToRemote
     };
   });
 
+  // Merge roadmap tasks into calendar events when layer is active
+  const calendarDisplayEvents = showRoadmapLayer 
+    ? [...filteredEvents, ...filteredRoadmapTasks] 
+    : filteredEvents;
+
   const handleEventClick = (clickInfo) => {
-    clickInfo.jsEvent.preventDefault(); // Prevent default behavior (like following links)
+    clickInfo.jsEvent.preventDefault();
+    // For roadmap events, show a tooltip or allow creating a calendar event from it
+    if (clickInfo.event.extendedProps?.isRoadmap) {
+      const issueId = clickInfo.event.extendedProps?.roadmapIssueId;
+      if (issueId) {
+        handleCreateFromRoadmap(issueId);
+      }
+      return;
+    }
     setModalState({ isOpen: true, mode: 'view', event: clickInfo.event });
   };
 
@@ -797,6 +924,67 @@ const Calendar = ({ user, onLogout, onBackToPanel, onBackToFolders, onGoToRemote
           </div>
 
           <div className="sidebar-section mt-auto">
+             <div className="section-title" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+               <span style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer' }}
+                 onClick={() => setShowRoadmapPicker(!showRoadmapPicker)}>
+                 <FiMap size={14} /> Roadmap
+                 <FiChevronDown size={12} style={{ transform: showRoadmapPicker ? 'rotate(180deg)' : 'none', transition: '0.2s' }} />
+               </span>
+               <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', fontSize: '12px' }}>
+                 <input 
+                   type="checkbox" 
+                   checked={showRoadmapLayer} 
+                   onChange={() => setShowRoadmapLayer(!showRoadmapLayer)}
+                   style={{ accentColor: '#6366f1' }}
+                 />
+                 {showRoadmapLayer ? 'ON' : 'OFF'}
+               </label>
+             </div>
+             {showRoadmapLayer && showRoadmapPicker && (
+               <div className="roadmap-project-picker">
+                 {roadmapProjects.length === 0 && (
+                   <div style={{ fontSize: '11px', color: 'var(--text-secondary)', padding: '4px 0' }}>
+                     Sin proyectos disponibles
+                   </div>
+                 )}
+                 {roadmapProjects.map(proj => (
+                   <div key={proj.id} className="roadmap-picker-item" onClick={() => toggleRoadmapProject(proj.id)}>
+                     <input
+                       type="checkbox"
+                       checked={selectedRoadmapProjects.has(proj.id)}
+                       onChange={() => {}}
+                       style={{ accentColor: '#6366f1' }}
+                     />
+                     <span className="roadmap-picker-icon">
+                       {proj.project_type === 'general' ? '🌐' : '🔒'}
+                     </span>
+                     <span className="roadmap-picker-name">{proj.name}</span>
+                     <span className="roadmap-picker-count">{proj.issue_count || 0}</span>
+                   </div>
+                 ))}
+                 <div style={{ borderTop: '1px solid var(--border-color)', marginTop: '6px', paddingTop: '6px' }}>
+                   <div style={{ display: 'flex', gap: '4px' }}>
+                     <button className="roadmap-picker-btn" onClick={() => setSelectedRoadmapProjects(new Set(roadmapProjects.map(p => p.id)))}>
+                       Todos
+                     </button>
+                     <button className="roadmap-picker-btn" onClick={() => setSelectedRoadmapProjects(new Set())}>
+                       Ninguno
+                     </button>
+                   </div>
+                 </div>
+               </div>
+             )}
+             {showRoadmapLayer && filteredRoadmapTasks.length > 0 && (
+               <div style={{ fontSize: '11px', color: 'var(--text-secondary)', padding: '4px 0' }}>
+                 📋 {filteredRoadmapTasks.length} tareas de roadmap visibles
+                 <div style={{ fontSize: '10px', marginTop: '2px', opacity: 0.7 }}>
+                   Click en una tarea para crear evento
+                 </div>
+               </div>
+             )}
+          </div>
+
+          <div className="sidebar-section mt-auto">
              <div className="section-title connection-status-section">{t('calendar.connectionStatus')}</div>
              <div className="connection-status-container">
                 <div 
@@ -884,7 +1072,7 @@ const Calendar = ({ user, onLogout, onBackToPanel, onBackToFolders, onGoToRemote
               selectMirror={true}
               dayMaxEvents={true}
               eventDisplay="block"
-              events={filteredEvents}
+              events={calendarDisplayEvents}
               eventClick={handleEventClick}
               select={handleDateSelect}
               unselectAuto={false} // Keep selection visible when modal opens
@@ -933,11 +1121,14 @@ const Calendar = ({ user, onLogout, onBackToPanel, onBackToFolders, onGoToRemote
           mode={modalState.mode}
           categories={categories}
           selectedDates={modalState.selectedDates}
+          prefill={modalState.prefill || null}
           onClose={() => {
             setModalState({ ...modalState, isOpen: false });
             calendarRef.current?.getApi()?.unselect(); // Clear selection when modal closes
           }}
           user={user}
+          roadmapProjects={roadmapProjects}
+          onGoToRoadmap={onGoToRoadmap}
           initialAssignMode={selectedGroupId ? 'group' : (viewUserId ? 'user' : 'me')}
           initialTargetUserId={viewUserId}
           initialGroupId={selectedGroupId}
@@ -985,6 +1176,23 @@ const Calendar = ({ user, onLogout, onBackToPanel, onBackToFolders, onGoToRemote
               }
               
               const result = await response.json();
+
+              // If this event was created from a roadmap task, link them
+              if (modalState.prefill?.roadmapIssueId && result.id) {
+                try {
+                  await fetch('/api/roadmap/calendar-links', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${getAuthToken()}` },
+                    body: JSON.stringify({
+                      calendar_event_id: result.id,
+                      issue_id: modalState.prefill.roadmapIssueId,
+                      link_direction: 'roadmap_to_calendar'
+                    })
+                  });
+                } catch (linkErr) {
+                  console.warn('Could not link roadmap issue to calendar event:', linkErr);
+                }
+              }
 
               setModalState({ ...modalState, isOpen: false });
               calendarRef.current?.getApi()?.unselect(); // Clear selection

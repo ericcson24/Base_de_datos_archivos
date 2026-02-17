@@ -1,10 +1,10 @@
 import React, { useState } from 'react';
 import SettingsModal from '../Modals/SettingsModal';
 import { useLanguage } from '../../context/LanguageContext';
-import { FiFolder, FiMonitor, FiCalendar, FiTool, FiLogOut, FiSettings } from 'react-icons/fi';
+import { FiFolder, FiMonitor, FiCalendar, FiTool, FiLogOut, FiSettings, FiMap } from 'react-icons/fi';
 import './FolderSelector.css';
 
-const FolderSelector = ({ user, onSelectFolder, onLogout, onThemeToggle, isDarkMode, onGoToAdmin, onGoToCalendar, onGoToRemote }) => {
+const FolderSelector = ({ user, onSelectFolder, onLogout, onThemeToggle, isDarkMode, onGoToAdmin, onGoToCalendar, onGoToRemote, onGoToRoadmap }) => {
   const { t } = useLanguage();
   const [showSettingsModal, setShowSettingsModal] = useState(false);
 
@@ -23,6 +23,12 @@ const FolderSelector = ({ user, onSelectFolder, onLogout, onThemeToggle, isDarkM
   const handleRemote = () => {
     if (onGoToRemote) {
       onGoToRemote();
+    }
+  };
+
+  const handleRoadmap = () => {
+    if (onGoToRoadmap) {
+      onGoToRoadmap();
     }
   };
 
@@ -57,47 +63,55 @@ const FolderSelector = ({ user, onSelectFolder, onLogout, onThemeToggle, isDarkM
           {user && (
             <div className="user-info">
               <p>{t('userPanel.welcome')}, <strong>{user.username}</strong></p>
-              {user.role === 'admin' && <span className="admin-badge">👑 Admin</span>}
+              {user.role === 'admin' && <span className="admin-badge"><FiTool size={12} /> Admin</span>}
             </div>
           )}
 
-          <button
-            className="folder-btn"
-            onClick={() => handleFolderSelect('privada')}
-          >
-            <FiFolder className="folder-btn-icon" /> {t('userPanel.myFiles')}
-          </button>
-
-          <button
-            className="folder-btn"
-            onClick={handleRemote}
-          >
-            <FiMonitor className="folder-btn-icon" /> {t('userPanel.remoteWork')}
-          </button>
-
-          <button
-            className="folder-btn"
-            onClick={handleCalendar}
-          >
-            <FiCalendar className="folder-btn-icon" /> {t('userPanel.calendar')}
-          </button>
-
-          {/* Botón de administrador solo para admins */}
-          {user && user.role === 'admin' && onGoToAdmin && (
-            <button
-              className="folder-btn"
-              onClick={onGoToAdmin}
-            >
-              <FiTool className="folder-btn-icon" /> {t('folders.adminPanel')}
+          <div className="apps-grid">
+            <button className="app-card" onClick={() => handleFolderSelect('privada')}>
+              <div className="app-card-icon" style={{ background: 'linear-gradient(135deg, #4285f4, #2b6cb0)' }}>
+                <FiFolder size={28} />
+              </div>
+              <span className="app-card-label">{t('userPanel.myFiles')}</span>
             </button>
-          )}
 
-          <button
-            className="folder-btn folder-btn-logout"
-            onClick={onLogout}
-          >
-            <FiLogOut className="folder-btn-icon" /> {t('userPanel.logout')}
-          </button>
+            <button className="app-card" onClick={handleRemote}>
+              <div className="app-card-icon" style={{ background: 'linear-gradient(135deg, #4285f4, #2b6cb0)' }}>
+                <FiMonitor size={28} />
+              </div>
+              <span className="app-card-label">{t('userPanel.remoteWork')}</span>
+            </button>
+
+            <button className="app-card" onClick={handleCalendar}>
+              <div className="app-card-icon" style={{ background: 'linear-gradient(135deg, #4285f4, #2b6cb0)' }}>
+                <FiCalendar size={28} />
+              </div>
+              <span className="app-card-label">{t('userPanel.calendar')}</span>
+            </button>
+
+            <button className="app-card" onClick={handleRoadmap}>
+              <div className="app-card-icon" style={{ background: 'linear-gradient(135deg, #4285f4, #2b6cb0)' }}>
+                <FiMap size={28} />
+              </div>
+              <span className="app-card-label">{t('roadmap.title')}</span>
+            </button>
+
+            {user && user.role === 'admin' && onGoToAdmin && (
+              <button className="app-card" onClick={onGoToAdmin}>
+                <div className="app-card-icon" style={{ background: 'linear-gradient(135deg, #4285f4, #2b6cb0)' }}>
+                  <FiTool size={28} />
+                </div>
+                <span className="app-card-label">{t('folders.adminPanel')}</span>
+              </button>
+            )}
+
+            <button className="app-card app-card-logout" onClick={onLogout}>
+              <div className="app-card-icon" style={{ background: 'linear-gradient(135deg, #6b7280, #4b5563)' }}>
+                <FiLogOut size={28} />
+              </div>
+              <span className="app-card-label">{t('userPanel.logout')}</span>
+            </button>
+          </div>
         </div>
       </div>
     </div>

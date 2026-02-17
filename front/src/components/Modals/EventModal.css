@@ -894,3 +894,83 @@
   box-shadow: 0 2px 8px rgba(139, 92, 246, 0.45);
 }
 
+/* Roadmap Integration */
+.roadmap-integration-section {
+  border-top: 1px solid var(--cal-border, rgba(0,0,0,0.05));
+  padding-top: 16px;
+  margin-top: 24px;
+}
+
+.roadmap-links-container {
+  margin-top: 10px;
+}
+
+.roadmap-link-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px;
+  background: rgba(16, 185, 129, 0.05);
+  border: 1px solid rgba(16, 185, 129, 0.1);
+  border-radius: 8px;
+  margin-bottom: 8px;
+}
+
+.sync-icon {
+  color: #10b981;
+  flex-shrink: 0;
+}
+
+.link-info {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.link-title {
+  font-weight: 600;
+  font-size: 0.9rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.link-meta {
+  font-size: 0.75rem;
+  opacity: 0.6;
+}
+
+.link-actions {
+  display: flex;
+  gap: 4px;
+}
+
+.icon-btn {
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  padding: 6px;
+  border-radius: 4px;
+  color: var(--cal-text-secondary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+}
+
+.icon-btn:hover {
+  background: rgba(0,0,0,0.05);
+  color: var(--cal-text);
+}
+
+.icon-btn.delete:hover {
+  background: rgba(239, 68, 68, 0.1);
+  color: #ef4444;
+}
+
+[data-theme="dark"] .roadmap-link-item {
+  background: rgba(16, 185, 129, 0.1);
+  border-color: rgba(16, 185, 129, 0.2);
+}
+

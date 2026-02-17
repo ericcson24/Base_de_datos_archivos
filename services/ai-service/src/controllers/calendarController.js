@@ -91,8 +91,21 @@ Tu tarea:
    - "delete": Eliminar evento.
    - "add_category": Crear/añadir una categoría nueva.
    - "attach_file": Adjuntar un archivo a un evento existente.
+   - "roadmap_task": Crear una tarea en el Roadmap (si el usuario dice "crea una tarea en el roadmap", "añade al kanban", "tarea de proyecto", etc.)
 
 2. Extraer los detalles.
+
+Si el intent es "roadmap_task", devuelve:
+{
+  "intent": "roadmap_task",
+  "title": "Título de la tarea",
+  "description": "Descripción",
+  "due_date": "YYYY-MM-DDTHH:mm:ssZ",
+  "assigned_to": "nombre del usuario si se menciona",
+  "column_name": "nombre de la columna si se menciona (ej: Validar, Backlog)",
+  "priority": "low|medium|high|critical",
+  "success": true
+}
 
 IMPORTANTE SOBRE FECHAS:
 - La fecha/hora actual es: ${nowInUserTZ} (formato DD/MM/YYYY HH:mm:ss, zona ${userTimeZone})
@@ -197,6 +210,79 @@ Responde SOLO el JSON.`;
 
     // 3. Manejo de Intenciones
     
+    // --- ROADMAP TASK (Bridge to Roadmap Service) ---
+    if (eventData.intent === 'roadmap_task') {
+      const ROADMAP_SERVICE_URL = 'http://roadmap-service:5010';
+      try {
+        // Forward to roadmap AI controller
+        const roadmapRes = await fetch(`${ROADMAP_SERVICE_URL}/projects`, {
+          headers: { 'Authorization': req.headers.authorization || '' }
+        });
+        let projects = [];
+        if (roadmapRes.ok) projects = await roadmapRes.json();
+
+        if (projects.length === 0) {
+          return res.json({
+            success: true,
+            isRoadmap: true,
+            message: 'No tienes proyectos en el Roadmap. Crea uno primero desde /roadmap.'
+          });
+        }
+
+        // Use first project if not specified
+        const targetProject = projects[0];
+        
+        // Resolve column
+        let columnId = null;
+        if (eventData.column_name) {
+          const colsRes = await fetch(`${ROADMAP_SERVICE_URL}/projects/${targetProject.id}/columns`, {
+            headers: { 'Authorization': req.headers.authorization || '' }
+          });
+          if (colsRes.ok) {
+            const cols = await colsRes.json();
+            const match = cols.find(c => c.name.toLowerCase().includes(eventData.column_name.toLowerCase()));
+            if (match) columnId = match.id;
+          }
+        }
+
+        // Resolve assignee
+        let assignedTo = null;
+        if (eventData.assigned_to) {
+          const assignee = await dbAsync.get('SELECT id FROM users WHERE username ILIKE ?', [eventData.assigned_to]);
+          if (assignee) assignedTo = assignee.id;
+        }
+
+        const issuePayload = {
+          title: eventData.title,
+          description: eventData.description || '',
+          priority: eventData.priority || 'medium',
+          due_date: eventData.due_date || eventData.startTimeUTC || null,
+          column_id: columnId,
+          assigned_to: assignedTo,
+          syncCalendar: true
+        };
+
+        const createRes = await fetch(`${ROADMAP_SERVICE_URL}/projects/${targetProject.id}/issues`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Authorization': req.headers.authorization || '' },
+          body: JSON.stringify(issuePayload)
+        });
+
+        if (createRes.ok) {
+          const issue = await createRes.json();
+          return res.json({
+            success: true,
+            isRoadmap: true,
+            message: `Tarea "${eventData.title}" creada en el Roadmap del proyecto "${targetProject.name}"${eventData.due_date ? ' y sincronizada con el calendario' : ''}`,
+            issue
+          });
+        }
+      } catch (e) {
+        console.error('[AI CALENDAR] Roadmap bridge error:', e);
+      }
+      return res.json({ success: true, isRoadmap: true, message: 'Tarea procesada' });
+    }
+
     // --- QUERY ---
     if (eventData.intent === 'query') {
         const timeFilter = eventData.dateFilter || 'today'; // prompt should support this

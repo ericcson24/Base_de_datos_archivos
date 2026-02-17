@@ -40,6 +40,10 @@ const AdminPanel = ({ user, onLogout, onBackToFolders, onThemeToggle, isDarkMode
   const [securityFilter, setSecurityFilter] = useState('security');
   const [securityLoading, setSecurityLoading] = useState(false);
 
+  // Roadmap Access States
+  const [roadmapAccessUsers, setRoadmapAccessUsers] = useState([]);
+  const [roadmapAccessLoading, setRoadmapAccessLoading] = useState(false);
+
   useEffect(() => {
     loadInitialData();
     const timer = setInterval(() => setCurrentTime(Date.now()), 1000);
@@ -50,6 +54,9 @@ const AdminPanel = ({ user, onLogout, onBackToFolders, onThemeToggle, isDarkMode
     if (activeTab === 'security') {
       loadSecurityOverview();
       loadSecurityLogs();
+    }
+    if (activeTab === 'roadmap') {
+      loadRoadmapAccess();
     }
   }, [activeTab]);
 
@@ -349,6 +356,179 @@ const AdminPanel = ({ user, onLogout, onBackToFolders, onThemeToggle, isDarkMode
     setTimeout(() => setAlert({ show: false, type: '', message: '' }), 3000);
   };
 
+  // Roadmap Access Management
+  const loadRoadmapAccess = async () => {
+    setRoadmapAccessLoading(true);
+    try {
+      const res = await fetchWithAuth('/api/roadmap/admin/access');
+      if (res.ok) {
+        const data = await res.json();
+        setRoadmapAccessUsers(Array.isArray(data) ? data : []);
+      } else {
+        console.error('Error loading roadmap access: HTTP', res.status);
+        setRoadmapAccessUsers([]);
+      }
+    } catch (error) {
+      console.error('Error loading roadmap access:', error);
+      setRoadmapAccessUsers([]);
+    } finally {
+      setRoadmapAccessLoading(false);
+    }
+  };
+
+  const updateRoadmapAccess = async (userId, accessLevel, canCreateProjects) => {
+    try {
+      const res = await fetchWithAuth(`/api/roadmap/admin/access/${userId}`, {
+        method: 'PUT',
+        body: JSON.stringify({ access_level: accessLevel, can_create_projects: canCreateProjects })
+      });
+      if (res.ok) {
+        showAlert('success', 'Acceso de Roadmap actualizado');
+        loadRoadmapAccess();
+      } else {
+        const err = await res.json();
+        showAlert('error', err.error || 'Error al actualizar acceso');
+      }
+    } catch (error) {
+      showAlert('error', 'Error al actualizar acceso');
+    }
+  };
+
+  const grantAllAccess = async (level) => {
+    try {
+      const usersToUpdate = roadmapAccessUsers.filter(u => u.role !== 'admin').map(u => ({
+        user_id: u.id,
+        access_level: level,
+        can_create_projects: level === 'manager' || level === 'admin'
+      }));
+      const res = await fetchWithAuth('/api/roadmap/admin/access/bulk', {
+        method: 'PUT',
+        body: JSON.stringify({ users: usersToUpdate })
+      });
+      if (res.ok) {
+        showAlert('success', `Acceso "${level}" otorgado a todos los usuarios`);
+        loadRoadmapAccess();
+      } else {
+        const err = await res.json();
+        showAlert('error', err.error || 'Error al actualizar accesos masivos');
+      }
+    } catch (error) {
+      showAlert('error', 'Error al actualizar accesos masivos');
+    }
+  };
+
+  const renderRoadmapAccess = () => {
+    const accessLevels = [
+      { value: 'none', label: 'Sin acceso', color: '#6b7280' },
+      { value: 'viewer', label: 'Visor', color: '#f59e0b' },
+      { value: 'member', label: 'Miembro', color: '#3b82f6' },
+      { value: 'manager', label: 'Manager', color: '#8b5cf6' },
+      { value: 'admin', label: 'Admin', color: '#22c55e' }
+    ];
+
+    return (
+      <div className="admin-section">
+        <div className="admin-section-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1rem' }}>
+          <h2 style={{ fontSize: '1.1rem', fontWeight: 600 }}>Gestión de Acceso al Roadmap</h2>
+          <div style={{ display: 'flex', gap: '8px' }}>
+            <button className="admin-btn admin-btn-outline" onClick={() => grantAllAccess('member')}>
+              Todos → Miembro
+            </button>
+            <button className="admin-btn admin-btn-outline" onClick={() => grantAllAccess('viewer')}>
+              Todos → Visor
+            </button>
+            <button className="admin-btn admin-btn-outline" onClick={() => grantAllAccess('none')} style={{ borderColor: '#ef4444', color: '#ef4444' }}>
+              Revocar todos
+            </button>
+          </div>
+        </div>
+
+        <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '1rem' }}>
+          Controla quién puede acceder al módulo de Roadmap y qué puede hacer cada usuario. Los administradores siempre tienen acceso completo.
+        </p>
+
+        {roadmapAccessLoading ? (
+          <div style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-secondary)' }}>Cargando...</div>
+        ) : (
+          <div className="admin-table-container">
+            <table className="admin-table">
+              <thead>
+                <tr>
+                  <th>Usuario</th>
+                  <th>Email</th>
+                  <th>Rol del Sistema</th>
+                  <th>Acceso Roadmap</th>
+                  <th>Puede Crear Proyectos</th>
+                  <th>Otorgado por</th>
+                </tr>
+              </thead>
+              <tbody>
+                {roadmapAccessUsers.map(u => {
+                  const isAdmin = u.role === 'admin';
+                  return (
+                    <tr key={u.id}>
+                      <td><strong>{u.username}</strong></td>
+                      <td>{u.email || '—'}</td>
+                      <td>
+                        <span className={`admin-role-badge ${u.role}`}>
+                          {u.role}
+                        </span>
+                      </td>
+                      <td>
+                        {isAdmin ? (
+                          <span style={{ color: '#22c55e', fontWeight: 600, fontSize: '0.85rem' }}>Admin (completo)</span>
+                        ) : (
+                          <select
+                            value={u.access_level || 'none'}
+                            onChange={(e) => updateRoadmapAccess(u.id, e.target.value, u.can_create_projects)}
+                            className="admin-select-sm"
+                            style={{ minWidth: '120px' }}
+                          >
+                            {accessLevels.map(l => (
+                              <option key={l.value} value={l.value}>{l.label}</option>
+                            ))}
+                          </select>
+                        )}
+                      </td>
+                      <td>
+                        {isAdmin ? (
+                          <span style={{ color: '#22c55e', fontWeight: 600 }}>Si</span>
+                        ) : (
+                          <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer' }}>
+                            <input
+                              type="checkbox"
+                              checked={!!u.can_create_projects}
+                              onChange={(e) => updateRoadmapAccess(u.id, u.access_level || 'member', e.target.checked)}
+                              style={{ accentColor: '#3b82f6' }}
+                            />
+                          </label>
+                        )}
+                      </td>
+                      <td style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
+                        {u.granted_by_username || '—'}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+
+        <div style={{ marginTop: '1.5rem', padding: '1rem', background: 'var(--bg-secondary, #f3f4f6)', borderRadius: '8px', fontSize: '0.82rem', color: 'var(--text-secondary)' }}>
+          <strong>Niveles de acceso:</strong>
+          <ul style={{ margin: '0.5rem 0 0 1.2rem', lineHeight: '1.6' }}>
+            <li><strong>Sin acceso:</strong> No puede ver ni acceder al Roadmap</li>
+            <li><strong>Visor:</strong> Solo puede ver proyectos generales (lectura)</li>
+            <li><strong>Miembro:</strong> Puede ver y crear/editar tareas en proyectos asignados</li>
+            <li><strong>Manager:</strong> Puede crear proyectos generales y gestionar miembros</li>
+            <li><strong>Admin:</strong> Acceso completo al Roadmap</li>
+          </ul>
+        </div>
+      </div>
+    );
+  };
+
   // Render Helpers
   const renderSidebar = () => (
     <div className="admin-sidebar">
@@ -405,6 +585,13 @@ const AdminPanel = ({ user, onLogout, onBackToFolders, onThemeToggle, isDarkMode
         >
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
           <span>{t('common.remoteDesktop')}</span>
+        </button>
+        <button 
+          className={`admin-nav-item ${activeTab === 'roadmap' ? 'active' : ''}`}
+          onClick={() => setActiveTab('roadmap')}
+        >
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6"/><line x1="8" y1="2" x2="8" y2="18"/><line x1="16" y1="6" x2="16" y2="22"/></svg>
+          <span>Roadmap</span>
         </button>
       </nav>
       <div className="admin-sidebar-footer">
@@ -848,6 +1035,7 @@ const AdminPanel = ({ user, onLogout, onBackToFolders, onThemeToggle, isDarkMode
             {activeTab === 'logs' && t('admin.logs')}
             {activeTab === 'security' && t('admin.security.title')}
             {activeTab === 'rdp' && t('admin.rdpAdmin')}
+            {activeTab === 'roadmap' && 'Roadmap'}
           </h1>
           <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
             <NotificationCenter />
@@ -870,6 +1058,7 @@ const AdminPanel = ({ user, onLogout, onBackToFolders, onThemeToggle, isDarkMode
         {activeTab === 'logs' && renderLogs()}
         {activeTab === 'security' && renderSecurity()}
         {activeTab === 'rdp' && <RDPManager />}
+        {activeTab === 'roadmap' && renderRoadmapAccess()}
       </main>
 
       {showSettingsModal && (

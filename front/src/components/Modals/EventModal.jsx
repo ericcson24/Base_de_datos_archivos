@@ -4,6 +4,7 @@ import LocationPickerModal from './LocationPickerModal';
 import { useLanguage } from '../../context/LanguageContext';
 import { getAuthToken, formatFileSize, getFileType } from '../../utils/fileUtils';
 import FileTypeIcon from '../Common/FileTypeIcon';
+import { FiLayout, FiLink, FiTrash2, FiExternalLink, FiPlus, FiCheckCircle, FiChevronRight } from 'react-icons/fi';
 
 const EventModal = ({
   isOpen,
@@ -18,7 +19,10 @@ const EventModal = ({
   user, // Add user prop
   initialAssignMode = 'me',
   initialTargetUserId = '',
-  initialGroupId = ''
+  initialGroupId = '',
+  prefill = null, // Pre-fill data from roadmap or other sources
+  roadmapProjects = [], // Add roadmapProjects prop
+  onGoToRoadmap = null
 }) => {
   const { t, language } = useLanguage();
   const [currentMode, setCurrentMode] = useState(mode);
@@ -58,6 +62,48 @@ const EventModal = ({
   const [suggestionsShown, setSuggestionsShown] = useState(false);
   const [dismissedSuggestions, setDismissedSuggestions] = useState(new Set());
   const suggestionsTimerRef = useRef(null);
+
+  // Roadmap Sync State
+  const [roadmapLinks, setRoadmapLinks] = useState([]);
+  const [loadingRoadmapLinks, setLoadingRoadmapLinks] = useState(false);
+  const [showRoadmapSyncForm, setShowRoadmapSyncForm] = useState(false);
+  const [syncProjectId, setSyncProjectId] = useState('');
+  const [syncColumnId, setSyncColumnId] = useState('');
+  const [projectColumns, setProjectColumns] = useState([]);
+  const [isSyncingToRoadmap, setIsSyncingToRoadmap] = useState(false);
+
+  // Load roadmap links for the current event
+  const loadRoadmapLinks = useCallback(async (eventId) => {
+    if (!eventId) return;
+    setLoadingRoadmapLinks(true);
+    try {
+      const response = await fetch(`/api/roadmap/calendar-links/${encodeURIComponent(eventId)}`, {
+        headers: { 'Authorization': `Bearer ${getAuthToken()}` }
+      });
+      if (response.ok) {
+        const data = await response.json();
+        setRoadmapLinks(Array.isArray(data) ? data : []);
+      }
+    } catch (err) {
+      console.error('Error loading roadmap links:', err);
+    } finally {
+      setLoadingRoadmapLinks(false);
+    }
+  }, []);
+
+  // Fetch columns for selected roadmap project
+  useEffect(() => {
+    if (!syncProjectId) {
+      setProjectColumns([]);
+      return;
+    }
+    fetch(`/api/roadmap/projects/${syncProjectId}/columns`, {
+      headers: { 'Authorization': `Bearer ${getAuthToken()}` }
+    })
+      .then(res => res.json())
+      .then(data => setProjectColumns(Array.isArray(data) ? data : []))
+      .catch(err => console.error('Error fetching roadmap columns:', err));
+  }, [syncProjectId]);
 
   // Load attachments when viewing/editing an event
   const loadAttachments = useCallback(async (eventId) => {
@@ -174,6 +220,66 @@ const EventModal = ({
     }
   };
 
+  useEffect(() => {
+    if (isOpen && event?.id) {
+      loadAttachments(event.id);
+      loadRoadmapLinks(event.id);
+    }
+  }, [isOpen, event?.id, loadAttachments, loadRoadmapLinks]);
+
+  const handleSyncToRoadmap = async () => {
+    if (!syncProjectId || !formData.title) return;
+    setIsSyncingToRoadmap(true);
+    try {
+      const response = await fetch('/api/roadmap/calendar-to-issue', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${getAuthToken()}`
+        },
+        body: JSON.stringify({
+          project_id: syncProjectId,
+          column_id: syncColumnId || null,
+          title: formData.title,
+          description: formData.description,
+          due_date: formData.end,
+          start_date: formData.start,
+          calendar_event_id: event?.id,
+          priority: 'medium'
+        })
+      });
+
+      if (response.ok) {
+        setShowRoadmapSyncForm(false);
+        setSyncProjectId('');
+        setSyncColumnId('');
+        loadRoadmapLinks(event?.id);
+      } else {
+        const err = await response.json();
+        alert(err.error || 'Error al sincronizar con Roadmap');
+      }
+    } catch (err) {
+      console.error('Error syncing to roadmap:', err);
+    } finally {
+      setIsSyncingToRoadmap(false);
+    }
+  };
+
+  const removeRoadmapLink = async (linkId) => {
+    if (!window.confirm('¿Eliminar el vínculo con el Roadmap? (No eliminará la tarea en el Roadmap)')) return;
+    try {
+      const response = await fetch(`/api/roadmap/calendar-links/${linkId}`, {
+        method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${getAuthToken()}` }
+      });
+      if (response.ok) {
+        setRoadmapLinks(prev => prev.filter(l => l.id !== linkId));
+      }
+    } catch (err) {
+      console.error('Error removing roadmap link:', err);
+    }
+  };
+
   // Update state when props change
   useEffect(() => {
     setAssignMode(initialAssignMode);
@@ -274,12 +380,12 @@ const EventModal = ({
         }
 
         setFormData({
-          title: '',
+          title: prefill?.title || '',
           start: startDate,
           end: endDate,
           allDay: selectedDates.allDay,
           location: '',
-          description: '',
+          description: prefill?.description || '',
           attendees: '',
           categories: []
         });
@@ -290,12 +396,12 @@ const EventModal = ({
         tomorrow.setDate(tomorrow.getDate() + 1);
 
         setFormData({
-          title: '',
+          title: prefill?.title || '',
           start: formatDateForInput(now),
           end: formatDateForInput(tomorrow),
           allDay: false,
           location: '',
-          description: '',
+          description: prefill?.description || '',
           attendees: '',
           categories: []
         });
@@ -849,6 +955,73 @@ const EventModal = ({
                     )}
                   </div>
                 </div>
+
+                {/* Roadmap Integration Section */}
+                {currentMode !== 'create' && (
+                  <div className="form-group roadmap-integration-section">
+                    <label className="form-label" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <FiLayout size={16} /> Roadmap (Jira)
+                    </label>
+                    <div className="roadmap-links-container">
+                      {loadingRoadmapLinks ? (
+                        <div className="text-sm opacity-50">Cargando enlaces...</div>
+                      ) : roadmapLinks.length > 0 ? (
+                        roadmapLinks.map(link => (
+                          <div key={link.id} className="roadmap-link-item">
+                            <FiCheckCircle className="sync-icon" />
+                            <div className="link-info">
+                              <span className="link-title">{link.title || 'Tarea vinculada'}</span>
+                              <span className="link-meta">{link.project_name} • {link.issue_key}</span>
+                            </div>
+                            <div className="link-actions">
+                              <button className="icon-btn" title="Ver en Roadmap" onClick={() => {
+                                if (onGoToRoadmap) onGoToRoadmap();
+                                else window.location.href = `/roadmap?project=${link.project_id}&issue=${link.issue_id}`;
+                              }}>
+                                <FiExternalLink size={14} />
+                              </button>
+                              <button className="icon-btn delete" onClick={() => removeRoadmapLink(link.id)} title="Desvincular">
+                                <FiTrash2 size={14} />
+                              </button>
+                            </div>
+                          </div>
+                        ))
+                      ) : !showRoadmapSyncForm ? (
+                        <button type="button" className="btn btn-sm btn-secondary" onClick={() => setShowRoadmapSyncForm(true)} style={{ fontSize: '0.8rem', padding: '4px 10px' }}>
+                          <FiPlus size={14} /> Enviar a Roadmap
+                        </button>
+                      ) : (
+                        <div className="roadmap-sync-form" style={{ padding: '12px', background: 'rgba(0,0,0,0.03)', borderRadius: '8px', marginTop: '8px' }}>
+                          <div className="form-group" style={{ marginBottom: '10px' }}>
+                            <select className="form-select" value={syncProjectId} onChange={e => setSyncProjectId(e.target.value)} style={{ fontSize: '0.85rem' }}>
+                              <option value="">Seleccionar Proyecto...</option>
+                              {roadmapProjects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                            </select>
+                          </div>
+                          {syncProjectId && (
+                            <div className="form-group" style={{ marginBottom: '10px' }}>
+                              <select className="form-select" value={syncColumnId} onChange={e => setSyncColumnId(e.target.value)} style={{ fontSize: '0.85rem' }}>
+                                <option value="">Estado (Opcional)</option>
+                                {projectColumns.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                              </select>
+                            </div>
+                          )}
+                          <div style={{ display: 'flex', gap: '8px' }}>
+                            <button className="btn btn-secondary btn-sm" onClick={() => setShowRoadmapSyncForm(false)} style={{ flex: 1, fontSize: '0.8rem' }}>Cancelar</button>
+                            <button 
+                              className="btn btn-primary btn-sm" 
+                              disabled={!syncProjectId || isSyncingToRoadmap}
+                              onClick={handleSyncToRoadmap}
+                              style={{ flex: 1, fontSize: '0.8rem' }}
+                            >
+                              {isSyncingToRoadmap ? '...' : 'Enviar'}
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
 
                 {/* AI File Suggestions */}
                 {(currentMode === 'create' || currentMode === 'edit') && (suggestionsLoading || (suggestedFiles.length > 0 && suggestionsShown)) && (

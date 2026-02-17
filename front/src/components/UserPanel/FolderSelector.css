@@ -25,7 +25,7 @@
 
 .selector-container {
   width: 100%;
-  max-width: 420px;
+  max-width: 520px;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -40,7 +40,7 @@
   display: flex;
   flex-direction: column;
   gap: 0.625rem;
-  padding: 1.75rem;
+  padding: 2rem;
   border-radius: 1.25rem;
   background: var(--sidebar-bg, rgba(255, 255, 255, 0.9));
   border: 1px solid var(--sidebar-border, rgba(0, 0, 0, 0.1));
@@ -114,7 +114,7 @@
   box-shadow: var(--shadow-hover);
 }
 
-/* Folder Buttons - Sidebar style */
+/* Folder Buttons - Sidebar style (legacy, kept for compatibility) */
 .folder-btn {
   width: 100%;
   padding: 0.875rem 1rem;
@@ -152,6 +152,83 @@
 
 .folder-btn:hover .folder-btn-icon {
   opacity: 0.8;
+}
+
+/* =============== APP GRID LAYOUT =============== */
+.apps-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1rem;
+  margin-top: 0.5rem;
+}
+
+.app-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 1.25rem 0.75rem;
+  background: transparent;
+  border: 1px solid var(--sidebar-border, rgba(0, 0, 0, 0.08));
+  border-radius: 1rem;
+  cursor: pointer;
+  transition: all 0.25s ease;
+  font-family: inherit;
+  color: var(--text-color);
+}
+
+.app-card:hover {
+  background: var(--sidebar-btn-hover, rgba(25, 118, 210, 0.06));
+  border-color: var(--panel-secondary-text, rgba(0, 0, 0, 0.15));
+  transform: translateY(-3px);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
+}
+
+.app-card:active {
+  transform: translateY(0);
+}
+
+.app-card-icon {
+  width: 56px;
+  height: 56px;
+  border-radius: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  transition: transform 0.25s ease, box-shadow 0.25s ease;
+}
+
+.app-card:hover .app-card-icon {
+  transform: scale(1.08);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.22);
+}
+
+.app-card-label {
+  font-size: 0.78rem;
+  font-weight: 500;
+  text-align: center;
+  line-height: 1.25;
+  opacity: 0.85;
+}
+
+.app-card:hover .app-card-label {
+  opacity: 1;
+}
+
+/* Logout card */
+.app-card-logout {
+  border-color: rgba(255, 59, 48, 0.12);
+}
+
+.app-card-logout .app-card-label {
+  color: #e74c3c;
+}
+
+.app-card-logout:hover {
+  background: rgba(255, 59, 48, 0.06);
+  border-color: rgba(255, 59, 48, 0.2);
 }
 
 /* Logout button */
@@ -216,6 +293,29 @@
   border-color: rgba(255, 107, 107, 0.25);
 }
 
+[data-theme="dark"] .app-card {
+  border-color: rgba(255, 255, 255, 0.06);
+}
+
+[data-theme="dark"] .app-card:hover {
+  background: rgba(255, 255, 255, 0.05);
+  border-color: rgba(255, 255, 255, 0.12);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+}
+
+[data-theme="dark"] .app-card-logout {
+  border-color: rgba(255, 107, 107, 0.12);
+}
+
+[data-theme="dark"] .app-card-logout .app-card-label {
+  color: #ff6b6b;
+}
+
+[data-theme="dark"] .app-card-logout:hover {
+  background: rgba(255, 59, 48, 0.08);
+  border-color: rgba(255, 107, 107, 0.2);
+}
+
 /* Responsive */
 @media (max-width: 640px) {
   .selector-container {
@@ -225,5 +325,16 @@
   
   .options-container {
     padding: 1.5rem;
+  }
+
+  .apps-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 0.75rem;
+  }
+
+  .app-card-icon {
+    width: 48px;
+    height: 48px;
+    border-radius: 14px;
   }
 }

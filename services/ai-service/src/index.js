@@ -10,6 +10,7 @@ const { getCacheStats, getDetailedCacheStats } = require('./utils/cache');
 const searchController = require('./controllers/searchController');
 const calendarController = require('./controllers/calendarController');
 const documentController = require('./controllers/documentController');
+const roadmapController = require('./controllers/roadmapController');
 
 dotenv.config();
 
@@ -65,6 +66,10 @@ app.post('/analyze-file', authenticateToken, searchController.analyzeFile);
 // --- Calendar ---
 app.post('/create-event', authenticateToken, calendarController.createEvent);
 app.post('/suggest-files', authenticateToken, calendarController.suggestFiles);
+
+// --- Roadmap ---
+app.post('/roadmap-command', authenticateToken, roadmapController.handleRoadmapCommand);
+app.post('/cross-search', authenticateToken, roadmapController.crossSearch);
 
 // --- Document Editor ---
 app.post('/analyze-document', authenticateToken, documentController.analyzeDocument);

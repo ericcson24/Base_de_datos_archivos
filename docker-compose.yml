@@ -21,6 +21,7 @@ services:
       - email-service
       - ai-service
       - rdp-service
+      - roadmap-service
     networks:
       - app-network
 
@@ -39,6 +40,24 @@ services:
     volumes:
       - ../Datos:/app/uploads
       - ../Tests/test_data:/app/test_data
+    depends_on:
+      - postgres
+    networks:
+      - app-network
+
+  # --- Roadmap Service (5010) ---
+  roadmap-service:
+    build: ./services/roadmap-service
+    environment:
+      - DB_TYPE=postgres
+      - DB_HOST=postgres
+      - DB_USER=${DB_USER:-admin}
+      - DB_PASSWORD=${DB_PASSWORD:-admin123}
+      - DB_NAME=${DB_NAME:-server_db}
+      - PORT=5010
+      - JWT_SECRET=${JWT_SECRET}
+      - OUTLOOK_SERVICE_URL=http://outlook-service:5003
+      - NOTIFICATION_SERVICE_URL=http://notification-service:5002
     depends_on:
       - postgres
     networks:

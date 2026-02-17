@@ -745,3 +745,68 @@
 .connection-status-text {
   color: var(--cal-text);
 }
+
+/* ============================================
+   ROADMAP PROJECT PICKER
+   ============================================ */
+.roadmap-project-picker {
+  padding: 6px 0;
+}
+
+.roadmap-picker-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 8px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 12px;
+  transition: background 0.15s;
+}
+
+.roadmap-picker-item:hover {
+  background: var(--cal-hover-bg, rgba(0,0,0,0.05));
+}
+
+.roadmap-picker-item input[type="checkbox"] {
+  width: 14px;
+  height: 14px;
+  cursor: pointer;
+}
+
+.roadmap-picker-icon {
+  font-size: 11px;
+}
+
+.roadmap-picker-name {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--cal-text);
+}
+
+.roadmap-picker-count {
+  font-size: 10px;
+  background: var(--cal-hover-bg, rgba(0,0,0,0.08));
+  padding: 1px 6px;
+  border-radius: 10px;
+  color: var(--cal-text-secondary, #888);
+}
+
+.roadmap-picker-btn {
+  flex: 1;
+  padding: 3px 8px;
+  border: 1px solid var(--border-color, #ddd);
+  border-radius: 4px;
+  background: transparent;
+  color: var(--cal-text-secondary, #888);
+  font-size: 10px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.roadmap-picker-btn:hover {
+  background: var(--cal-hover-bg, rgba(0,0,0,0.05));
+  color: var(--cal-text);
+}

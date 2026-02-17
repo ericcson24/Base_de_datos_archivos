@@ -1049,7 +1049,7 @@ app.post('/assign-user', authenticate, async (req, res) => {
 // NEW ENDPOINT: Create Event (AI/Manual)
 app.post('/events', authenticate, async (req, res) => {
   try {
-    const { subject, body, startTime, endTime, location, isAllDay, categories } = req.body;
+    const { subject, body, startTime, endTime, location, isAllDay, categories, provider_id } = req.body;
     const username = req.user.username;
 
     if (!subject || !startTime || !endTime) {
@@ -1107,8 +1107,8 @@ app.post('/events', authenticate, async (req, res) => {
         INSERT INTO calendar_events (
             microsoft_id, user_id, subject, body_preview, 
             start_time, end_time, is_all_day, location, 
-            web_link, categories, last_synced, created_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+            web_link, categories, provider_id, last_synced, created_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
     `, [
         eventId,
         user.id,
@@ -1119,7 +1119,8 @@ app.post('/events', authenticate, async (req, res) => {
         isAllDay ? 1 : 0,
         location || null,
         webLink || null,
-        JSON.stringify(Array.isArray(categories) ? categories : (categories ? [categories] : []))
+        JSON.stringify(Array.isArray(categories) ? categories : (categories ? [categories] : [])),
+        provider_id || null
     ]);
 
     res.json({ 

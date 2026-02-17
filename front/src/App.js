@@ -5,6 +5,7 @@ import AdminPanel from './components/Admin/AdminPanel';
 import RemotePage from './components/Remote/RemotePage';
 import FolderSelector from './components/UserPanel/FolderSelector';
 import Calendar from './components/Calendar/Calendar';
+import Roadmap from './components/Roadmap/Roadmap';
 import { NotificationProvider } from './context/NotificationContext';
 import './App.css';
 
@@ -30,7 +31,7 @@ function App() {
   console.log('APP V2 LOADED - DEBUG MODE');
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [user, setUser] = useState(null);
-  const [currentView, setCurrentView] = useState('login'); // 'login', 'folders', 'panel', 'calendar', 'admin'
+  const [currentView, setCurrentView] = useState('login'); // 'login', 'folders', 'panel', 'calendar', 'admin', 'roadmap'
   const [isLoading, setIsLoading] = useState(true);
 
   // Estado para el tema global - ahora usa cookies
@@ -122,6 +123,8 @@ function App() {
             setCurrentView('folders');
           } else if (currentPath === '/remote') {
             setCurrentView('remote');
+          } else if (currentPath === '/roadmap') {
+            setCurrentView('roadmap');
           } else {
             // Redirigir según el rol del usuario si está autenticado
             if (role === 'admin') {
@@ -186,6 +189,8 @@ function App() {
           setCurrentView('panel');
         } else if (currentPath === '/remote') {
           setCurrentView('remote');
+        } else if (currentPath === '/roadmap') {
+          setCurrentView('roadmap');
         } else if (currentPath === '/admin' && user.role === 'admin') {
           setCurrentView('admin');
         } else if (currentPath === '/folders') {
@@ -361,6 +366,10 @@ function App() {
             setCurrentView('remote');
             window.history.pushState(null, '', '/remote');
           }}
+          onGoToRoadmap={() => {
+            setCurrentView('roadmap');
+            window.history.pushState(null, '', '/roadmap');
+          }}
         />
       </div>
     );
@@ -381,6 +390,9 @@ function App() {
           } else if (path === '/panel') {
             setCurrentView('panel');
             window.history.pushState(null, '', '/panel');
+          } else if (path === '/roadmap') {
+            setCurrentView('roadmap');
+            window.history.pushState(null, '', '/roadmap');
           }
         }}
       >
@@ -419,6 +431,9 @@ function App() {
           } else if (path === '/remote') {
             setCurrentView('remote');
             window.history.pushState(null, '', '/remote');
+          } else if (path === '/roadmap') {
+            setCurrentView('roadmap');
+            window.history.pushState(null, '', '/roadmap');
           }
         }}
       >
@@ -465,6 +480,9 @@ function App() {
           } else if (path === '/remote') {
             setCurrentView('remote');
             window.history.pushState(null, '', '/remote');
+          } else if (path === '/roadmap') {
+            setCurrentView('roadmap');
+            window.history.pushState(null, '', '/roadmap');
           }
         }}
       >
@@ -482,6 +500,56 @@ function App() {
           onGoToCalendar={() => {
             setCurrentView('calendar');
             window.history.pushState(null, '', '/calendar');
+          }}
+          onThemeToggle={toggleTheme}
+          isDarkMode={isDarkMode}
+        />
+      </NotificationProvider>
+    );
+  }
+
+  // Si está logueado y en vista de roadmap
+  if (currentView === 'roadmap' && user) {
+    return (
+      <NotificationProvider 
+        user={user}
+        onNavigate={(path) => {
+          if (path === '/calendar') {
+            setCurrentView('calendar');
+            window.history.pushState(null, '', '/calendar');
+          } else if (path === '/admin') {
+            setCurrentView('admin');
+            window.history.pushState(null, '', '/admin');
+          } else if (path === '/panel') {
+            setCurrentView('panel');
+            window.history.pushState(null, '', '/panel');
+          } else if (path === '/remote') {
+            setCurrentView('remote');
+            window.history.pushState(null, '', '/remote');
+          } else if (path === '/roadmap') {
+            setCurrentView('roadmap');
+            window.history.pushState(null, '', '/roadmap');
+          }
+        }}
+      >
+        <Roadmap
+          user={user}
+          onLogout={handleLogout}
+          onBackToFolders={() => {
+            setCurrentView('folders');
+            window.history.pushState(null, '', '/folders');
+          }}
+          onGoToCalendar={() => {
+            setCurrentView('calendar');
+            window.history.pushState(null, '', '/calendar');
+          }}
+          onGoToPanel={() => {
+            setCurrentView('panel');
+            window.history.pushState(null, '', '/panel');
+          }}
+          onGoToRemote={() => {
+            setCurrentView('remote');
+            window.history.pushState(null, '', '/remote');
           }}
           onThemeToggle={toggleTheme}
           isDarkMode={isDarkMode}
@@ -508,6 +576,9 @@ function App() {
           } else if (path === '/remote') {
             setCurrentView('remote');
             window.history.pushState(null, '', '/remote');
+          } else if (path === '/roadmap') {
+            setCurrentView('roadmap');
+            window.history.pushState(null, '', '/roadmap');
           }
         }}
       >
@@ -525,6 +596,10 @@ function App() {
           onGoToRemote={() => {
             setCurrentView('remote');
             window.history.pushState(null, '', '/remote');
+          }}
+          onGoToRoadmap={() => {
+            setCurrentView('roadmap');
+            window.history.pushState(null, '', '/roadmap');
           }}
           onThemeToggle={toggleTheme}
           isDarkMode={isDarkMode}
@@ -551,6 +626,9 @@ function App() {
         } else if (path === '/remote') {
           setCurrentView('remote');
           window.history.pushState(null, '', '/remote');
+        } else if (path === '/roadmap') {
+          setCurrentView('roadmap');
+          window.history.pushState(null, '', '/roadmap');
         }
       }}
     >
