@@ -4,13 +4,12 @@ import {
   FiFileText, FiAlertTriangle, FiCpu, FiChevronRight,
   FiFlag, FiClock, FiMessageSquare, FiLink, FiSearch, FiX, FiCheck,
   FiArrowLeft, FiSettings, FiLayout, FiLogOut, FiActivity, FiTarget,
-  FiChevronDown, FiPaperclip, FiSend, FiMonitor, FiStar, FiFilter,
+  FiChevronDown, FiPaperclip, FiSend, FiMonitor, FiStar,
   FiList, FiColumns, FiZap, FiEye, FiEyeOff, FiPlay, FiSquare,
   FiCheckSquare, FiTrendingUp, FiHash, FiBookmark, FiCheckCircle,
-  FiCircle, FiChevronUp, FiRepeat, FiCornerDownRight, FiSave,
+  FiCircle, FiRepeat, FiCornerDownRight,
   FiMenu, FiMap, FiGlobe, FiLock, FiBarChart2, FiExternalLink
 } from 'react-icons/fi';
-import { useLanguage } from '../../context/LanguageContext';
 import { useToast } from '../../context/ToastContext';
 import { getAuthToken } from '../../utils/fileUtils';
 import NotificationCenter from '../Common/NotificationCenter';
@@ -1054,7 +1053,6 @@ const TimelineView = ({ issues, columns, sprints, epics, onEditIssue }) => {
 // MAIN ROADMAP COMPONENT
 // ============================================
 const Roadmap = ({ user, onLogout, onBackToFolders, onGoToCalendar, onGoToPanel, onGoToRemote, onThemeToggle, isDarkMode }) => {
-  const { t } = useLanguage();
   const { showToast } = useToast();
 
   // Core state
@@ -1110,7 +1108,6 @@ const Roadmap = ({ user, onLogout, onBackToFolders, onGoToCalendar, onGoToPanel,
 
   // Access control
   const [myAccess, setMyAccess] = useState({ access_level: 'none', can_create_projects: false, is_admin: false });
-  const [accessLoaded, setAccessLoaded] = useState(false);
 
   // AI
   const [showAIModal, setShowAIModal] = useState(false);
@@ -1147,11 +1144,9 @@ const Roadmap = ({ user, onLogout, onBackToFolders, onGoToCalendar, onGoToPanel,
       const res = await fetch('/api/roadmap/admin/access/me', { headers: { 'Authorization': `Bearer ${getToken()}` } });
       if (res.ok) { const data = await res.json(); setMyAccess(data); }
     } catch (e) { console.warn('Could not fetch access:', e); }
-    finally { setAccessLoaded(true); }
   }, [getToken]);
 
   const canCreate = myAccess.is_admin || myAccess.can_create_projects || myAccess.access_level === 'manager' || myAccess.access_level === 'admin';
-  const canEdit = myAccess.is_admin || ['member', 'manager', 'admin'].includes(myAccess.access_level);
   const isViewer = myAccess.access_level === 'viewer' && !myAccess.is_admin;
 
   // ===== FETCH PROJECTS =====
@@ -1222,19 +1217,6 @@ const Roadmap = ({ user, onLogout, onBackToFolders, onGoToCalendar, onGoToPanel,
         showToast(err.error || 'Error al crear proyecto', 'error');
       }
     } catch (e) { showToast('Error al crear proyecto', 'error'); }
-  };
-
-  // Send issue to calendar
-  const handleSendToCalendar = async (issueId) => {
-    try {
-      const res = await fetch('/api/roadmap/issue-to-calendar', {
-        method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${getToken()}` },
-        body: JSON.stringify({ issue_id: issueId })
-      });
-      if (res.ok) {
-        showToast('Datos de evento preparados. Ve al Calendario para crearlo.', 'success');
-      }
-    } catch (e) { showToast('Error al enviar al calendario', 'error'); }
   };
 
   const handleSaveIssue = async (formData) => {
@@ -1768,7 +1750,7 @@ const Roadmap = ({ user, onLogout, onBackToFolders, onGoToCalendar, onGoToPanel,
                     return (
                       <div key={issue.id} className="rm-backlog-row" draggable
                         onDragStart={e => e.dataTransfer.setData('text/plain', JSON.stringify({ backlogIssueId: issue.id }))}
-                        onClick={() => { setEditingIssue(issue); setShowIssueModal(true); }}>
+                        onClick={() => { setEditingIssueId(issue.id); setShowIssueModal(true); }}>
                         <span className="rm-backlog-type" style={{ color: it.color }}>{it.icon}</span>
                         <span className="rm-backlog-key">{issue.issue_key}</span>
                         <span className="rm-backlog-title">{issue.title}</span>
