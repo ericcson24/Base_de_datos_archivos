@@ -180,7 +180,7 @@ const KanbanColumn = ({ column, issues, onAddIssue, onEditIssue, onDeleteIssue, 
 // ============================================
 // ISSUE MODAL (Create/Edit) — Jira-like with tabs
 // ============================================
-const IssueModal = ({ issue, columns, members, sprints, epics, onSave, onClose, onLinkDocument, onUnlinkDocument, projectId }) => {
+const IssueModal = ({ issue, columns, members, sprints, epics, onSave, onUpdate, onClose, onLinkDocument, onUnlinkDocument, projectId }) => {
   const [form, setForm] = useState({
     title: issue?.title || '', description: issue?.description || '',
     priority: issue?.priority || 'medium', issue_type: issue?.issue_type || 'task',
@@ -216,6 +216,20 @@ const IssueModal = ({ issue, columns, members, sprints, epics, onSave, onClose, 
   const [history, setHistory] = useState([]);
   const token = getAuthToken();
 
+  // Sync state if issue prop updates (e.g. from parent refresh)
+  useEffect(() => {
+    if (issue) {
+      setSubtasks(issue.subtasks || []);
+      setLinks(issue.links || []);
+      setWatchers(issue.watchers || []);
+      setForm(prev => ({
+        ...prev,
+        labels: issue.labels || [],
+        story_points: issue.story_points || ''
+      }));
+    }
+  }, [issue]);
+
   useEffect(() => {
     if (!issue?.id) return;
     const headers = { 'Authorization': `Bearer ${token}` };
@@ -240,7 +254,7 @@ const IssueModal = ({ issue, columns, members, sprints, epics, onSave, onClose, 
     if (!newComment.trim() || !issue?.id) return;
     try {
       const res = await fetch(`/api/roadmap/issues/${issue.id}/comments`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` }, body: JSON.stringify({ content: newComment }) });
-      if (res.ok) { const c = await res.json(); setComments(prev => [...prev, c]); setNewComment(''); }
+      if (res.ok) { const c = await res.json(); setComments(prev => [...prev, c]); setNewComment(''); onUpdate?.(); }
     } catch (e) { /* ignore */ }
   };
 
@@ -248,26 +262,26 @@ const IssueModal = ({ issue, columns, members, sprints, epics, onSave, onClose, 
     if (!newSubtask.trim() || !issue?.id) return;
     try {
       const res = await fetch(`/api/roadmap/issues/${issue.id}/subtasks`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` }, body: JSON.stringify({ title: newSubtask }) });
-      if (res.ok) { const st = await res.json(); setSubtasks(prev => [...prev, st]); setNewSubtask(''); }
+      if (res.ok) { const st = await res.json(); setSubtasks(prev => [...prev, st]); setNewSubtask(''); onUpdate?.(); }
     } catch (e) { /* ignore */ }
   };
 
   const toggleSubtask = async (id, completed) => {
     try {
       const res = await fetch(`/api/roadmap/subtasks/${id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` }, body: JSON.stringify({ is_completed: !completed }) });
-      if (res.ok) { const up = await res.json(); setSubtasks(prev => prev.map(s => s.id === id ? up : s)); }
+      if (res.ok) { const up = await res.json(); setSubtasks(prev => prev.map(s => s.id === id ? up : s)); onUpdate?.(); }
     } catch (e) { /* ignore */ }
   };
 
   const deleteSubtask = async (id) => {
-    try { await fetch(`/api/roadmap/subtasks/${id}`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${token}` } }); setSubtasks(prev => prev.filter(s => s.id !== id)); } catch (e) { /* ignore */ }
+    try { await fetch(`/api/roadmap/subtasks/${id}`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${token}` } }); setSubtasks(prev => prev.filter(s => s.id !== id)); onUpdate?.(); } catch (e) { /* ignore */ }
   };
 
   const addTimeLog = async () => {
     if (!logHours || parseFloat(logHours) <= 0 || !issue?.id) return;
     try {
       const res = await fetch(`/api/roadmap/issues/${issue.id}/time-logs`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` }, body: JSON.stringify({ hours: parseFloat(logHours), description: logDesc, work_date: logDate }) });
-      if (res.ok) { const tl = await res.json(); setTimeLogs(prev => [tl, ...prev]); setLogHours(''); setLogDesc(''); }
+      if (res.ok) { const tl = await res.json(); setTimeLogs(prev => [tl, ...prev]); setLogHours(''); setLogDesc(''); onUpdate?.(); }
     } catch (e) { /* ignore */ }
   };
 
@@ -296,12 +310,12 @@ const IssueModal = ({ issue, columns, members, sprints, epics, onSave, onClose, 
     if (!issue?.id) return;
     try {
       const res = await fetch(`/api/roadmap/issues/${issue.id}/links`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` }, body: JSON.stringify({ target_issue_id: targetId, link_type: linkType }) });
-      if (res.ok) { const l = await res.json(); setLinks(prev => [...prev, l]); setShowLinkForm(false); setLinkSearch(''); setLinkResults([]); }
+      if (res.ok) { const l = await res.json(); setLinks(prev => [...prev, l]); setShowLinkForm(false); setLinkSearch(''); setLinkResults([]); onUpdate?.(); }
     } catch (e) { /* ignore */ }
   };
 
   const deleteLink = async (linkId) => {
-    try { await fetch(`/api/roadmap/links/${linkId}`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${token}` } }); setLinks(prev => prev.filter(l => l.id !== linkId)); } catch (e) { /* ignore */ }
+    try { await fetch(`/api/roadmap/links/${linkId}`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${token}` } }); setLinks(prev => prev.filter(l => l.id !== linkId)); onUpdate?.(); } catch (e) { /* ignore */ }
   };
 
   const searchDocuments = async (queryOverride) => {
@@ -525,9 +539,10 @@ const IssueModal = ({ issue, columns, members, sprints, epics, onSave, onClose, 
                       <button className="rm-subtask-delete" onClick={() => deleteSubtask(st.id)}><FiTrash2 size={12} /></button>
                     </div>
                   ))}
+                  {subtasks.length === 0 && <p className="rm-loading-text">No hay subtareas. Crea la primera abajo.</p>}
                 </div>
                 <div className="rm-subtask-add">
-                  <input placeholder="Nueva subtarea..." value={newSubtask}
+                  <input placeholder="Añadir subtarea..." value={newSubtask}
                     onChange={e => setNewSubtask(e.target.value)} onKeyDown={e => e.key === 'Enter' && addSubtask()} />
                   <button onClick={addSubtask}><FiPlus size={14} /></button>
                 </div>
@@ -536,28 +551,31 @@ const IssueModal = ({ issue, columns, members, sprints, epics, onSave, onClose, 
 
             {/* TIME TRACKING TAB */}
             {activeTab === 'time' && issue?.id && (
-              <div>
+              <div className="rm-time-tracking-section">
                 <div className="rm-time-summary">
                   <div className="rm-time-stat"><label>Estimado</label><span>{form.estimated_hours || 0}h</span></div>
                   <div className="rm-time-stat"><label>Registrado</label><span>{totalLogged.toFixed(1)}h</span></div>
-                  <div className="rm-time-stat"><label>Restante</label><span>{form.remaining_hours || 0}h</span></div>
+                  <div className="rm-time-stat"><label>Restante</label><span>{Math.max(0, (form.estimated_hours || 0) - totalLogged).toFixed(1)}h</span></div>
                 </div>
+                
                 <div className="rm-time-log-form">
-                  <h4>Registrar Tiempo</h4>
+                  <h4>Registar nuevo tiempo</h4>
                   <div className="rm-time-log-inputs">
                     <input type="number" min="0.25" step="0.25" placeholder="Horas" value={logHours} onChange={e => setLogHours(e.target.value)} />
                     <input type="date" value={logDate} onChange={e => setLogDate(e.target.value)} />
-                    <input placeholder="Descripción (opcional)" value={logDesc} onChange={e => setLogDesc(e.target.value)} />
+                    <input placeholder="¿En qué has trabajado?" value={logDesc} onChange={e => setLogDesc(e.target.value)} />
                     <button onClick={addTimeLog}><FiPlus size={14} /> Registrar</button>
                   </div>
                 </div>
-                <div style={{ marginTop: '1rem' }}>
+
+                <div className="rm-time-logs-list" style={{ marginTop: '20px' }}>
+                  <h4 style={{ marginBottom: '12px' }}>Logs Recientes</h4>
                   {timeLogs.map(tl => (
                     <div key={tl.id} className="rm-time-log-entry">
-                      <strong>{tl.username}</strong>
+                      <strong>{tl.username || 'Usuario'}</strong>
                       <span className="rm-time-log-hours">{tl.hours}h</span>
                       <span className="rm-time-log-date">{new Date(tl.work_date).toLocaleDateString('es-ES')}</span>
-                      {tl.description && <span> — {tl.description}</span>}
+                      {tl.description && <span style={{ opacity: 0.8 }}> — {tl.description}</span>}
                     </div>
                   ))}
                   {timeLogs.length === 0 && <p className="rm-loading-text">Sin registros de tiempo</p>}
@@ -568,23 +586,25 @@ const IssueModal = ({ issue, columns, members, sprints, epics, onSave, onClose, 
             {/* LINKS TAB */}
             {activeTab === 'links' && issue?.id && (
               <div className="rm-links-section">
-                <h3><FiLink size={14} /> Enlaces entre Issues
-                  <button className="rm-action-btn" onClick={() => setShowLinkForm(!showLinkForm)} style={{ marginLeft: 8 }}>
-                    <FiPlus size={12} /> Enlazar
+                <div className="rm-links-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <h3><FiLink size={14} /> Tareas Vinculadas</h3>
+                  <button className="rm-action-btn" onClick={() => setShowLinkForm(!showLinkForm)}>
+                    <FiPlus size={12} /> {showLinkForm ? 'Cancelar' : 'Vincular Tarea'}
                   </button>
-                </h3>
+                </div>
+
                 {showLinkForm && (
                   <div className="rm-link-create-form">
                     <select value={linkType} onChange={e => setLinkType(e.target.value)}>
                       {Object.entries(LINK_TYPES).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
                     </select>
                     <div className="rm-link-search-row">
-                      <input placeholder="Buscar issue por título o clave..." value={linkSearch}
+                      <input placeholder="Buscar por título o clave (ej: PRJ-12)..." value={linkSearch}
                         onChange={e => setLinkSearch(e.target.value)} onKeyDown={e => e.key === 'Enter' && searchForLink()} />
                       <button onClick={searchForLink}><FiSearch size={14} /></button>
                     </div>
                     {linkResults.length > 0 && (
-                      <div className="rm-link-results">
+                      <div className="rm-link-results custom-scrollbar">
                         {linkResults.map(r => (
                           <div key={r.id} className="rm-link-result-item" onClick={() => createLink(r.id)}>
                             <span style={{ color: (ISSUE_TYPES[r.issue_type] || ISSUE_TYPES.task).color }}>{(ISSUE_TYPES[r.issue_type] || ISSUE_TYPES.task).icon}</span>
@@ -596,6 +616,7 @@ const IssueModal = ({ issue, columns, members, sprints, epics, onSave, onClose, 
                     )}
                   </div>
                 )}
+
                 <div className="rm-links-list">
                   {links.map(l => {
                     const isSource = l.source_issue_id === issue.id;
@@ -609,11 +630,11 @@ const IssueModal = ({ issue, columns, members, sprints, epics, onSave, onClose, 
                         <span className="rm-link-key">{linkedKey}</span>
                         <span className="rm-link-title">{linkedTitle}</span>
                         <span className="rm-link-status">{linkedStatus}</span>
-                        <button className="rm-link-delete" onClick={() => deleteLink(l.id)}><FiTrash2 size={12} /></button>
+                        <button className="rm-link-delete" onClick={() => deleteLink(l.id)} title="Eliminar vínculo"><FiTrash2 size={12} /></button>
                       </div>
                     );
                   })}
-                  {links.length === 0 && <p className="rm-loading-text">Sin enlaces</p>}
+                  {links.length === 0 && <p className="rm-loading-text">No hay tareas vinculadas</p>}
                 </div>
               </div>
             )}
@@ -644,24 +665,44 @@ const IssueModal = ({ issue, columns, members, sprints, epics, onSave, onClose, 
 
             {/* HISTORY TAB */}
             {activeTab === 'history' && issue?.id && (
-              <div>
-                <h3 style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.95rem' }}><FiActivity size={14} /> Historial de Cambios</h3>
-                <div className="rm-history-list">
-                  {history.map(h => (
-                    <div key={h.id} className="rm-history-entry">
-                      <div className="rm-history-user-time">
-                        <strong>{h.username}</strong>
-                        <span>{new Date(h.created_at).toLocaleString('es-ES')}</span>
+              <div className="rm-history-section">
+                <div className="rm-history-header">
+                  <h3><FiActivity size={14} /> Historial de Actividad</h3>
+                  <span className="rm-history-count">{history.length} eventos</span>
+                </div>
+                <div className="rm-history-timeline">
+                  {history.map((h, idx) => (
+                    <div key={h.id || idx} className="rm-history-item">
+                      <div className="rm-history-marker">
+                        <div className="rm-history-dot" />
+                        {idx !== history.length - 1 && <div className="rm-history-line" />}
                       </div>
-                      <div className="rm-history-change">
-                        <span className="rm-history-field">{h.field_name}</span>
-                        {h.old_value && <span className="rm-history-old">{h.old_value}</span>}
-                        {h.old_value && <FiChevronRight size={12} />}
-                        <span className="rm-history-new">{h.new_value}</span>
+                      <div className="rm-history-content">
+                        <div className="rm-history-top">
+                          <span className="rm-history-user">{h.username || 'Sistema'}</span>
+                          <span className="rm-history-time">
+                            {new Date(h.created_at).toLocaleString('es-ES', { 
+                              day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' 
+                            })}
+                          </span>
+                        </div>
+                        <div className="rm-history-details">
+                          <span className="rm-history-field-badge">{h.field_name}</span>
+                          <div className="rm-history-values">
+                            {h.old_value && <span className="rm-history-val old">{h.old_value}</span>}
+                            {h.old_value && <FiChevronRight className="rm-history-arrow" />}
+                            <span className="rm-history-val new">{h.new_value}</span>
+                          </div>
+                        </div>
                       </div>
                     </div>
                   ))}
-                  {history.length === 0 && <p className="rm-loading-text">Sin historial</p>}
+                  {history.length === 0 && (
+                    <div className="rm-empty-state">
+                      <FiActivity size={24} />
+                      <p>Todavía no hay cambios registrados en esta tarea.</p>
+                    </div>
+                  )}
                 </div>
               </div>
             )}
@@ -1044,9 +1085,17 @@ const Roadmap = ({ user, onLogout, onBackToFolders, onGoToCalendar, onGoToPanel,
 
   // UI
   const [showIssueModal, setShowIssueModal] = useState(false);
-  const [editingIssue, setEditingIssue] = useState(null);
+  const [editingIssueId, setEditingIssueId] = useState(null);
   const [preselectedColumnId, setPreselectedColumnId] = useState(null);
   const [showInsights, setShowInsights] = useState(false);
+  
+  const editingIssue = useMemo(() => {
+    if (!editingIssueId) return null;
+    // Map of all issues
+    const allIssues = [...issues, ...backlog, ...epics];
+    return allIssues.find(i => i.id === editingIssueId) || null;
+  }, [editingIssueId, issues, backlog, epics]);
+
   const [insights, setInsights] = useState(null);
   const [insightsSummary, setInsightsSummary] = useState(null);
   const [draggingIssueId, setDraggingIssueId] = useState(null);
@@ -1200,7 +1249,7 @@ const Roadmap = ({ user, onLogout, onBackToFolders, onGoToCalendar, onGoToPanel,
         if (res.ok) { const created = await res.json(); setIssues(prev => [...prev, created]); showToast('Tarea creada', 'success'); }
       }
     } catch (e) { showToast('Error al guardar tarea', 'error'); }
-    setShowIssueModal(false); setEditingIssue(null); setPreselectedColumnId(null);
+    setShowIssueModal(false); setEditingIssueId(null); setPreselectedColumnId(null);
   };
 
   const handleDeleteIssue = async (issueId) => {
@@ -1227,14 +1276,6 @@ const Roadmap = ({ user, onLogout, onBackToFolders, onGoToCalendar, onGoToPanel,
         body: JSON.stringify(doc) 
       });
       if (res.ok) { 
-        const newDoc = await res.json();
-        // Update local state so it shows immediately in the modal
-        if (editingIssue && editingIssue.id === issueId) {
-          setEditingIssue(prev => ({
-            ...prev,
-            documents: [...(prev.documents || []), newDoc]
-          }));
-        }
         fetchProjectData(selectedProjectId); 
         showToast('Documento vinculado', 'success'); 
       }
@@ -1245,13 +1286,6 @@ const Roadmap = ({ user, onLogout, onBackToFolders, onGoToCalendar, onGoToPanel,
     try { 
       const res = await fetch(`/api/roadmap/documents/${docLinkId}`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${getToken()}` } }); 
       if (res.ok) {
-        // Update local state so it disappears immediately
-        if (editingIssue) {
-          setEditingIssue(prev => ({
-            ...prev,
-            documents: (prev.documents || []).filter(d => d.id !== docLinkId)
-          }));
-        }
         fetchProjectData(selectedProjectId); 
       }
     } catch (e) { /* ignore */ }
@@ -1380,7 +1414,7 @@ const Roadmap = ({ user, onLogout, onBackToFolders, onGoToCalendar, onGoToPanel,
 
           {/* New Issue Button */}
           {selectedProjectId && (
-            <button className="rm-create-btn" onClick={() => { setPreselectedColumnId(columns[0]?.id); setEditingIssue(null); setShowIssueModal(true); }}>
+            <button className="rm-create-btn" onClick={() => { setPreselectedColumnId(columns[0]?.id); setEditingIssueId(null); setShowIssueModal(true); }}>
               <FiPlus size={16} /> Nueva Tarea
             </button>
           )}
@@ -1611,8 +1645,8 @@ const Roadmap = ({ user, onLogout, onBackToFolders, onGoToCalendar, onGoToPanel,
               <div className="rm-board">
                 {columns.map(col => (
                   <KanbanColumn key={col.id} column={col} issues={filteredIssues}
-                    onAddIssue={(colId) => { setPreselectedColumnId(colId); setEditingIssue(null); setShowIssueModal(true); }}
-                    onEditIssue={(issue) => { setEditingIssue(issue); setShowIssueModal(true); }}
+                    onAddIssue={(colId) => { setPreselectedColumnId(colId); setEditingIssueId(null); setShowIssueModal(true); }}
+                    onEditIssue={(issue) => { setEditingIssueId(issue.id); setShowIssueModal(true); }}
                     onDeleteIssue={handleDeleteIssue} onDrop={handleDrop}
                     onDragStart={(id) => setDraggingIssueId(id)} onDragEnd={() => setDraggingIssueId(null)}
                     draggingIssueId={draggingIssueId} />
@@ -1643,7 +1677,7 @@ const Roadmap = ({ user, onLogout, onBackToFolders, onGoToCalendar, onGoToPanel,
                       const it = ISSUE_TYPES[issue.issue_type] || ISSUE_TYPES.task;
                       const pr = PRIORITIES[issue.priority] || PRIORITIES.medium;
                       return (
-                        <div key={issue.id} className="rm-backlog-row" onClick={() => { setEditingIssue(issue); setShowIssueModal(true); }}>
+                        <div key={issue.id} className="rm-backlog-row" onClick={() => { setEditingIssueId(issue.id); setShowIssueModal(true); }}>
                           <span className="rm-backlog-type" style={{ color: it.color }}>{it.icon}</span>
                           <span className="rm-backlog-key">{issue.issue_key}</span>
                           <span className="rm-backlog-title">{issue.title}</span>
@@ -1684,7 +1718,7 @@ const Roadmap = ({ user, onLogout, onBackToFolders, onGoToCalendar, onGoToPanel,
                       const it = ISSUE_TYPES[issue.issue_type] || ISSUE_TYPES.task;
                       const pr = PRIORITIES[issue.priority] || PRIORITIES.medium;
                       return (
-                        <div key={issue.id} className="rm-backlog-row" onClick={() => { setEditingIssue(issue); setShowIssueModal(true); }}>
+                        <div key={issue.id} className="rm-backlog-row" onClick={() => { setEditingIssueId(issue.id); setShowIssueModal(true); }}>
                           <span className="rm-backlog-type" style={{ color: it.color }}>{it.icon}</span>
                           <span className="rm-backlog-key">{issue.issue_key}</span>
                           <span className="rm-backlog-title">{issue.title}</span>
@@ -1705,7 +1739,7 @@ const Roadmap = ({ user, onLogout, onBackToFolders, onGoToCalendar, onGoToPanel,
                     <span className="rm-issue-count">{backlog.length} tareas</span>
                   </div>
                   <div className="rm-backlog-header-right">
-                    <button className="rm-action-btn" onClick={() => { setPreselectedColumnId(columns[0]?.id); setEditingIssue(null); setShowIssueModal(true); }}>
+                    <button className="rm-action-btn" onClick={() => { setPreselectedColumnId(columns[0]?.id); setEditingIssueId(null); setShowIssueModal(true); }}>
                       <FiPlus size={12} /> Nueva Tarea
                     </button>
                     <button className="rm-action-btn" onClick={() => setShowSprintForm(true)}><FiPlus size={12} /> Nuevo Sprint</button>
@@ -1825,7 +1859,7 @@ const Roadmap = ({ user, onLogout, onBackToFolders, onGoToCalendar, onGoToPanel,
           {/* TIMELINE VIEW */}
           {activeView === 'timeline' && (
             <TimelineView issues={issues} columns={columns} sprints={sprints} epics={epics}
-              onEditIssue={(issue) => { setEditingIssue(issue); setShowIssueModal(true); }} />
+              onEditIssue={(issue) => { setEditingIssueId(issue.id); setShowIssueModal(true); }} />
           )}
 
           {/* EPICS VIEW */}
@@ -1833,7 +1867,7 @@ const Roadmap = ({ user, onLogout, onBackToFolders, onGoToCalendar, onGoToPanel,
             <div>
               <div className="rm-epics-header">
                 <h2><FiZap size={20} /> Epics</h2>
-                <button className="rm-action-btn" onClick={() => { setEditingIssue(null); setPreselectedColumnId(columns[0]?.id); setShowIssueModal(true); }}>
+                <button className="rm-action-btn" onClick={() => { setEditingIssueId(null); setPreselectedColumnId(columns[0]?.id); setShowIssueModal(true); }}>
                   <FiPlus size={14} /> Nuevo Epic
                 </button>
               </div>
@@ -1841,7 +1875,7 @@ const Roadmap = ({ user, onLogout, onBackToFolders, onGoToCalendar, onGoToPanel,
                 {epics.map(epic => {
                   const progress = epic.child_count > 0 ? epic.progress : 0;
                   return (
-                    <div key={epic.id} className="rm-epic-card" onClick={() => { setEditingIssue(epic); setShowIssueModal(true); }}>
+                    <div key={epic.id} className="rm-epic-card" onClick={() => { setEditingIssueId(epic.id); setShowIssueModal(true); }}>
                       <div className="rm-epic-card-header">
                         <span className="rm-epic-key">{epic.issue_key}</span>
                         <h3>{epic.title}</h3>
@@ -1977,7 +2011,9 @@ const Roadmap = ({ user, onLogout, onBackToFolders, onGoToCalendar, onGoToPanel,
       {showIssueModal && (
         <IssueModal
           issue={editingIssue} columns={columns} members={members} sprints={sprints} epics={epics}
-          onSave={handleSaveIssue} onClose={() => { setShowIssueModal(false); setEditingIssue(null); }}
+          onSave={handleSaveIssue} 
+          onUpdate={() => fetchProjectData(selectedProjectId)}
+          onClose={() => { setShowIssueModal(false); setEditingIssueId(null); }}
           onLinkDocument={handleLinkDocument} onUnlinkDocument={handleUnlinkDocument} projectId={selectedProjectId} />
       )}
 

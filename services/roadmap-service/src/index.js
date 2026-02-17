@@ -171,6 +171,20 @@ const runMigrations = async () => {
       FOREIGN KEY(linked_by) REFERENCES users(id) ON DELETE CASCADE,
       UNIQUE(calendar_event_id, issue_id)
     )`).catch(() => {});
+
+    // Issue-Documents links table
+    await dbAsync.run(`CREATE TABLE IF NOT EXISTS roadmap_issue_documents (
+      id SERIAL PRIMARY KEY,
+      issue_id INTEGER NOT NULL,
+      file_id INTEGER,
+      file_path TEXT,
+      file_name TEXT NOT NULL,
+      linked_by INTEGER NOT NULL,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY(issue_id) REFERENCES roadmap_issues(id) ON DELETE CASCADE,
+      FOREIGN KEY(linked_by) REFERENCES users(id) ON DELETE CASCADE
+    )`).catch(() => {});
+
     console.log('[ROADMAP] Migrations completed');
   } catch (e) {
     console.warn('[ROADMAP] Migration warning:', e.message);
@@ -1041,23 +1055,39 @@ app.delete('/projects/:projectId/members/:userId', authenticateToken, async (req
 // POST /issues/:issueId/documents — link a document from the Panel
 app.post('/issues/:issueId/documents', authenticateToken, async (req, res) => {
   try {
+    const issueId = parseInt(req.params.issueId);
     const { file_id, file_path, file_name } = req.body;
+    
     if (!file_name) return res.status(400).json({ error: 'file_name requerido' });
+    if (isNaN(issueId)) return res.status(400).json({ error: 'ID de tarea inválido' });
+
+    // Asegurar que file_id es un número o nulo (por si viene un string vacío o algo raro)
+    const validFileId = (file_id && !isNaN(parseInt(file_id))) ? parseInt(file_id) : null;
+    const userId = parseInt(req.user.id);
 
     const result = await dbAsync.run(
       'INSERT INTO roadmap_issue_documents (issue_id, file_id, file_path, file_name, linked_by) VALUES (?, ?, ?, ?, ?)',
-      [req.params.issueId, file_id || null, file_path || '', file_name, req.user.id]
+      [issueId, validFileId, file_path || '', file_name, userId]
     );
 
-    const issue = await dbAsync.get('SELECT * FROM roadmap_issues WHERE id = ?', [req.params.issueId]);
+    const issue = await dbAsync.get('SELECT * FROM roadmap_issues WHERE id = ?', [issueId]);
     if (issue) {
-      await logActivity(issue.project_id, issue.id, req.user.id, 'document_linked', { file_name });
+      await logActivity(issue.project_id, issue.id, userId, 'document_linked', { file_name });
     }
 
-    const doc = await dbAsync.get('SELECT * FROM roadmap_issue_documents WHERE id = ?', [result.lastID]);
-    res.status(201).json(doc);
+    const docId = result.lastID;
+    let doc = null;
+    if (docId) {
+      doc = await dbAsync.get('SELECT * FROM roadmap_issue_documents WHERE id = ?', [docId]);
+    } else {
+      // Fallback si lastID no volvió (aunque en Postgres debería)
+      doc = await dbAsync.get('SELECT * FROM roadmap_issue_documents WHERE issue_id = ? AND file_name = ? ORDER BY created_at DESC LIMIT 1', [issueId, file_name]);
+    }
+    
+    res.status(201).json(doc || { success: true });
   } catch (error) {
-    res.status(500).json({ error: 'Error al vincular documento' });
+    console.error('[ROADMAP] Error linking document:', error.message);
+    res.status(500).json({ error: 'Error al vincular documento', detail: error.message });
   }
 });
 
