@@ -8,15 +8,26 @@ const RDPViewer = ({ connectionId, token, onClose }) => {
     const elementRef = useRef(null);
     const clientRef = useRef(null);
     const keyboardRef = useRef(null);
+    const cleanupRef = useRef(null);
     const [display, setDisplay] = useState(null);
-    const [connectionState, setConnectionState] = useState('CONNECTING');
+    const [connectionState, setConnectionState] = useState('IDLE');
     const [errorMsg, setErrorMsg] = useState('');
     const [pingMs, setPingMs] = useState(null);
     const [lastSync, setLastSync] = useState(null);
     const [frameCount, setFrameCount] = useState(0);
 
-    // Connect to Guacamole
-    useEffect(() => {
+    // Credentials modal state
+    const [showCredentials, setShowCredentials] = useState(true);
+    const [rdpUsername, setRdpUsername] = useState('');
+    const [rdpPassword, setRdpPassword] = useState('');
+    const [showPassword, setShowPassword] = useState(false);
+
+    // Fallback credentials modal for when guacd asks mid-connection
+    const [pendingRequired, setPendingRequired] = useState(null);
+    const [fallbackPassword, setFallbackPassword] = useState('');
+
+    // Start the actual Guacamole connection after user submits credentials
+    const startConnection = useCallback(() => {
         if (!token || !connectionId || !elementRef.current) {
             console.warn('RDPViewer - Missing required params:', {
                 hasToken: !!token,
@@ -30,18 +41,24 @@ const RDPViewer = ({ connectionId, token, onClose }) => {
             return;
         }
 
-        console.log('RDPViewer - Initializing connection:', { connectionId });
+        setShowCredentials(false);
+        setConnectionState('CONNECTING');
 
-        // Create tunnel - custom WebSocket implementation
-        const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+        console.log('RDPViewer - Initializing connection:', { connectionId, rdpUsername });
+
+        // Create tunnel - use the current browser host/protocol
         const host = window.location.host;
+        const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
         
-        // Build tunnel URL WITHOUT query params — they'll be added by tunnel.connect()
-        // WebSocketTunnel.connect(data) does: new WebSocket(tunnelURL + "?" + data, "guacamole")
         const tunnelUrl = `${protocol}//${host}/api/rdp`;
-        const connectData = `token=${encodeURIComponent(token)}&id=${connectionId}`;
+        // Use the actual container size so the RDP session fills the view 1:1
+        const ctr = elementRef.current;
+        const screenW = (ctr && ctr.clientWidth > 0) ? ctr.clientWidth : window.innerWidth;
+        const screenH = (ctr && ctr.clientHeight > 0) ? ctr.clientHeight : (window.innerHeight - 50);
+        const dpi = 96;
+        const connectData = `token=${encodeURIComponent(token)}&id=${connectionId}&rdpUser=${encodeURIComponent(rdpUsername)}&rdpPass=${encodeURIComponent(rdpPassword)}&width=${screenW}&height=${screenH}&dpi=${dpi}`;
         
-        console.log('RDPViewer - Tunnel URL:', tunnelUrl, '| connect data:', connectData);
+        console.log('RDPViewer - Tunnel URL:', tunnelUrl, '| connect data (credentials masked)');
         
         const tunnel = new Guacamole.WebSocketTunnel(tunnelUrl);
         
@@ -54,27 +71,26 @@ const RDPViewer = ({ connectionId, token, onClose }) => {
         // Error handler
         guacClient.onerror = (error) => {
             console.error('Guacamole error:', error);
+            // Guacamole.Status has .code and .message
+            const code = error?.code ?? '';
+            const msg = error?.message || '';
+            let displayMsg = msg || 'Unknown error';
+            // Map common Guacamole status codes to user-friendly messages
+            if (code === 0x0203 || code === 515) displayMsg = t('rdp.authFailed') || 'Authentication failed — check your username and password';
+            else if (code === 0x0200 || code === 512) displayMsg = t('rdp.serverError') || 'Server error — could not connect';
+            else if (code === 0x0308 || code === 776) displayMsg = t('rdp.upstreamError') || 'Remote desktop server unreachable';
+            else if (msg) displayMsg = msg;
+            console.error('RDP Error -', 'code:', code, 'message:', msg, 'display:', displayMsg);
             setConnectionState('ERROR');
-            setErrorMsg(error.message || 'Unknown error');
+            setErrorMsg(displayMsg);
         };
 
-        // Handle 'required' instruction — guacd needs credentials interactively
+        // Handle 'required' instruction — guacd needs credentials interactively (fallback)
         guacClient.onrequired = (params) => {
             console.warn('Guacamole requires params:', params);
-            // If password is required, prompt the user
             if (params && params.includes('password')) {
-                const pwd = window.prompt(t('rdp.enterPassword') || 'Enter password for RDP connection:');
-                if (pwd !== null) {
-                    // Send password via argv stream
-                    const stream = guacClient.createArgumentValueStream('text/plain', 'password');
-                    stream.onack = () => {}; // ack handler
-                    stream.sendBlob(btoa(pwd));
-                    stream.sendEnd();
-                } else {
-                    // User cancelled
-                    setConnectionState('ERROR');
-                    setErrorMsg(t('rdp.passwordRequired') || 'Password required but not provided');
-                }
+                // Show a smaller inline modal for password re-entry
+                setPendingRequired({ params, client: guacClient });
             }
         };
 
@@ -82,11 +98,9 @@ const RDPViewer = ({ connectionId, token, onClose }) => {
         guacClient.onsync = (timestamp) => {
             syncCounter++;
             const now = Date.now();
-            // Calculate rough ping based on server timestamp vs local time
             const rtt = Math.abs(now - timestamp);
-            // Only update ping every 5 syncs to avoid UI flicker
             if (syncCounter % 5 === 0) {
-                setPingMs(rtt > 5000 ? null : rtt); // ignore absurd values
+                setPingMs(rtt > 5000 ? null : rtt);
             }
             setLastSync(now);
             setFrameCount(syncCounter);
@@ -100,12 +114,9 @@ const RDPViewer = ({ connectionId, token, onClose }) => {
                 case 2: setConnectionState('WAITING'); break;
                 case 3: 
                     setConnectionState('CONNECTED');
-                    // Auto-focus the display element when connected
                     setTimeout(() => {
                         const displayEl = elementRef.current?.querySelector('div');
-                        if (displayEl) {
-                            displayEl.focus();
-                        }
+                        if (displayEl) displayEl.focus();
                     }, 200);
                     break;
                 case 4: setConnectionState('DISCONNECTING'); break;
@@ -124,55 +135,54 @@ const RDPViewer = ({ connectionId, token, onClose }) => {
         containerEl.innerHTML = '';
         containerEl.appendChild(displayElement);
 
-        // Make the display element focusable for keyboard input
         displayElement.tabIndex = 0;
-        displayElement.style.outline = 'none'; // Remove focus outline
+        displayElement.style.outline = 'none';
 
-        // Connect — pass query params here so URL is clean (tunnelURL + "?" + data)
+        // Connect
         guacClient.connect(connectData);
 
         // ========== MOUSE ==========
-        // Create mouse handler on the display element
         const mouse = new Guacamole.Mouse(displayElement);
 
         mouse.onmousedown = mouse.onmouseup = mouse.onmousemove = (mouseState) => {
-            // When user clicks/interacts, ensure focus for keyboard
+            // Scale coordinates to match the remote desktop resolution
+            const scale = guacDisplay.getScale() || 1;
+            mouseState.x = mouseState.x / scale;
+            mouseState.y = mouseState.y / scale;
             if (mouseState.left || mouseState.right || mouseState.middle) {
                 displayElement.focus();
             }
             guacClient.sendMouseState(mouseState);
         };
 
-        // Touch support for mobile/tablet
         let touch = null;
         if (Guacamole.Mouse.Touchscreen) {
             touch = new Guacamole.Mouse.Touchscreen(displayElement);
             touch.onmousedown = touch.onmouseup = touch.onmousemove = (mouseState) => {
+                const scale = guacDisplay.getScale() || 1;
+                mouseState.x = mouseState.x / scale;
+                mouseState.y = mouseState.y / scale;
                 guacClient.sendMouseState(mouseState);
             };
         }
 
         // ========== KEYBOARD ==========
-        // Attach keyboard to DOCUMENT for reliable key capture in fullscreen mode.
-        // The RDPViewer takes over the entire viewport, so there's no conflict
-        // with other input elements.
         const keyboard = new Guacamole.Keyboard(document);
         keyboardRef.current = keyboard;
 
         keyboard.onkeydown = (keysym) => {
             guacClient.sendKeyEvent(1, keysym);
-            return false; // Prevent browser default for captured keys
+            return false;
         };
         keyboard.onkeyup = (keysym) => {
             guacClient.sendKeyEvent(0, keysym);
             return false;
         };
 
-        // Focus the display element so user sees it's interactive
         displayElement.focus();
 
-        // Cleanup
-        return () => {
+        // Store cleanup function
+        cleanupRef.current = () => {
             keyboard.onkeydown = null;
             keyboard.onkeyup = null;
             keyboardRef.current = null;
@@ -186,11 +196,34 @@ const RDPViewer = ({ connectionId, token, onClose }) => {
             }
             guacClient.disconnect();
             clientRef.current = null;
-            if (containerEl) {
-                containerEl.innerHTML = '';
-            }
+            if (containerEl) containerEl.innerHTML = '';
         };
-    }, [token, connectionId]);
+    }, [token, connectionId, rdpUsername, rdpPassword]);
+
+    // Cleanup on unmount
+    useEffect(() => {
+        return () => {
+            if (cleanupRef.current) cleanupRef.current();
+        };
+    }, []);
+
+    // Handler for fallback password submission (when guacd asks mid-connection)
+    const handleFallbackPasswordSubmit = useCallback(() => {
+        if (!pendingRequired) return;
+        const { client } = pendingRequired;
+        const stream = client.createArgumentValueStream('text/plain', 'password');
+        stream.onack = () => {};
+        stream.sendBlob(btoa(fallbackPassword));
+        stream.sendEnd();
+        setPendingRequired(null);
+        setFallbackPassword('');
+    }, [pendingRequired, fallbackPassword]);
+
+    // Handle credentials form submission
+    const handleCredentialsSubmit = (e) => {
+        e.preventDefault();
+        startConnection();
+    };
 
     // Fit to screen
     useEffect(() => {
@@ -274,6 +307,118 @@ const RDPViewer = ({ connectionId, token, onClose }) => {
 
     return (
         <div className="rdp-viewer-container">
+            {/* ===== Credentials Modal ===== */}
+            {showCredentials && (
+                <div className="rdp-credentials-overlay">
+                    <form className="rdp-credentials-modal glassmorphism" onSubmit={handleCredentialsSubmit}>
+                        <div className="rdp-credentials-header">
+                            <div className="rdp-credentials-icon">🖥️</div>
+                            <h2>{t('rdp.connectTitle') || 'Remote Desktop Connection'}</h2>
+                            <p className="rdp-credentials-subtitle">
+                                {t('rdp.enterCredentials') || 'Enter your Windows credentials to connect'}
+                            </p>
+                        </div>
+
+                        <div className="rdp-credentials-body">
+                            <div className="rdp-input-group">
+                                <label htmlFor="rdp-username">
+                                    <span className="rdp-input-icon">👤</span>
+                                    {t('rdp.username') || 'Username'}
+                                </label>
+                                <input
+                                    id="rdp-username"
+                                    type="text"
+                                    value={rdpUsername}
+                                    onChange={(e) => setRdpUsername(e.target.value)}
+                                    placeholder={t('rdp.usernamePlaceholder') || 'e.g. Administrator'}
+                                    autoFocus
+                                    autoComplete="username"
+                                    spellCheck={false}
+                                />
+                            </div>
+
+                            <div className="rdp-input-group">
+                                <label htmlFor="rdp-password">
+                                    <span className="rdp-input-icon">🔒</span>
+                                    {t('rdp.password') || 'Password'}
+                                </label>
+                                <div className="rdp-password-wrapper">
+                                    <input
+                                        id="rdp-password"
+                                        type={showPassword ? 'text' : 'password'}
+                                        value={rdpPassword}
+                                        onChange={(e) => setRdpPassword(e.target.value)}
+                                        placeholder="••••••••"
+                                        autoComplete="current-password"
+                                    />
+                                    <button
+                                        type="button"
+                                        className="rdp-password-toggle"
+                                        onClick={() => setShowPassword(!showPassword)}
+                                        tabIndex={-1}
+                                    >
+                                        {showPassword ? '🙈' : '👁️'}
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="rdp-credentials-footer">
+                            <button type="button" className="rdp-btn" onClick={onClose}>
+                                {t('common.cancel') || 'Cancel'}
+                            </button>
+                            <button type="submit" className="rdp-btn primary">
+                                🖥️ {t('rdp.connect') || 'Connect'}
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            )}
+
+            {/* ===== Fallback password modal (when guacd requests mid-connection) ===== */}
+            {pendingRequired && (
+                <div className="rdp-credentials-overlay">
+                    <div className="rdp-credentials-modal glassmorphism rdp-credentials-compact">
+                        <div className="rdp-credentials-header">
+                            <div className="rdp-credentials-icon">🔐</div>
+                            <h2>{t('rdp.passwordRequired') || 'Password Required'}</h2>
+                            <p className="rdp-credentials-subtitle">
+                                {t('rdp.serverRequestsPassword') || 'The remote server is requesting your password'}
+                            </p>
+                        </div>
+                        <div className="rdp-credentials-body">
+                            <div className="rdp-input-group">
+                                <label htmlFor="rdp-fallback-password">
+                                    <span className="rdp-input-icon">🔒</span>
+                                    {t('rdp.password') || 'Password'}
+                                </label>
+                                <input
+                                    id="rdp-fallback-password"
+                                    type="password"
+                                    value={fallbackPassword}
+                                    onChange={(e) => setFallbackPassword(e.target.value)}
+                                    placeholder="••••••••"
+                                    autoFocus
+                                    onKeyDown={(e) => { if (e.key === 'Enter') handleFallbackPasswordSubmit(); }}
+                                />
+                            </div>
+                        </div>
+                        <div className="rdp-credentials-footer">
+                            <button className="rdp-btn" onClick={() => {
+                                setPendingRequired(null);
+                                setConnectionState('ERROR');
+                                setErrorMsg(t('rdp.passwordRequired') || 'Password required but not provided');
+                            }}>
+                                {t('common.cancel') || 'Cancel'}
+                            </button>
+                            <button className="rdp-btn primary" onClick={handleFallbackPasswordSubmit}>
+                                🔓 {t('rdp.authenticate') || 'Authenticate'}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
             {/* Toolbar */}
             <div className="rdp-toolbar glassmorphism" onMouseDown={(e) => e.stopPropagation()}>
                 <div className="rdp-status">
@@ -305,14 +450,13 @@ const RDPViewer = ({ connectionId, token, onClose }) => {
                 className={`rdp-display${connectionState === 'CONNECTED' ? ' cursor-hidden' : ''}`} 
                 ref={elementRef}
                 onClick={() => {
-                    // Re-focus display element on click for keyboard capture
                     const displayEl = elementRef.current?.querySelector('div');
                     if (displayEl) displayEl.focus();
                 }}
             ></div>
 
             {/* Loading Overlay */}
-            {connectionState === 'CONNECTING' || connectionState === 'WAITING' ? (
+            {(connectionState === 'CONNECTING' || connectionState === 'WAITING') && !showCredentials ? (
                 <div className="rdp-overlay">
                     <div className="spinner"></div>
                     <p>{t('rdp.connecting')}</p>

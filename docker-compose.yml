@@ -9,7 +9,7 @@ services:
   gateway:
     build: ./gateway
     ports:
-      - "80:80"
+      - "8080:80"
     depends_on:
       - frontend
       - auth-service
@@ -219,6 +219,8 @@ services:
       - DB_PASSWORD=${DB_PASSWORD:-admin123}
       - DB_NAME=${DB_NAME:-server_db}
       - DB_PORT=5432
+      - RDP_SERVER_HOST=${RDP_SERVER_HOST:-host.docker.internal}
+      - RDP_SERVER_PORT=${RDP_SERVER_PORT:-3389}
     depends_on:
       - guacd
       - postgres

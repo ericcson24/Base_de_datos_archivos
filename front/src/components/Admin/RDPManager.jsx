@@ -12,6 +12,16 @@ const RDPManager = () => {
     const [loading, setLoading] = useState(true);
     const [activeConnection, setActiveConnection] = useState(null);
     const [defaultConnection, setDefaultConnection] = useState(null);
+    const [serverInfo, setServerInfo] = useState(null);
+
+    // Fetch server info for display
+    useEffect(() => {
+        const token = getAuthToken();
+        fetch('/api/rdp/server-info', { headers: { 'Authorization': `Bearer ${token}` } })
+            .then(r => r.ok ? r.json() : null)
+            .then(data => { if (data) setServerInfo(data); })
+            .catch(() => {});
+    }, []);
 
     const fetchSettings = async () => {
         try {
@@ -205,7 +215,9 @@ session bpp:i:32
                          <div className="rdp-info-card glassmorphism">
                             <h4>ℹ️ {t('common.info')}</h4>
                             <p><strong>{t('rdp.serverId')}:</strong> {settings.server_id}</p>
-                            <p><strong>Host:</strong> {defaultConnection?.hostname || 'System'}</p>
+                            <p><strong>Host:</strong> {defaultConnection?.hostname === 'host.docker.internal'
+                                ? `${serverInfo?.hostname || 'Este Servidor'} (${serverInfo?.lanIP || '...'})`
+                                : (defaultConnection?.hostname || 'System')}</p>
                              <div className="setting-toggle-row small">
                                 <label className="switch">
                                     <input 

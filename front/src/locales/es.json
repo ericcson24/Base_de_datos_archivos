@@ -93,6 +93,8 @@
     "selectConnectionDesc": "Elige el escritorio remoto al que deseas conectarte",
     "noConnectionsDesc": "No hay conexiones remotas configuradas todavía.",
     "initializeDefault": "Inicializar Conexión por Defecto",
+    "thisServer": "Este Servidor",
+    "cannotDeleteDefault": "No se puede eliminar la conexión del servidor por defecto",
     "running": "EN EJECUCIÓN",
     "stopped": "DETENIDO",
     "stop": "DETENER",
@@ -103,7 +105,16 @@
     "restartConfirm": "¿Reiniciar servicio RDP? Esto desconectará a los usuarios activos.",
     "restartSuccess": "Servicio Reiniciado",
     "access": "Métodos de Acceso",
-    "unknownError": "Error desconocido"
+    "unknownError": "Error desconocido",
+    "enterCredentials": "Introduce tus credenciales de Windows para conectarte",
+    "usernamePlaceholder": "ej. Administrador",
+    "enterPassword": "Introduce la contraseña para la conexión RDP",
+    "passwordRequired": "Contraseña Requerida",
+    "serverRequestsPassword": "El servidor remoto solicita tu contraseña",
+    "authenticate": "Autenticar",
+    "authFailed": "Autenticaci\u00f3n fallida \u2014 verifica tu usuario y contrase\u00f1a",
+    "serverError": "Error del servidor \u2014 no se pudo conectar al escritorio remoto",
+    "upstreamError": "Servidor de escritorio remoto inaccesible"
   },
   "folders": {
     "title": "Selecciona una carpeta",

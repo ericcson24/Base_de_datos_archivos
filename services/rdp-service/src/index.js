@@ -3,15 +3,31 @@ const express = require('express');
 const http = require('http');
 const WebSocket = require('ws');
 const net = require('net');
+const os = require('os');
 const jwt = require('jsonwebtoken');
 const cors = require('cors');
 const crypto = require('crypto');
+
+// Auto-detect the host machine's LAN IP (for display purposes)
+function getServerLanIP() {
+    const interfaces = os.networkInterfaces();
+    for (const name of Object.keys(interfaces)) {
+        for (const iface of interfaces[name]) {
+            if (iface.family === 'IPv4' && !iface.internal) {
+                return iface.address;
+            }
+        }
+    }
+    return 'host.docker.internal';
+}
 
 const app = express();
 const PORT = process.env.PORT || 5008;
 const GUACD_HOST = process.env.GUACD_HOST || 'guacd';
 const GUACD_PORT = parseInt(process.env.GUACD_PORT, 10) || 4822;
 const JWT_SECRET = process.env.JWT_SECRET || 'secret';
+const RDP_SERVER_HOST = process.env.RDP_SERVER_HOST || 'host.docker.internal';
+const RDP_SERVER_PORT = parseInt(process.env.RDP_SERVER_PORT, 10) || 3389;
 
 // Encryption key for connection tokens (derived from JWT_SECRET)
 const ENCRYPTION_KEY = crypto.createHash('sha256').update(JWT_SECRET).digest();
@@ -154,6 +170,22 @@ app.post('/settings', async (req, res) => {
     }
 });
 
+// Server info endpoint — returns the detected server IP for frontend display
+app.get('/server-info', async (req, res) => {
+    try {
+        const authHeader = req.headers.authorization;
+        if (!authHeader) return res.status(401).json({ error: 'No token provided' });
+        const token = authHeader.split(' ')[1];
+        verifyToken(token);
+        
+        const hostname = os.hostname();
+        const lanIP = getServerLanIP();
+        res.json({ hostname, lanIP, rdpHost: RDP_SERVER_HOST });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
 app.post('/initialize-default', async (req, res) => {
     try {
         const authHeader = req.headers.authorization;
@@ -169,17 +201,17 @@ app.post('/initialize-default', async (req, res) => {
         const token = authHeader.split(' ')[1];
         const decoded = verifyToken(token); // To get user ID
 
-        // Create Default
-        // Assuming host.docker.internal for Windows environments or a sane default
+        // Create Default — always points to the host machine (this server)
         const defaultConn = {
-            name: 'System Desktop',
+            name: 'Este Servidor',
             hostname: 'host.docker.internal',
-            port: 3389,
-            username: 'eric2',
+            port: RDP_SERVER_PORT,
+            username: '',
             password: '',
             protocol: 'rdp',
             security: 'any',
-            virtual_ip: '10.10.10.2'
+            virtual_ip: '10.10.10.2',
+            is_default: true
         };
 
         const randomServerId = Math.floor(100000 + Math.random() * 900000).toString();
@@ -271,8 +303,8 @@ app.get('/connections/:id/token', async (req, res) => {
             connection: {
                 type: connection.protocol || 'rdp',
                 settings: {
-                    hostname: connection.hostname || 'host.docker.internal',
-                    port: connection.port || 3389,
+                    hostname: connection.hostname || RDP_SERVER_HOST,
+                    port: connection.port || RDP_SERVER_PORT,
                     username: connection.username || '',
                     password: connection.password || '',
                     security: 'nla',
@@ -348,6 +380,11 @@ app.delete('/connections/:id', async (req, res) => {
             return res.status(403).json({ error: 'Admin access required' });
         }
 
+        // Prevent deleting the default server connection
+        const conn = await dbAsync.get('SELECT id, hostname FROM rdp_connections WHERE id = ?', [req.params.id]);
+        if (conn && conn.hostname === 'host.docker.internal') {
+            return res.status(403).json({ error: 'Cannot delete the default server connection' });
+        }
         await dbAsync.run('DELETE FROM rdp_connections WHERE id = ?', [req.params.id]);
         res.json({ success: true });
     } catch (error) {
@@ -392,10 +429,13 @@ const wss = new WebSocket.Server({
     },
     handleProtocols: (protocols, req) => {
         console.log('WS Protocol Negotiation:', protocols);
+        // ws@8.x passes protocols as a Set, use .has() instead of .includes()
         if (protocols.has('guacamole')) {
             return 'guacamole';
         }
-        return [...protocols][0] || 'guacamole';
+        // Fallback: pick first available protocol
+        const first = protocols.values().next().value;
+        return first || 'guacamole';
     }
 });
 
@@ -505,11 +545,31 @@ wss.on('connection', async (ws, request) => {
             ws.close(1008, 'Connection not found');
             return;
         }
+
+        // Override credentials from query params if provided by the frontend modal
+        const rdpUser = url.searchParams.get('rdpUser');
+        const rdpPass = url.searchParams.get('rdpPass');
+        if (rdpUser !== null && rdpUser !== '') {
+            connection.username = rdpUser;
+            console.log('Using username from frontend modal:', rdpUser);
+        }
+        if (rdpPass !== null && rdpPass !== '') {
+            connection.password = rdpPass;
+            console.log('Using password from frontend modal (provided)');
+        }
+
+        // Read client screen resolution from query params
+        const clientWidth = parseInt(url.searchParams.get('width'), 10) || 1920;
+        const clientHeight = parseInt(url.searchParams.get('height'), 10) || 1080;
+        const clientDpi = parseInt(url.searchParams.get('dpi'), 10) || 96;
+        console.log(`Client screen: ${clientWidth}x${clientHeight} @ ${clientDpi} DPI`);
         
-        console.log('Connecting to:', connection.hostname, ':', connection.port);
+        console.log('Connecting to:', connection.hostname, ':', connection.port, '| user:', connection.username || '(empty)');
         
         // Pre-check: verify the RDP target is reachable before engaging guacd.
         // This gives users a clear error instead of the cryptic "wrong security type".
+        // COMMENTED OUT: Skip pre-check to allow guacd to handle connection errors directly
+        /*
         await new Promise((resolve, reject) => {
             const probe = new net.Socket();
             probe.setTimeout(5000);
@@ -527,6 +587,7 @@ wss.on('connection', async (ws, request) => {
             });
         });
         console.log('Pre-check: RDP target is reachable');
+        */
         
         // Connect to guacd
         const guacdSocket = new net.Socket();
@@ -634,6 +695,13 @@ wss.on('connection', async (ws, request) => {
                 if (!silentOpcodes.includes(opcode)) {
                     console.log('Guacd opcode:', opcode, '| elements count:', elements.length);
                 }
+
+                // Log error details from guacd
+                if (opcode === 'error') {
+                    const errMsg = elements[1] || 'Unknown guacd error';
+                    const errCode = elements[2] || '';
+                    console.error('*** GUACD ERROR:', errMsg, '| code:', errCode);
+                }
                 
                 if (opcode === 'args' && !handshakeComplete) {
                     handshakeComplete = true;
@@ -649,8 +717,8 @@ wss.on('connection', async (ws, request) => {
                     
                     // Build config map for all known RDP args
                     const config = {
-                        'hostname': connection.hostname || 'host.docker.internal',
-                        'port': String(connection.port || 3389),
+                        'hostname': connection.hostname || RDP_SERVER_HOST,
+                        'port': String(connection.port || RDP_SERVER_PORT),
                         'domain': connection.domain || '',
                         'username': connection.username || '',
                         'password': connection.password || '',
@@ -665,9 +733,9 @@ wss.on('connection', async (ws, request) => {
                         'disable-bitmap-caching': 'false',
                         'disable-offscreen-caching': 'false',
                         'color-depth': '32',
-                        'width': '1024',
-                        'height': '768',
-                        'dpi': '96',
+                        'width': String(clientWidth),
+                        'height': String(clientHeight),
+                        'dpi': String(clientDpi),
                         'resize-method': 'display-update',
                         'enable-drive': 'true',
                         'drive-name': 'Shared',
@@ -720,11 +788,15 @@ wss.on('connection', async (ws, request) => {
                     const values = argNames.map(name => config[name] || '');
                     
                     console.log(`Responding with ${values.length} values for ${argNames.length} args`);
+                    // Debug: log key credential values being sent
+                    const usernameIdx = argNames.indexOf('username');
+                    const passwordIdx = argNames.indexOf('password');
+                    console.log(`Credentials in handshake -> username[${usernameIdx}]: "${values[usernameIdx] || '(empty)'}" | password[${passwordIdx}]: ${values[passwordIdx] ? '(set, ' + values[passwordIdx].length + ' chars)' : '(empty)'}`);
                     
                     // Send: size, audio, video, image, timezone, then connect
                     // Per Guacamole protocol spec: connect's first arg is the version,
                     // followed by one value per arg name from the 'args' instruction
-                    const sizeInstr = formatGuac('size', ['1024', '768', '96']);
+                    const sizeInstr = formatGuac('size', [String(clientWidth), String(clientHeight), String(clientDpi)]);
                     const audioInstr = formatGuac('audio', ['audio/L8', 'audio/L16']);
                     const videoInstr = formatGuac('video', []);
                     const imageInstr = formatGuac('image', ['image/png', 'image/jpeg', 'image/webp']);

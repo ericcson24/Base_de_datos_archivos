@@ -118,12 +118,12 @@
 .rdp-display > div {
     outline: none !important;
     touch-action: none; /* Prevent browser touch gestures interfering with remote desktop */
+    position: relative;
 }
 
 .rdp-display canvas {
-    box-shadow: var(--shadow);
-    max-width: 100%;
-    max-height: 100%;
+    /* Let Guacamole manage sizing via display.scale() — no constraints */
+    display: block;
 }
 
 .rdp-overlay {
@@ -167,4 +167,177 @@
 
 @keyframes spin {
     to { transform: rotate(360deg); }
+}
+
+/* ===== Credentials Modal ===== */
+.rdp-credentials-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.75);
+    backdrop-filter: blur(8px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 10000;
+    animation: fadeIn 0.25s ease;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+@keyframes slideUp {
+    from { opacity: 0; transform: translateY(30px) scale(0.96); }
+    to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.rdp-credentials-modal {
+    width: 420px;
+    max-width: 92vw;
+    border-radius: 16px;
+    padding: 0;
+    overflow: hidden;
+    animation: slideUp 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+    background: var(--sidebar-bg, #1e1e2e);
+    border: 1px solid var(--sidebar-border, rgba(255,255,255,0.08));
+    box-shadow: 0 25px 60px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255,255,255,0.05);
+}
+
+.rdp-credentials-compact {
+    width: 380px;
+}
+
+.rdp-credentials-header {
+    text-align: center;
+    padding: 32px 32px 8px;
+}
+
+.rdp-credentials-icon {
+    font-size: 3rem;
+    margin-bottom: 12px;
+    filter: drop-shadow(0 4px 12px rgba(0,0,0,0.3));
+}
+
+.rdp-credentials-header h2 {
+    margin: 0 0 6px;
+    font-size: 1.35rem;
+    font-weight: 700;
+    color: var(--text-color, #fff);
+    letter-spacing: -0.02em;
+}
+
+.rdp-credentials-subtitle {
+    margin: 0;
+    font-size: 0.85rem;
+    color: var(--text-secondary, #888);
+    line-height: 1.4;
+}
+
+.rdp-credentials-body {
+    padding: 20px 32px 8px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.rdp-input-group {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.rdp-input-group label {
+    font-size: 0.82rem;
+    font-weight: 600;
+    color: var(--text-secondary, #aaa);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.rdp-input-icon {
+    font-size: 0.9rem;
+}
+
+.rdp-input-group input {
+    width: 100%;
+    padding: 12px 14px;
+    border-radius: 10px;
+    border: 1.5px solid var(--sidebar-border, rgba(255,255,255,0.1));
+    background: var(--input-bg, rgba(0,0,0,0.2));
+    color: var(--text-color, #fff);
+    font-size: 0.95rem;
+    font-family: inherit;
+    transition: all 0.2s ease;
+    outline: none;
+    box-sizing: border-box;
+}
+
+.rdp-input-group input::placeholder {
+    color: var(--text-secondary, #555);
+}
+
+.rdp-input-group input:focus {
+    border-color: var(--accent-color, #6366f1);
+    box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.15);
+    background: var(--input-bg-focus, rgba(0,0,0,0.3));
+}
+
+.rdp-password-wrapper {
+    position: relative;
+    display: flex;
+    align-items: center;
+}
+
+.rdp-password-wrapper input {
+    padding-right: 44px;
+}
+
+.rdp-password-toggle {
+    position: absolute;
+    right: 6px;
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-size: 1.1rem;
+    padding: 6px 8px;
+    border-radius: 6px;
+    transition: background 0.15s;
+    line-height: 1;
+}
+
+.rdp-password-toggle:hover {
+    background: rgba(255,255,255,0.08);
+}
+
+.rdp-credentials-footer {
+    display: flex;
+    gap: 10px;
+    padding: 20px 32px 28px;
+    justify-content: flex-end;
+}
+
+.rdp-btn.primary {
+    background: linear-gradient(135deg, #6366f1, #8b5cf6);
+    border: none;
+    color: #fff;
+    font-weight: 600;
+    padding: 10px 24px;
+    font-size: 0.9rem;
+    box-shadow: 0 4px 14px rgba(99, 102, 241, 0.35);
+    transition: all 0.2s ease;
+}
+
+.rdp-btn.primary:hover {
+    background: linear-gradient(135deg, #5558e6, #7c4fef);
+    box-shadow: 0 6px 20px rgba(99, 102, 241, 0.45);
+    transform: translateY(-1px);
+}
+
+.rdp-btn.primary:active {
+    transform: translateY(0);
+    box-shadow: 0 2px 8px rgba(99, 102, 241, 0.3);
 }

@@ -17,9 +17,16 @@ const RemotePage = ({ user, onLogout, onGoBack, onGoToPanel, onGoToCalendar, onT
     const [activeConnectionId, setActiveConnectionId] = useState(null);
     const [showSettingsModal, setShowSettingsModal] = useState(false);
     const [sidebarOpen, setSidebarOpen] = useState(false);
+    const [serverInfo, setServerInfo] = useState(null);
 
     useEffect(() => {
         fetchData();
+        // Fetch server info for display
+        const token = user?.token || getAuthToken();
+        fetch('/api/rdp/server-info', { headers: { 'Authorization': `Bearer ${token}` } })
+            .then(r => r.ok ? r.json() : null)
+            .then(data => { if (data) setServerInfo(data); })
+            .catch(() => {});
     }, []);
 
     const fetchData = async () => {
@@ -200,7 +207,11 @@ const RemotePage = ({ user, onLogout, onGoBack, onGoToPanel, onGoToCalendar, onT
                                             <div className="connection-icon">🖥️</div>
                                             <div className="connection-info">
                                                 <h3>{conn.name}</h3>
-                                                <p className="connection-host">{conn.hostname || 'localhost'}</p>
+                                                <p className="connection-host">
+                                                    {conn.hostname === 'host.docker.internal'
+                                                        ? `${serverInfo?.hostname || t('rdp.thisServer') || 'This Server'} (${serverInfo?.lanIP || '...'})`
+                                                        : (conn.hostname || 'localhost')}
+                                                </p>
                                                 {conn.description && (
                                                     <p className="connection-desc">{conn.description}</p>
                                                 )}
