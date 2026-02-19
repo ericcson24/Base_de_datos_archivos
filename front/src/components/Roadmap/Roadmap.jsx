@@ -8,9 +8,11 @@ import {
   FiList, FiColumns, FiZap, FiEye, FiEyeOff, FiPlay, FiSquare,
   FiCheckSquare, FiTrendingUp, FiHash, FiBookmark, FiCheckCircle,
   FiCircle, FiRepeat, FiCornerDownRight,
-  FiMenu, FiMap, FiGlobe, FiLock, FiBarChart2, FiExternalLink
+  FiMenu, FiMap, FiGlobe, FiLock, FiBarChart2, FiExternalLink, FiFolder,
+  FiRefreshCw
 } from 'react-icons/fi';
 import { useToast } from '../../context/ToastContext';
+import { useLanguage } from '../../context/LanguageContext';
 import { getAuthToken } from '../../utils/fileUtils';
 import NotificationCenter from '../Common/NotificationCenter';
 import SettingsModal from '../Modals/SettingsModal';
@@ -20,35 +22,35 @@ import './Roadmap.css';
 // PRIORITY CONFIG
 // ============================================
 const PRIORITIES = {
-  critical: { label: 'Crítica', color: '#ef4444', icon: <FiCircle size={10} fill="#ef4444" stroke="#ef4444" /> },
-  high: { label: 'Alta', color: '#f97316', icon: <FiCircle size={10} fill="#f97316" stroke="#f97316" /> },
-  medium: { label: 'Media', color: '#eab308', icon: <FiCircle size={10} fill="#eab308" stroke="#eab308" /> },
-  low: { label: 'Baja', color: '#22c55e', icon: <FiCircle size={10} fill="#22c55e" stroke="#22c55e" /> }
+  critical: { labelKey: 'critical', color: '#fd0606ff', icon: <FiCircle size={10} fill="#ef4444" stroke="#ef4444" /> },
+  high: { labelKey: 'high', color: '#fd6900ff', icon: <FiCircle size={10} fill="#f97316" stroke="#f97316" /> },
+  medium: { labelKey: 'medium', color: '#ffd506ff', icon: <FiCircle size={10} fill="#eab308" stroke="#eab308" /> },
+  low: { labelKey: 'low', color: '#22c55e', icon: <FiCircle size={10} fill="#22c55e" stroke="#22c55e" /> }
 };
 
 // ============================================
 // ISSUE TYPE CONFIG
 // ============================================
 const ISSUE_TYPES = {
-  task: { label: 'Tarea', icon: <FiCheckSquare size={14} />, color: '#4b9cdb' },
-  bug: { label: 'Bug', icon: <FiAlertTriangle size={14} />, color: '#e5493a' },
-  story: { label: 'Historia', icon: <FiBookmark size={14} />, color: '#63ba3c' },
-  epic: { label: 'Epic', icon: <FiZap size={14} />, color: '#904ee2' },
-  subtask: { label: 'Subtarea', icon: <FiCornerDownRight size={14} />, color: '#4b9cdb' },
-  improvement: { label: 'Mejora', icon: <FiTrendingUp size={14} />, color: '#2dcccd' }
+  task: { labelKey: 'task', icon: <FiCheckSquare size={14} />, color: '#4b9cdb' },
+  bug: { labelKey: 'bug', icon: <FiAlertTriangle size={14} />, color: '#e5493a' },
+  story: { labelKey: 'story', icon: <FiBookmark size={14} />, color: '#63ba3c' },
+  epic: { labelKey: 'epic', icon: <FiZap size={14} />, color: '#904ee2' },
+  subtask: { labelKey: 'subtask', icon: <FiCornerDownRight size={14} />, color: '#4b9cdb' },
+  improvement: { labelKey: 'improvement', icon: <FiTrendingUp size={14} />, color: '#2dcccd' }
 };
 
 const LINK_TYPES = {
-  blocks: { label: 'Bloquea', reverse: 'es bloqueado por' },
-  relates_to: { label: 'Relacionado con', reverse: 'Relacionado con' },
-  duplicates: { label: 'Duplica', reverse: 'es duplicado por' },
-  clones: { label: 'Clona', reverse: 'es clonado por' }
+  blocks: { labelKey: 'blocks', reverseKey: 'blockedBy' },
+  relates_to: { labelKey: 'relatesTo', reverseKey: 'relatesTo' },
+  duplicates: { labelKey: 'duplicates', reverseKey: 'duplicatedBy' },
+  clones: { labelKey: 'clones', reverseKey: 'clonedBy' }
 };
 
 // ============================================
 // KANBAN CARD
 // ============================================
-const KanbanCard = ({ issue, onEdit, onDelete, onDragStart, onDragEnd, isDragging }) => {
+const KanbanCard = ({ issue, onEdit, onDelete, onDragStart, onDragEnd, isDragging, t }) => {
   const [showMenu, setShowMenu] = useState(false);
   const priority = PRIORITIES[issue.priority] || PRIORITIES.medium;
   const issueType = ISSUE_TYPES[issue.issue_type] || ISSUE_TYPES.task;
@@ -69,7 +71,7 @@ const KanbanCard = ({ issue, onEdit, onDelete, onDragStart, onDragEnd, isDraggin
     >
       <div className="rm-card-top">
         <div className="rm-card-type-key">
-          <span className="rm-card-type-icon" style={{ color: issueType.color }} title={issueType.label}>
+          <span className="rm-card-type-icon" style={{ color: issueType.color }} title={issueType.labelKey ? t(`roadmap.issueTypes.${issueType.labelKey}`) : ''}>
             {issueType.icon}
           </span>
           {issue.issue_key && <span className="rm-card-key">{issue.issue_key}</span>}
@@ -85,8 +87,8 @@ const KanbanCard = ({ issue, onEdit, onDelete, onDragStart, onDragEnd, isDraggin
           </button>
           {showMenu && (
             <div className="rm-card-dropdown" onMouseLeave={() => setShowMenu(false)}>
-              <button onClick={() => { onEdit(issue); setShowMenu(false); }}><FiEdit2 size={12} /> Editar</button>
-              <button className="danger" onClick={() => { onDelete(issue.id); setShowMenu(false); }}><FiTrash2 size={12} /> Eliminar</button>
+              <button onClick={() => { onEdit(issue); setShowMenu(false); }}><FiEdit2 size={12} /> {t('roadmap.actions.edit')}</button>
+              <button className="danger" onClick={() => { onDelete(issue.id); setShowMenu(false); }}><FiTrash2 size={12} /> {t('roadmap.actions.delete')}</button>
             </div>
           )}
         </div>
@@ -124,7 +126,11 @@ const KanbanCard = ({ issue, onEdit, onDelete, onDragStart, onDragEnd, isDraggin
 
       {issue.assigned_username && (
         <div className="rm-card-assignee">
-          <div className="rm-avatar-sm">{issue.assigned_username.charAt(0).toUpperCase()}</div>
+          {issue.assigned_avatar ? (
+            <img src={issue.assigned_avatar} alt={issue.assigned_username} className="rm-avatar-img" />
+          ) : (
+            <div className="rm-avatar-sm">{issue.assigned_username.charAt(0).toUpperCase()}</div>
+          )}
           <span>{issue.assigned_username}</span>
         </div>
       )}
@@ -135,7 +141,7 @@ const KanbanCard = ({ issue, onEdit, onDelete, onDragStart, onDragEnd, isDraggin
 // ============================================
 // KANBAN COLUMN
 // ============================================
-const KanbanColumn = ({ column, issues, onAddIssue, onEditIssue, onDeleteIssue, onDrop, onDragStart, onDragEnd, draggingIssueId }) => {
+const KanbanColumn = ({ column, issues, onAddIssue, onEditIssue, onDeleteIssue, onDrop, onDragStart, onDragEnd, draggingIssueId, t }) => {
   const [isDragOver, setIsDragOver] = useState(false);
   const columnIssues = issues.filter(i => i.column_id === column.id);
   const isOverWip = column.wip_limit > 0 && columnIssues.length >= column.wip_limit;
@@ -161,16 +167,16 @@ const KanbanColumn = ({ column, issues, onAddIssue, onEditIssue, onDeleteIssue, 
           <h3 className="rm-col-title">{column.name}</h3>
           <span className="rm-col-count">{columnIssues.length}{column.wip_limit > 0 ? `/${column.wip_limit}` : ''}</span>
         </div>
-        <button className="rm-col-add-btn" onClick={() => onAddIssue(column.id)} title="Nueva tarea">
+        <button className="rm-col-add-btn" onClick={() => onAddIssue(column.id)} title={t('roadmap.sidebar.newTask')}>
           <FiPlus size={16} />
         </button>
       </div>
       <div className="rm-col-body">
         {columnIssues.map(issue => (
           <KanbanCard key={issue.id} issue={issue} onEdit={onEditIssue} onDelete={onDeleteIssue}
-            onDragStart={onDragStart} onDragEnd={onDragEnd} isDragging={draggingIssueId === issue.id} />
+            onDragStart={onDragStart} onDragEnd={onDragEnd} isDragging={draggingIssueId === issue.id} t={t} />
         ))}
-        {columnIssues.length === 0 && <div className="rm-col-empty"><span>Sin tareas</span></div>}
+        {columnIssues.length === 0 && <div className="rm-col-empty"><span>{t('roadmap.messages.noTasks')}</span></div>}
       </div>
     </div>
   );
@@ -179,17 +185,27 @@ const KanbanColumn = ({ column, issues, onAddIssue, onEditIssue, onDeleteIssue, 
 // ============================================
 // ISSUE MODAL (Create/Edit) — Jira-like with tabs
 // ============================================
-const IssueModal = ({ issue, columns, members, sprints, epics, onSave, onUpdate, onClose, onLinkDocument, onUnlinkDocument, projectId }) => {
+const IssueModal = ({ issue, columns, members, sprints, epics, onSave, onUpdate, onClose, onLinkDocument, onUnlinkDocument, projectId, initialIssueType }) => {
+  const { t } = useLanguage();
+  
+  // Helper to format date for input (YYYY-MM-DD) avoiding timezone shifts
+  const formatDateForInput = (dateStr) => {
+    if (!dateStr) return '';
+    return new Date(dateStr).toISOString().split('T')[0];
+  };
+
   const [form, setForm] = useState({
     title: issue?.title || '', description: issue?.description || '',
-    priority: issue?.priority || 'medium', issue_type: issue?.issue_type || 'task',
-    assigned_to: issue?.assigned_to || '', due_date: issue?.due_date ? new Date(issue.due_date).toISOString().slice(0, 16) : '',
-    start_date: issue?.start_date ? new Date(issue.start_date).toISOString().slice(0, 16) : '',
+    priority: issue?.priority || 'medium', issue_type: issue?.issue_type || initialIssueType || 'task',
+    assigned_to: issue?.assigned_to || '',
+    due_date: formatDateForInput(issue?.due_date),
+    start_date: issue?.start_date ? formatDateForInput(issue.start_date) : '',
     column_id: issue?.column_id || '', labels: issue?.labels || [],
     estimated_hours: issue?.estimated_hours || 0, remaining_hours: issue?.remaining_hours || 0,
     story_points: issue?.story_points || '', sprint_id: issue?.sprint_id || '',
     epic_id: issue?.epic_id || '', environment: issue?.environment || '',
-    acceptance_criteria: issue?.acceptance_criteria || '', syncCalendar: true
+    acceptance_criteria: issue?.acceptance_criteria || '', 
+    syncCalendar: issue?.sync_calendar !== false // Default to true unless explicitly false
   });
   const [activeTab, setActiveTab] = useState('details');
   const [newLabel, setNewLabel] = useState('');
@@ -356,25 +372,25 @@ const IssueModal = ({ issue, columns, members, sprints, epics, onSave, onUpdate,
   const uid = parseInt(localStorage.getItem('userId'));
 
   const tabs = [
-    { id: 'details', label: 'Detalles', icon: <FiFileText size={13} /> },
+    { id: 'details', label: t('roadmap.tabs.details'), icon: <FiFileText size={13} /> },
     ...(issue?.id ? [
-      { id: 'subtasks', label: `Subtareas (${subTotal})`, icon: <FiCheckSquare size={13} /> },
-      { id: 'time', label: 'Tiempo', icon: <FiClock size={13} /> },
-      { id: 'links', label: `Enlaces (${links.length})`, icon: <FiLink size={13} /> },
-      { id: 'comments', label: `Comentarios (${comments.length})`, icon: <FiMessageSquare size={13} /> },
-      { id: 'history', label: 'Historial', icon: <FiActivity size={13} /> }
+      { id: 'subtasks', label: `${t('roadmap.tabs.subtasks')} (${subTotal})`, icon: <FiCheckSquare size={13} /> },
+      { id: 'time', label: t('roadmap.tabs.time'), icon: <FiClock size={13} /> },
+      { id: 'links', label: `${t('roadmap.tabs.links')} (${links.length})`, icon: <FiLink size={13} /> },
+      { id: 'comments', label: `${t('roadmap.tabs.comments')} (${comments.length})`, icon: <FiMessageSquare size={13} /> },
+      { id: 'history', label: t('roadmap.tabs.history'), icon: <FiActivity size={13} /> }
     ] : [])
   ];
 
   return (
-    <div className="rm-modal-overlay" onClick={onClose} style={{ zIndex: 1000 }}>
+    <div className="rm-modal-overlay" onClick={onClose}>
       <div className="rm-modal glassmorphism-modal" onClick={e => e.stopPropagation()}>
         <div className="rm-modal-header">
           <div className="rm-modal-header-left">
             <span style={{ color: issueType.color }}>{issueType.icon}</span>
-            <h2>{issue ? (issue.issue_key || 'Editar Tarea') : 'Nueva Tarea'}</h2>
+            <h2>{issue ? (issue.issue_key || t('roadmap.modal.editTask')) : t('roadmap.modal.newTask')}</h2>
             {issue?.id && (
-              <button className="rm-icon-btn" onClick={toggleWatcher} title={watchers.some(w => w.user_id === uid) ? 'Dejar de observar' : 'Observar'} style={{ width: 28, height: 28 }}>
+              <button className="rm-icon-btn" onClick={toggleWatcher} title={watchers.some(w => w.user_id === uid) ? t('roadmap.modal.unwatchTask') : t('roadmap.modal.watchTask')} style={{ width: 28, height: 28 }}>
                 {watchers.some(w => w.user_id === uid) ? <FiEye size={14} /> : <FiEyeOff size={14} />}
               </button>
             )}
@@ -384,9 +400,9 @@ const IssueModal = ({ issue, columns, members, sprints, epics, onSave, onUpdate,
 
         {tabs.length > 1 && (
           <div className="rm-modal-tabs">
-            {tabs.map(t => (
-              <button key={t.id} className={`rm-modal-tab ${activeTab === t.id ? 'active' : ''}`} onClick={() => setActiveTab(t.id)}>
-                {t.icon} {t.label}
+            {tabs.map(tab => (
+              <button key={tab.id} className={`rm-modal-tab ${activeTab === tab.id ? 'active' : ''}`} onClick={() => setActiveTab(tab.id)}>
+                {tab.icon} {tab.label}
               </button>
             ))}
           </div>
@@ -397,30 +413,30 @@ const IssueModal = ({ issue, columns, members, sprints, epics, onSave, onUpdate,
             {/* DETAILS TAB */}
             {activeTab === 'details' && (
               <>
-                <input className="rm-input-title" placeholder="Título de la tarea..." value={form.title}
+                <input className="rm-input-title" placeholder={t('roadmap.modal.taskTitle')} value={form.title}
                   onChange={e => setForm(f => ({ ...f, title: e.target.value }))} autoFocus />
-                <textarea className="rm-textarea" placeholder="Descripción..." value={form.description}
+                <textarea className="rm-textarea" placeholder={t('roadmap.modal.taskDescription')} value={form.description}
                   onChange={e => setForm(f => ({ ...f, description: e.target.value }))} rows={4} />
 
                 <div className="rm-field-group">
-                  <label><FiCheckCircle size={14} /> Criterios de Aceptación</label>
-                  <textarea className="rm-textarea" placeholder="Definir cuándo está completa..."
+                  <label><FiCheckCircle size={14} /> {t('roadmap.fields.acceptanceCriteria')}</label>
+                  <textarea className="rm-textarea" placeholder={t('roadmap.modal.acceptanceCriteriaPlaceholder')}
                     value={form.acceptance_criteria} onChange={e => setForm(f => ({ ...f, acceptance_criteria: e.target.value }))} rows={3} />
                 </div>
 
                 <div className="rm-field-group">
-                  <label><FiMonitor size={14} /> Entorno</label>
-                  <input type="text" placeholder="Producción, Staging, etc."
+                  <label><FiMonitor size={14} /> {t('roadmap.fields.environment')}</label>
+                  <input type="text" placeholder={t('roadmap.modal.environmentPlaceholder')}
                     value={form.environment} onChange={e => setForm(f => ({ ...f, environment: e.target.value }))} />
                 </div>
 
                 <div className="rm-field-group">
-                  <label><FiFlag size={14} /> Etiquetas</label>
+                  <label><FiFlag size={14} /> {t('roadmap.fields.labels')}</label>
                   <div className="rm-labels-row">
                     {form.labels.map((l, i) => (
                       <span key={i} className="rm-label-tag" onClick={() => removeLabel(l)}>{l} ×</span>
                     ))}
-                    <input className="rm-label-input" placeholder="Añadir..." value={newLabel}
+                    <input className="rm-label-input" placeholder={t('roadmap.modal.addLabel')} value={newLabel}
                       onChange={e => setNewLabel(e.target.value)} onKeyDown={e => e.key === 'Enter' && addLabel()} />
                   </div>
                 </div>
@@ -428,13 +444,13 @@ const IssueModal = ({ issue, columns, members, sprints, epics, onSave, onUpdate,
                 {issue?.id && (
                   <div className="rm-docs-section">
                     <div className="rm-docs-header">
-                      <h3><FiPaperclip size={14} /> Documentos Vinculados</h3>
+                      <h3><FiPaperclip size={14} /> {t('roadmap.documents.title')}</h3>
                       <button className="rm-action-link" onClick={() => {
                         const ns = !showDocPicker;
                         setShowDocPicker(ns);
                         if (ns) { setDocSearch(''); searchDocuments(''); }
                       }}>
-                        {showDocPicker ? 'Cancelar' : '+ Vincular desde Panel'}
+                        {showDocPicker ? t('roadmap.actions.cancel') : `+ ${t('roadmap.actions.linkFromPanel')}`}
                       </button>
                     </div>
 
@@ -446,15 +462,15 @@ const IssueModal = ({ issue, columns, members, sprints, epics, onSave, onUpdate,
                             <span className="rm-doc-name" onClick={() => window.open(`/api/files/download?path=${encodeURIComponent(doc.file_path)}`, '_blank')}>
                               {doc.file_name}
                             </span>
-                            <span className="rm-doc-meta">{doc.file_path && doc.file_path.split('/').slice(0, -1).join('/') || 'Raíz'}</span>
+                            <span className="rm-doc-meta">{doc.file_path && doc.file_path.split('/').slice(0, -1).join('/') || t('roadmap.documents.root')}</span>
                           </div>
-                          <button className="rm-doc-unlink" onClick={() => onUnlinkDocument?.(doc.id)} title="Desvincular">
+                          <button className="rm-doc-unlink" onClick={() => onUnlinkDocument?.(doc.id)} title={t('roadmap.actions.unlinkTask')}>
                             <FiX size={14} />
                           </button>
                         </div>
                       ))}
                       {(!issue.documents || issue.documents.length === 0) && !showDocPicker && (
-                        <p className="rm-empty-text">No hay documentos vinculados. Puedes adjuntar archivos del panel aquí.</p>
+                        <p className="rm-empty-text">{t('roadmap.documents.noDocuments')}</p>
                       )}
                     </div>
 
@@ -463,7 +479,7 @@ const IssueModal = ({ issue, columns, members, sprints, epics, onSave, onUpdate,
                         <div className="rm-doc-search-box">
                           <FiSearch className="search-icon" />
                           <input 
-                            placeholder="Buscar en tus archivos..." 
+                            placeholder={t('roadmap.documents.searchFiles')} 
                             value={docSearch}
                             autoFocus
                             onChange={e => {
@@ -496,14 +512,14 @@ const IssueModal = ({ issue, columns, members, sprints, epics, onSave, onUpdate,
                                 </div>
                                 <div className="result-details">
                                   <span className="result-name">{doc.name}</span>
-                                  <span className="result-path">{doc.path || 'Raíz'}</span>
+                                  <span className="result-path">{doc.path || t('roadmap.documents.root')}</span>
                                 </div>
                                 <FiPlus className="add-icon" />
                               </div>
                             ))
                           ) : (
                             <p className="rm-no-results">
-                              {loadingDocs ? 'Buscando archivos...' : (docSearch ? 'No se encontraron archivos' : 'Empieza a escribir para buscar...')}
+                              {loadingDocs ? t('roadmap.documents.searching') : (docSearch ? t('roadmap.documents.noResults') : t('roadmap.documents.startTyping'))}
                             </p>
                           )}
                         </div>
@@ -518,7 +534,7 @@ const IssueModal = ({ issue, columns, members, sprints, epics, onSave, onUpdate,
             {activeTab === 'subtasks' && issue?.id && (
               <div className="rm-subtasks-section">
                 <div className="rm-subtasks-header">
-                  <h3><FiCheckSquare size={14} /> Subtareas</h3>
+                  <h3><FiCheckSquare size={14} /> {t('roadmap.subtasks.title')}</h3>
                   {subTotal > 0 && (
                     <div className="rm-subtask-progress-info">
                       <div className="rm-subtask-progress-bar">
@@ -538,10 +554,10 @@ const IssueModal = ({ issue, columns, members, sprints, epics, onSave, onUpdate,
                       <button className="rm-subtask-delete" onClick={() => deleteSubtask(st.id)}><FiTrash2 size={12} /></button>
                     </div>
                   ))}
-                  {subtasks.length === 0 && <p className="rm-loading-text">No hay subtareas. Crea la primera abajo.</p>}
+                  {subtasks.length === 0 && <p className="rm-loading-text">{t('roadmap.subtasks.noSubtasks')}</p>}
                 </div>
                 <div className="rm-subtask-add">
-                  <input placeholder="Añadir subtarea..." value={newSubtask}
+                  <input placeholder={t('roadmap.subtasks.addPlaceholder')} value={newSubtask}
                     onChange={e => setNewSubtask(e.target.value)} onKeyDown={e => e.key === 'Enter' && addSubtask()} />
                   <button onClick={addSubtask}><FiPlus size={14} /></button>
                 </div>
@@ -552,23 +568,23 @@ const IssueModal = ({ issue, columns, members, sprints, epics, onSave, onUpdate,
             {activeTab === 'time' && issue?.id && (
               <div className="rm-time-tracking-section">
                 <div className="rm-time-summary">
-                  <div className="rm-time-stat"><label>Estimado</label><span>{form.estimated_hours || 0}h</span></div>
-                  <div className="rm-time-stat"><label>Registrado</label><span>{totalLogged.toFixed(1)}h</span></div>
-                  <div className="rm-time-stat"><label>Restante</label><span>{Math.max(0, (form.estimated_hours || 0) - totalLogged).toFixed(1)}h</span></div>
+                  <div className="rm-time-stat"><label>{t('roadmap.time.estimated')}</label><span>{form.estimated_hours || 0}h</span></div>
+                  <div className="rm-time-stat"><label>{t('roadmap.time.logged')}</label><span>{totalLogged.toFixed(1)}h</span></div>
+                  <div className="rm-time-stat"><label>{t('roadmap.time.remaining')}</label><span>{Math.max(0, (form.estimated_hours || 0) - totalLogged).toFixed(1)}h</span></div>
                 </div>
                 
                 <div className="rm-time-log-form">
-                  <h4>Registar nuevo tiempo</h4>
+                  <h4>{t('roadmap.time.logNew')}</h4>
                   <div className="rm-time-log-inputs">
-                    <input type="number" min="0.25" step="0.25" placeholder="Horas" value={logHours} onChange={e => setLogHours(e.target.value)} />
+                    <input type="number" min="0.25" step="0.25" placeholder={t('roadmap.time.hoursPlaceholder')} value={logHours} onChange={e => setLogHours(e.target.value)} />
                     <input type="date" value={logDate} onChange={e => setLogDate(e.target.value)} />
-                    <input placeholder="¿En qué has trabajado?" value={logDesc} onChange={e => setLogDesc(e.target.value)} />
-                    <button onClick={addTimeLog}><FiPlus size={14} /> Registrar</button>
+                    <input placeholder={t('roadmap.time.whatWorked')} value={logDesc} onChange={e => setLogDesc(e.target.value)} />
+                    <button onClick={addTimeLog}><FiPlus size={14} /> {t('roadmap.actions.register')}</button>
                   </div>
                 </div>
 
                 <div className="rm-time-logs-list" style={{ marginTop: '20px' }}>
-                  <h4 style={{ marginBottom: '12px' }}>Logs Recientes</h4>
+                  <h4 style={{ marginBottom: '12px' }}>{t('roadmap.time.recentLogs')}</h4>
                   {timeLogs.map(tl => (
                     <div key={tl.id} className="rm-time-log-entry">
                       <strong>{tl.username || 'Usuario'}</strong>
@@ -577,7 +593,7 @@ const IssueModal = ({ issue, columns, members, sprints, epics, onSave, onUpdate,
                       {tl.description && <span style={{ opacity: 0.8 }}> — {tl.description}</span>}
                     </div>
                   ))}
-                  {timeLogs.length === 0 && <p className="rm-loading-text">Sin registros de tiempo</p>}
+                  {timeLogs.length === 0 && <p className="rm-loading-text">{t('roadmap.time.noLogs')}</p>}
                 </div>
               </div>
             )}
@@ -586,19 +602,19 @@ const IssueModal = ({ issue, columns, members, sprints, epics, onSave, onUpdate,
             {activeTab === 'links' && issue?.id && (
               <div className="rm-links-section">
                 <div className="rm-links-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <h3><FiLink size={14} /> Tareas Vinculadas</h3>
+                  <h3><FiLink size={14} /> {t('roadmap.links.title')}</h3>
                   <button className="rm-action-btn" onClick={() => setShowLinkForm(!showLinkForm)}>
-                    <FiPlus size={12} /> {showLinkForm ? 'Cancelar' : 'Vincular Tarea'}
+                    <FiPlus size={12} /> {showLinkForm ? t('roadmap.actions.cancel') : t('roadmap.actions.linkTask')}
                   </button>
                 </div>
 
                 {showLinkForm && (
                   <div className="rm-link-create-form">
                     <select value={linkType} onChange={e => setLinkType(e.target.value)}>
-                      {Object.entries(LINK_TYPES).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
+                      {Object.entries(LINK_TYPES).map(([k, v]) => <option key={k} value={k}>{t(`roadmap.links.${v.labelKey}`)}</option>)}
                     </select>
                     <div className="rm-link-search-row">
-                      <input placeholder="Buscar por título o clave (ej: PRJ-12)..." value={linkSearch}
+                      <input placeholder={t('roadmap.links.searchPlaceholder')} value={linkSearch}
                         onChange={e => setLinkSearch(e.target.value)} onKeyDown={e => e.key === 'Enter' && searchForLink()} />
                       <button onClick={searchForLink}><FiSearch size={14} /></button>
                     </div>
@@ -622,18 +638,18 @@ const IssueModal = ({ issue, columns, members, sprints, epics, onSave, onUpdate,
                     const linkedTitle = isSource ? l.target_title : l.source_title;
                     const linkedKey = isSource ? l.target_key : l.source_key;
                     const linkedStatus = isSource ? l.target_status : l.source_status;
-                    const typeLabel = isSource ? LINK_TYPES[l.link_type]?.label : LINK_TYPES[l.link_type]?.reverse;
+                    const typeLabel = isSource ? t(`roadmap.links.${LINK_TYPES[l.link_type]?.labelKey || l.link_type}`) : t(`roadmap.links.${LINK_TYPES[l.link_type]?.reverseKey || l.link_type}`);
                     return (
                       <div key={l.id} className="rm-link-item">
                         <span className="rm-link-type-label">{typeLabel || l.link_type}</span>
                         <span className="rm-link-key">{linkedKey}</span>
                         <span className="rm-link-title">{linkedTitle}</span>
                         <span className="rm-link-status">{linkedStatus}</span>
-                        <button className="rm-link-delete" onClick={() => deleteLink(l.id)} title="Eliminar vínculo"><FiTrash2 size={12} /></button>
+                        <button className="rm-link-delete" onClick={() => deleteLink(l.id)} title={t('roadmap.actions.delete')}><FiTrash2 size={12} /></button>
                       </div>
                     );
                   })}
-                  {links.length === 0 && <p className="rm-loading-text">No hay tareas vinculadas</p>}
+                  {links.length === 0 && <p className="rm-loading-text">{t('roadmap.links.noLinks')}</p>}
                 </div>
               </div>
             )}
@@ -641,23 +657,61 @@ const IssueModal = ({ issue, columns, members, sprints, epics, onSave, onUpdate,
             {/* COMMENTS TAB */}
             {activeTab === 'comments' && issue?.id && (
               <div className="rm-comments-section">
-                <h3><FiMessageSquare size={14} /> Comentarios ({comments.length})</h3>
+                <h3><FiMessageSquare size={14} /> {t('roadmap.comments.title')} ({comments.length})</h3>
                 <div className="rm-comments-list">
                   {comments.map(c => (
                     <div key={c.id} className="rm-comment">
                       <div className="rm-comment-header">
                         <strong>{c.username}</strong>
-                        <span>{new Date(c.created_at).toLocaleString('es-ES')}</span>
+                        <span>{new Date(c.created_at).toLocaleString()}</span>
                       </div>
-                      <p>{c.content}</p>
+                      <div className="rm-comment-body" dangerouslySetInnerHTML={{ __html: c.content }} />
                     </div>
                   ))}
-                  {loadingComments && <p className="rm-loading-text">Cargando...</p>}
+                  {loadingComments && <p className="rm-loading-text">{t('roadmap.comments.loading')}</p>}
                 </div>
-                <div className="rm-comment-input-row">
-                  <input placeholder="Escribe un comentario..." value={newComment}
-                    onChange={e => setNewComment(e.target.value)} onKeyDown={e => e.key === 'Enter' && addComment()} />
-                  <button onClick={addComment}><FiSend size={14} /></button>
+                <div className="rm-comment-editor">
+                  <div className="rm-comment-toolbar">
+                    <button type="button" title={t('roadmap.comments.bold')} onClick={() => {
+                      setNewComment(prev => prev + '<b></b>');
+                    }}><strong>B</strong></button>
+                    <button type="button" title={t('roadmap.comments.italic')} onClick={() => {
+                      setNewComment(prev => prev + '<i></i>');
+                    }}><em>I</em></button>
+                    <button type="button" title={t('roadmap.comments.bulletList')} onClick={() => {
+                      setNewComment(prev => prev + '<ul><li></li></ul>');
+                    }}><FiList size={14} /></button>
+                    <button type="button" title={t('roadmap.comments.codeBlock')} onClick={() => {
+                      setNewComment(prev => prev + '<pre><code></code></pre>');
+                    }}>{'</>'}</button>
+                    <label className="rm-comment-image-btn" title={t('roadmap.comments.addImage')}>
+                      <FiPaperclip size={14} />
+                      <input type="file" accept="image/*" style={{ display: 'none' }} onChange={async (e) => {
+                        const file = e.target.files[0];
+                        if (!file) return;
+                        const formData = new FormData();
+                        formData.append('file', file);
+                        try {
+                          const res = await fetch('/api/files/upload-image', {
+                            method: 'POST',
+                            headers: { 'Authorization': `Bearer ${token}` },
+                            body: formData
+                          });
+                          if (res.ok) {
+                            const data = await res.json();
+                            const imgUrl = data.url || `/api/files/download?path=${encodeURIComponent(data.path)}`;
+                            setNewComment(prev => prev + `<img src="${imgUrl}" alt="${file.name}" style="max-width:100%;border-radius:6px;margin:8px 0;" />`);
+                          }
+                        } catch (err) { /* ignore */ }
+                        e.target.value = '';
+                      }} />
+                    </label>
+                  </div>
+                  <div className="rm-comment-input-row">
+                    <textarea className="rm-comment-textarea" placeholder={t('roadmap.comments.writeComment')} value={newComment}
+                      onChange={e => setNewComment(e.target.value)} onKeyDown={e => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) addComment(); }} rows={3} />
+                    <button onClick={addComment}><FiSend size={14} /></button>
+                  </div>
                 </div>
               </div>
             )}
@@ -666,8 +720,8 @@ const IssueModal = ({ issue, columns, members, sprints, epics, onSave, onUpdate,
             {activeTab === 'history' && issue?.id && (
               <div className="rm-history-section">
                 <div className="rm-history-header">
-                  <h3><FiActivity size={14} /> Historial de Actividad</h3>
-                  <span className="rm-history-count">{history.length} eventos</span>
+                  <h3><FiActivity size={14} /> {t('roadmap.history.title')}</h3>
+                  <span className="rm-history-count">{history.length} {t('roadmap.history.events')}</span>
                 </div>
                 <div className="rm-history-timeline">
                   {history.map((h, idx) => (
@@ -699,7 +753,7 @@ const IssueModal = ({ issue, columns, members, sprints, epics, onSave, onUpdate,
                   {history.length === 0 && (
                     <div className="rm-empty-state">
                       <FiActivity size={24} />
-                      <p>Todavía no hay cambios registrados en esta tarea.</p>
+                      <p>{t('roadmap.history.noHistory')}</p>
                     </div>
                   )}
                 </div>
@@ -710,72 +764,74 @@ const IssueModal = ({ issue, columns, members, sprints, epics, onSave, onUpdate,
           {/* Modal Sidebar Fields */}
           <div className="rm-modal-sidebar">
             <div className="rm-field-group">
-              <label>Tipo</label>
+              <label>{t('roadmap.fields.type')}</label>
               <select value={form.issue_type} onChange={e => setForm(f => ({ ...f, issue_type: e.target.value }))}>
-                {Object.entries(ISSUE_TYPES).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
+                {Object.entries(ISSUE_TYPES).map(([k, v]) => (
+                  <option key={k} value={k}>{t(`roadmap.issueTypes.${v.labelKey}`)}</option>
+                ))}
               </select>
             </div>
             <div className="rm-field-group">
-              <label>Estado</label>
+              <label>{t('roadmap.fields.status')}</label>
               <select value={form.column_id} onChange={e => setForm(f => ({ ...f, column_id: parseInt(e.target.value) }))}>
-                <option value="">Seleccionar...</option>
+                <option value="">{t('roadmap.modal.select')}</option>
                 {columns.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
               </select>
             </div>
             <div className="rm-field-group">
-              <label>Prioridad</label>
+              <label>{t('roadmap.fields.priority')}</label>
               <select value={form.priority} onChange={e => setForm(f => ({ ...f, priority: e.target.value }))}>
-                {Object.entries(PRIORITIES).map(([k, v]) => <option key={k} value={k}>{v.icon} {v.label}</option>)}
+                {Object.entries(PRIORITIES).map(([k, v]) => <option key={k} value={k}>{t(`roadmap.priorities.${v.labelKey}`)}</option>)}
               </select>
             </div>
             <div className="rm-field-group">
-              <label><FiUser size={14} /> Asignar a</label>
+              <label><FiUser size={14} /> {t('roadmap.fields.assignee')}</label>
               <select value={form.assigned_to} onChange={e => setForm(f => ({ ...f, assigned_to: parseInt(e.target.value) || '' }))}>
-                <option value="">Sin asignar</option>
+                <option value="">{t('roadmap.modal.unassigned')}</option>
                 {members.map(m => <option key={m.user_id} value={m.user_id}>{m.username}</option>)}
               </select>
             </div>
             <div className="rm-field-group">
-              <label><FiZap size={14} /> Sprint</label>
+              <label><FiZap size={14} /> {t('roadmap.fields.sprint')}</label>
               <select value={form.sprint_id} onChange={e => setForm(f => ({ ...f, sprint_id: parseInt(e.target.value) || '' }))}>
-                <option value="">Backlog</option>
+                <option value="">{t('roadmap.modal.noSprint')}</option>
                 {(sprints || []).map(s => <option key={s.id} value={s.id}>{s.name} ({s.status})</option>)}
               </select>
             </div>
             <div className="rm-field-group">
-              <label><FiBookmark size={14} /> Epic</label>
+              <label><FiBookmark size={14} /> {t('roadmap.fields.epic')}</label>
               <select value={form.epic_id} onChange={e => setForm(f => ({ ...f, epic_id: parseInt(e.target.value) || '' }))}>
-                <option value="">Sin epic</option>
+                <option value="">{t('roadmap.modal.noEpic')}</option>
                 {(epics || []).map(ep => <option key={ep.id} value={ep.id}>{ep.issue_key} - {ep.title}</option>)}
               </select>
             </div>
             <div className="rm-field-group">
-              <label><FiHash size={14} /> Story Points</label>
+              <label><FiHash size={14} /> {t('roadmap.fields.storyPoints')}</label>
               <select value={form.story_points} onChange={e => setForm(f => ({ ...f, story_points: e.target.value }))}>
                 <option value="">-</option>
                 {[1, 2, 3, 5, 8, 13, 21].map(v => <option key={v} value={v}>{v}</option>)}
               </select>
             </div>
             <div className="rm-field-group">
-              <label><FiCalendar size={14} /> Fecha inicio</label>
-              <input type="datetime-local" value={form.start_date} onChange={e => setForm(f => ({ ...f, start_date: e.target.value }))} />
+              <label><FiCalendar size={14} /> {t('roadmap.fields.startDate')}</label>
+              <input type="date" value={form.start_date} onChange={e => setForm(f => ({ ...f, start_date: e.target.value }))} />
             </div>
             <div className="rm-field-group">
-              <label><FiCalendar size={14} /> Fecha fin / límite</label>
-              <input type="datetime-local" value={form.due_date} onChange={e => setForm(f => ({ ...f, due_date: e.target.value }))} />
+              <label><FiCalendar size={14} /> {t('roadmap.fields.dueDate')}</label>
+              <input type="date" value={form.due_date} onChange={e => setForm(f => ({ ...f, due_date: e.target.value }))} />
             </div>
             <div className="rm-field-group">
-              <label><FiClock size={14} /> Horas estimadas</label>
+              <label><FiClock size={14} /> {t('roadmap.fields.estimated')}</label>
               <input type="number" min="0" step="0.5" value={form.estimated_hours} onChange={e => setForm(f => ({ ...f, estimated_hours: parseFloat(e.target.value) || 0 }))} />
             </div>
             <div className="rm-field-group checkbox-field">
-              <label>
+              <label className="rm-outlook-sync-label">
                 <input type="checkbox" checked={form.syncCalendar} onChange={e => setForm(f => ({ ...f, syncCalendar: e.target.checked }))} />
-                <FiCalendar size={14} /> Sincronizar con Calendario
+                <span className="rm-outlook-text"><FiRefreshCw size={14} /> {t('roadmap.fields.syncCalendar')}</span>
               </label>
               {issue?.calendar_event_id && (
                 <div className="rm-sync-status">
-                  <FiLink size={12} /> Vinculado a Calendario
+                  <FiLink size={12} /> {t('roadmap.messages.linkedToCalendar')}
                   <button className="rm-link-btn" onClick={() => window.location.href = '/calendar'} title="Ver en Calendario">
                     <FiExternalLink size={12} />
                   </button>
@@ -783,7 +839,7 @@ const IssueModal = ({ issue, columns, members, sprints, epics, onSave, onUpdate,
               )}
             </div>
             <button className="rm-save-btn" onClick={handleSubmit}>
-              <FiCheck size={16} /> {issue ? 'Guardar cambios' : 'Crear tarea'}
+              <FiCheck size={16} /> {issue ? t('roadmap.actions.save') : t('roadmap.actions.create')}
             </button>
           </div>
         </div>
@@ -795,9 +851,43 @@ const IssueModal = ({ issue, columns, members, sprints, epics, onSave, onUpdate,
 // ============================================
 // TIMELINE / GANTT VIEW
 // ============================================
-const TimelineView = ({ issues, columns, sprints, epics, onEditIssue }) => {
-  const [timelineScale, setTimelineScale] = useState('weeks'); // days, weeks, months
-  const [groupBy, setGroupBy] = useState('column'); // column, sprint, epic, assignee
+const ZOOM_LEVELS = ['hours', 'days', 'weeks', 'months'];
+const TimelineView = ({ issues, columns, sprints, epics, onEditIssue, t }) => {
+  const [zoomIndex, setZoomIndex] = useState(2); // default to 'weeks'
+  const timelineScale = ZOOM_LEVELS[zoomIndex];
+  const [groupBy, setGroupBy] = useState('column');
+  const scrollRef = React.useRef(null);
+
+  // Mouse wheel zoom (with debounce for trackpad)
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    let lastZoomTime = 0;
+    let accumulatedDelta = 0;
+    const ZOOM_COOLDOWN = 300; // ms between zoom level changes
+    const DELTA_THRESHOLD = 50; // accumulated delta needed to trigger zoom
+    const handleWheel = (e) => {
+      if (e.ctrlKey || e.metaKey) {
+        e.preventDefault();
+        const now = Date.now();
+        if (now - lastZoomTime < ZOOM_COOLDOWN) {
+          accumulatedDelta = 0;
+          return;
+        }
+        accumulatedDelta += e.deltaY;
+        if (Math.abs(accumulatedDelta) < DELTA_THRESHOLD) return;
+        lastZoomTime = now;
+        const direction = accumulatedDelta > 0 ? 1 : -1; // positive = zoom in, negative = zoom out
+        accumulatedDelta = 0;
+        setZoomIndex(prev => {
+          if (direction < 0) return Math.min(prev + 1, ZOOM_LEVELS.length - 1);
+          return Math.max(prev - 1, 0);
+        });
+      }
+    };
+    el.addEventListener('wheel', handleWheel, { passive: false });
+    return () => el.removeEventListener('wheel', handleWheel);
+  }, []);
 
   // Calculate the date range for the timeline
   const timelineData = useMemo(() => {
@@ -840,19 +930,19 @@ const TimelineView = ({ issues, columns, sprints, epics, onEditIssue }) => {
         items: issues.filter(i => i.sprint_id === s.id)
       }));
       const noSprint = issues.filter(i => !i.sprint_id);
-      if (noSprint.length > 0) groups.push({ id: 'none', name: 'Sin Sprint', color: '#9ca3af', items: noSprint });
+      if (noSprint.length > 0) groups.push({ id: 'none', name: t('roadmap.timeline.noSprint'), color: '#9ca3af', items: noSprint });
     } else if (groupBy === 'epic') {
       groups = epics.map(ep => ({
         id: ep.id, name: ep.title, color: '#904ee2',
         items: issues.filter(i => i.epic_id === ep.id)
       }));
       const noEpic = issues.filter(i => !i.epic_id);
-      if (noEpic.length > 0) groups.push({ id: 'none', name: 'Sin Epic', color: '#9ca3af', items: noEpic });
+      if (noEpic.length > 0) groups.push({ id: 'none', name: t('roadmap.timeline.noEpic'), color: '#9ca3af', items: noEpic });
     } else if (groupBy === 'assignee') {
       const byAssignee = {};
       issues.forEach(i => {
         const key = i.assigned_to || 'unassigned';
-        const name = i.assigned_username || 'Sin Asignar';
+        const name = i.assigned_username || t('roadmap.timeline.unassigned');
         if (!byAssignee[key]) byAssignee[key] = { id: key, name, color: '#4b9cdb', items: [] };
         byAssignee[key].items.push(i);
       });
@@ -865,8 +955,19 @@ const TimelineView = ({ issues, columns, sprints, epics, onEditIssue }) => {
   function generateSlots(start, end, scale) {
     const slots = [];
     const current = new Date(start);
-    while (current <= end) {
-      if (scale === 'days') {
+    const maxSlots = 500; // safety limit
+    let count = 0;
+    while (current <= end && count < maxSlots) {
+      count++;
+      if (scale === 'hours') {
+        slots.push({
+          date: new Date(current),
+          label: current.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' }),
+          subLabel: current.toLocaleDateString('es-ES', { day: '2-digit', month: 'short' }),
+          width: 50
+        });
+        current.setHours(current.getHours() + 1);
+      } else if (scale === 'days') {
         const isWeekend = current.getDay() === 0 || current.getDay() === 6;
         slots.push({ 
           date: new Date(current), 
@@ -879,7 +980,7 @@ const TimelineView = ({ issues, columns, sprints, epics, onEditIssue }) => {
       } else if (scale === 'weeks') {
         slots.push({ 
           date: new Date(current), 
-          label: `Sem. ${Math.ceil(current.getDate() / 7)}`,
+          label: `${t('roadmap.timeline.week')} ${Math.ceil(current.getDate() / 7)}`,
           subLabel: current.toLocaleDateString('es-ES', { month: 'short' }),
           width: 100 
         });
@@ -925,23 +1026,33 @@ const TimelineView = ({ issues, columns, sprints, epics, onEditIssue }) => {
     <div className="rm-timeline-container">
       {/* Timeline Toolbar */}
       <div className="rm-timeline-toolbar">
-        <h2><FiBarChart2 size={20} /> Timeline</h2>
+        <h2><FiBarChart2 size={20} /> {t('roadmap.timeline.title')}</h2>
         <div className="rm-timeline-controls">
+          <div className="rm-timeline-zoom-controls">
+            <button className="rm-zoom-btn" onClick={() => setZoomIndex(i => Math.max(i - 1, 0))} disabled={zoomIndex === 0} title="Zoom in">
+              <FiPlus size={14} />
+            </button>
+            <span className="rm-zoom-level">{timelineScale === 'hours' ? t('roadmap.timeline.hours') : timelineScale === 'days' ? t('roadmap.timeline.days') : timelineScale === 'weeks' ? t('roadmap.timeline.weeks') : t('roadmap.timeline.months')}</span>
+            <button className="rm-zoom-btn" onClick={() => setZoomIndex(i => Math.min(i + 1, ZOOM_LEVELS.length - 1))} disabled={zoomIndex === ZOOM_LEVELS.length - 1} title="Zoom out">
+              <FiSearch size={14} />
+            </button>
+          </div>
           <div className="rm-timeline-control-group">
-            <label>Escala:</label>
-            <select value={timelineScale} onChange={e => setTimelineScale(e.target.value)}>
-              <option value="days">Días</option>
-              <option value="weeks">Semanas</option>
-              <option value="months">Meses</option>
+            <label>{t('roadmap.timeline.scale')}:</label>
+            <select value={timelineScale} onChange={e => setZoomIndex(ZOOM_LEVELS.indexOf(e.target.value))}>
+              <option value="hours">{t('roadmap.timeline.hours')}</option>
+              <option value="days">{t('roadmap.timeline.days')}</option>
+              <option value="weeks">{t('roadmap.timeline.weeks')}</option>
+              <option value="months">{t('roadmap.timeline.months')}</option>
             </select>
           </div>
           <div className="rm-timeline-control-group">
-            <label>Agrupar:</label>
+            <label>{t('roadmap.timeline.groupBy')}:</label>
             <select value={groupBy} onChange={e => setGroupBy(e.target.value)}>
-              <option value="column">Columna</option>
-              <option value="sprint">Sprint</option>
-              <option value="epic">Epic</option>
-              <option value="assignee">Asignado</option>
+              <option value="column">{t('roadmap.timeline.byColumn')}</option>
+              <option value="sprint">{t('roadmap.timeline.bySprint')}</option>
+              <option value="epic">{t('roadmap.timeline.byEpic')}</option>
+              <option value="assignee">{t('roadmap.timeline.byAssignee')}</option>
             </select>
           </div>
         </div>
@@ -950,15 +1061,15 @@ const TimelineView = ({ issues, columns, sprints, epics, onEditIssue }) => {
       {issues.length === 0 ? (
         <div className="rm-empty">
           <FiBarChart2 size={48} />
-          <h2>Sin tareas</h2>
-          <p>Crea tareas con fechas para verlas en el timeline</p>
+          <h2>{t('roadmap.messages.noTimeline')}</h2>
+          <p>{t('roadmap.messages.noTimelineDesc')}</p>
         </div>
       ) : (
-        <div className="rm-timeline-scroll">
+        <div className="rm-timeline-scroll" ref={scrollRef}>
           <div className="rm-timeline-grid" style={{ minWidth: totalWidth + 220 }}>
             {/* Header Row - Dates */}
             <div className="rm-timeline-header">
-              <div className="rm-timeline-label-col">Tarea</div>
+              <div className="rm-timeline-label-col">{t('roadmap.timeline.task')}</div>
               <div className="rm-timeline-dates-row">
                 {timelineData.slots.map((slot, i) => (
                   <div key={i} className={`rm-timeline-date-cell ${slot.type || ''}`} style={{ width: slot.width, minWidth: slot.width }}>
@@ -1012,7 +1123,11 @@ const TimelineView = ({ issues, columns, sprints, epics, onEditIssue }) => {
                         </span>
                         <span className="rm-timeline-item-title">{item.title}</span>
                         {item.assigned_username && (
-                          <div className="rm-avatar-xs">{item.assigned_username.charAt(0).toUpperCase()}</div>
+                          item.assigned_avatar ? (
+                            <img src={item.assigned_avatar} alt={item.assigned_username} className="rm-avatar-xs-img" />
+                          ) : (
+                            <div className="rm-avatar-xs">{item.assigned_username.charAt(0).toUpperCase()}</div>
+                          )
                         )}
                       </div>
                       <div className="rm-timeline-dates-row" style={{ position: 'relative' }}>
@@ -1026,7 +1141,7 @@ const TimelineView = ({ issues, columns, sprints, epics, onEditIssue }) => {
                             <span className="rm-timeline-bar-priority" style={{ background: PRIORITY_COLORS[item.priority] || '#eab308' }} />
                           </div>
                         ) : (
-                          <div className="rm-timeline-no-dates">Sin fechas</div>
+                          <div className="rm-timeline-no-dates">{t('roadmap.timeline.noDates')}</div>
                         )}
                       </div>
                     </div>
@@ -1038,7 +1153,7 @@ const TimelineView = ({ issues, columns, sprints, epics, onEditIssue }) => {
             {/* Today marker */}
             {todayLeft > 0 && todayLeft < totalWidth && (
               <div className="rm-timeline-today" style={{ left: todayLeft + 220 }}>
-                <div className="rm-timeline-today-label">Hoy</div>
+                <div className="rm-timeline-today-label">{t('roadmap.timeline.today')}</div>
                 <div className="rm-timeline-today-line" />
               </div>
             )}
@@ -1054,6 +1169,7 @@ const TimelineView = ({ issues, columns, sprints, epics, onEditIssue }) => {
 // ============================================
 const Roadmap = ({ user, onLogout, onBackToFolders, onGoToCalendar, onGoToPanel, onGoToRemote, onThemeToggle, isDarkMode }) => {
   const { showToast } = useToast();
+  const { t } = useLanguage();
 
   // Core state
   const [projects, setProjects] = useState([]);
@@ -1085,6 +1201,7 @@ const Roadmap = ({ user, onLogout, onBackToFolders, onGoToCalendar, onGoToPanel,
   const [showIssueModal, setShowIssueModal] = useState(false);
   const [editingIssueId, setEditingIssueId] = useState(null);
   const [preselectedColumnId, setPreselectedColumnId] = useState(null);
+  const [preselectedIssueType, setPreselectedIssueType] = useState(null);
   const [showInsights, setShowInsights] = useState(false);
   
   const editingIssue = useMemo(() => {
@@ -1097,6 +1214,11 @@ const Roadmap = ({ user, onLogout, onBackToFolders, onGoToCalendar, onGoToPanel,
   const [insights, setInsights] = useState(null);
   const [insightsSummary, setInsightsSummary] = useState(null);
   const [draggingIssueId, setDraggingIssueId] = useState(null);
+
+  // Share
+  const [showShareModal, setShowShareModal] = useState(false);
+  const [allUsers, setAllUsers] = useState([]);
+  const [shareSearch, setShareSearch] = useState('');
 
   // Sidebar
   const [sidebarOpen, setSidebarOpen] = useState(true);
@@ -1158,9 +1280,11 @@ const Roadmap = ({ user, onLogout, onBackToFolders, onGoToCalendar, onGoToPanel,
         setProjects(data);
         if (data.length > 0 && !selectedProjectId) {
           setSelectedProjectId(data[0].id);
-        } else if (data.length === 0) {
+        } else {
           setLoading(false);
         }
+      } else {
+        setLoading(false);
       }
     } catch (e) { 
       console.error('Error fetching projects:', e); 
@@ -1211,12 +1335,12 @@ const Roadmap = ({ user, onLogout, onBackToFolders, onGoToCalendar, onGoToPanel,
         setProjects(prev => [...prev, project]);
         setSelectedProjectId(project.id);
         setNewProjectName(''); setNewProjectDesc(''); setNewProjectType('personal'); setShowNewProject(false);
-        showToast(`Proyecto "${newProjectName}" creado`, 'success');
+        showToast(t('roadmap.messages.projectCreated', { name: newProjectName }), 'success');
       } else {
         const err = await res.json();
-        showToast(err.error || 'Error al crear proyecto', 'error');
+        showToast(err.error || t('roadmap.messages.errorCreateProject'), 'error');
       }
-    } catch (e) { showToast('Error al crear proyecto', 'error'); }
+    } catch (e) { showToast(t('roadmap.messages.errorCreateProject'), 'error'); }
   };
 
   const handleSaveIssue = async (formData) => {
@@ -1224,21 +1348,23 @@ const Roadmap = ({ user, onLogout, onBackToFolders, onGoToCalendar, onGoToPanel,
     try {
       if (editingIssue) {
         const res = await fetch(`/api/roadmap/issues/${editingIssue.id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` }, body: JSON.stringify(formData) });
-        if (res.ok) { const updated = await res.json(); setIssues(prev => prev.map(i => i.id === updated.id ? updated : i)); showToast('Tarea actualizada', 'success'); }
+        if (res.ok) { const updated = await res.json(); setIssues(prev => prev.map(i => i.id === updated.id ? updated : i)); showToast(t('roadmap.messages.issueUpdated'), 'success'); }
+        else { const err = await res.json().catch(() => ({})); showToast(err.error || t('roadmap.messages.errorUpdating'), 'error'); return; }
       } else {
         const payload = { ...formData, column_id: formData.column_id || preselectedColumnId };
         const res = await fetch(`/api/roadmap/projects/${selectedProjectId}/issues`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` }, body: JSON.stringify(payload) });
-        if (res.ok) { const created = await res.json(); setIssues(prev => [...prev, created]); showToast('Tarea creada', 'success'); }
+        if (res.ok) { const created = await res.json(); setIssues(prev => [...prev, created]); showToast(t('roadmap.messages.issueCreated'), 'success'); }
+        else { const err = await res.json().catch(() => ({})); showToast(err.error || t('roadmap.messages.errorCreating'), 'error'); return; }
       }
-    } catch (e) { showToast('Error al guardar tarea', 'error'); }
-    setShowIssueModal(false); setEditingIssueId(null); setPreselectedColumnId(null);
+    } catch (e) { showToast(t('roadmap.messages.errorSaving'), 'error'); return; }
+    setShowIssueModal(false); setEditingIssueId(null); setPreselectedColumnId(null); setPreselectedIssueType(null);
   };
 
   const handleDeleteIssue = async (issueId) => {
     try {
       const res = await fetch(`/api/roadmap/issues/${issueId}`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${getToken()}` } });
-      if (res.ok) { setIssues(prev => prev.filter(i => i.id !== issueId)); showToast('Tarea eliminada', 'success'); }
-    } catch (e) { showToast('Error al eliminar', 'error'); }
+      if (res.ok) { setIssues(prev => prev.filter(i => i.id !== issueId)); showToast(t('roadmap.messages.issueDeleted'), 'success'); }
+    } catch (e) { showToast(t('roadmap.messages.errorDeleting'), 'error'); }
   };
 
   const handleDrop = async (issueId, targetColumnId, fromColumnId) => {
@@ -1259,9 +1385,9 @@ const Roadmap = ({ user, onLogout, onBackToFolders, onGoToCalendar, onGoToPanel,
       });
       if (res.ok) { 
         fetchProjectData(selectedProjectId); 
-        showToast('Documento vinculado', 'success'); 
+        showToast(t('roadmap.messages.docLinked'), 'success'); 
       }
-    } catch (e) { showToast('Error al vincular documento', 'error'); }
+    } catch (e) { showToast(t('roadmap.messages.errorLinkDoc'), 'error'); }
   };
 
   const handleUnlinkDocument = async (docLinkId) => {
@@ -1278,7 +1404,43 @@ const Roadmap = ({ user, onLogout, onBackToFolders, onGoToCalendar, onGoToPanel,
     try {
       const res = await fetch(`/api/roadmap/projects/${selectedProjectId}/insights`, { headers: { 'Authorization': `Bearer ${getToken()}` } });
       if (res.ok) { const data = await res.json(); setInsights(data.insights); setInsightsSummary(data.summary); setShowInsights(true); }
-    } catch (e) { showToast('Error al obtener insights', 'error'); }
+    } catch (e) { showToast(t('roadmap.messages.errorInsights'), 'error'); }
+  };
+
+  // ===== SHARE HANDLERS =====
+  const handleOpenShare = async () => {
+    if (!selectedProjectId) return;
+    try {
+      const res = await fetch('/api/roadmap/users', { headers: { 'Authorization': `Bearer ${getToken()}` } });
+      if (res.ok) { setAllUsers(await res.json()); }
+    } catch (e) { /* ignore */ }
+    setShareSearch('');
+    setShowShareModal(true);
+  };
+
+  const handleAddMember = async (userId) => {
+    try {
+      const res = await fetch(`/api/roadmap/projects/${selectedProjectId}/members`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${getToken()}` },
+        body: JSON.stringify({ user_id: userId, role: 'member' })
+      });
+      if (res.ok) { 
+        fetchProjectData(selectedProjectId); 
+        showToast(t('roadmap.messages.memberAdded'), 'success'); 
+      }
+    } catch (e) { showToast(t('roadmap.messages.errorAddMember'), 'error'); }
+  };
+
+  const handleRemoveMember = async (userId) => {
+    try {
+      const res = await fetch(`/api/roadmap/projects/${selectedProjectId}/members/${userId}`, {
+        method: 'DELETE', headers: { 'Authorization': `Bearer ${getToken()}` }
+      });
+      if (res.ok) { 
+        fetchProjectData(selectedProjectId); 
+        showToast(t('roadmap.messages.memberRemoved'), 'success'); 
+      }
+    } catch (e) { showToast(t('roadmap.messages.errorRemoveMember'), 'error'); }
   };
 
   const handleAICommand = async () => {
@@ -1286,9 +1448,9 @@ const Roadmap = ({ user, onLogout, onBackToFolders, onGoToCalendar, onGoToPanel,
     setAiLoading(true);
     try {
       const res = await fetch('/api/ai/roadmap-command', { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${getToken()}` }, body: JSON.stringify({ query: aiInput, projectId: selectedProjectId }) });
-      if (res.ok) { const data = await res.json(); showToast(data.message || 'Comando procesado', 'success'); setAiInput(''); fetchProjectData(selectedProjectId); fetchProjects(); }
-      else { const err = await res.json(); showToast(err.error || 'Error', 'error'); }
-    } catch (e) { showToast('Error de conexión con IA', 'error'); }
+      if (res.ok) { const data = await res.json(); showToast(data.message || t('roadmap.ai.commandProcessed'), 'success'); setAiInput(''); fetchProjectData(selectedProjectId); fetchProjects(); }
+      else { const err = await res.json(); showToast(err.error || t('roadmap.messages.errorUpdating'), 'error'); }
+    } catch (e) { showToast(t('roadmap.ai.connectionError'), 'error'); }
     finally { setAiLoading(false); }
   };
 
@@ -1297,44 +1459,46 @@ const Roadmap = ({ user, onLogout, onBackToFolders, onGoToCalendar, onGoToPanel,
     if (!sprintForm.name.trim()) return;
     try {
       const res = await fetch(`/api/roadmap/projects/${selectedProjectId}/sprints`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${getToken()}` }, body: JSON.stringify(sprintForm) });
-      if (res.ok) { const sprint = await res.json(); setSprints(prev => [sprint, ...prev]); setSprintForm({ name: '', goal: '', start_date: '', end_date: '' }); setShowSprintForm(false); showToast(`Sprint "${sprint.name}" creado`, 'success'); }
-    } catch (e) { showToast('Error al crear sprint', 'error'); }
+      if (res.ok) { const sprint = await res.json(); setSprints(prev => [sprint, ...prev]); setSprintForm({ name: '', goal: '', start_date: '', end_date: '' }); setShowSprintForm(false); showToast(t('roadmap.messages.sprintCreated', { name: sprint.name }), 'success'); }
+      else { const err = await res.json().catch(() => ({})); showToast(err.error || t('roadmap.messages.errorSprint'), 'error'); }
+    } catch (e) { showToast(t('roadmap.messages.errorSprint'), 'error'); }
   };
 
   const handleStartSprint = async (sprintId) => {
     try {
       const res = await fetch(`/api/roadmap/sprints/${sprintId}/start`, { method: 'PUT', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${getToken()}` } });
-      if (res.ok) { const updated = await res.json(); setSprints(prev => prev.map(s => s.id === sprintId ? { ...updated, issue_count: s.issue_count, done_count: s.done_count } : s)); showToast('Sprint iniciado', 'success'); }
-      else { const err = await res.json(); showToast(err.error || 'Error', 'error'); }
-    } catch (e) { showToast('Error al iniciar sprint', 'error'); }
+      if (res.ok) { const updated = await res.json(); setSprints(prev => prev.map(s => s.id === sprintId ? { ...updated, issue_count: s.issue_count, done_count: s.done_count } : s)); showToast(t('roadmap.messages.sprintStarted'), 'success'); }
+      else { const err = await res.json(); showToast(err.error || t('roadmap.messages.errorUpdating'), 'error'); }
+    } catch (e) { showToast(t('roadmap.messages.errorUpdating'), 'error'); }
   };
 
   const handleCompleteSprint = async (sprintId) => {
     try {
       const res = await fetch(`/api/roadmap/sprints/${sprintId}/complete`, { method: 'PUT', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${getToken()}` }, body: JSON.stringify({}) });
-      if (res.ok) { showToast('Sprint completado', 'success'); fetchProjectData(selectedProjectId); }
-    } catch (e) { showToast('Error al completar sprint', 'error'); }
+      if (res.ok) { showToast(t('roadmap.messages.sprintCompleted'), 'success'); fetchProjectData(selectedProjectId); }
+      else { const err = await res.json().catch(() => ({})); showToast(err.error || t('roadmap.messages.errorUpdating'), 'error'); }
+    } catch (e) { showToast(t('roadmap.messages.errorUpdating'), 'error'); }
   };
 
   const handleDeleteSprint = async (sprintId) => {
     try {
       await fetch(`/api/roadmap/sprints/${sprintId}`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${getToken()}` } });
-      setSprints(prev => prev.filter(s => s.id !== sprintId)); showToast('Sprint eliminado', 'success'); fetchProjectData(selectedProjectId);
-    } catch (e) { showToast('Error', 'error'); }
+      setSprints(prev => prev.filter(s => s.id !== sprintId)); showToast(t('roadmap.messages.sprintDeleted'), 'success'); fetchProjectData(selectedProjectId);
+    } catch (e) { showToast(t('roadmap.messages.errorDeleting'), 'error'); }
   };
 
   const handleFetchBurndown = async (sprintId) => {
     try {
       const res = await fetch(`/api/roadmap/sprints/${sprintId}/burndown`, { headers: { 'Authorization': `Bearer ${getToken()}` } });
       if (res.ok) { const data = await res.json(); setBurndownData(data); setShowBurndown(true); }
-    } catch (e) { showToast('Error al obtener burndown', 'error'); }
+    } catch (e) { showToast(t('roadmap.messages.errorBurndown'), 'error'); }
   };
 
   const handleMoveToSprint = async (issueIds, sprintId) => {
     try {
       await fetch(`/api/roadmap/projects/${selectedProjectId}/issues/bulk`, { method: 'PUT', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${getToken()}` }, body: JSON.stringify({ issue_ids: issueIds, updates: { sprint_id: sprintId } }) });
-      fetchProjectData(selectedProjectId); showToast('Tareas movidas', 'success');
-    } catch (e) { showToast('Error', 'error'); }
+      fetchProjectData(selectedProjectId); showToast(t('roadmap.messages.tasksMoved'), 'success');
+    } catch (e) { showToast(t('roadmap.messages.errorUpdating'), 'error'); }
   };
 
   const handleDeleteProjectConfirm = async () => {
@@ -1346,12 +1510,12 @@ const Roadmap = ({ user, onLogout, onBackToFolders, onGoToCalendar, onGoToPanel,
         setSelectedProjectId(null);
         setShowDeleteProjectModal(false);
         setDeleteConfirmationName('');
-        showToast('Proyecto eliminado correctamente', 'success');
+        showToast(t('roadmap.messages.projectDeleted'), 'success');
       } else {
         const err = await res.json();
-        showToast(err.error || 'Error al eliminar proyecto', 'error');
+        showToast(err.error || t('roadmap.messages.errorDeleteProject'), 'error');
       }
-    } catch (e) { showToast('Error al eliminar proyecto', 'error'); }
+    } catch (e) { showToast(t('roadmap.messages.errorDeleteProject'), 'error'); }
   };
 
   const selectedProject = projects.find(p => p.id === selectedProjectId);
@@ -1391,49 +1555,49 @@ const Roadmap = ({ user, onLogout, onBackToFolders, onGoToCalendar, onGoToPanel,
         <div className="roadmap-sidebar-content">
           {/* AI Assistant Button */}
           <button className="rm-create-btn" onClick={() => setShowAIModal(true)}>
-            <FiCpu size={16} /> AI Assistant
+            <FiCpu size={16} /> {t('roadmap.sidebar.aiAssistant')}
           </button>
 
           {/* New Issue Button */}
           {selectedProjectId && (
             <button className="rm-create-btn" onClick={() => { setPreselectedColumnId(columns[0]?.id); setEditingIssueId(null); setShowIssueModal(true); }}>
-              <FiPlus size={16} /> Nueva Tarea
+              <FiPlus size={16} /> {t('roadmap.sidebar.newTask')}
             </button>
           )}
 
           {/* Views Navigation */}
           <div className="rm-sidebar-section">
-            <div className="rm-section-title">Vistas</div>
+            <div className="rm-section-title">{t('roadmap.sidebar.views')}</div>
             <div className="rm-nav-list">
               <button className={`rm-nav-item ${activeView === 'board' ? 'active' : ''}`} onClick={() => setActiveView('board')}>
-                <FiColumns size={16} className="nav-icon" /> Board
+                <FiColumns size={16} className="nav-icon" /> {t('roadmap.views.board')}
                 <span className="rm-nav-count">{filteredIssues.length}</span>
               </button>
               <button className={`rm-nav-item ${activeView === 'backlog' ? 'active' : ''}`} onClick={() => setActiveView('backlog')}>
-                <FiList size={16} className="nav-icon" /> Backlog
+                <FiList size={16} className="nav-icon" /> {t('roadmap.views.backlog')}
                 <span className="rm-nav-count">{backlog.length}</span>
               </button>
               <button className={`rm-nav-item ${activeView === 'sprints' ? 'active' : ''}`} onClick={() => setActiveView('sprints')}>
-                <FiRepeat size={16} className="nav-icon" /> Sprints
+                <FiRepeat size={16} className="nav-icon" /> {t('roadmap.views.sprints')}
                 <span className="rm-nav-count">{sprints.length}</span>
               </button>
               <button className={`rm-nav-item ${activeView === 'epics' ? 'active' : ''}`} onClick={() => setActiveView('epics')}>
-                <FiZap size={16} className="nav-icon" /> Epics
+                <FiZap size={16} className="nav-icon" /> {t('roadmap.views.epics')}
                 <span className="rm-nav-count">{epics.length}</span>
               </button>
               <button className={`rm-nav-item ${activeView === 'timeline' ? 'active' : ''}`} onClick={() => setActiveView('timeline')}>
-                <FiBarChart2 size={16} className="nav-icon" /> Timeline
+                <FiBarChart2 size={16} className="nav-icon" /> {t('roadmap.views.timeline')}
               </button>
             </div>
           </div>
 
           {/* Projects */}
           <div className="rm-sidebar-section">
-            <div className="rm-section-title">Proyectos</div>
+            <div className="rm-section-title">{t('roadmap.project.projects')}</div>
             <div className="rm-project-list">
-              {/* General (company) projects first */}
-              {projects.filter(p => p.project_type === 'general').length > 0 && (
-                <div className="rm-project-group-label"><FiGlobe size={11} /> Generales</div>
+              {/* General (company) projects */}
+              {projects.filter(p => p.project_type === 'general').length > 0 && projects.filter(p => p.project_type !== 'general').length > 0 && (
+                <div className="rm-project-group-label"><FiGlobe size={11} /> {t('roadmap.project.generalProjects')}</div>
               )}
               {projects.filter(p => p.project_type === 'general').map(p => (
                 <button key={p.id} className={`rm-project-item ${p.id === selectedProjectId ? 'active' : ''}`}
@@ -1443,9 +1607,9 @@ const Roadmap = ({ user, onLogout, onBackToFolders, onGoToCalendar, onGoToPanel,
                   <span className="rm-project-count">{p.issue_count || 0}</span>
                 </button>
               ))}
-              {/* Personal projects */}
-              {projects.filter(p => p.project_type !== 'general').length > 0 && (
-                <div className="rm-project-group-label"><FiLock size={11} /> Mis Proyectos</div>
+              {/* Personal projects — only show label when both types exist */}
+              {projects.filter(p => p.project_type !== 'general').length > 0 && projects.filter(p => p.project_type === 'general').length > 0 && (
+                <div className="rm-project-group-label"><FiLock size={11} /> {t('roadmap.project.myProjects')}</div>
               )}
               {projects.filter(p => p.project_type !== 'general').map(p => (
                 <button key={p.id} className={`rm-project-item ${p.id === selectedProjectId ? 'active' : ''}`}
@@ -1457,38 +1621,17 @@ const Roadmap = ({ user, onLogout, onBackToFolders, onGoToCalendar, onGoToPanel,
               ))}
               {canCreate && (
                 <button className="rm-nav-item" onClick={() => setShowNewProject(!showNewProject)}>
-                  <FiPlus size={14} className="nav-icon" /> Nuevo Proyecto
+                  <FiPlus size={14} className="nav-icon" /> {t('roadmap.project.newProject')}
                 </button>
               )}
             </div>
-            {showNewProject && canCreate && (
-              <div className="rm-new-project-form">
-                <input placeholder="Nombre del proyecto" value={newProjectName} onChange={e => setNewProjectName(e.target.value)} autoFocus />
-                <input placeholder="Descripción (opcional)" value={newProjectDesc} onChange={e => setNewProjectDesc(e.target.value)} />
-                <div className="rm-project-type-selector">
-                  <label className={`rm-type-option ${newProjectType === 'personal' ? 'active' : ''}`}
-                    onClick={() => setNewProjectType('personal')}>
-                    <input type="radio" name="projectType" checked={newProjectType === 'personal'} onChange={() => setNewProjectType('personal')} />
-                    <FiLock size={12} /> Personal
-                  </label>
-                  <label className={`rm-type-option ${newProjectType === 'general' ? 'active' : ''}`}
-                    onClick={() => setNewProjectType('general')}>
-                    <input type="radio" name="projectType" checked={newProjectType === 'general'} onChange={() => setNewProjectType('general')} />
-                    <FiGlobe size={12} /> General
-                  </label>
-                </div>
-                <div className="rm-form-actions">
-                  <button className="rm-btn-primary" onClick={handleCreateProject}><FiCheck size={12} /> Crear</button>
-                  <button className="rm-btn-secondary" onClick={() => setShowNewProject(false)}><FiX size={12} /></button>
-                </div>
-              </div>
-            )}
+
           </div>
 
           {/* Active Sprint */}
           {activeSprint && (
             <div className="rm-sidebar-section">
-              <div className="rm-section-title">Sprint Activo</div>
+              <div className="rm-section-title">{t('roadmap.sidebar.activeSprint')}</div>
               <div className="rm-sprint-card">
                 <strong>{activeSprint.name}</strong>
                 {activeSprint.goal && <p className="rm-sprint-goal">{activeSprint.goal}</p>}
@@ -1508,7 +1651,7 @@ const Roadmap = ({ user, onLogout, onBackToFolders, onGoToCalendar, onGoToPanel,
           {/* Milestones */}
           {milestones.length > 0 && (
             <div className="rm-sidebar-section">
-              <div className="rm-section-title"><FiStar size={12} /> Hitos</div>
+              <div className="rm-section-title"><FiStar size={12} /> {t('roadmap.sidebar.milestones')}</div>
               {milestones.map(m => (
                 <div key={m.id} style={{ marginBottom: '0.5rem' }}>
                   <div style={{ fontSize: '0.82rem', fontWeight: 500 }}>{m.title}</div>
@@ -1530,24 +1673,24 @@ const Roadmap = ({ user, onLogout, onBackToFolders, onGoToCalendar, onGoToPanel,
         {/* Sidebar Footer - Navigation */}
         <div className="roadmap-sidebar-footer">
           <button className="roadmap-sidebar-btn" onClick={onBackToFolders}>
-            <FiArrowLeft size={16} className="roadmap-sidebar-btn-icon" /> Volver
+            <FiArrowLeft size={16} className="roadmap-sidebar-btn-icon" /> {t('roadmap.sidebar.back')}
           </button>
           <button className="roadmap-sidebar-btn" onClick={onGoToPanel}>
-            <FiLayout size={16} className="roadmap-sidebar-btn-icon" /> Panel
+            <FiLayout size={16} className="roadmap-sidebar-btn-icon" /> {t('roadmap.sidebar.panel')}
           </button>
           <button className="roadmap-sidebar-btn" onClick={onGoToCalendar}>
-            <FiCalendar size={16} className="roadmap-sidebar-btn-icon" /> Calendario
+            <FiCalendar size={16} className="roadmap-sidebar-btn-icon" /> {t('roadmap.sidebar.calendar')}
           </button>
           {onGoToRemote && (
             <button className="roadmap-sidebar-btn" onClick={onGoToRemote}>
-              <FiMonitor size={16} className="roadmap-sidebar-btn-icon" /> Remoto
+              <FiMonitor size={16} className="roadmap-sidebar-btn-icon" /> {t('roadmap.sidebar.remote')}
             </button>
           )}
           <button className="roadmap-sidebar-btn" onClick={() => setShowSettingsModal(true)}>
-            <FiSettings size={16} className="roadmap-sidebar-btn-icon" /> Ajustes
+            <FiSettings size={16} className="roadmap-sidebar-btn-icon" /> {t('roadmap.sidebar.settings')}
           </button>
           <button className="roadmap-sidebar-btn roadmap-sidebar-btn-logout" onClick={onLogout}>
-            <FiLogOut size={16} className="roadmap-sidebar-btn-icon" /> Cerrar Sesión
+            <FiLogOut size={16} className="roadmap-sidebar-btn-icon" /> {t('roadmap.sidebar.logout')}
           </button>
         </div>
       </div>
@@ -1562,17 +1705,22 @@ const Roadmap = ({ user, onLogout, onBackToFolders, onGoToCalendar, onGoToPanel,
             </button>
             <h1 className="rm-header-title">{selectedProject?.name || 'Roadmap'}</h1>
             {selectedProject?.project_key && <span className="rm-header-project-key">{selectedProject.project_key}</span>}
-            {selectedProject?.project_type === 'general' && <span className="rm-type-badge general"><FiGlobe size={12} /> General</span>}
-            {selectedProject?.project_type === 'personal' && <span className="rm-type-badge personal"><FiLock size={12} /> Personal</span>}
-            {isViewer && <span className="rm-type-badge viewer"><FiEye size={12} /> Solo lectura</span>}
+            {selectedProject?.project_type === 'general' && <span className="rm-type-badge general"><FiGlobe size={12} /> {t('roadmap.project.general')}</span>}
+            {selectedProject?.project_type === 'personal' && <span className="rm-type-badge personal"><FiLock size={12} /> {t('roadmap.project.personal')}</span>}
+            {isViewer && <span className="rm-type-badge viewer"><FiEye size={12} /> {t('roadmap.project.readOnly')}</span>}
           </div>
           <div className="rm-header-right">
+            {selectedProjectId && isOwner && (
+              <button className="rm-icon-btn" onClick={handleOpenShare} title={t('roadmap.project.shareProject')}>
+                <FiUser size={16} />
+              </button>
+            )}
             {isOwner && (
-              <button className="rm-icon-btn danger" onClick={() => setShowDeleteProjectModal(true)} title="Eliminar proyecto">
+              <button className="rm-icon-btn danger" onClick={() => setShowDeleteProjectModal(true)} title={t('roadmap.project.deleteProject')}>
                 <FiTrash2 size={16} />
               </button>
             )}
-            <button className={`rm-icon-btn ${showInsights ? 'active' : ''}`} onClick={handleFetchInsights} title="AI Insights">
+            <button className={`rm-icon-btn ${showInsights ? 'active' : ''}`} onClick={handleFetchInsights} title={t('roadmap.ai.insights')}>
               <FiCpu size={16} />
             </button>
             <NotificationCenter user={user} />
@@ -1584,44 +1732,53 @@ const Roadmap = ({ user, onLogout, onBackToFolders, onGoToCalendar, onGoToPanel,
           <div className="rm-toolbar">
             <div className="rm-search-box">
               <FiSearch size={14} />
-              <input placeholder="Buscar..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)} />
+              <input placeholder={t('roadmap.searchPlaceholder')} value={searchQuery} onChange={e => setSearchQuery(e.target.value)} />
             </div>
             <select className="rm-filter-select" value={filterType} onChange={e => setFilterType(e.target.value)}>
-              <option value="">Tipo</option>
-              {Object.entries(ISSUE_TYPES).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
+              <option value="">{t('roadmap.filters.type')}</option>
+              {Object.entries(ISSUE_TYPES).map(([k, v]) => <option key={k} value={k}>{t(`roadmap.issueTypes.${v.labelKey}`)}</option>)}
             </select>
             <select className="rm-filter-select" value={filterPriority} onChange={e => setFilterPriority(e.target.value)}>
-              <option value="">Prioridad</option>
-              {Object.entries(PRIORITIES).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
+              <option value="">{t('roadmap.filters.priority')}</option>
+              {Object.entries(PRIORITIES).map(([k, v]) => <option key={k} value={k}>{t(`roadmap.priorities.${v.labelKey}`)}</option>)}
             </select>
             <select className="rm-filter-select" value={filterAssignee} onChange={e => setFilterAssignee(e.target.value)}>
-              <option value="">Asignado</option>
+              <option value="">{t('roadmap.filters.assignee')}</option>
               {members.map(m => <option key={m.user_id} value={m.user_id}>{m.username}</option>)}
             </select>
             <select className="rm-filter-select" value={filterSprint} onChange={e => setFilterSprint(e.target.value)}>
-              <option value="">Sprint</option>
+              <option value="">{t('roadmap.filters.sprint')}</option>
               {sprints.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
             </select>
             {hasFilters && (
-              <button className="rm-filter-clear" onClick={clearFilters}><FiX size={12} /> Limpiar</button>
+              <button className="rm-filter-clear" onClick={clearFilters}><FiX size={12} /> {t('roadmap.filters.clear')}</button>
             )}
             <div className="rm-toolbar-spacer" />
-            <span className="rm-filter-count">{filteredIssues.length} tareas</span>
+            <span className="rm-filter-count">{filteredIssues.length} {t('roadmap.filters.tasks')}</span>
           </div>
         )}
 
         {/* ========== VIEW CONTENT ========== */}
         <div className="rm-content">
+          {/* NO PROJECT SELECTED — show empty state for all views */}
+          {!selectedProjectId && !loading ? (
+            <div className="rm-empty">
+              <FiTarget size={48} />
+              <h2>{t('roadmap.messages.noProjects')}</h2>
+              <p>{t('roadmap.messages.noProjectsDesc')}</p>
+              <button onClick={() => setShowNewProject(true)}><FiPlus size={16} /> {t('roadmap.project.createProject')}</button>
+            </div>
+          ) : (
+          <>
           {/* BOARD VIEW */}
           {activeView === 'board' && (
             loading ? (
-              <div className="rm-loading"><div className="rm-loading-spinner" /><p>Cargando proyecto...</p></div>
+              <div className="rm-loading"><div className="rm-loading-spinner" /><p>{t('roadmap.messages.loadingProject')}</p></div>
             ) : columns.length === 0 ? (
               <div className="rm-empty">
-                <FiTarget size={48} />
-                <h2>Sin proyectos</h2>
-                <p>Crea un proyecto para empezar a gestionar tareas</p>
-                <button onClick={() => setShowNewProject(true)}><FiPlus size={16} /> Crear proyecto</button>
+                <FiColumns size={48} />
+                <h2>{t('roadmap.messages.noColumns')}</h2>
+                <p>{t('roadmap.messages.noColumnsDesc')}</p>
               </div>
             ) : (
               <div className="rm-board">
@@ -1631,7 +1788,7 @@ const Roadmap = ({ user, onLogout, onBackToFolders, onGoToCalendar, onGoToPanel,
                     onEditIssue={(issue) => { setEditingIssueId(issue.id); setShowIssueModal(true); }}
                     onDeleteIssue={handleDeleteIssue} onDrop={handleDrop}
                     onDragStart={(id) => setDraggingIssueId(id)} onDragEnd={() => setDraggingIssueId(null)}
-                    draggingIssueId={draggingIssueId} />
+                    draggingIssueId={draggingIssueId} t={t} />
                 ))}
               </div>
             )
@@ -1647,11 +1804,11 @@ const Roadmap = ({ user, onLogout, onBackToFolders, onGoToCalendar, onGoToPanel,
                     <div className="rm-backlog-header-left">
                       <h3>{activeSprint.name}</h3>
                       <span className="rm-status-badge active">Activo</span>
-                      <span className="rm-issue-count">{issues.filter(i => i.sprint_id === activeSprint.id).length} tareas</span>
+                      <span className="rm-issue-count">{issues.filter(i => i.sprint_id === activeSprint.id).length} {t('roadmap.filters.tasks')}</span>
                     </div>
                     <div className="rm-backlog-header-right">
-                      <button className="rm-action-btn" onClick={() => handleCompleteSprint(activeSprint.id)}><FiCheck size={12} /> Completar</button>
-                      <button className="rm-action-btn" onClick={() => handleFetchBurndown(activeSprint.id)}><FiTrendingUp size={12} /> Burndown</button>
+                      <button className="rm-action-btn" onClick={() => handleCompleteSprint(activeSprint.id)}><FiCheck size={12} /> {t('roadmap.actions.complete')}</button>
+                      <button className="rm-action-btn" onClick={() => handleFetchBurndown(activeSprint.id)}><FiTrendingUp size={12} /> {t('roadmap.actions.burndown')}</button>
                     </div>
                   </div>
                   <div className="rm-backlog-issues">
@@ -1665,7 +1822,15 @@ const Roadmap = ({ user, onLogout, onBackToFolders, onGoToCalendar, onGoToPanel,
                           <span className="rm-backlog-title">{issue.title}</span>
                           <span className="rm-backlog-priority" style={{ color: pr.color }}>{pr.icon}</span>
                           {issue.story_points > 0 && <span className="rm-story-pts">{issue.story_points}</span>}
-                          {issue.assigned_username && <div className="rm-avatar-sm">{issue.assigned_username.charAt(0).toUpperCase()}</div>}
+                          {issue.assigned_username && (
+                            <div className="rm-assigned-user" title={issue.assigned_username}>
+                              {issue.assigned_avatar ? (
+                                <img src={issue.assigned_avatar} alt={issue.assigned_username} className="rm-avatar-img" />
+                              ) : (
+                                <div className="rm-avatar-sm">{issue.assigned_username.charAt(0).toUpperCase()}</div>
+                              )}
+                            </div>
+                          )}
                         </div>
                       );
                     })}
@@ -1683,7 +1848,7 @@ const Roadmap = ({ user, onLogout, onBackToFolders, onGoToCalendar, onGoToPanel,
                       <span className="rm-issue-count">{issues.filter(i => i.sprint_id === sprint.id).length} tareas</span>
                     </div>
                     <div className="rm-backlog-header-right">
-                      <button className="rm-action-btn start" onClick={() => handleStartSprint(sprint.id)}><FiPlay size={12} /> Iniciar</button>
+                      <button className="rm-action-btn" onClick={() => handleStartSprint(sprint.id)}><FiPlay size={12} /> Iniciar</button>
                       <button className="rm-action-btn danger" onClick={() => handleDeleteSprint(sprint.id)}><FiTrash2 size={12} /></button>
                     </div>
                   </div>
@@ -1705,6 +1870,16 @@ const Roadmap = ({ user, onLogout, onBackToFolders, onGoToCalendar, onGoToPanel,
                           <span className="rm-backlog-key">{issue.issue_key}</span>
                           <span className="rm-backlog-title">{issue.title}</span>
                           <span className="rm-backlog-priority" style={{ color: pr.color }}>{pr.icon}</span>
+                          {issue.story_points > 0 && <span className="rm-story-pts">{issue.story_points}</span>}
+                          {issue.assigned_username && (
+                            <div className="rm-assigned-user" title={issue.assigned_username}>
+                              {issue.assigned_avatar ? (
+                                <img src={issue.assigned_avatar} alt={issue.assigned_username} className="rm-avatar-img" />
+                              ) : (
+                                <div className="rm-avatar-sm">{issue.assigned_username.charAt(0).toUpperCase()}</div>
+                              )}
+                            </div>
+                          )}
                         </div>
                       );
                     })}
@@ -1756,6 +1931,15 @@ const Roadmap = ({ user, onLogout, onBackToFolders, onGoToCalendar, onGoToPanel,
                         <span className="rm-backlog-title">{issue.title}</span>
                         <span className="rm-backlog-priority" style={{ color: pr.color }}>{pr.icon}</span>
                         {issue.story_points > 0 && <span className="rm-story-pts">{issue.story_points}</span>}
+                        {issue.assigned_username && (
+                          <div className="rm-assigned-user" title={issue.assigned_username}>
+                           {issue.assigned_avatar ? (
+                             <img src={issue.assigned_avatar} alt={issue.assigned_username} className="rm-avatar-img" />
+                           ) : (
+                             <div className="rm-avatar-sm">{issue.assigned_username.charAt(0).toUpperCase()}</div>
+                           )}
+                          </div>
+                        )}
                       </div>
                     );
                   })}
@@ -1841,7 +2025,8 @@ const Roadmap = ({ user, onLogout, onBackToFolders, onGoToCalendar, onGoToPanel,
           {/* TIMELINE VIEW */}
           {activeView === 'timeline' && (
             <TimelineView issues={issues} columns={columns} sprints={sprints} epics={epics}
-              onEditIssue={(issue) => { setEditingIssueId(issue.id); setShowIssueModal(true); }} />
+              onEditIssue={(issue) => { setEditingIssueId(issue.id); setShowIssueModal(true); }}
+              t={t} />
           )}
 
           {/* EPICS VIEW */}
@@ -1849,7 +2034,7 @@ const Roadmap = ({ user, onLogout, onBackToFolders, onGoToCalendar, onGoToPanel,
             <div>
               <div className="rm-epics-header">
                 <h2><FiZap size={20} /> Epics</h2>
-                <button className="rm-action-btn" onClick={() => { setEditingIssueId(null); setPreselectedColumnId(columns[0]?.id); setShowIssueModal(true); }}>
+                <button className="rm-action-btn" onClick={() => { setEditingIssueId(null); setPreselectedColumnId(columns[0]?.id); setPreselectedIssueType('epic'); setShowIssueModal(true); }}>
                   <FiPlus size={14} /> Nuevo Epic
                 </button>
               </div>
@@ -1881,10 +2066,10 @@ const Roadmap = ({ user, onLogout, onBackToFolders, onGoToCalendar, onGoToPanel,
               </div>
             </div>
           )}
+          </>
+          )}
         </div>
       </div>
-
-      {/* ========== AI INSIGHTS OVERLAY ========== */}
       {showInsights && insights && (
         <div className="rm-modal-overlay" onClick={() => setShowInsights(false)}>
           <div className="rm-modal" style={{ maxWidth: 550 }} onClick={e => e.stopPropagation()}>
@@ -1995,13 +2180,14 @@ const Roadmap = ({ user, onLogout, onBackToFolders, onGoToCalendar, onGoToPanel,
           issue={editingIssue} columns={columns} members={members} sprints={sprints} epics={epics}
           onSave={handleSaveIssue} 
           onUpdate={() => fetchProjectData(selectedProjectId)}
-          onClose={() => { setShowIssueModal(false); setEditingIssueId(null); }}
-          onLinkDocument={handleLinkDocument} onUnlinkDocument={handleUnlinkDocument} projectId={selectedProjectId} />
+          onClose={() => { setShowIssueModal(false); setEditingIssueId(null); setPreselectedIssueType(null); }}
+          onLinkDocument={handleLinkDocument} onUnlinkDocument={handleUnlinkDocument} projectId={selectedProjectId}
+          initialIssueType={preselectedIssueType} />
       )}
 
       {/* Delete Project Modal */}
       {showDeleteProjectModal && (
-        <div className="rm-modal-overlay" style={{ zIndex: 1100 }}>
+        <div className="rm-modal-overlay">
           <div className="rm-modal" style={{ maxWidth: '500px', height: 'auto', maxHeight: '90vh', padding: '24px' }}>
             <div className="rm-modal-header" style={{ borderBottom: '1px solid var(--rm-border)', marginBottom: '16px', paddingBottom: '16px' }}>
               <h2 style={{ color: '#ef4444', display: 'flex', alignItems: 'center', gap: '8px', fontSize: '1.25rem', margin: 0 }}>
@@ -2068,6 +2254,70 @@ const Roadmap = ({ user, onLogout, onBackToFolders, onGoToCalendar, onGoToPanel,
         </div>
       )}
 
+      {/* Share Project Modal */}
+      {showShareModal && selectedProjectId && (
+        <div className="rm-modal-overlay" onClick={() => setShowShareModal(false)}>
+          <div className="rm-modal rm-share-modal" onClick={e => e.stopPropagation()}>
+            <div className="rm-modal-header">
+              <div className="rm-modal-header-left"><FiUser size={16} /><h2>Compartir proyecto</h2></div>
+              <button className="rm-modal-close" onClick={() => setShowShareModal(false)}><FiX size={20} /></button>
+            </div>
+            <div className="rm-share-content">
+              <div className="rm-share-search-box">
+                <FiSearch size={14} />
+                <input placeholder="Buscar usuarios..." value={shareSearch} onChange={e => setShareSearch(e.target.value)} autoFocus />
+              </div>
+
+              {/* Current Members */}
+              <div className="rm-share-section">
+                <h3 className="rm-share-section-title">Miembros actuales ({members.length})</h3>
+                <div className="rm-share-list">
+                  {members.map(m => (
+                    <div key={m.user_id} className="rm-share-user-item">
+                      <div className="rm-avatar-sm">{(m.username || '?').charAt(0).toUpperCase()}</div>
+                      <div className="rm-share-user-info">
+                        <span className="rm-share-username">{m.username}</span>
+                        <span className="rm-share-role">{m.role === 'owner' ? 'Propietario' : m.role === 'admin' ? 'Admin' : 'Miembro'}</span>
+                      </div>
+                      {m.role !== 'owner' && m.user_id !== currentUserId && (
+                        <button className="rm-share-remove-btn" onClick={() => handleRemoveMember(m.user_id)} title="Eliminar">
+                          <FiX size={14} />
+                        </button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Add New Members */}
+              <div className="rm-share-section">
+                <h3 className="rm-share-section-title">Añadir personas</h3>
+                <div className="rm-share-list">
+                  {allUsers
+                    .filter(u => !members.some(m => m.user_id === u.id))
+                    .filter(u => !shareSearch || u.username.toLowerCase().includes(shareSearch.toLowerCase()) || (u.email && u.email.toLowerCase().includes(shareSearch.toLowerCase())))
+                    .map(u => (
+                      <div key={u.id} className="rm-share-user-item">
+                        <div className="rm-avatar-sm">{u.username.charAt(0).toUpperCase()}</div>
+                        <div className="rm-share-user-info">
+                          <span className="rm-share-username">{u.username}</span>
+                          {u.email && <span className="rm-share-email">{u.email}</span>}
+                        </div>
+                        <button className="rm-share-add-btn" onClick={() => handleAddMember(u.id)} title="Añadir">
+                          <FiPlus size={14} />
+                        </button>
+                      </div>
+                    ))}
+                  {allUsers.filter(u => !members.some(m => m.user_id === u.id)).filter(u => !shareSearch || u.username.toLowerCase().includes(shareSearch.toLowerCase())).length === 0 && (
+                    <p className="rm-share-empty">No hay usuarios disponibles</p>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Settings Modal */}
       {showSettingsModal && (
         <SettingsModal
@@ -2075,6 +2325,49 @@ const Roadmap = ({ user, onLogout, onBackToFolders, onGoToCalendar, onGoToPanel,
           isDarkMode={isDarkMode}
           onThemeToggle={onThemeToggle}
         />
+      )}
+
+      {/* ========== NEW PROJECT MODAL ========== */}
+      {showNewProject && canCreate && (
+        <div className="rm-modal-overlay" onClick={() => setShowNewProject(false)}>
+          <div className="rm-modal" style={{ maxWidth: 480 }} onClick={e => e.stopPropagation()}>
+            <div className="rm-modal-header">
+              <div className="rm-modal-header-left"><FiFolder size={16} /><h2>Nuevo Proyecto</h2></div>
+              <button className="rm-modal-close" onClick={() => setShowNewProject(false)}><FiX size={20} /></button>
+            </div>
+            <div className="rm-new-project-modal-content">
+              <div className="rm-form-group">
+                <label>Nombre del proyecto</label>
+                <input placeholder="Mi proyecto" value={newProjectName} onChange={e => setNewProjectName(e.target.value)} autoFocus />
+              </div>
+              <div className="rm-form-group">
+                <label>Descripción (opcional)</label>
+                <input placeholder="Breve descripción..." value={newProjectDesc} onChange={e => setNewProjectDesc(e.target.value)} />
+              </div>
+              <div className="rm-form-group">
+                <label>Tipo de proyecto</label>
+                <div className="rm-project-type-selector">
+                  <label className={`rm-type-option ${newProjectType === 'personal' ? 'active' : ''}`}
+                    onClick={() => setNewProjectType('personal')}>
+                    <input type="radio" name="projectType" checked={newProjectType === 'personal'} onChange={() => setNewProjectType('personal')} />
+                    <FiLock size={14} /> Personal
+                  </label>
+                  <label className={`rm-type-option ${newProjectType === 'general' ? 'active' : ''}`}
+                    onClick={() => setNewProjectType('general')}>
+                    <input type="radio" name="projectType" checked={newProjectType === 'general'} onChange={() => setNewProjectType('general')} />
+                    <FiGlobe size={14} /> General
+                  </label>
+                </div>
+              </div>
+              <div className="rm-form-actions" style={{ marginTop: '1rem' }}>
+                <button className="rm-btn-secondary" onClick={() => setShowNewProject(false)}><FiX size={14} /> Cancelar</button>
+                <button className="rm-btn-primary" onClick={handleCreateProject} disabled={!newProjectName.trim()}>
+                  <FiCheck size={14} /> Crear Proyecto
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

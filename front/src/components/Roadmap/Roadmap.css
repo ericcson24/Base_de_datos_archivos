@@ -349,49 +349,88 @@
   background: #94a3b8;
 }
 
-.rm-new-project-form {
-  margin-top: 10px;
-  padding: 12px;
-  background: var(--roadmap-input-bg);
-  border-radius: 8px;
+.rm-new-project-modal-content {
+  padding: 1.5rem;
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 1rem;
 }
 
-.rm-new-project-form input {
-  width: 100%;
-  padding: 8px;
-  border-radius: 6px;
-  border: 1px solid var(--roadmap-input-border);
-  background: var(--roadmap-card-bg);
-  color: var(--roadmap-text);
+.rm-form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.rm-form-group > label {
   font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--roadmap-text-secondary);
+}
+
+.rm-form-group > input {
+  width: 100%;
+  padding: 10px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--roadmap-input-border);
+  background: var(--roadmap-input-bg);
+  color: var(--roadmap-text);
+  font-size: 0.88rem;
+  transition: border-color 0.2s;
+}
+
+.rm-form-group > input:focus {
+  outline: none;
+  border-color: var(--roadmap-accent);
+  box-shadow: 0 0 0 3px rgba(75, 156, 219, 0.15);
 }
 
 .rm-form-actions {
   display: flex;
-  gap: 6px;
+  gap: 8px;
+  justify-content: flex-end;
 }
 
 .rm-btn-primary {
-  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 6px;
   background: var(--roadmap-accent);
   color: white;
   border: none;
-  padding: 6px;
-  border-radius: 6px;
-  font-size: 0.8rem;
+  padding: 8px 18px;
+  border-radius: 8px;
+  font-size: 0.85rem;
+  font-weight: 500;
   cursor: pointer;
+  transition: opacity 0.2s;
+}
+
+.rm-btn-primary:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.rm-btn-primary:hover:not(:disabled) {
+  opacity: 0.9;
 }
 
 .rm-btn-secondary {
-  padding: 6px 10px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 18px;
   background: transparent;
   border: 1px solid var(--roadmap-input-border);
   color: var(--roadmap-text);
-  border-radius: 6px;
+  border-radius: 8px;
+  font-size: 0.85rem;
   cursor: pointer;
+  transition: background 0.2s;
+}
+
+.rm-btn-secondary:hover {
+  background: var(--roadmap-input-bg);
 }
 
 .rm-content {
@@ -1079,7 +1118,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 200;
+  z-index: 2000;
 }
 
 .rm-modal {
@@ -2346,18 +2385,6 @@
   background: var(--bg-secondary);
   color: var(--text-primary);
   font-size: 13px;
-  resize: vertical;
-  font-family: inherit;
-}
-
-.roadmap-input-sm {
-  width: 100%;
-  padding: 6px 10px;
-  border: 1px solid var(--border-color);
-  border-radius: 6px;
-  background: var(--bg-secondary);
-  color: var(--text-primary);
-  font-size: 13px;
 }
 
 /* ==========================================
@@ -3280,6 +3307,7 @@
 .sprint-form-actions button {
   display: flex;
   align-items: center;
+  justify-content: center;
   gap: 4px;
   padding: 6px 14px;
   border: none;
@@ -3386,10 +3414,10 @@
 .sprints-header h2 {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
   margin: 0;
-  font-size: 18px;
-  color: var(--text-primary);
+  font-size: 1.15rem;
+  color: var(--roadmap-text);
 }
 
 .sprints-grid {
@@ -3434,13 +3462,13 @@
 .sprint-card-header h3 {
   margin: 0;
   font-size: 15px;
-  color: var(--text-primary);
+  color: var(--roadmap-text);
 }
 
 .sprint-card-stats {
   display: flex;
   gap: 16px;
-  margin: 8px 0;
+  margin: 10px 0;
 }
 
 .sprint-stat {
@@ -3449,14 +3477,16 @@
 
 .sprint-stat label {
   display: block;
-  font-size: 10px;
-  color: var(--text-secondary);
+  font-size: 0.65rem;
+  color: var(--roadmap-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
 }
 
 .sprint-stat span {
-  font-size: 14px;
+  font-size: 0.9rem;
   font-weight: 700;
-  color: var(--text-primary);
+  color: var(--roadmap-text);
 }
 
 .sprint-card-progress {
@@ -3467,17 +3497,18 @@
 }
 
 .sprint-card-progress span {
-  font-size: 12px;
-  color: var(--text-secondary);
+  font-size: 0.78rem;
+  color: var(--roadmap-muted);
   min-width: 32px;
 }
 
 .sprint-card-dates {
   display: flex;
-  gap: 8px;
-  font-size: 11px;
-  color: var(--text-secondary);
+  gap: 10px;
+  font-size: 0.78rem;
+  color: var(--roadmap-muted);
   margin-top: 8px;
+  align-items: center;
 }
 
 .sprint-card-actions {
@@ -3492,7 +3523,7 @@
   display: flex;
   align-items: center;
   gap: 4px;
-  padding: 5px 10px;
+  padding: 5px 12px;
   border: 1px solid var(--border-color);
   border-radius: 6px;
   background: var(--bg-tertiary);
@@ -3536,10 +3567,10 @@
 .epics-header h2 {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
   margin: 0;
-  font-size: 18px;
-  color: var(--text-primary);
+  font-size: 1.15rem;
+  color: var(--roadmap-text);
 }
 
 .epics-list {
@@ -3559,14 +3590,11 @@
 }
 
 .epic-card:hover {
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
   transform: translateY(-1px);
 }
 
 .epic-card-header {
-  display: flex;
-  align-items: center;
-  gap: 8px;
   margin-bottom: 8px;
 }
 
@@ -3579,24 +3607,24 @@
 
 .epic-card-header h3 {
   margin: 0;
-  font-size: 14px;
-  color: var(--text-primary);
-  flex: 1;
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--roadmap-text);
 }
 
 .epic-desc {
-  font-size: 12px;
-  color: var(--text-secondary);
-  margin: 0 0 8px;
-  line-height: 1.4;
+  font-size: 0.8rem;
+  color: var(--roadmap-muted);
+  line-height: 1.5;
+  margin: 0 0 10px;
 }
 
 .epic-card-stats {
   display: flex;
-  gap: 16px;
-  font-size: 11px;
-  color: var(--text-secondary);
-  margin-bottom: 8px;
+  gap: 12px;
+  font-size: 0.75rem;
+  color: var(--roadmap-muted);
+  margin-bottom: 10px;
 }
 
 .epic-progress-bar {
@@ -3614,134 +3642,11 @@
 }
 
 .epic-progress-text {
-  font-size: 11px;
-  color: var(--text-secondary);
+  font-size: 0.72rem;
+  color: var(--roadmap-muted);
   margin-top: 4px;
   display: block;
 }
-
-/* ==========================================
-   BURNDOWN MODAL
-   ========================================== */
-.burndown-modal {
-  max-width: 700px;
-}
-
-.burndown-content {
-  padding: 20px;
-}
-
-.burndown-chart {
-  width: 100%;
-  overflow-x: auto;
-  margin-bottom: 16px;
-}
-
-.burndown-svg {
-  width: 100%;
-  min-height: 200px;
-}
-
-.burndown-stats {
-  display: flex;
-  gap: 16px;
-}
-
-.burndown-stat {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 13px;
-}
-
-.burndown-stat label {
-  color: var(--text-secondary);
-}
-
-.burndown-stat span {
-  font-weight: 600;
-  color: var(--text-primary);
-}
-
-/* ============================================
-   PROJECT TYPE SELECTOR & BADGES
-   ============================================ */
-.rm-project-type-selector {
-  display: flex;
-  gap: 8px;
-  margin-bottom: 8px;
-}
-
-.rm-type-option {
-  display: flex;
-  align-items: center;
-  gap: 5px;
-  padding: 6px 12px;
-  border-radius: 8px;
-  font-size: 0.8rem;
-  cursor: pointer;
-  border: 1.5px solid var(--rm-border);
-  background: var(--rm-bg);
-  color: var(--rm-text-secondary);
-  transition: all 0.2s;
-  flex: 1;
-  justify-content: center;
-}
-
-.rm-type-option:hover {
-  border-color: var(--rm-accent);
-}
-
-.rm-type-option.active {
-  border-color: var(--rm-accent);
-  background: rgba(79, 139, 255, 0.08);
-  color: var(--rm-accent);
-  font-weight: 600;
-}
-
-.rm-type-option input[type="radio"] {
-  display: none;
-}
-
-.rm-type-badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  padding: 2px 8px;
-  border-radius: 4px;
-  font-size: 0.7rem;
-  font-weight: 600;
-}
-
-.rm-type-badge.general {
-  background: rgba(59, 130, 246, 0.1);
-  color: #3b82f6;
-}
-
-.rm-type-badge.personal {
-  background: rgba(107, 114, 128, 0.1);
-  color: var(--rm-text-secondary);
-}
-
-.rm-type-badge.viewer {
-  background: rgba(245, 158, 11, 0.1);
-  color: #f59e0b;
-}
-
-.rm-project-group-label {
-  font-size: 0.7rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  color: var(--rm-text-secondary);
-  padding: 8px 12px 4px;
-  margin-top: 4px;
-}
-
-/* ============================================
-   RM-PREFIXED MISSING STYLES
-   Sprint, Epics, Burndown, Toolbar, etc.
-   ============================================ */
 
 /* --- Header extras --- */
 .rm-header-project-key {
@@ -3784,13 +3689,6 @@
   font-weight: 500;
 }
 
-/* --- Modal header left --- */
-.rm-modal-header-left {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
 /* --- Sprint Form (rm- prefix) --- */
 .rm-sprint-form {
   padding: 12px 16px;
@@ -3811,7 +3709,7 @@
 
 .rm-sprint-form input {
   padding: 8px 10px;
-  border: 1px solid var(--roadmap-input-border);
+  border: 1px solid var(--border-color);
   border-radius: 6px;
   background: var(--roadmap-card-bg);
   color: var(--roadmap-text);
@@ -3883,11 +3781,11 @@
 }
 
 .rm-sprint-card-view.sprint-active {
-  border-left: 4px solid #22c55e;
+  border-color: #22c55e;
 }
 
 .rm-sprint-card-view.sprint-planning {
-  border-left: 4px solid #3b82f6;
+  border-color: #3b82f6;
 }
 
 .rm-sprint-card-view.sprint-completed {
@@ -3967,25 +3865,28 @@
   align-items: center;
   gap: 4px;
   padding: 5px 12px;
-  border: 1px solid var(--roadmap-input-border);
+  border: 1px solid var(--border-color);
   border-radius: 6px;
-  background: transparent;
-  color: var(--roadmap-text);
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
   font-size: 0.78rem;
   cursor: pointer;
   transition: all 0.15s;
 }
 
 .rm-sprint-card-actions button:hover {
-  background: var(--roadmap-hover);
-  border-color: var(--roadmap-accent);
-  color: var(--roadmap-accent);
+  background: var(--accent-color);
+  color: white;
+  border-color: var(--accent-color);
+}
+
+.rm-sprint-card-actions button.danger {
+  color: #ef4444;
 }
 
 .rm-sprint-card-actions button.danger:hover {
-  border-color: #ef4444;
-  color: #ef4444;
-  background: rgba(239, 68, 68, 0.06);
+  background: #ef4444;
+  color: white;
 }
 
 /* --- Epics View --- */
@@ -4014,9 +3915,9 @@
 
 .rm-epic-card {
   border: 1px solid var(--roadmap-card-border);
-  border-radius: 12px;
+  border-radius: 10px;
   padding: 16px;
-  background: var(--roadmap-card-bg);
+  background: var(--bg-secondary);
   cursor: pointer;
   transition: all 0.2s;
   border-left: 4px solid #904ee2;
@@ -4062,60 +3963,25 @@
   margin-bottom: 10px;
 }
 
-.rm-epic-progress-bar {
+.epic-progress-bar {
   width: 100%;
   height: 6px;
-  background: var(--roadmap-input-bg);
+  background: var(--bg-tertiary);
   border-radius: 3px;
   overflow: hidden;
 }
 
-.rm-epic-progress-text {
+.epic-progress-fill {
+  height: 100%;
+  border-radius: 3px;
+  transition: width 0.3s;
+}
+
+.epic-progress-text {
   font-size: 0.72rem;
   color: var(--roadmap-muted);
   margin-top: 4px;
   display: block;
-}
-
-/* --- Burndown Modal --- */
-.rm-burndown-modal {
-  max-width: 700px;
-}
-
-.rm-burndown-content {
-  padding: 20px;
-}
-
-.rm-burndown-chart {
-  width: 100%;
-  overflow-x: auto;
-  margin-bottom: 16px;
-}
-
-.rm-burndown-svg {
-  width: 100%;
-  min-height: 200px;
-}
-
-.rm-burndown-stats {
-  display: flex;
-  gap: 16px;
-}
-
-.rm-burndown-stat {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 0.85rem;
-}
-
-.rm-burndown-stat label {
-  color: var(--roadmap-muted);
-}
-
-.rm-burndown-stat span {
-  font-weight: 600;
-  color: var(--roadmap-text);
 }
 
 /* --- AI modal content --- */
@@ -4182,7 +4048,7 @@
   font-size: 0.7rem;
   color: var(--roadmap-muted);
   text-transform: uppercase;
-  margin-bottom: 4px;
+  letter-spacing: 0.05em;
 }
 
 .rm-time-stat span {
@@ -4601,4 +4467,192 @@
   }
 }
 
+/* ============================================
+   TIMELINE ZOOM CONTROLS
+   ============================================ */
+.rm-timeline-zoom-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--roadmap-input-bg);
+  border: 1px solid var(--roadmap-input-border);
+  border-radius: 8px;
+  padding: 4px 8px;
+}
+
+.rm-zoom-btn {
+  background: none;
+  border: none;
+  color: var(--roadmap-text);
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  transition: background 0.2s;
+}
+
+.rm-zoom-btn:hover:not(:disabled) {
+  background: var(--roadmap-hover);
+}
+
+.rm-zoom-btn:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+.rm-zoom-level {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--roadmap-text);
+  min-width: 64px;
+  text-align: center;
+}
+
+/* ============================================
+   SHARE MODAL
+   ============================================ */
+.rm-share-modal {
+  max-width: 520px !important;
+  max-height: 80vh;
+}
+
+.rm-share-content {
+  padding: 16px 20px;
+  overflow-y: auto;
+  max-height: calc(80vh - 60px);
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.rm-share-search-box {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--roadmap-input-bg);
+  border: 1px solid var(--roadmap-input-border);
+  padding: 8px 12px;
+  border-radius: 8px;
+}
+
+.rm-share-search-box input {
+  border: none;
+  background: transparent;
+  color: var(--roadmap-text);
+  font-size: 0.88rem;
+  flex: 1;
+  outline: none;
+}
+
+.rm-share-section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.rm-share-section-title {
+  font-size: 0.78rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--roadmap-muted);
+  margin: 0;
+}
+
+.rm-share-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-height: 240px;
+  overflow-y: auto;
+}
+
+.rm-share-user-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  transition: background 0.15s;
+}
+
+.rm-share-user-item:hover {
+  background: var(--roadmap-hover);
+}
+
+.rm-share-user-info {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.rm-share-username {
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: var(--roadmap-text);
+}
+
+.rm-share-role {
+  font-size: 0.72rem;
+  color: var(--roadmap-muted);
+  text-transform: capitalize;
+}
+
+.rm-share-email {
+  font-size: 0.72rem;
+  color: var(--roadmap-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.rm-share-add-btn,
+.rm-share-remove-btn {
+  background: none;
+  border: 1px solid var(--roadmap-input-border);
+  color: var(--roadmap-text);
+  cursor: pointer;
+  padding: 6px;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  transition: all 0.2s;
+  flex-shrink: 0;
+}
+
+.rm-share-add-btn:hover {
+  background: rgba(34, 197, 94, 0.15);
+  border-color: #22c55e;
+  color: #22c55e;
+}
+
+.rm-share-remove-btn:hover {
+  background: rgba(239, 68, 68, 0.15);
+  border-color: #ef4444;
+  color: #ef4444;
+}
+
+.rm-share-empty {
+  font-size: 0.82rem;
+  color: var(--roadmap-muted);
+  text-align: center;
+  padding: 16px;
+}
+
+/* === AVATAR IMAGES === */
+.rm-assigned-user {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.rm-avatar-img {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 1px solid var(--roadmap-card-border);
+}
 

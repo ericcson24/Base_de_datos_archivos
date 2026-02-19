@@ -217,6 +217,25 @@ const checkRoadmapAccess = (minLevel = 'viewer') => {
 };
 
 // ========================================
+// USERS (for sharing)
+// ========================================
+
+// GET /users — list all users (for member search in share modal)
+app.get('/users', authenticateToken, async (req, res) => {
+  try {
+    const users = await dbAsync.all(`
+      SELECT id, username, COALESCE(microsoft_email, '') AS email, role
+      FROM users
+      ORDER BY username ASC
+    `);
+    res.json(users);
+  } catch (error) {
+    console.error('[ROADMAP] Error fetching users:', error);
+    res.status(500).json({ error: 'Error al obtener usuarios' });
+  }
+});
+
+// ========================================
 // PROJECTS
 // ========================================
 
@@ -471,7 +490,7 @@ app.get('/projects/:projectId/issues', authenticateToken, async (req, res) => {
     const { sprint_id, issue_type, assignee, status, epic_id } = req.query;
     
     let query = `
-      SELECT i.*, u.username AS assigned_username, c.username AS creator_username, 
+      SELECT i.*, u.username AS assigned_username, u.avatar_url AS assigned_avatar, c.username AS creator_username, 
              r.username AS reporter_username, ep.title AS epic_title,
              s.name AS sprint_name
       FROM roadmap_issues i
@@ -577,7 +596,7 @@ app.post('/projects/:projectId/issues', authenticateToken, async (req, res) => {
     ]);
 
     const issue = await dbAsync.get(`
-      SELECT i.*, u.username AS assigned_username
+      SELECT i.*, u.username AS assigned_username, u.avatar_url AS assigned_avatar
       FROM roadmap_issues i LEFT JOIN users u ON i.assigned_to = u.id
       WHERE i.id = ?
     `, [result.lastID]);
@@ -770,7 +789,7 @@ app.put('/issues/:id', authenticateToken, async (req, res) => {
     }
 
     const updated = await dbAsync.get(`
-      SELECT i.*, u.username AS assigned_username, c.username AS creator_username,
+      SELECT i.*, u.username AS assigned_username, u.avatar_url AS assigned_avatar, c.username AS creator_username,
              r.username AS reporter_username, ep.title AS epic_title, s.name AS sprint_name
       FROM roadmap_issues i
       LEFT JOIN users u ON i.assigned_to = u.id
@@ -1366,8 +1385,8 @@ app.post('/projects/:projectId/sprints', authenticateToken, async (req, res) => 
     const { name, goal, start_date, end_date } = req.body;
     if (!name) return res.status(400).json({ error: 'Nombre requerido' });
     const result = await dbAsync.run(
-      'INSERT INTO roadmap_sprints (project_id, name, goal, start_date, end_date, status) VALUES (?, ?, ?, ?, ?, ?)',
-      [req.params.projectId, name, goal || null, start_date || null, end_date || null, 'planning']
+      'INSERT INTO roadmap_sprints (project_id, name, goal, start_date, end_date, status, created_by) VALUES (?, ?, ?, ?, ?, ?, ?)',
+      [req.params.projectId, name, goal || null, start_date || null, end_date || null, 'planning', req.user.id]
     );
     const sprint = await dbAsync.get('SELECT * FROM roadmap_sprints WHERE id = ?', [result.lastID || result.id]);
     res.status(201).json(sprint);
@@ -1382,7 +1401,7 @@ app.put('/sprints/:id', authenticateToken, async (req, res) => {
   try {
     const { name, goal, start_date, end_date } = req.body;
     await dbAsync.run(
-      'UPDATE roadmap_sprints SET name = COALESCE(?, name), goal = COALESCE(?, goal), start_date = COALESCE(?, start_date), end_date = COALESCE(?, end_date), updated_at = CURRENT_TIMESTAMP WHERE id = ?',
+      'UPDATE roadmap_sprints SET name = COALESCE(?, name), goal = COALESCE(?, goal), start_date = COALESCE(?, start_date), end_date = COALESCE(?, end_date) WHERE id = ?',
       [name, goal, start_date, end_date, req.params.id]
     );
     const sprint = await dbAsync.get('SELECT * FROM roadmap_sprints WHERE id = ?', [req.params.id]);
@@ -1403,7 +1422,7 @@ app.put('/sprints/:id/start', authenticateToken, async (req, res) => {
     const active = await dbAsync.get('SELECT id FROM roadmap_sprints WHERE project_id = ? AND status = ?', [sprint.project_id, 'active']);
     if (active) return res.status(400).json({ error: 'Ya hay un sprint activo en este proyecto' });
     await dbAsync.run(
-      'UPDATE roadmap_sprints SET status = ?, start_date = COALESCE(start_date, CURRENT_DATE), updated_at = CURRENT_TIMESTAMP WHERE id = ?',
+      'UPDATE roadmap_sprints SET status = ?, start_date = COALESCE(start_date, CURRENT_DATE) WHERE id = ?',
       ['active', req.params.id]
     );
     // Create initial burndown snapshot
@@ -1415,10 +1434,10 @@ app.put('/sprints/:id/start', authenticateToken, async (req, res) => {
       [req.params.id]
     );
     await dbAsync.run(
-      'INSERT INTO roadmap_sprint_burndown (sprint_id, date, remaining_points, remaining_issues, completed_points, completed_issues) VALUES (?, CURRENT_DATE, ?, ?, ?, ?)',
+      'INSERT INTO roadmap_sprint_burndown (sprint_id, snapshot_date, remaining_points, total_issues, completed_points, completed_issues) VALUES (?, CURRENT_DATE, ?, ?, ?, ?)',
       [req.params.id,
         (issueStats?.total_points || 0) - (issueStats?.done_points || 0),
-        (issueStats?.total || 0) - (issueStats?.done || 0),
+        (issueStats?.total || 0),
         issueStats?.done_points || 0,
         issueStats?.done || 0]
     );
@@ -1443,7 +1462,7 @@ app.put('/sprints/:id/complete', authenticateToken, async (req, res) => {
     );
     const velocity = donePoints?.pts || 0;
     await dbAsync.run(
-      'UPDATE roadmap_sprints SET status = ?, end_date = COALESCE(end_date, CURRENT_DATE), velocity = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
+      'UPDATE roadmap_sprints SET status = ?, end_date = COALESCE(end_date, CURRENT_DATE), velocity = ?, completed_at = CURRENT_TIMESTAMP WHERE id = ?',
       ['completed', velocity, req.params.id]
     );
     // Move incomplete issues to backlog (sprint_id = NULL)
@@ -1485,7 +1504,7 @@ app.delete('/sprints/:id', authenticateToken, async (req, res) => {
 app.get('/sprints/:id/burndown', authenticateToken, async (req, res) => {
   try {
     const data = await dbAsync.all(
-      'SELECT * FROM roadmap_sprint_burndown WHERE sprint_id = ? ORDER BY date ASC',
+      'SELECT * FROM roadmap_sprint_burndown WHERE sprint_id = ? ORDER BY snapshot_date ASC',
       [req.params.id]
     );
     const sprint = await dbAsync.get('SELECT * FROM roadmap_sprints WHERE id = ?', [req.params.id]);
@@ -1509,10 +1528,10 @@ app.post('/sprints/:id/snapshot', authenticateToken, async (req, res) => {
       [req.params.id]
     );
     await dbAsync.run(
-      'INSERT INTO roadmap_sprint_burndown (sprint_id, date, remaining_points, remaining_issues, completed_points, completed_issues) VALUES (?, CURRENT_DATE, ?, ?, ?, ?)',
+      'INSERT INTO roadmap_sprint_burndown (sprint_id, snapshot_date, remaining_points, total_issues, completed_points, completed_issues) VALUES (?, CURRENT_DATE, ?, ?, ?, ?)',
       [req.params.id,
         (stats?.total_points || 0) - (stats?.done_points || 0),
-        (stats?.total || 0) - (stats?.done || 0),
+        (stats?.total || 0),
         stats?.done_points || 0,
         stats?.done || 0]
     );
@@ -1527,7 +1546,7 @@ app.post('/sprints/:id/snapshot', authenticateToken, async (req, res) => {
 app.get('/projects/:projectId/backlog', authenticateToken, async (req, res) => {
   try {
     const issues = await dbAsync.all(`
-      SELECT i.*, u.username AS assigned_username, c.username AS creator_username
+      SELECT i.*, u.username AS assigned_username, u.avatar_url AS assigned_avatar, c.username AS creator_username
       FROM roadmap_issues i
       LEFT JOIN users u ON i.assigned_to = u.id
       LEFT JOIN users c ON i.created_by = c.id
@@ -1573,8 +1592,8 @@ app.post('/issues/:issueId/subtasks', authenticateToken, async (req, res) => {
     if (!title) return res.status(400).json({ error: 'Título requerido' });
     const maxPos = await dbAsync.get('SELECT MAX(position) as mp FROM roadmap_subtasks WHERE issue_id = ?', [req.params.issueId]);
     const result = await dbAsync.run(
-      'INSERT INTO roadmap_subtasks (issue_id, title, assigned_to, position) VALUES (?, ?, ?, ?)',
-      [req.params.issueId, title, assigned_to || null, (maxPos?.mp || 0) + 1]
+      'INSERT INTO roadmap_subtasks (issue_id, title, assigned_to, position, created_by) VALUES (?, ?, ?, ?, ?)',
+      [req.params.issueId, title, assigned_to || null, (maxPos?.mp || 0) + 1, req.user.id]
     );
     const subtask = await dbAsync.get('SELECT st.*, u.username AS assigned_username FROM roadmap_subtasks st LEFT JOIN users u ON st.assigned_to = u.id WHERE st.id = ?', [result.lastID || result.id]);
     res.status(201).json(subtask);
@@ -2018,7 +2037,7 @@ app.get('/projects/:projectId/search', authenticateToken, async (req, res) => {
 app.get('/issues/:id', authenticateToken, async (req, res) => {
   try {
     const issue = await dbAsync.get(`
-      SELECT i.*, u.username AS assigned_username, c.username AS creator_username,
+      SELECT i.*, u.username AS assigned_username, u.avatar_url AS assigned_avatar, c.username AS creator_username,
              r.username AS reporter_username, ep.title AS epic_title, ep.issue_key AS epic_key,
              s.name AS sprint_name, s.status AS sprint_status
       FROM roadmap_issues i
@@ -2071,7 +2090,7 @@ app.get('/issues/:id', authenticateToken, async (req, res) => {
 app.get('/projects/:projectId/epics', authenticateToken, async (req, res) => {
   try {
     const epics = await dbAsync.all(`
-      SELECT i.*, u.username AS assigned_username,
+      SELECT i.*, u.username AS assigned_username, u.avatar_url AS assigned_avatar,
         (SELECT COUNT(*) FROM roadmap_issues c WHERE c.epic_id = i.id) AS child_count,
         (SELECT COUNT(*) FROM roadmap_issues c WHERE c.epic_id = i.id AND c.status = 'done') AS done_count,
         (SELECT SUM(COALESCE(c.story_points, 0)) FROM roadmap_issues c WHERE c.epic_id = i.id) AS total_points,
@@ -2317,7 +2336,7 @@ app.post('/calendar-to-issue', authenticateToken, checkRoadmapAccess('member'), 
     await logActivity(project_id, issueId, req.user.id, 'issue_created_from_calendar', { title, issueKey });
 
     const issue = await dbAsync.get(`
-      SELECT i.*, u.username AS assigned_username
+      SELECT i.*, u.username AS assigned_username, u.avatar_url AS assigned_avatar
       FROM roadmap_issues i LEFT JOIN users u ON i.assigned_to = u.id
       WHERE i.id = ?
     `, [issueId]);

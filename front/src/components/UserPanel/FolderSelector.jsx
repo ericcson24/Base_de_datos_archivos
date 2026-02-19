@@ -69,28 +69,28 @@ const FolderSelector = ({ user, onSelectFolder, onLogout, onThemeToggle, isDarkM
 
           <div className="apps-grid">
             <button className="app-card" onClick={() => handleFolderSelect('privada')}>
-              <div className="app-card-icon" style={{ background: 'linear-gradient(135deg, #4285f4, #2b6cb0)' }}>
+              <div className="app-card-icon" style={{ background: 'linear-gradient(135deg, #393939ff, #2b6cb0)' }}>
                 <FiFolder size={28} />
               </div>
               <span className="app-card-label">{t('userPanel.myFiles')}</span>
             </button>
 
             <button className="app-card" onClick={handleRemote}>
-              <div className="app-card-icon" style={{ background: 'linear-gradient(135deg, #4285f4, #2b6cb0)' }}>
+              <div className="app-card-icon" style={{ background: 'linear-gradient(135deg, #393939ff, #2b6cb0)' }}>
                 <FiMonitor size={28} />
               </div>
               <span className="app-card-label">{t('userPanel.remoteWork')}</span>
             </button>
 
             <button className="app-card" onClick={handleCalendar}>
-              <div className="app-card-icon" style={{ background: 'linear-gradient(135deg, #4285f4, #2b6cb0)' }}>
+              <div className="app-card-icon" style={{ background: 'linear-gradient(135deg, #393939ff, #2b6cb0)' }}>
                 <FiCalendar size={28} />
               </div>
               <span className="app-card-label">{t('userPanel.calendar')}</span>
             </button>
 
             <button className="app-card" onClick={handleRoadmap}>
-              <div className="app-card-icon" style={{ background: 'linear-gradient(135deg, #4285f4, #2b6cb0)' }}>
+              <div className="app-card-icon" style={{ background: 'linear-gradient(135deg, #393939ff, #2b6cb0)' }}>
                 <FiMap size={28} />
               </div>
               <span className="app-card-label">{t('roadmap.title')}</span>
@@ -98,7 +98,7 @@ const FolderSelector = ({ user, onSelectFolder, onLogout, onThemeToggle, isDarkM
 
             {user && user.role === 'admin' && onGoToAdmin && (
               <button className="app-card" onClick={onGoToAdmin}>
-                <div className="app-card-icon" style={{ background: 'linear-gradient(135deg, #4285f4, #2b6cb0)' }}>
+                <div className="app-card-icon" style={{ background: 'linear-gradient(135deg, #393939ff, #2b6cb0)' }}>
                   <FiTool size={28} />
                 </div>
                 <span className="app-card-label">{t('folders.adminPanel')}</span>
