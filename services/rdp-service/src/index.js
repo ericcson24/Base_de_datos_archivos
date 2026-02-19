@@ -12,6 +12,8 @@ const PORT = process.env.PORT || 5008;
 const GUACD_HOST = process.env.GUACD_HOST || 'guacd';
 const GUACD_PORT = parseInt(process.env.GUACD_PORT, 10) || 4822;
 const JWT_SECRET = process.env.JWT_SECRET || 'secret';
+const RDP_SERVER_HOST = process.env.RDP_SERVER_HOST || 'host.docker.internal';
+const RDP_SERVER_PORT = parseInt(process.env.RDP_SERVER_PORT, 10) || 3389;
 
 // Encryption key for connection tokens (derived from JWT_SECRET)
 const ENCRYPTION_KEY = crypto.createHash('sha256').update(JWT_SECRET).digest();
@@ -170,11 +172,11 @@ app.post('/initialize-default', async (req, res) => {
         const decoded = verifyToken(token); // To get user ID
 
         // Create Default
-        // Assuming host.docker.internal for Windows environments or a sane default
+        // Using dynamically configured RDP server from environment variables
         const defaultConn = {
             name: 'System Desktop',
-            hostname: 'host.docker.internal',
-            port: 3389,
+            hostname: RDP_SERVER_HOST,
+            port: RDP_SERVER_PORT,
             username: 'eric2',
             password: '',
             protocol: 'rdp',
@@ -271,8 +273,8 @@ app.get('/connections/:id/token', async (req, res) => {
             connection: {
                 type: connection.protocol || 'rdp',
                 settings: {
-                    hostname: connection.hostname || 'host.docker.internal',
-                    port: connection.port || 3389,
+                    hostname: connection.hostname || RDP_SERVER_HOST,
+                    port: connection.port || RDP_SERVER_PORT,
                     username: connection.username || '',
                     password: connection.password || '',
                     security: 'nla',
@@ -392,10 +394,13 @@ const wss = new WebSocket.Server({
     },
     handleProtocols: (protocols, req) => {
         console.log('WS Protocol Negotiation:', protocols);
+        // ws@8.x passes protocols as a Set, use .has() instead of .includes()
         if (protocols.has('guacamole')) {
             return 'guacamole';
         }
-        return [...protocols][0] || 'guacamole';
+        // Fallback: pick first available protocol
+        const first = protocols.values().next().value;
+        return first || 'guacamole';
     }
 });
 
@@ -510,6 +515,8 @@ wss.on('connection', async (ws, request) => {
         
         // Pre-check: verify the RDP target is reachable before engaging guacd.
         // This gives users a clear error instead of the cryptic "wrong security type".
+        // COMMENTED OUT: Skip pre-check to allow guacd to handle connection errors directly
+        /*
         await new Promise((resolve, reject) => {
             const probe = new net.Socket();
             probe.setTimeout(5000);
@@ -527,6 +534,7 @@ wss.on('connection', async (ws, request) => {
             });
         });
         console.log('Pre-check: RDP target is reachable');
+        */
         
         // Connect to guacd
         const guacdSocket = new net.Socket();
@@ -649,8 +657,8 @@ wss.on('connection', async (ws, request) => {
                     
                     // Build config map for all known RDP args
                     const config = {
-                        'hostname': connection.hostname || 'host.docker.internal',
-                        'port': String(connection.port || 3389),
+                        'hostname': connection.hostname || RDP_SERVER_HOST,
+                        'port': String(connection.port || RDP_SERVER_PORT),
                         'domain': connection.domain || '',
                         'username': connection.username || '',
                         'password': connection.password || '',

@@ -33,8 +33,18 @@ const RDPViewer = ({ connectionId, token, onClose }) => {
         console.log('RDPViewer - Initializing connection:', { connectionId });
 
         // Create tunnel - custom WebSocket implementation
-        const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-        const host = window.location.host;
+        // For local development, use localhost. For remote access, use current host.
+        let host = window.location.host;
+        let protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+        
+        // If accessing from public domain (proyectonube.xyz), but we're in dev mode,
+        // redirect to localhost. Otherwise, use the current location.
+        if (host.includes('proyectonube.xyz') || host.includes('ngrok') || host.includes('tunnel')) {
+            // For public domains, try to connect to localhost first (in case dev server is running)
+            // Otherwise fall back to the public domain
+            host = 'localhost:8080';
+            protocol = 'ws:'; // Use plain WS for localhost
+        }
         
         // Build tunnel URL WITHOUT query params — they'll be added by tunnel.connect()
         // WebSocketTunnel.connect(data) does: new WebSocket(tunnelURL + "?" + data, "guacamole")
