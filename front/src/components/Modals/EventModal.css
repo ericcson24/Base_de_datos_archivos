@@ -909,16 +909,22 @@
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 10px;
+  padding: 10px 12px;
   background: rgba(16, 185, 129, 0.05);
   border: 1px solid rgba(16, 185, 129, 0.1);
-  border-radius: 8px;
+  border-radius: 10px;
   margin-bottom: 8px;
+  transition: background 0.2s;
+}
+
+.roadmap-link-item:hover {
+  background: rgba(16, 185, 129, 0.08);
 }
 
 .sync-icon {
   color: #10b981;
   flex-shrink: 0;
+  font-size: 1.1rem;
 }
 
 .link-info {
@@ -926,45 +932,51 @@
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  gap: 2px;
 }
 
 .link-title {
   font-weight: 600;
-  font-size: 0.9rem;
+  font-size: 0.85rem;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  color: var(--cal-text, #333);
 }
 
 .link-meta {
-  font-size: 0.75rem;
+  font-size: 0.72rem;
   opacity: 0.6;
+  color: var(--cal-text-secondary, #666);
 }
 
 .link-actions {
   display: flex;
   gap: 4px;
+  flex-shrink: 0;
 }
 
-.icon-btn {
+.link-actions .icon-btn {
   background: transparent;
   border: none;
   cursor: pointer;
   padding: 6px;
-  border-radius: 4px;
-  color: var(--cal-text-secondary);
+  border-radius: 6px;
+  color: var(--cal-text-secondary, #666);
   display: flex;
   align-items: center;
   justify-content: center;
   transition: all 0.2s;
+  width: 30px;
+  height: 30px;
 }
 
-.icon-btn:hover {
+.link-actions .icon-btn:hover {
   background: rgba(0,0,0,0.05);
-  color: var(--cal-text);
+  color: #6366f1;
 }
 
-.icon-btn.delete:hover {
+.link-actions .icon-btn.delete:hover {
   background: rgba(239, 68, 68, 0.1);
   color: #ef4444;
 }
@@ -972,5 +984,128 @@
 [data-theme="dark"] .roadmap-link-item {
   background: rgba(16, 185, 129, 0.1);
   border-color: rgba(16, 185, 129, 0.2);
+}
+
+[data-theme="dark"] .roadmap-link-item:hover {
+  background: rgba(16, 185, 129, 0.15);
+}
+
+/* Roadmap Sync Form */
+.roadmap-sync-form {
+  padding: 12px;
+  background: rgba(99, 102, 241, 0.03);
+  border: 1px solid rgba(99, 102, 241, 0.1);
+  border-radius: 10px;
+  margin-top: 8px;
+}
+
+.roadmap-sync-form .form-group {
+  margin-bottom: 10px;
+}
+
+.roadmap-sync-form .form-select {
+  width: 100%;
+  padding: 8px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--cal-border, rgba(0,0,0,0.1));
+  background: var(--cal-surface, #fff);
+  color: var(--cal-text, #333);
+  font-size: 0.82rem;
+  cursor: pointer;
+  transition: border-color 0.2s;
+  outline: none;
+}
+
+.roadmap-sync-form .form-select:focus {
+  border-color: #6366f1;
+}
+
+[data-theme="dark"] .roadmap-sync-form {
+  background: rgba(99, 102, 241, 0.08);
+  border-color: rgba(99, 102, 241, 0.2);
+}
+
+[data-theme="dark"] .roadmap-sync-form .form-select {
+  background: rgba(255, 255, 255, 0.05);
+  border-color: rgba(255, 255, 255, 0.1);
+  color: #fff;
+}
+
+.roadmap-sync-form .btn-sm {
+  padding: 6px 12px;
+  font-size: 0.8rem;
+  border-radius: 8px;
+  font-weight: 500;
+}
+
+.roadmap-sync-form .btn-primary {
+  background: #6366f1;
+  color: #fff;
+  border: none;
+}
+
+.roadmap-sync-form .btn-primary:hover:not(:disabled) {
+  background: #4f46e5;
+}
+
+.roadmap-sync-form .btn-secondary {
+  background: transparent;
+  border: 1px solid var(--cal-border, rgba(0,0,0,0.1));
+  color: var(--cal-text, #333);
+}
+
+.roadmap-sync-form .btn-secondary:hover {
+  background: rgba(0,0,0,0.03);
+}
+
+.roadmap-sync-form-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.roadmap-sync-form-actions .btn {
+  flex: 1;
+}
+
+.roadmap-send-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  font-size: 0.8rem;
+  border-radius: 8px;
+  border: 1px solid rgba(99, 102, 241, 0.2);
+  background: rgba(99, 102, 241, 0.05);
+  color: #6366f1;
+  cursor: pointer;
+  font-weight: 500;
+  transition: all 0.2s;
+}
+
+.roadmap-send-btn:hover {
+  background: rgba(99, 102, 241, 0.1);
+  border-color: rgba(99, 102, 241, 0.4);
+}
+
+[data-theme="dark"] .roadmap-send-btn {
+  background: rgba(99, 102, 241, 0.1);
+  border-color: rgba(99, 102, 241, 0.3);
+  color: #a5b4fc;
+}
+
+[data-theme="dark"] .roadmap-send-btn:hover {
+  background: rgba(99, 102, 241, 0.2);
+}
+
+.roadmap-section-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #6366f1;
+  font-weight: 600;
+}
+
+[data-theme="dark"] .roadmap-section-label {
+  color: #a5b4fc;
 }
 

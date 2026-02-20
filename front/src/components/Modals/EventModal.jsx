@@ -959,7 +959,7 @@ const EventModal = ({
                 {/* Roadmap Integration Section */}
                 {currentMode !== 'create' && (
                   <div className="form-group roadmap-integration-section">
-                    <label className="form-label" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <label className="form-label roadmap-section-label">
                       <FiLayout size={16} /> Roadmap (Jira)
                     </label>
                     <div className="roadmap-links-container">
@@ -987,32 +987,31 @@ const EventModal = ({
                           </div>
                         ))
                       ) : !showRoadmapSyncForm ? (
-                        <button type="button" className="btn btn-sm btn-secondary" onClick={() => setShowRoadmapSyncForm(true)} style={{ fontSize: '0.8rem', padding: '4px 10px' }}>
+                        <button type="button" className="btn btn-sm btn-secondary roadmap-send-btn" onClick={() => setShowRoadmapSyncForm(true)}>
                           <FiPlus size={14} /> Enviar a Roadmap
                         </button>
                       ) : (
-                        <div className="roadmap-sync-form" style={{ padding: '12px', background: 'rgba(0,0,0,0.03)', borderRadius: '8px', marginTop: '8px' }}>
-                          <div className="form-group" style={{ marginBottom: '10px' }}>
-                            <select className="form-select" value={syncProjectId} onChange={e => setSyncProjectId(e.target.value)} style={{ fontSize: '0.85rem' }}>
+                        <div className="roadmap-sync-form">
+                          <div className="form-group">
+                            <select className="form-select" value={syncProjectId} onChange={e => setSyncProjectId(e.target.value)}>
                               <option value="">Seleccionar Proyecto...</option>
                               {roadmapProjects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
                             </select>
                           </div>
                           {syncProjectId && (
-                            <div className="form-group" style={{ marginBottom: '10px' }}>
-                              <select className="form-select" value={syncColumnId} onChange={e => setSyncColumnId(e.target.value)} style={{ fontSize: '0.85rem' }}>
+                            <div className="form-group">
+                              <select className="form-select" value={syncColumnId} onChange={e => setSyncColumnId(e.target.value)}>
                                 <option value="">Estado (Opcional)</option>
                                 {projectColumns.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                               </select>
                             </div>
                           )}
-                          <div style={{ display: 'flex', gap: '8px' }}>
-                            <button className="btn btn-secondary btn-sm" onClick={() => setShowRoadmapSyncForm(false)} style={{ flex: 1, fontSize: '0.8rem' }}>Cancelar</button>
+                          <div className="roadmap-sync-form-actions">
+                            <button className="btn btn-secondary btn-sm" onClick={() => setShowRoadmapSyncForm(false)}>Cancelar</button>
                             <button 
                               className="btn btn-primary btn-sm" 
                               disabled={!syncProjectId || isSyncingToRoadmap}
                               onClick={handleSyncToRoadmap}
-                              style={{ flex: 1, fontSize: '0.8rem' }}
                             >
                               {isSyncingToRoadmap ? '...' : 'Enviar'}
                             </button>

@@ -56,9 +56,9 @@ const sendNotification = async (userId, title, message, type = 'info', metadata 
 // ========================================
 const syncIssueToCalendar = async (issue, authHeader, action = 'create') => {
   try {
-    if (action === 'create' && issue.due_date) {
+    if (action === 'create' && (issue.due_date || issue.start_date)) {
       const startDate = issue.start_date ? new Date(issue.start_date) : new Date(issue.due_date);
-      const dueDate = new Date(issue.due_date);
+      const dueDate = issue.due_date ? new Date(issue.due_date) : new Date(issue.start_date);
       
       // Si no hay start_date o es igual a due_date, ponemos bloque de 1h
       let endDate = new Date(dueDate);
@@ -66,11 +66,12 @@ const syncIssueToCalendar = async (issue, authHeader, action = 'create') => {
         endDate = new Date(dueDate.getTime() + 60 * 60 * 1000);
       }
 
+      // Use the field names the outlook-service expects: subject, startTime, endTime, body (string), categories
       const eventPayload = {
         subject: `[Roadmap] ${issue.title}`,
-        body: { contentType: 'text', content: issue.description || `Tarea del Roadmap: ${issue.title}` },
-        start: { dateTime: startDate.toISOString(), timeZone: 'Europe/Madrid' },
-        end: { dateTime: endDate.toISOString(), timeZone: 'Europe/Madrid' },
+        body: issue.description || `Tarea del Roadmap: ${issue.title}`,
+        startTime: startDate.toISOString(),
+        endTime: endDate.toISOString(),
         categories: ['Roadmap']
       };
 
@@ -82,21 +83,32 @@ const syncIssueToCalendar = async (issue, authHeader, action = 'create') => {
 
       if (response.ok) {
         const eventData = await response.json();
-        const eventId = eventData.id || eventData.microsoft_id;
+        // outlook-service returns { microsoftId, success, ... }
+        const eventId = eventData.microsoftId || eventData.id || eventData.microsoft_id;
         if (eventId) {
           // Store the calendar link
-          await dbAsync.run(
-            'INSERT INTO roadmap_issue_events (issue_id, event_id, provider, sync_direction) VALUES (?, ?, ?, ?)',
-            [issue.id, eventId, 'outlook', 'both']
-          );
+          try {
+            await dbAsync.run(
+              'INSERT INTO roadmap_issue_events (issue_id, event_id, provider, sync_direction) VALUES (?, ?, ?, ?)',
+              [issue.id, eventId, 'outlook', 'both']
+            );
+          } catch (linkErr) {
+            // Might already exist, ignore duplicate
+            console.warn('[ROADMAP] Calendar link insert warning:', linkErr.message);
+          }
           // Update issue with calendar_event_id
           await dbAsync.run('UPDATE roadmap_issues SET calendar_event_id = ? WHERE id = ?', [eventId, issue.id]);
+          console.log('[ROADMAP] Calendar event created:', eventId, 'for issue:', issue.id);
         }
         return eventId;
+      } else {
+        const errBody = await response.text();
+        console.error('[ROADMAP] Calendar create failed:', response.status, errBody);
       }
     } else if (action === 'update' && issue.calendar_event_id) {
       const startDate = issue.start_date ? new Date(issue.start_date) : null;
       const dueDate = issue.due_date ? new Date(issue.due_date) : null;
+      // Use the field names the outlook-service expects
       const patchBody = { subject: `[Roadmap] ${issue.title}` };
       
       if (dueDate) {
@@ -107,24 +119,32 @@ const syncIssueToCalendar = async (issue, authHeader, action = 'create') => {
           endDate = new Date(dueDate.getTime() + 60 * 60 * 1000);
         }
         
-        patchBody.start = { dateTime: actualStart.toISOString(), timeZone: 'Europe/Madrid' };
-        patchBody.end = { dateTime: endDate.toISOString(), timeZone: 'Europe/Madrid' };
+        patchBody.startTime = actualStart.toISOString();
+        patchBody.endTime = endDate.toISOString();
       }
-      if (issue.description) patchBody.body = { contentType: 'text', content: issue.description };
+      if (issue.description) patchBody.body = issue.description;
 
-      await fetch(`${OUTLOOK_SERVICE_URL}/events/${issue.calendar_event_id}`, {
+      const response = await fetch(`${OUTLOOK_SERVICE_URL}/events/${issue.calendar_event_id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json', 'Authorization': authHeader },
         body: JSON.stringify(patchBody)
       });
+      if (!response.ok) {
+        const errBody = await response.text();
+        console.error('[ROADMAP] Calendar update failed:', response.status, errBody);
+      }
     } else if (action === 'delete' && issue.calendar_event_id) {
-      await fetch(`${OUTLOOK_SERVICE_URL}/events/${issue.calendar_event_id}`, {
+      const response = await fetch(`${OUTLOOK_SERVICE_URL}/events/${issue.calendar_event_id}`, {
         method: 'DELETE',
         headers: { 'Authorization': authHeader }
       });
+      if (!response.ok) {
+        const errBody = await response.text();
+        console.error('[ROADMAP] Calendar delete failed:', response.status, errBody);
+      }
     }
   } catch (e) {
-    console.warn('[ROADMAP] Calendar sync error:', e.message);
+    console.error('[ROADMAP] Calendar sync error:', e.message);
   }
   return null;
 };
@@ -839,6 +859,34 @@ app.delete('/issues/:id', authenticateToken, async (req, res) => {
   }
 });
 
+// POST /issues/:id/sync — explicit calendar sync
+app.post('/issues/:id/sync', authenticateToken, async (req, res) => {
+  try {
+    const issue = await dbAsync.get('SELECT * FROM roadmap_issues WHERE id = ?', [req.params.id]);
+    if (!issue) return res.status(404).json({ error: 'Issue no encontrada' });
+    if (!issue.due_date && !issue.start_date) {
+      return res.status(400).json({ error: 'La tarea necesita fecha de inicio o vencimiento para sincronizar' });
+    }
+    const authHeader = req.headers.authorization || '';
+    let eventId = null;
+    if (issue.calendar_event_id) {
+      await syncIssueToCalendar(issue, authHeader, 'update');
+      eventId = issue.calendar_event_id;
+    } else {
+      eventId = await syncIssueToCalendar(issue, authHeader, 'create');
+    }
+    if (eventId) {
+      const updated = await dbAsync.get('SELECT calendar_event_id FROM roadmap_issues WHERE id = ?', [req.params.id]);
+      res.json({ success: true, calendar_event_id: updated?.calendar_event_id || eventId });
+    } else {
+      res.status(500).json({ error: 'No se pudo sincronizar con el calendario. Verifica que Microsoft esté vinculado.' });
+    }
+  } catch (error) {
+    console.error('[ROADMAP] Sync error:', error);
+    res.status(500).json({ error: 'Error al sincronizar con calendario' });
+  }
+});
+
 // PUT /issues/reorder — batch reorder issues within/across columns
 app.put('/issues/reorder', authenticateToken, async (req, res) => {
   try {
@@ -972,9 +1020,9 @@ app.post('/projects/:projectId/milestones', authenticateToken, async (req, res) 
         const milestoneDate = new Date(due_date);
         const eventPayload = {
           subject: `[Hito] ${title}`,
-          body: { contentType: 'text', content: description || `Hito del Roadmap: ${title}` },
-          start: { dateTime: milestoneDate.toISOString(), timeZone: 'Europe/Madrid' },
-          end: { dateTime: new Date(milestoneDate.getTime() + 30 * 60000).toISOString(), timeZone: 'Europe/Madrid' },
+          body: description || `Hito del Roadmap: ${title}`,
+          startTime: milestoneDate.toISOString(),
+          endTime: new Date(milestoneDate.getTime() + 30 * 60000).toISOString(),
           categories: ['Roadmap']
         };
         const calRes = await fetch(`${OUTLOOK_SERVICE_URL}/events`, {
@@ -984,7 +1032,7 @@ app.post('/projects/:projectId/milestones', authenticateToken, async (req, res) 
         });
         if (calRes.ok) {
           const calData = await calRes.json();
-          const eventId = calData.id || calData.microsoft_id;
+          const eventId = calData.microsoftId || calData.id || calData.microsoft_id;
           if (eventId) {
             await dbAsync.run('UPDATE roadmap_milestones SET calendar_event_id = ? WHERE id = ?', [eventId, result.lastID]);
           }
@@ -1418,9 +1466,7 @@ app.put('/sprints/:id/start', authenticateToken, async (req, res) => {
     const sprint = await dbAsync.get('SELECT * FROM roadmap_sprints WHERE id = ?', [req.params.id]);
     if (!sprint) return res.status(404).json({ error: 'Sprint no encontrado' });
     if (sprint.status !== 'planning') return res.status(400).json({ error: 'Solo se puede iniciar un sprint en planificación' });
-    // Check no other active sprint in this project
-    const active = await dbAsync.get('SELECT id FROM roadmap_sprints WHERE project_id = ? AND status = ?', [sprint.project_id, 'active']);
-    if (active) return res.status(400).json({ error: 'Ya hay un sprint activo en este proyecto' });
+    // Multiple active sprints are allowed
     await dbAsync.run(
       'UPDATE roadmap_sprints SET status = ?, start_date = COALESCE(start_date, CURRENT_DATE) WHERE id = ?',
       ['active', req.params.id]

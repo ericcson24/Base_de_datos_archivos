@@ -824,18 +824,47 @@ const IssueModal = ({ issue, columns, members, sprints, epics, onSave, onUpdate,
               <label><FiClock size={14} /> {t('roadmap.fields.estimated')}</label>
               <input type="number" min="0" step="0.5" value={form.estimated_hours} onChange={e => setForm(f => ({ ...f, estimated_hours: parseFloat(e.target.value) || 0 }))} />
             </div>
-            <div className="rm-field-group checkbox-field">
-              <label className="rm-outlook-sync-label">
+            <div className="rm-sync-section">
+              <div className="rm-sync-header">
+                <FiRefreshCw size={14} />
+                <span>{t('roadmap.fields.syncCalendar')}</span>
+              </div>
+              <label className="rm-sync-toggle">
                 <input type="checkbox" checked={form.syncCalendar} onChange={e => setForm(f => ({ ...f, syncCalendar: e.target.checked }))} />
-                <span className="rm-outlook-text"><FiRefreshCw size={14} /> {t('roadmap.fields.syncCalendar')}</span>
+                <span className="rm-sync-toggle-slider" />
+                <span className="rm-sync-toggle-label">{form.syncCalendar ? 'ON' : 'OFF'}</span>
               </label>
               {issue?.calendar_event_id && (
-                <div className="rm-sync-status">
-                  <FiLink size={12} /> {t('roadmap.messages.linkedToCalendar')}
+                <div className="rm-sync-status linked">
+                  <FiCheckCircle size={12} /> {t('roadmap.messages.linkedToCalendar')}
                   <button className="rm-link-btn" onClick={() => window.location.href = '/calendar'} title="Ver en Calendario">
                     <FiExternalLink size={12} />
                   </button>
                 </div>
+              )}
+              {issue?.id && (form.due_date || form.start_date) && (
+                <button className="rm-sync-now-btn" onClick={async () => {
+                  try {
+                    const res = await fetch(`/api/roadmap/issues/${issue.id}/sync`, {
+                      method: 'POST',
+                      headers: { 'Authorization': `Bearer ${token}` }
+                    });
+                    if (res.ok) {
+                      const data = await res.json();
+                      if (data.calendar_event_id) {
+                        onUpdate?.();
+                      }
+                    } else {
+                      const err = await res.json().catch(() => ({}));
+                      alert(err.error || 'Error al sincronizar');
+                    }
+                  } catch (e) { alert('Error de conexión al sincronizar'); }
+                }}>
+                  <FiRefreshCw size={12} /> Sincronizar ahora
+                </button>
+              )}
+              {issue?.id && !form.due_date && !form.start_date && (
+                <div className="rm-sync-hint">Añade fechas para poder sincronizar</div>
               )}
             </div>
             <button className="rm-save-btn" onClick={handleSubmit}>
@@ -1189,6 +1218,16 @@ const Roadmap = ({ user, onLogout, onBackToFolders, onGoToCalendar, onGoToPanel,
   const [sprintForm, setSprintForm] = useState({ name: '', goal: '', start_date: '', end_date: '' });
   const [burndownData, setBurndownData] = useState(null);
   const [showBurndown, setShowBurndown] = useState(false);
+  const [editingSprint, setEditingSprint] = useState(null);
+  const [editSprintForm, setEditSprintForm] = useState({ name: '', goal: '', start_date: '', end_date: '' });
+
+  // Sprint chips (multi-select, persisted in localStorage)
+  const [selectedSprintChips, setSelectedSprintChips] = useState(() => {
+    try {
+      const saved = localStorage.getItem('roadmap_selected_sprints');
+      return saved ? JSON.parse(saved) : [];
+    } catch { return []; }
+  });
 
   // Filters
   const [filterType, setFilterType] = useState('');
@@ -1252,10 +1291,12 @@ const Roadmap = ({ user, onLogout, onBackToFolders, onGoToCalendar, onGoToPanel,
       if (filterPriority && i.priority !== filterPriority) return false;
       if (filterAssignee && String(i.assigned_to) !== filterAssignee) return false;
       if (filterSprint && String(i.sprint_id) !== filterSprint) return false;
+      // Sprint chips filter: if chips are selected, only show matching sprints
+      if (selectedSprintChips.length > 0 && !selectedSprintChips.includes(i.sprint_id)) return false;
       if (searchQuery && !i.title?.toLowerCase().includes(searchQuery.toLowerCase()) && !i.issue_key?.toLowerCase().includes(searchQuery.toLowerCase())) return false;
       return true;
     });
-  }, [issues, filterType, filterPriority, filterAssignee, filterSprint, searchQuery]);
+  }, [issues, filterType, filterPriority, filterAssignee, filterSprint, selectedSprintChips, searchQuery]);
 
   const hasFilters = filterType || filterPriority || filterAssignee || filterSprint || searchQuery;
   const clearFilters = () => { setFilterType(''); setFilterPriority(''); setFilterAssignee(''); setFilterSprint(''); setSearchQuery(''); };
@@ -1318,6 +1359,26 @@ const Roadmap = ({ user, onLogout, onBackToFolders, onGoToCalendar, onGoToPanel,
     } catch (e) { console.error('Error fetching project data:', e); }
     finally { setLoading(false); }
   }, [getToken]);
+
+  // Persist sprint chip selection to localStorage
+  useEffect(() => {
+    localStorage.setItem('roadmap_selected_sprints', JSON.stringify(selectedSprintChips));
+  }, [selectedSprintChips]);
+
+  const toggleSprintChip = (sprintId) => {
+    setSelectedSprintChips(prev => {
+      if (prev.includes(sprintId)) return prev.filter(id => id !== sprintId);
+      return [...prev, sprintId];
+    });
+  };
+
+  const selectAllSprintChips = () => {
+    setSelectedSprintChips(sprints.map(s => s.id));
+  };
+
+  const clearSprintChips = () => {
+    setSelectedSprintChips([]);
+  };
 
   useEffect(() => { fetchMyAccess(); fetchProjects(); }, [fetchMyAccess, fetchProjects]);
   useEffect(() => { if (selectedProjectId) fetchProjectData(selectedProjectId); }, [selectedProjectId, fetchProjectData]);
@@ -1487,6 +1548,26 @@ const Roadmap = ({ user, onLogout, onBackToFolders, onGoToCalendar, onGoToPanel,
     } catch (e) { showToast(t('roadmap.messages.errorDeleting'), 'error'); }
   };
 
+  const handleUpdateSprint = async (sprintId) => {
+    if (!editSprintForm.name?.trim()) return;
+    try {
+      const res = await fetch(`/api/roadmap/sprints/${sprintId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${getToken()}` },
+        body: JSON.stringify(editSprintForm)
+      });
+      if (res.ok) {
+        const updated = await res.json();
+        setSprints(prev => prev.map(s => s.id === sprintId ? { ...s, ...updated } : s));
+        setEditingSprint(null);
+        showToast('Sprint actualizado', 'success');
+      } else {
+        const err = await res.json().catch(() => ({}));
+        showToast(err.error || 'Error actualizando sprint', 'error');
+      }
+    } catch (e) { showToast('Error actualizando sprint', 'error'); }
+  };
+
   const handleFetchBurndown = async (sprintId) => {
     try {
       const res = await fetch(`/api/roadmap/sprints/${sprintId}/burndown`, { headers: { 'Authorization': `Bearer ${getToken()}` } });
@@ -1521,7 +1602,7 @@ const Roadmap = ({ user, onLogout, onBackToFolders, onGoToCalendar, onGoToPanel,
   const selectedProject = projects.find(p => p.id === selectedProjectId);
   const currentUserId = user?.id || parseInt(localStorage.getItem('userId'));
   const isOwner = selectedProject && selectedProject.owner_id === currentUserId;
-  const activeSprint = sprints.find(s => s.status === 'active');
+  const activeSprints = sprints.filter(s => s.status === 'active');
 
   const closeMobileSidebar = () => setMobileSidebar(false);
 
@@ -1628,23 +1709,25 @@ const Roadmap = ({ user, onLogout, onBackToFolders, onGoToCalendar, onGoToPanel,
 
           </div>
 
-          {/* Active Sprint */}
-          {activeSprint && (
+          {/* Active Sprints */}
+          {activeSprints.length > 0 && (
             <div className="rm-sidebar-section">
-              <div className="rm-section-title">{t('roadmap.sidebar.activeSprint')}</div>
-              <div className="rm-sprint-card">
-                <strong>{activeSprint.name}</strong>
-                {activeSprint.goal && <p className="rm-sprint-goal">{activeSprint.goal}</p>}
-                <div className="rm-sprint-progress">
-                  <div className="rm-progress-bar">
-                    <div className="rm-progress-fill" style={{ width: `${activeSprint.issue_count > 0 ? (activeSprint.done_count / activeSprint.issue_count) * 100 : 0}%`, background: '#22c55e' }} />
+              <div className="rm-section-title">{t('roadmap.sidebar.activeSprint')}{activeSprints.length > 1 ? 's' : ''}</div>
+              {activeSprints.map(sp => (
+                <div key={sp.id} className="rm-sprint-card" style={{ marginBottom: 8 }}>
+                  <strong>{sp.name}</strong>
+                  {sp.goal && <p className="rm-sprint-goal">{sp.goal}</p>}
+                  <div className="rm-sprint-progress">
+                    <div className="rm-progress-bar">
+                      <div className="rm-progress-fill" style={{ width: `${sp.issue_count > 0 ? (sp.done_count / sp.issue_count) * 100 : 0}%`, background: '#22c55e' }} />
+                    </div>
+                    <span>{sp.done_count}/{sp.issue_count}</span>
                   </div>
-                  <span>{activeSprint.done_count}/{activeSprint.issue_count}</span>
+                  {sp.end_date && (
+                    <div className="rm-sprint-date"><FiCalendar size={11} /> {new Date(sp.end_date).toLocaleDateString('es-ES')}</div>
+                  )}
                 </div>
-                {activeSprint.end_date && (
-                  <div className="rm-sprint-date"><FiCalendar size={11} /> {new Date(activeSprint.end_date).toLocaleDateString('es-ES')}</div>
-                )}
-              </div>
+              ))}
             </div>
           )}
 
@@ -1727,6 +1810,47 @@ const Roadmap = ({ user, onLogout, onBackToFolders, onGoToCalendar, onGoToPanel,
           </div>
         </div>
 
+        {/* Sprint Chips Selector */}
+        {selectedProjectId && sprints.length > 0 && (activeView === 'board' || activeView === 'backlog') && (
+          <div className="rm-sprint-chips-bar">
+            <div className="rm-sprint-chips-label">
+              <FiRepeat size={13} /> Sprints:
+            </div>
+            <div className="rm-sprint-chips">
+              {sprints.map(sprint => {
+                const isSelected = selectedSprintChips.includes(sprint.id);
+                const statusClass = sprint.status === 'active' ? 'active' : sprint.status === 'completed' ? 'completed' : 'planning';
+                return (
+                  <button
+                    key={sprint.id}
+                    className={`rm-sprint-chip ${isSelected ? 'selected' : ''} ${statusClass}`}
+                    onClick={() => toggleSprintChip(sprint.id)}
+                    title={`${sprint.name} (${sprint.status})`}
+                  >
+                    {sprint.status === 'active' && <FiPlay size={10} />}
+                    {sprint.status === 'planning' && <FiClock size={10} />}
+                    {sprint.status === 'completed' && <FiCheck size={10} />}
+                    {sprint.name}
+                    <span className="rm-sprint-chip-count">
+                      {issues.filter(i => i.sprint_id === sprint.id).length}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+            <div className="rm-sprint-chips-actions">
+              {selectedSprintChips.length > 0 && (
+                <button className="rm-chip-action" onClick={clearSprintChips} title="Limpiar filtro">
+                  <FiX size={12} /> Limpiar
+                </button>
+              )}
+              <button className="rm-chip-action" onClick={selectAllSprintChips} title="Seleccionar todos">
+                Todos
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* Toolbar / Filters */}
         {selectedProjectId && (
           <div className="rm-toolbar">
@@ -1797,22 +1921,22 @@ const Roadmap = ({ user, onLogout, onBackToFolders, onGoToCalendar, onGoToPanel,
           {/* BACKLOG VIEW */}
           {activeView === 'backlog' && (
             <div className="rm-backlog">
-              {/* Active Sprint */}
-              {activeSprint && (
-                <div className="rm-backlog-section">
+              {/* Active Sprints */}
+              {activeSprints.map(activeSp => (
+                <div key={activeSp.id} className="rm-backlog-section">
                   <div className="rm-backlog-header">
                     <div className="rm-backlog-header-left">
-                      <h3>{activeSprint.name}</h3>
+                      <h3>{activeSp.name}</h3>
                       <span className="rm-status-badge active">Activo</span>
-                      <span className="rm-issue-count">{issues.filter(i => i.sprint_id === activeSprint.id).length} {t('roadmap.filters.tasks')}</span>
+                      <span className="rm-issue-count">{issues.filter(i => i.sprint_id === activeSp.id).length} {t('roadmap.filters.tasks')}</span>
                     </div>
                     <div className="rm-backlog-header-right">
-                      <button className="rm-action-btn" onClick={() => handleCompleteSprint(activeSprint.id)}><FiCheck size={12} /> {t('roadmap.actions.complete')}</button>
-                      <button className="rm-action-btn" onClick={() => handleFetchBurndown(activeSprint.id)}><FiTrendingUp size={12} /> {t('roadmap.actions.burndown')}</button>
+                      <button className="rm-action-btn" onClick={() => handleCompleteSprint(activeSp.id)}><FiCheck size={12} /> {t('roadmap.actions.complete')}</button>
+                      <button className="rm-action-btn" onClick={() => handleFetchBurndown(activeSp.id)}><FiTrendingUp size={12} /> {t('roadmap.actions.burndown')}</button>
                     </div>
                   </div>
                   <div className="rm-backlog-issues">
-                    {issues.filter(i => i.sprint_id === activeSprint.id).map(issue => {
+                    {issues.filter(i => i.sprint_id === activeSp.id).map(issue => {
                       const it = ISSUE_TYPES[issue.issue_type] || ISSUE_TYPES.task;
                       const pr = PRIORITIES[issue.priority] || PRIORITIES.medium;
                       return (
@@ -1836,7 +1960,7 @@ const Roadmap = ({ user, onLogout, onBackToFolders, onGoToCalendar, onGoToPanel,
                     })}
                   </div>
                 </div>
-              )}
+              ))}
 
               {/* Planning Sprints */}
               {sprints.filter(s => s.status === 'planning').map(sprint => (
@@ -1973,45 +2097,74 @@ const Roadmap = ({ user, onLogout, onBackToFolders, onGoToCalendar, onGoToPanel,
               <div className="rm-sprints-grid">
                 {sprints.map(sprint => {
                   const progress = sprint.issue_count > 0 ? Math.round((sprint.done_count / sprint.issue_count) * 100) : 0;
+                  const isEditing = editingSprint === sprint.id;
                   return (
                     <div key={sprint.id} className={`rm-sprint-card-view sprint-${sprint.status}`}>
-                      <div className="rm-sprint-card-header">
-                        <h3>{sprint.name}</h3>
-                        <span className={`rm-status-badge ${sprint.status}`}>{sprint.status}</span>
-                      </div>
-                      {sprint.goal && <p className="rm-sprint-goal">{sprint.goal}</p>}
-                      <div className="rm-sprint-card-stats">
-                        <div className="rm-sprint-stat"><label>Tareas</label><span>{sprint.done_count}/{sprint.issue_count}</span></div>
-                        <div className="rm-sprint-stat"><label>Puntos</label><span>{sprint.done_points}/{sprint.total_points}</span></div>
-                        {sprint.velocity > 0 && <div className="rm-sprint-stat"><label>Velocidad</label><span>{sprint.velocity} pts</span></div>}
-                      </div>
-                      <div className="rm-sprint-card-progress">
-                        <div className="rm-progress-bar"><div className="rm-progress-fill" style={{ width: `${progress}%`, background: '#22c55e' }} /></div>
-                        <span>{progress}%</span>
-                      </div>
-                      {(sprint.start_date || sprint.end_date) && (
-                        <div className="rm-sprint-card-dates">
-                          {sprint.start_date && <span><FiCalendar size={11} /> {new Date(sprint.start_date).toLocaleDateString('es-ES')}</span>}
-                          {sprint.end_date && <span>→ {new Date(sprint.end_date).toLocaleDateString('es-ES')}</span>}
+                      {isEditing ? (
+                        <div className="rm-sprint-edit-form">
+                          <input placeholder="Nombre" value={editSprintForm.name} onChange={e => setEditSprintForm(f => ({ ...f, name: e.target.value }))} autoFocus />
+                          <input placeholder="Objetivo" value={editSprintForm.goal} onChange={e => setEditSprintForm(f => ({ ...f, goal: e.target.value }))} />
+                          <div className="rm-sprint-form-dates">
+                            <label>Inicio: <input type="date" value={editSprintForm.start_date || ''} onChange={e => setEditSprintForm(f => ({ ...f, start_date: e.target.value }))} /></label>
+                            <label>Fin: <input type="date" value={editSprintForm.end_date || ''} onChange={e => setEditSprintForm(f => ({ ...f, end_date: e.target.value }))} /></label>
+                          </div>
+                          <div className="rm-sprint-form-btns">
+                            <button className="rm-btn-primary" onClick={() => handleUpdateSprint(sprint.id)}><FiCheck size={12} /> Guardar</button>
+                            <button className="rm-btn-secondary" onClick={() => setEditingSprint(null)}><FiX size={12} /> Cancelar</button>
+                          </div>
                         </div>
+                      ) : (
+                        <>
+                          <div className="rm-sprint-card-header">
+                            <h3>{sprint.name}</h3>
+                            <div className="rm-sprint-header-actions">
+                              <span className={`rm-status-badge ${sprint.status}`}>{sprint.status}</span>
+                              <button className="rm-sprint-edit-btn" onClick={() => {
+                                setEditingSprint(sprint.id);
+                                setEditSprintForm({
+                                  name: sprint.name || '',
+                                  goal: sprint.goal || '',
+                                  start_date: sprint.start_date ? sprint.start_date.split('T')[0] : '',
+                                  end_date: sprint.end_date ? sprint.end_date.split('T')[0] : ''
+                                });
+                              }} title="Editar sprint"><FiEdit2 size={12} /></button>
+                            </div>
+                          </div>
+                          {sprint.goal && <p className="rm-sprint-goal">{sprint.goal}</p>}
+                          <div className="rm-sprint-card-stats">
+                            <div className="rm-sprint-stat"><label>Tareas</label><span>{sprint.done_count}/{sprint.issue_count}</span></div>
+                            <div className="rm-sprint-stat"><label>Puntos</label><span>{sprint.done_points}/{sprint.total_points}</span></div>
+                            {sprint.velocity > 0 && <div className="rm-sprint-stat"><label>Velocidad</label><span>{sprint.velocity} pts</span></div>}
+                          </div>
+                          <div className="rm-sprint-card-progress">
+                            <div className="rm-progress-bar"><div className="rm-progress-fill" style={{ width: `${progress}%`, background: '#22c55e' }} /></div>
+                            <span>{progress}%</span>
+                          </div>
+                          {(sprint.start_date || sprint.end_date) && (
+                            <div className="rm-sprint-card-dates">
+                              {sprint.start_date && <span><FiCalendar size={11} /> {new Date(sprint.start_date).toLocaleDateString('es-ES')}</span>}
+                              {sprint.end_date && <span>→ {new Date(sprint.end_date).toLocaleDateString('es-ES')}</span>}
+                            </div>
+                          )}
+                          <div className="rm-sprint-card-actions">
+                            {sprint.status === 'planning' && (
+                              <>
+                                <button onClick={() => handleStartSprint(sprint.id)}><FiPlay size={12} /> Iniciar</button>
+                                <button className="danger" onClick={() => handleDeleteSprint(sprint.id)}><FiTrash2 size={12} /></button>
+                              </>
+                            )}
+                            {sprint.status === 'active' && (
+                              <>
+                                <button onClick={() => handleCompleteSprint(sprint.id)}><FiCheck size={12} /> Completar</button>
+                                <button onClick={() => handleFetchBurndown(sprint.id)}><FiTrendingUp size={12} /> Burndown</button>
+                              </>
+                            )}
+                            {sprint.status === 'completed' && sprint.velocity > 0 && (
+                              <button onClick={() => handleFetchBurndown(sprint.id)}><FiTrendingUp size={12} /> Ver Burndown</button>
+                            )}
+                          </div>
+                        </>
                       )}
-                      <div className="rm-sprint-card-actions">
-                        {sprint.status === 'planning' && (
-                          <>
-                            <button onClick={() => handleStartSprint(sprint.id)}><FiPlay size={12} /> Iniciar</button>
-                            <button className="danger" onClick={() => handleDeleteSprint(sprint.id)}><FiTrash2 size={12} /></button>
-                          </>
-                        )}
-                        {sprint.status === 'active' && (
-                          <>
-                            <button onClick={() => handleCompleteSprint(sprint.id)}><FiCheck size={12} /> Completar</button>
-                            <button onClick={() => handleFetchBurndown(sprint.id)}><FiTrendingUp size={12} /> Burndown</button>
-                          </>
-                        )}
-                        {sprint.status === 'completed' && sprint.velocity > 0 && (
-                          <button onClick={() => handleFetchBurndown(sprint.id)}><FiTrendingUp size={12} /> Ver Burndown</button>
-                        )}
-                      </div>
                     </div>
                   );
                 })}

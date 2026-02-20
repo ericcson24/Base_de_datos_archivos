@@ -204,6 +204,9 @@ const Calendar = ({ user, onLogout, onBackToPanel, onBackToFolders, onGoToRemote
   const [roadmapProjects, setRoadmapProjects] = useState([]);
   const [selectedRoadmapProjects, setSelectedRoadmapProjects] = useState(new Set());
   const [showRoadmapPicker, setShowRoadmapPicker] = useState(false);
+  const [roadmapSprints, setRoadmapSprints] = useState([]);
+  const [selectedRoadmapSprints, setSelectedRoadmapSprints] = useState(new Set());
+  const [showSprintPicker, setShowSprintPicker] = useState(false);
 
   // Load roadmap projects + tasks when layer is toggled on
   useEffect(() => {
@@ -223,6 +226,23 @@ const Calendar = ({ user, onLogout, onBackToPanel, onBackToFolders, onGoToRemote
         // Select all projects by default if none selected
         if (selectedRoadmapProjects.size === 0) {
           setSelectedRoadmapProjects(new Set(projects.map(p => p.id)));
+        }
+        
+        // Fetch sprints for all projects
+        const allSprints = [];
+        for (const proj of projects) {
+          try {
+            const spRes = await fetch(`/api/roadmap/projects/${proj.id}/sprints`, { headers });
+            if (spRes.ok) {
+              const sprints = await spRes.json();
+              sprints.forEach(s => allSprints.push({ ...s, projectId: proj.id, projectName: proj.name }));
+            }
+          } catch (e) { /* ignore */ }
+        }
+        setRoadmapSprints(allSprints);
+        // Select all sprints by default if none selected
+        if (selectedRoadmapSprints.size === 0) {
+          setSelectedRoadmapSprints(new Set(allSprints.map(s => s.id)));
         }
         
         // Fetch issues for all projects
@@ -251,7 +271,8 @@ const Calendar = ({ user, onLogout, onBackToPanel, onBackToFolders, onGoToRemote
                   issueKey: issue.issue_key,
                   issueType: issue.issue_type,
                   assignedUsername: issue.assigned_username,
-                  description: issue.description
+                  description: issue.description,
+                  sprintId: issue.sprint_id
                 }
               });
             });
@@ -274,10 +295,26 @@ const Calendar = ({ user, onLogout, onBackToPanel, onBackToFolders, onGoToRemote
     });
   };
 
-  // Filter roadmap tasks by selected projects
-  const filteredRoadmapTasks = roadmapTasks.filter(t => 
-    selectedRoadmapProjects.has(t.extendedProps?.projectId)
-  );
+  const toggleRoadmapSprint = (sprintId) => {
+    setSelectedRoadmapSprints(prev => {
+      const next = new Set(prev);
+      if (next.has(sprintId)) next.delete(sprintId);
+      else next.add(sprintId);
+      return next;
+    });
+  };
+
+  // Filter roadmap tasks by selected projects AND sprints
+  const filteredRoadmapTasks = roadmapTasks.filter(t => {
+    if (!selectedRoadmapProjects.has(t.extendedProps?.projectId)) return false;
+    // If no sprints selected, show all; otherwise filter by sprint
+    if (selectedRoadmapSprints.size > 0) {
+      const taskSprintId = t.extendedProps?.sprintId;
+      // Show tasks with no sprint OR tasks whose sprint is selected
+      if (taskSprintId && !selectedRoadmapSprints.has(taskSprintId)) return false;
+    }
+    return true;
+  });
 
   // Handle creating a calendar event from a roadmap task
   const handleCreateFromRoadmap = async (roadmapIssueId) => {
@@ -923,28 +960,28 @@ const Calendar = ({ user, onLogout, onBackToPanel, onBackToFolders, onGoToRemote
             </div>
           </div>
 
-          <div className="sidebar-section mt-auto">
-             <div className="section-title" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-               <span style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer' }}
-                 onClick={() => setShowRoadmapPicker(!showRoadmapPicker)}>
+          <div className="sidebar-section roadmap-sidebar-section">
+             <div className="roadmap-section-header">
+               <span className="roadmap-section-title" onClick={() => setShowRoadmapPicker(!showRoadmapPicker)}>
                  <FiMap size={14} /> Roadmap
-                 <FiChevronDown size={12} style={{ transform: showRoadmapPicker ? 'rotate(180deg)' : 'none', transition: '0.2s' }} />
+                 <FiChevronDown size={12} className={`roadmap-chevron ${showRoadmapPicker ? 'open' : ''}`} />
                </span>
-               <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', fontSize: '12px' }}>
+               <label className="roadmap-toggle-label">
                  <input 
                    type="checkbox" 
                    checked={showRoadmapLayer} 
                    onChange={() => setShowRoadmapLayer(!showRoadmapLayer)}
-                   style={{ accentColor: '#6366f1' }}
+                   className="roadmap-toggle-input"
                  />
-                 {showRoadmapLayer ? 'ON' : 'OFF'}
+                 <span className="roadmap-toggle-slider"></span>
                </label>
              </div>
              {showRoadmapLayer && showRoadmapPicker && (
                <div className="roadmap-project-picker">
+                 <div className="roadmap-picker-section-label">{t('roadmap.projects') || 'Proyectos'}</div>
                  {roadmapProjects.length === 0 && (
-                   <div style={{ fontSize: '11px', color: 'var(--text-secondary)', padding: '4px 0' }}>
-                     Sin proyectos disponibles
+                   <div className="roadmap-picker-empty">
+                     {t('roadmap.noProjects') || 'Sin proyectos disponibles'}
                    </div>
                  )}
                  {roadmapProjects.map(proj => (
@@ -953,7 +990,7 @@ const Calendar = ({ user, onLogout, onBackToPanel, onBackToFolders, onGoToRemote
                        type="checkbox"
                        checked={selectedRoadmapProjects.has(proj.id)}
                        onChange={() => {}}
-                       style={{ accentColor: '#6366f1' }}
+                       className="roadmap-picker-checkbox"
                      />
                      <span className="roadmap-picker-icon">
                        {proj.project_type === 'general' ? '🌐' : '🔒'}
@@ -962,24 +999,56 @@ const Calendar = ({ user, onLogout, onBackToPanel, onBackToFolders, onGoToRemote
                      <span className="roadmap-picker-count">{proj.issue_count || 0}</span>
                    </div>
                  ))}
-                 <div style={{ borderTop: '1px solid var(--border-color)', marginTop: '6px', paddingTop: '6px' }}>
-                   <div style={{ display: 'flex', gap: '4px' }}>
-                     <button className="roadmap-picker-btn" onClick={() => setSelectedRoadmapProjects(new Set(roadmapProjects.map(p => p.id)))}>
-                       Todos
-                     </button>
-                     <button className="roadmap-picker-btn" onClick={() => setSelectedRoadmapProjects(new Set())}>
-                       Ninguno
-                     </button>
-                   </div>
+                 <div className="roadmap-picker-actions">
+                   <button className="roadmap-picker-btn" onClick={() => setSelectedRoadmapProjects(new Set(roadmapProjects.map(p => p.id)))}>
+                     {t('roadmap.filters.all') || 'Todos'}
+                   </button>
+                   <button className="roadmap-picker-btn" onClick={() => setSelectedRoadmapProjects(new Set())}>
+                     {t('roadmap.filters.clear') || 'Ninguno'}
+                   </button>
                  </div>
+
+                 {/* Sprint Filter */}
+                 {roadmapSprints.length > 0 && (
+                   <>
+                     <div className="roadmap-picker-section-label" onClick={() => setShowSprintPicker(!showSprintPicker)} style={{ cursor: 'pointer' }}>
+                       🏃 {t('roadmap.filters.sprint') || 'Sprints'}
+                       <FiChevronDown size={11} className={`roadmap-chevron ${showSprintPicker ? 'open' : ''}`} />
+                     </div>
+                     {showSprintPicker && (
+                       <>
+                         {roadmapSprints.map(sprint => (
+                           <div key={sprint.id} className="roadmap-picker-item" onClick={() => toggleRoadmapSprint(sprint.id)}>
+                             <input
+                               type="checkbox"
+                               checked={selectedRoadmapSprints.has(sprint.id)}
+                               onChange={() => {}}
+                               className="roadmap-picker-checkbox"
+                             />
+                             <span className={`roadmap-sprint-status ${sprint.status}`}>
+                               {sprint.status === 'active' ? '🟢' : sprint.status === 'completed' ? '✅' : '⏳'}
+                             </span>
+                             <span className="roadmap-picker-name">{sprint.name}</span>
+                           </div>
+                         ))}
+                         <div className="roadmap-picker-actions">
+                           <button className="roadmap-picker-btn" onClick={() => setSelectedRoadmapSprints(new Set(roadmapSprints.map(s => s.id)))}>
+                             {t('roadmap.filters.all') || 'Todos'}
+                           </button>
+                           <button className="roadmap-picker-btn" onClick={() => setSelectedRoadmapSprints(new Set())}>
+                             {t('roadmap.filters.clear') || 'Ninguno'}
+                           </button>
+                         </div>
+                       </>
+                     )}
+                   </>
+                 )}
                </div>
              )}
              {showRoadmapLayer && filteredRoadmapTasks.length > 0 && (
-               <div style={{ fontSize: '11px', color: 'var(--text-secondary)', padding: '4px 0' }}>
-                 📋 {filteredRoadmapTasks.length} tareas de roadmap visibles
-                 <div style={{ fontSize: '10px', marginTop: '2px', opacity: 0.7 }}>
-                   Click en una tarea para crear evento
-                 </div>
+               <div className="roadmap-task-summary">
+                 <span>📋 {filteredRoadmapTasks.length} {t('roadmap.filters.tasks') || 'tareas'}</span>
+                 <span className="roadmap-task-hint">{t('calendar.clickToCreate') || 'Click en una tarea para crear evento'}</span>
                </div>
              )}
           </div>
