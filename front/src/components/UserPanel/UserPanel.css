@@ -3638,6 +3638,49 @@ input[type="text"]:focus {
   background: #f9fafb;
 }
 
+/* ===== POWERPOINT PREVIEW ===== */
+
+.office-preview-html.powerpoint-preview {
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  background: #f1f1f1;
+}
+
+.office-preview-html.powerpoint-preview .pptx-slide {
+  background: white;
+  border: 1px solid #d1d5db;
+  border-radius: 3px;
+  padding: 10px 14px;
+  min-height: 60px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+}
+
+.office-preview-html.powerpoint-preview .pptx-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: #1e293b;
+  margin-bottom: 6px;
+  line-height: 1.3;
+}
+
+.office-preview-html.powerpoint-preview .pptx-content {
+  font-size: 10px;
+  color: #475569;
+  line-height: 1.4;
+  margin: 2px 0;
+  padding-left: 8px;
+  border-left: 2px solid #e2e8f0;
+}
+
+.office-preview-html.powerpoint-preview .pptx-empty-placeholder {
+  font-size: 32px;
+  text-align: center;
+  padding: 16px 0 8px;
+  opacity: 0.5;
+}
+
 /* Dark mode for office previews */
 [data-theme="dark"] .office-preview-content {
   background: #1e293b;
@@ -3658,4 +3701,22 @@ input[type="text"]:focus {
 
 [data-theme="dark"] .office-preview-html.excel-preview tr:nth-child(even) {
   background: #1e293b;
+}
+
+[data-theme="dark"] .office-preview-html.powerpoint-preview {
+  background: #0f172a;
+}
+
+[data-theme="dark"] .office-preview-html.powerpoint-preview .pptx-slide {
+  background: #1e293b;
+  border-color: #334155;
+}
+
+[data-theme="dark"] .office-preview-html.powerpoint-preview .pptx-title {
+  color: #e2e8f0;
+}
+
+[data-theme="dark"] .office-preview-html.powerpoint-preview .pptx-content {
+  color: #94a3b8;
+  border-left-color: #334155;
 }

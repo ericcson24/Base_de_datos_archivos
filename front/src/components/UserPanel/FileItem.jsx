@@ -5,6 +5,118 @@ import { useLanguage } from '../../context/LanguageContext';
 import FolderIcon from '../Common/FolderIcon';
 import FileTypeIcon from '../Common/FileTypeIcon';
 
+// Helper: build Excel preview HTML table
+const buildExcelPreviewHtml = (XLSX, ws) => {
+  const hasData = ws && ws['!ref'];
+  const range = hasData ? XLSX.utils.decode_range(ws['!ref']) : { s: { r: 0, c: 0 }, e: { r: 7, c: 5 } };
+  const maxR = Math.min(hasData ? range.e.r : 7, 15);
+  const maxC = Math.min(hasData ? range.e.c : 5, 10);
+  let html = '<table><thead><tr><th></th>';
+  for (let c = 0; c <= maxC; c++) {
+    const letter = c < 26 ? String.fromCharCode(65 + c) : String.fromCharCode(64 + Math.floor(c / 26)) + String.fromCharCode(65 + (c % 26));
+    html += `<th>${letter}</th>`;
+  }
+  html += '</tr></thead><tbody>';
+  for (let r = 0; r <= maxR; r++) {
+    html += `<tr><td style="background:#f3f4f6;font-weight:600;text-align:center;color:#6b7280;min-width:28px">${r + 1}</td>`;
+    for (let c = 0; c <= maxC; c++) {
+      if (hasData) {
+        const addr = XLSX.utils.encode_cell({ r, c });
+        const cell = ws[addr];
+        let val = '';
+        let style = '';
+        if (cell) {
+          val = cell.w || (cell.v != null ? String(cell.v) : '');
+          if (cell.t === 'n' && !cell.w) val = String(cell.v);
+          val = val.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+          if (typeof cell.v === 'number') style += 'text-align:right;';
+        }
+        html += `<td style="${style}">${val}</td>`;
+      } else {
+        html += '<td></td>';
+      }
+    }
+    html += '</tr>';
+  }
+  html += '</tbody></table>';
+  return html;
+};
+
+// Helper: build PowerPoint preview HTML slides
+const buildPptxPreviewHtml = async (zip) => {
+  const slideFiles = Object.keys(zip.files)
+    .filter(f => /ppt\/slides\/slide\d+\.xml/.test(f))
+    .sort((a, b) => {
+      const nA = parseInt(a.match(/slide(\d+)/)[1]);
+      const nB = parseInt(b.match(/slide(\d+)/)[1]);
+      return nA - nB;
+    });
+
+  if (slideFiles.length === 0) return null;
+
+  const slides = [];
+  for (const sf of slideFiles.slice(0, 2)) {
+    const xml = await zip.file(sf).async('text');
+    let title = '';
+    let contents = [];
+
+    // Method 1: Parse <p:sp> shape blocks to detect titles vs content
+    const spMatches = xml.match(/<p:sp[\s>]([\s\S]*?)<\/p:sp>/g) || [];
+    for (const sp of spMatches) {
+      const isTitle = /<p:ph[^>]*type="(title|ctrTitle)"/i.test(sp);
+      const textMatches = sp.match(/<a:t[^>]*>([^<]*)<\/a:t>/g);
+      if (textMatches) {
+        const text = textMatches.map(m => m.replace(/<[^>]+>/g, '')).filter(t => t.trim()).join(' ');
+        if (text.trim()) {
+          if (isTitle && !title) {
+            title = text.trim();
+          } else {
+            contents.push(text.trim());
+          }
+        }
+      }
+    }
+
+    // Method 2: Fallback — if no shapes matched, extract ALL <a:t> text directly
+    if (!title && contents.length === 0) {
+      const allTextMatches = xml.match(/<a:t[^>]*>([^<]+)<\/a:t>/g);
+      if (allTextMatches) {
+        const allTexts = allTextMatches.map(m => m.replace(/<[^>]+>/g, '')).filter(t => t.trim());
+        if (allTexts.length > 0) {
+          title = allTexts[0];
+          contents = allTexts.slice(1, 5);
+        }
+      }
+    }
+
+    // If no explicit title found, promote first content
+    if (!title && contents.length > 0) {
+      title = contents.shift();
+    }
+
+    slides.push({ title, contents: contents.slice(0, 4) });
+  }
+
+  const hasContent = slides.some(s => s.title || s.contents.length > 0);
+
+  // Build HTML — even for empty slides, show a nice slide placeholder
+  const slideHtml = slides.length > 0 ? slides.map((s) => {
+    let h = '<div class="pptx-slide">';
+    if (s.title) {
+      h += `<div class="pptx-title">${s.title.replace(/&/g, '&amp;').replace(/</g, '&lt;')}</div>`;
+    } else if (!hasContent) {
+      h += '<div class="pptx-empty-placeholder">📽️</div>';
+    }
+    if (s.contents.length > 0) {
+      h += s.contents.map(c => `<div class="pptx-content">${c.replace(/&/g, '&amp;').replace(/</g, '&lt;')}</div>`).join('');
+    }
+    h += '</div>';
+    return h;
+  }).join('') : '<div class="pptx-slide"><div class="pptx-empty-placeholder">📽️</div></div>';
+
+  return slideHtml;
+};
+
 // Lazy-loaded Office preview for grid thumbnails
 const OfficePreview = React.memo(({ fileId, fileType, fileName }) => {
   const [content, setContent] = useState(null);
@@ -16,43 +128,37 @@ const OfficePreview = React.memo(({ fileId, fileType, fileName }) => {
       try {
         const token = getAuthToken();
         const url = `/api/files/preview/${encodeURIComponent(fileId)}?token=${encodeURIComponent(token)}`;
-        const resp = await fetch(url, { headers: { 'Authorization': `Bearer ${token}` } });
+        const resp = await fetch(url, {
+          headers: { 'Authorization': `Bearer ${token}` },
+          cache: 'no-store'
+        });
         if (!resp.ok) throw new Error('Failed');
         const buf = await resp.arrayBuffer();
+        if (buf.byteLength === 0) throw new Error('Empty');
 
         if (fileType === 'word') {
           const mammothModule = await import('mammoth');
           const mammoth = mammothModule.default || mammothModule;
           const result = await mammoth.convertToHtml({ arrayBuffer: buf });
           if (!cancelled) setContent({ type: 'html', data: result.value });
+
         } else if (fileType === 'excel') {
           const XLSX = await import('xlsx');
-          const wb = XLSX.read(new Uint8Array(buf), { type: 'array' });
+          const wb = XLSX.read(new Uint8Array(buf), { type: 'array', cellStyles: true, cellDates: true });
           const ws = wb.Sheets[wb.SheetNames[0]];
-          const html = XLSX.utils.sheet_to_html(ws, { editable: false });
+          // Always generate preview — even for empty sheets (shows empty grid)
+          const html = buildExcelPreviewHtml(XLSX, ws);
           if (!cancelled) setContent({ type: 'html', data: html });
+
         } else if (fileType === 'powerpoint') {
-          // Extract text from pptx using JSZip
           const JSZipModule = await import('jszip');
           const JSZip = JSZipModule.default || JSZipModule;
           const zip = await JSZip.loadAsync(buf);
-          let texts = [];
-          // Look for slide XML files
-          const slideFiles = Object.keys(zip.files).filter(f => f.match(/ppt\/slides\/slide\d+\.xml/)).sort();
-          for (const sf of slideFiles.slice(0, 3)) { // First 3 slides
-            const xml = await zip.file(sf).async('text');
-            // Extract text from <a:t> tags
-            const matches = xml.match(/<a:t[^>]*>([^<]*)<\/a:t>/g);
-            if (matches) {
-              const slideTexts = matches.map(m => m.replace(/<[^>]+>/g, '')).filter(t => t.trim());
-              texts.push(...slideTexts);
-            }
-          }
-          if (texts.length > 0 && !cancelled) {
-            const html = `<div style="padding:8px;font-size:10px;line-height:1.4;color:#444"><p style="font-weight:600;font-size:12px;margin-bottom:4px">${texts[0]}</p>${texts.slice(1, 6).map(t => `<p style="margin:2px 0">${t}</p>`).join('')}</div>`;
+          const html = await buildPptxPreviewHtml(zip);
+          if (html && !cancelled) {
             setContent({ type: 'html', data: html });
-          } else {
-            if (!cancelled) setError(true);
+          } else if (!cancelled) {
+            setError(true);
           }
         }
       } catch (e) {
@@ -71,10 +177,14 @@ const OfficePreview = React.memo(({ fileId, fileType, fileName }) => {
     );
   }
 
+  const previewClass = fileType === 'excel' ? 'excel-preview'
+    : fileType === 'powerpoint' ? 'powerpoint-preview'
+    : 'word-preview';
+
   return (
     <div className="office-preview-content">
       <div
-        className={`office-preview-html ${fileType === 'excel' ? 'excel-preview' : 'word-preview'}`}
+        className={`office-preview-html ${previewClass}`}
         dangerouslySetInnerHTML={{ __html: content.data }}
       />
     </div>
