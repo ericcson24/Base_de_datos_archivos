@@ -745,7 +745,7 @@ wss.on('connection', async (ws, request) => {
                         'enable-printing': 'false',
                         'server-layout': '',
                         'timezone': '',
-                        'console': '',
+                        'console': 'true',
                         'initial-program': '',
                         'client-name': 'RDP-Web',
                         'console-audio': '',
