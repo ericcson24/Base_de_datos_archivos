@@ -78,7 +78,7 @@ export const canPreview = (filename) => {
 
 export const canEdit = (filename) => {
   const type = getFileType(filename);
-  return ['word', 'excel', 'powerpoint'].includes(type);
+  return ['word', 'excel', 'powerpoint', 'pdf'].includes(type);
 };
 
 export const getAuthenticatedPreviewUrl = async (fileId, filename) => {

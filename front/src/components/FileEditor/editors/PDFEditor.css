@@ -1,30 +1,583 @@
-.pdf-editor {
-  background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
-}
+/* ═══════════════════════════════════════════
+   PDF EDITOR
+   ═══════════════════════════════════════════ */
 
-[data-theme="dark"] .pdf-editor {
-  background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
-}
-
-.pdf-viewer-container {
-  position: relative;
-  background: #525252;
-  border-radius: 8px;
+.pdf-editor-container {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  width: 100%;
+  background: #f3f4f6;
   overflow: hidden;
+}
+
+.pdf-editor-container.fullscreen {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 99999;
+}
+
+/* ─── Loading ─── */
+.pdf-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  gap: 12px;
+  color: #6b7280;
+}
+
+.pdf-loading .spinner {
+  width: 40px;
+  height: 40px;
+  border: 3px solid #e5e7eb;
+  border-top-color: #3b82f6;
+  border-radius: 50%;
+  animation: pdfSpin 0.7s linear infinite;
+}
+
+@keyframes pdfSpin {
+  to { transform: rotate(360deg); }
+}
+
+/* ─── Toolbar ─── */
+.pdf-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  background: white;
+  border-bottom: 1px solid #e5e7eb;
+  flex-wrap: wrap;
+  min-height: 44px;
+  z-index: 10;
+}
+
+.pdf-toolbar-section {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.pdf-toolbar-section::after {
+  content: '';
+  width: 1px;
+  height: 24px;
+  background: #e5e7eb;
+  margin: 0 4px;
+}
+
+.pdf-toolbar-section:last-child::after,
+.pdf-toolbar-right::after {
+  display: none;
+}
+
+.pdf-toolbar-right {
+  margin-left: auto;
+}
+
+.pdf-tools {
+  flex-wrap: wrap;
+}
+
+/* Buttons */
+.pdf-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 5px 12px;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  background: white;
+  color: #374151;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s;
+  white-space: nowrap;
+}
+
+.pdf-btn:hover {
+  background: #f9fafb;
+  border-color: #9ca3af;
+}
+
+.pdf-btn-primary {
+  background: #3b82f6;
+  color: white;
+  border-color: #3b82f6;
+}
+
+.pdf-btn-primary:hover {
+  background: #2563eb;
+}
+
+.pdf-btn-success {
+  background: #10b981;
+  color: white;
+  border-color: #10b981;
+}
+
+.pdf-btn-success:hover:not(:disabled) {
+  background: #059669;
+}
+
+.pdf-btn-success:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.pdf-btn-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  background: white;
+  color: #374151;
+  font-size: 14px;
+  cursor: pointer;
+  transition: all 0.15s;
+  padding: 0;
+}
+
+.pdf-btn-icon:hover:not(:disabled) {
+  background: #f3f4f6;
+  border-color: #9ca3af;
+}
+
+.pdf-btn-icon:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+.pdf-btn-danger-icon:hover:not(:disabled) {
+  background: #fef2f2;
+  border-color: #ef4444;
+  color: #ef4444;
+}
+
+.pdf-btn-tool {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 4px 10px;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  background: white;
+  color: #374151;
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.15s;
+  white-space: nowrap;
+}
+
+.pdf-btn-tool:hover {
+  background: #f3f4f6;
+}
+
+.pdf-btn-tool.active {
+  background: #eff6ff;
+  border-color: #3b82f6;
+  color: #2563eb;
+  box-shadow: 0 0 0 1px #3b82f6;
+}
+
+.pdf-page-info,
+.pdf-zoom-info {
+  font-size: 12px;
+  font-weight: 500;
+  color: #4b5563;
+  min-width: 50px;
+  text-align: center;
+  user-select: none;
+}
+
+.pdf-zoom-info {
+  cursor: pointer;
+}
+
+.pdf-zoom-info:hover {
+  color: #3b82f6;
+}
+
+.pdf-tool-divider {
+  width: 1px;
+  height: 24px;
+  background: #e5e7eb;
+  margin: 0 4px;
+}
+
+.pdf-color-picker {
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  cursor: pointer;
+  background: transparent;
+}
+
+.pdf-font-size-select {
+  padding: 4px 6px;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  font-size: 12px;
+  background: white;
+  color: #374151;
+  cursor: pointer;
+}
+
+/* ─── Viewer Area ─── */
+.pdf-viewer-area {
+  flex: 1;
+  overflow: auto;
+  display: flex;
+  justify-content: center;
+  padding: 20px;
+  background: #e5e7eb;
+}
+
+.pdf-page-wrapper {
+  transition: transform 0.2s ease;
+}
+
+.pdf-page-container {
+  position: relative;
+  background: white;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.15), 0 0 1px rgba(0,0,0,0.1);
+  border-radius: 2px;
 }
 
 .pdf-iframe {
   width: 800px;
+  height: 1050px;
+  border: none;
+  display: block;
 }
 
-.pdf-transform-container {
-  transform-origin: center top;
-}
-
-.annotation-item {
+/* ─── Annotation Overlay ─── */
+.pdf-annotation-overlay {
   position: absolute;
-  padding: 4px 8px;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 5;
+}
+
+.pdf-annotation-svg {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
+.pdf-annotation-svg .pdf-annotation-shape {
+  pointer-events: auto;
+}
+
+/* Text annotations */
+.pdf-text-annotation {
+  position: absolute;
+  font-weight: 600;
+  font-family: Helvetica, Arial, sans-serif;
+  pointer-events: auto;
+  cursor: default;
+  padding: 1px 3px;
+  border-radius: 2px;
+  white-space: nowrap;
+  line-height: 1.2;
+}
+
+.pdf-text-annotation:hover {
+  background: rgba(255, 255, 255, 0.7);
+}
+
+/* Delete button on annotations */
+.pdf-ann-delete-btn {
+  width: 18px;
+  height: 18px;
+  border: none;
+  background: #ef4444;
+  color: white;
+  border-radius: 50%;
+  font-size: 10px;
+  line-height: 1;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transition: opacity 0.15s;
+  padding: 0;
+}
+
+.pdf-text-annotation:hover .pdf-ann-delete-btn,
+.pdf-annotation-shape:hover + foreignObject .pdf-ann-delete-btn,
+g:hover .pdf-ann-delete-btn {
+  opacity: 1;
+}
+
+.pdf-ann-delete-btn.inline {
+  display: inline-flex;
+  margin-left: 4px;
+  vertical-align: middle;
+}
+
+.pdf-ann-delete-btn:hover {
+  background: #dc2626;
+  transform: scale(1.1);
+}
+
+/* Text input popup */
+.pdf-text-input-popup {
+  position: absolute;
+  z-index: 20;
+  background: white;
+  border: 2px solid #3b82f6;
+  border-radius: 8px;
+  padding: 8px;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.15);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 200px;
+}
+
+.pdf-text-input {
+  border: 1px solid #d1d5db;
   border-radius: 4px;
+  padding: 6px 8px;
+  font-family: Helvetica, Arial, sans-serif;
+  font-weight: 600;
+  outline: none;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.pdf-text-input:focus {
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 2px rgba(59,130,246,0.2);
+}
+
+.pdf-text-input-actions {
+  display: flex;
+  gap: 4px;
+  justify-content: flex-end;
+}
+
+.pdf-text-confirm,
+.pdf-text-cancel {
+  width: 28px;
+  height: 28px;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  cursor: pointer;
   font-size: 14px;
-  font-weight: bold;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s;
+}
+
+.pdf-text-confirm {
+  background: #10b981;
+  color: white;
+  border-color: #10b981;
+}
+
+.pdf-text-confirm:hover {
+  background: #059669;
+}
+
+.pdf-text-cancel {
+  background: white;
+  color: #6b7280;
+}
+
+.pdf-text-cancel:hover {
+  background: #fef2f2;
+  color: #ef4444;
+  border-color: #ef4444;
+}
+
+/* ─── Status Bar ─── */
+.pdf-status-bar {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 4px 12px;
+  background: white;
+  border-top: 1px solid #e5e7eb;
+  font-size: 11px;
+  color: #6b7280;
+  min-height: 28px;
+}
+
+.pdf-unsaved-badge {
+  color: #f59e0b;
+  font-weight: 600;
+}
+
+.pdf-edit-badge {
+  color: #3b82f6;
+  font-weight: 500;
+}
+
+/* ═══════════════════════════════════════════
+   DARK MODE
+   ═══════════════════════════════════════════ */
+
+[data-theme="dark"] .pdf-editor-container {
+  background: #111827;
+}
+
+[data-theme="dark"] .pdf-toolbar {
+  background: #1e293b;
+  border-bottom-color: #334155;
+}
+
+[data-theme="dark"] .pdf-toolbar-section::after {
+  background: #334155;
+}
+
+[data-theme="dark"] .pdf-btn {
+  background: #1e293b;
+  border-color: #374151;
+  color: #e5e7eb;
+}
+
+[data-theme="dark"] .pdf-btn:hover {
+  background: #334155;
+}
+
+[data-theme="dark"] .pdf-btn-primary {
+  background: #3b82f6;
+  border-color: #3b82f6;
+  color: white;
+}
+
+[data-theme="dark"] .pdf-btn-success {
+  background: #10b981;
+  border-color: #10b981;
+}
+
+[data-theme="dark"] .pdf-btn-icon {
+  background: #1e293b;
+  border-color: #374151;
+  color: #e5e7eb;
+}
+
+[data-theme="dark"] .pdf-btn-icon:hover:not(:disabled) {
+  background: #334155;
+}
+
+[data-theme="dark"] .pdf-btn-danger-icon:hover:not(:disabled) {
+  background: #450a0a;
+  border-color: #ef4444;
+  color: #ef4444;
+}
+
+[data-theme="dark"] .pdf-btn-tool {
+  background: #1e293b;
+  border-color: #374151;
+  color: #e5e7eb;
+}
+
+[data-theme="dark"] .pdf-btn-tool:hover {
+  background: #334155;
+}
+
+[data-theme="dark"] .pdf-btn-tool.active {
+  background: #1e3a5f;
+  border-color: #3b82f6;
+  color: #93c5fd;
+}
+
+[data-theme="dark"] .pdf-page-info,
+[data-theme="dark"] .pdf-zoom-info {
+  color: #9ca3af;
+}
+
+[data-theme="dark"] .pdf-tool-divider {
+  background: #374151;
+}
+
+[data-theme="dark"] .pdf-color-picker {
+  border-color: #374151;
+}
+
+[data-theme="dark"] .pdf-font-size-select {
+  background: #1e293b;
+  border-color: #374151;
+  color: #e5e7eb;
+}
+
+[data-theme="dark"] .pdf-viewer-area {
+  background: #0f172a;
+}
+
+[data-theme="dark"] .pdf-page-container {
+  box-shadow: 0 4px 20px rgba(0,0,0,0.4);
+}
+
+[data-theme="dark"] .pdf-text-input-popup {
+  background: #1e293b;
+  border-color: #3b82f6;
+}
+
+[data-theme="dark"] .pdf-text-input {
+  background: #0f172a;
+  border-color: #374151;
+  color: #e5e7eb;
+}
+
+[data-theme="dark"] .pdf-text-confirm {
+  background: #10b981;
+}
+
+[data-theme="dark"] .pdf-text-cancel {
+  background: #1e293b;
+  color: #9ca3af;
+  border-color: #374151;
+}
+
+[data-theme="dark"] .pdf-status-bar {
+  background: #1e293b;
+  border-top-color: #334155;
+  color: #9ca3af;
+}
+
+/* ═══════════════════════════════════════════
+   RESPONSIVE
+   ═══════════════════════════════════════════ */
+
+@media (max-width: 768px) {
+  .pdf-toolbar {
+    padding: 4px 8px;
+    gap: 4px;
+  }
+
+  .pdf-btn-tool {
+    font-size: 11px;
+    padding: 3px 6px;
+  }
+
+  .pdf-iframe {
+    width: 100%;
+    height: 600px;
+  }
+
+  .pdf-viewer-area {
+    padding: 10px;
+  }
 }

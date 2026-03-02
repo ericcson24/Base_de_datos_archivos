@@ -443,6 +443,35 @@ const WordEditor = ({ fileUrl, fileBlob, file, onClose, onFileSaved, highlightTe
       activeImg = null;
     };
 
+    const deleteActiveImage = () => {
+      if (!activeImg) return;
+      const quill = quillRef.current?.getEditor();
+      if (!quill) return;
+      const blot = window.Quill?.find(activeImg) || null;
+      if (blot) {
+        const index = quill.getIndex(blot);
+        removeOverlay();
+        quill.deleteText(index, 1);
+      } else {
+        // Fallback: remove DOM node directly
+        activeImg.remove();
+        removeOverlay();
+      }
+    };
+
+    const handleKeyDown = (e) => {
+      if (!activeImg || !resizeOverlay) return;
+      if (e.key === 'Delete' || e.key === 'Backspace') {
+        e.preventDefault();
+        e.stopPropagation();
+        deleteActiveImage();
+      } else if (e.key === 'Escape') {
+        removeOverlay();
+      }
+    };
+
+    document.addEventListener('keydown', handleKeyDown);
+
     const updateOverlayPosition = () => {
       if (!activeImg || !resizeOverlay) return;
       const imgRect = activeImg.getBoundingClientRect();
@@ -539,6 +568,21 @@ const WordEditor = ({ fileUrl, fileBlob, file, onClose, onFileSaved, highlightTe
       label.textContent = `${img.offsetWidth || img.naturalWidth} × ${img.offsetHeight || img.naturalHeight}`;
       overlay.appendChild(label);
 
+      // Delete button
+      const deleteBtn = document.createElement('button');
+      deleteBtn.className = 'img-resize-delete-btn';
+      deleteBtn.style.cssText = 'position:absolute;top:-14px;right:-14px;width:28px;height:28px;background:#ef4444;color:#fff;border:2px solid #fff;border-radius:50%;font-size:16px;line-height:1;cursor:pointer;pointer-events:all;z-index:102;display:flex;align-items:center;justify-content:center;box-shadow:0 2px 6px rgba(0,0,0,0.3);transition:background 0.15s;';
+      deleteBtn.innerHTML = '×';
+      deleteBtn.title = 'Delete image';
+      deleteBtn.addEventListener('mouseenter', () => { deleteBtn.style.background = '#dc2626'; });
+      deleteBtn.addEventListener('mouseleave', () => { deleteBtn.style.background = '#ef4444'; });
+      deleteBtn.addEventListener('mousedown', (ev) => {
+        ev.preventDefault();
+        ev.stopPropagation();
+        deleteActiveImage();
+      });
+      overlay.appendChild(deleteBtn);
+
       scrollParent.appendChild(overlay);
       resizeOverlay = overlay;
       updateOverlayPosition();
@@ -571,6 +615,7 @@ const WordEditor = ({ fileUrl, fileBlob, file, onClose, onFileSaved, highlightTe
       quill.root.removeEventListener('paste', handlePaste);
       quill.root.removeEventListener('click', handleEditorClick);
       document.removeEventListener('mousedown', handleDocClick);
+      document.removeEventListener('keydown', handleKeyDown);
       removeOverlay();
     };
   }, [isEditing]);

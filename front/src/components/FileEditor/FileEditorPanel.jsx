@@ -247,7 +247,7 @@ const FileEditorPanel = ({ file, onClose, position, zIndex, onBringToFront, pane
       case 'image':
         return <ImageEditor fileUrl={fileUrl} file={file} />;
       case 'pdf':
-        return <PDFEditor fileUrl={fileUrl} file={file} />;
+        return <PDFEditor fileUrl={fileUrl} file={file} onFileSaved={onFileSaved} />;
       case 'text':
         return <TextEditor content={fileUrl} file={file} />;
       case 'video':
