@@ -271,17 +271,30 @@ app.put('/api/users/:id/password', requireAdmin, async (req, res) => {
   }
 });
 
-// Eliminar usuario
+// Eliminar usuario (solo acceso web, NO afecta perfil de Windows Server)
 app.delete('/api/users/:id', requireAdmin, async (req, res) => {
   try {
     const { id } = req.params;
-    
+    const user = await dbAsync.get("SELECT username FROM users WHERE id = ?", [id]);
+    if (!user) return res.status(404).json({ success: false, message: 'User not found' });
+
+    // Clean up ALL FK-dependent tables
+    await dbAsync.run("DELETE FROM shared_files WHERE owner_username = ? OR shared_with_username = ?", [user.username, user.username]);
+    await dbAsync.run("DELETE FROM files WHERE owner_id = ?", [id]);
+    await dbAsync.run("DELETE FROM folders WHERE owner_id = ?", [id]);
+    await dbAsync.run("DELETE FROM group_members WHERE user_id = ?", [id]);
+    await dbAsync.run("DELETE FROM calendar_events WHERE user_id = ?", [id]);
+    await dbAsync.run("DELETE FROM notifications WHERE user_id = ?", [id]);
+    await dbAsync.run("DELETE FROM admin_inbox WHERE user_id = ?", [id]);
+    await dbAsync.run("DELETE FROM security_settings WHERE user_id = ?", [id]);
+    await dbAsync.run("DELETE FROM windows_user_links WHERE cloud_username = ?", [user.username]);
     await dbAsync.run("DELETE FROM user_credentials WHERE user_id = ?", [id]);
     await dbAsync.run("DELETE FROM users WHERE id = ?", [id]);
 
-    await addLog('critical', `Usuario eliminado: ID ${id}`, 'admin', req.user.username);
+    await addLog('critical', `Usuario eliminado: ${user.username} (solo acceso web)`, 'admin', req.user.username);
     res.json({ success: true });
   } catch (error) {
+    console.error('Error deleting user:', error);
     res.status(500).json({ success: false, message: error.message });
   }
 });
@@ -341,9 +354,11 @@ app.get('/api/users', requireAdmin, async (req, res) => {
     const users = await dbAsync.all(`
       SELECT 
         u.id, u.username, u.role, u.created_at, u.deletion_scheduled_at,
-        uc.is_locked, uc.last_login, uc.failed_attempts, uc.lockout_until
+        uc.is_locked, uc.last_login, uc.failed_attempts, uc.lockout_until,
+        wl.windows_username
       FROM users u
       LEFT JOIN user_credentials uc ON u.id = uc.user_id
+      LEFT JOIN windows_user_links wl ON u.username = wl.cloud_username
     `);
     
     const usersWithStats = users.map(user => {
@@ -705,17 +720,22 @@ setInterval(async () => {
     
     for (const user of usersToDelete) {
       console.log(`Executing scheduled deletion for user ${user.username} (${user.id})`);
-      
-      // 1. Delete from group_members
-      await dbAsync.run("DELETE FROM group_members WHERE user_id = ?", [user.id]);
-      
-      // 2. Delete from user_credentials
-      await dbAsync.run("DELETE FROM user_credentials WHERE user_id = ?", [user.id]);
-      
-      // 3. Delete from users
-      await dbAsync.run("DELETE FROM users WHERE id = ?", [user.id]);
-      
-      await addLog('critical', `Usuario eliminado automáticamente (programado): ID ${user.id} (y sus membresías de grupo)`, 'system', 'system');
+      try {
+        await dbAsync.run("DELETE FROM shared_files WHERE owner_username = ? OR shared_with_username = ?", [user.username, user.username]);
+        await dbAsync.run("DELETE FROM files WHERE owner_id = ?", [user.id]);
+        await dbAsync.run("DELETE FROM folders WHERE owner_id = ?", [user.id]);
+        await dbAsync.run("DELETE FROM group_members WHERE user_id = ?", [user.id]);
+        await dbAsync.run("DELETE FROM calendar_events WHERE user_id = ?", [user.id]);
+        await dbAsync.run("DELETE FROM notifications WHERE user_id = ?", [user.id]);
+        await dbAsync.run("DELETE FROM admin_inbox WHERE user_id = ?", [user.id]);
+        await dbAsync.run("DELETE FROM security_settings WHERE user_id = ?", [user.id]);
+        await dbAsync.run("DELETE FROM windows_user_links WHERE cloud_username = ?", [user.username]);
+        await dbAsync.run("DELETE FROM user_credentials WHERE user_id = ?", [user.id]);
+        await dbAsync.run("DELETE FROM users WHERE id = ?", [user.id]);
+        await addLog('critical', `Usuario eliminado automáticamente: ${user.username} (solo acceso web)`, 'system', 'system');
+      } catch (delErr) {
+        console.error(`Failed to delete user ${user.username}:`, delErr.message);
+      }
     }
   } catch (error) {
     console.error('Error in deletion background task:', error);

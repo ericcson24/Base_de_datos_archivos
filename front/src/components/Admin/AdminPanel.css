@@ -750,3 +750,47 @@ code {
 [data-theme='dark'] code {
   background: rgba(255, 255, 255, 0.1);
 }
+
+/* ── Windows Integration Toggle ── */
+.win-toggle {
+  position: relative;
+  display: inline-block;
+  width: 36px;
+  height: 20px;
+}
+.win-toggle input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+.win-toggle-slider {
+  position: absolute;
+  cursor: pointer;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background-color: #ccc;
+  border-radius: 20px;
+  transition: 0.2s;
+}
+.win-toggle-slider::before {
+  content: "";
+  position: absolute;
+  height: 14px;
+  width: 14px;
+  left: 3px;
+  bottom: 3px;
+  background: white;
+  border-radius: 50%;
+  transition: 0.2s;
+}
+.win-toggle input:checked + .win-toggle-slider {
+  background-color: #4caf50;
+}
+.win-toggle input:checked + .win-toggle-slider::before {
+  transform: translateX(16px);
+}
+
+/* Windows panel table alignment */
+.windows-panel .admin-table td,
+.windows-panel .admin-table th {
+  vertical-align: middle;
+}

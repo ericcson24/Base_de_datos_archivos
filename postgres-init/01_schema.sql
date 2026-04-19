@@ -198,3 +198,16 @@ CREATE TABLE IF NOT EXISTS folder_metadata (
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     UNIQUE(username, folder_path)
 );
+
+-- Windows User Links (cloud ↔ Windows Server user mapping)
+CREATE TABLE IF NOT EXISTS windows_user_links (
+    id SERIAL PRIMARY KEY,
+    cloud_username TEXT NOT NULL UNIQUE,
+    windows_username TEXT NOT NULL UNIQUE,
+    sync_enabled BOOLEAN DEFAULT TRUE,
+    sync_desktop BOOLEAN DEFAULT TRUE,
+    sync_documents BOOLEAN DEFAULT TRUE,
+    sync_downloads BOOLEAN DEFAULT TRUE,
+    linked_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    last_sync TIMESTAMP
+);

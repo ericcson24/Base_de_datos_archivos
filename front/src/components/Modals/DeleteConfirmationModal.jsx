@@ -27,7 +27,15 @@ const DeleteConfirmationModal = ({ isOpen, onClose, onConfirm, userName }) => {
             <strong>{t('admin.warning') || 'Advertencia'}:</strong>
             <p>
               {t('admin.deleteWarningDetail') || 
-               'Esta acción programará la eliminación de todos los datos del usuario (archivos, eventos, correos). Tienes 5 minutos para cancelar esta operación.'}
+               'Esta acción eliminará permanentemente todos los datos del usuario en la nube (archivos, eventos, configuración). Esta acción no se puede deshacer.'}
+            </p>
+          </div>
+
+          <div className="delete-warning-box" style={{ borderColor: '#4caf50', backgroundColor: 'rgba(76, 175, 80, 0.08)', marginTop: '12px' }}>
+            <strong style={{ color: '#4caf50' }}>{t('admin.deleteCloudOnlyTitle') || 'Solo acceso web'}:</strong>
+            <p style={{ color: 'var(--text-primary, #e0e0e0)' }}>
+              {t('admin.deleteCloudOnlyDetail') || 
+               'Esta eliminación solo afecta al acceso web (cuenta en la nube). El perfil de Windows Server y sus archivos locales NO se verán afectados.'}
             </p>
           </div>
         </div>
@@ -40,7 +48,7 @@ const DeleteConfirmationModal = ({ isOpen, onClose, onConfirm, userName }) => {
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <path d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
             </svg>
-            {t('admin.confirmDelete') || 'Programar Eliminación'}
+            {t('admin.confirmDelete') || 'Eliminar Usuario'}
           </button>
         </div>
       </div>

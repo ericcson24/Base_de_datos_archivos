@@ -292,6 +292,30 @@ services:
     depends_on:
       gateway:
         condition: service_healthy
+
+  # --- Windows Integration Service (5010) ---
+  windows-service:
+    build: 
+      context: ./services/windows-service
+      network: host
+    restart: unless-stopped
+    environment:
+      - DB_TYPE=postgres
+      - DB_HOST=postgres
+      - DB_USER=${DB_USER:-admin}
+      - DB_PASSWORD=${DB_PASSWORD:-admin123}
+      - DB_NAME=${DB_NAME:-server_db}
+      - PORT=5010
+      - JWT_SECRET=${JWT_SECRET}
+      - HOST_USERS_DIR=/host-users
+      - UPLOAD_DIR=/app/uploads
+    volumes:
+      - C:\Users:/host-users:ro
+      - ../Datos:/app/uploads
+    depends_on:
+      - postgres
+    networks:
+      - app-network
     
 
 volumes:
