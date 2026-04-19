@@ -11,6 +11,8 @@
 
   .calendar-layout {
     flex-direction: column;
+    height: 100vh;
+    height: 100dvh;
   }
 
   /* Sidebar Mobile Logic */
@@ -19,13 +21,15 @@
     top: 0;
     left: 0;
     height: 100vh;
+    height: 100dvh;
     width: 80%;
     max-width: 300px;
     transform: translateX(-100%);
     transition: transform 0.3s ease;
     z-index: 1000;
     box-shadow: 2px 0 10px rgba(0,0,0,0.2);
-    margin-left: 0 !important; /* Override desktop toggle logic */
+    margin-left: 0 !important;
+    padding-top: env(safe-area-inset-top, 0px);
   }
 
   .calendar-sidebar.open {
@@ -36,10 +40,7 @@
   .sidebar-overlay {
     display: none;
     position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
+    inset: 0;
     background: rgba(0,0,0,0.5);
     z-index: 999;
     backdrop-filter: blur(2px);
@@ -52,11 +53,16 @@
   /* Main Content */
   .calendar-main {
     width: 100%;
-    padding-top: 60px; /* Space for mobile header */
+    height: 100%;
+    padding-top: calc(60px + env(safe-area-inset-top, 0px));
+    overflow-y: auto;
+    overflow-x: hidden;
+    -webkit-overflow-scrolling: touch;
+    box-sizing: border-box;
   }
 
   .main-header {
-    display: none; /* Hide desktop header */
+    display: none;
   }
 
   /* Mobile Header */
@@ -65,15 +71,18 @@
     align-items: center;
     justify-content: space-between;
     padding: 0.5rem 1rem;
-    height: 60px;
+    padding-top: calc(0.5rem + env(safe-area-inset-top, 0px));
+    height: calc(60px + env(safe-area-inset-top, 0px));
     position: fixed;
     top: 0;
     left: 0;
     right: 0;
-    background: var(--sidebar-bg);
+    background: var(--cal-surface);
     z-index: 900;
     backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
     border-bottom: 1px solid var(--cal-border);
+    box-sizing: border-box;
   }
 
   .hamburger-btn {
@@ -83,6 +92,7 @@
     color: var(--cal-text);
     cursor: pointer;
     padding: 0.5rem;
+    -webkit-tap-highlight-color: transparent;
   }
 
   .mobile-close-btn {
@@ -93,19 +103,114 @@
     color: var(--cal-text);
     cursor: pointer;
     margin-left: auto;
+    -webkit-tap-highlight-color: transparent;
   }
 
-  /* Calendar View Adjustments */
+  /* Daily Timeline - compact on mobile */
+  .daily-timeline-wrapper {
+    padding: 0.5rem 0.75rem 0.25rem;
+  }
+
+  .daily-timeline-track {
+    height: 45px;
+  }
+
+  /* Calendar View - CRITICAL: explicit height so FullCalendar renders */
   .calendar-view {
     padding: 0.5rem;
+    flex: none;
+    height: calc(100dvh - 200px);
+    min-height: 400px;
+    overflow: hidden;
   }
 
-  .fc-toolbar {
-    flex-direction: column;
-    gap: 0.5rem;
+  .calendar-card {
+    height: 100%;
+    box-sizing: border-box;
   }
 
-  .fc-toolbar-title {
-    font-size: 1.2rem !important;
+  /* FullCalendar toolbar - stack on mobile */
+  .fc .fc-toolbar {
+    flex-wrap: wrap;
+    gap: 0.4rem;
+    margin-bottom: 0.75rem !important;
+  }
+
+  .fc .fc-toolbar-title {
+    font-size: 1.1rem !important;
+    width: 100%;
+    text-align: center;
+    order: -1;
+  }
+
+  .fc .fc-toolbar-chunk {
+    display: flex;
+    justify-content: center;
+  }
+
+  .fc .fc-button {
+    padding: 0.3rem 0.5rem !important;
+    font-size: 0.75rem !important;
+  }
+
+  .fc .fc-daygrid-day-number {
+    font-size: 0.8rem;
+    padding: 0.25rem !important;
+  }
+
+  .fc .fc-col-header-cell-cushion {
+    font-size: 0.75rem;
+    padding: 0.3rem !important;
+  }
+
+  .fc .fc-event {
+    font-size: 0.7rem !important;
+    padding: 1px 3px !important;
+  }
+
+  /* Day Panel - full width on mobile */
+  .day-panel {
+    width: 100%;
+    max-width: 100%;
+  }
+
+  /* Sidebar footer safe area */
+  .sidebar-footer {
+    padding-bottom: calc(1rem + env(safe-area-inset-bottom, 0px));
+  }
+
+  .sidebar-btn {
+    padding: 0.6rem 0.75rem;
+    font-size: 0.85rem;
+  }
+}
+
+/* Extra small screens */
+@media (max-width: 480px) {
+  .calendar-view {
+    padding: 0.25rem;
+    height: calc(100dvh - 180px);
+    min-height: 350px;
+  }
+
+  .fc .fc-toolbar-title {
+    font-size: 1rem !important;
+  }
+
+  .fc .fc-button {
+    padding: 0.25rem 0.4rem !important;
+    font-size: 0.7rem !important;
+  }
+
+  .daily-timeline-wrapper {
+    padding: 0.4rem 0.5rem 0.2rem;
+  }
+
+  .daily-timeline-track {
+    height: 40px;
+  }
+
+  .mobile-header {
+    padding: 0.25rem 0.75rem;
   }
 }

@@ -209,6 +209,34 @@ function getOutlookCategoryColor(outlookColor) {
 // Background sync tracker: avoid concurrent syncs for same user
 const syncInProgress = new Map();
 
+// --- Connection status endpoint ---
+// Actually validates the Microsoft token instead of just checking if it exists
+app.get('/status', authenticate, async (req, res) => {
+  try {
+    const user = await dbAsync.get(
+      'SELECT id, microsoft_access_token, microsoft_refresh_token, microsoft_email FROM users WHERE username = ?',
+      [req.user.username]
+    );
+
+    if (!user || !user.microsoft_access_token) {
+      return res.json({ success: true, linked: false, email: null });
+    }
+
+    // Actually validate the token (will auto-refresh if expired)
+    const validToken = await getValidAccessToken(user);
+
+    if (!validToken) {
+      // Token expired AND refresh failed — connection is dead
+      return res.json({ success: true, linked: false, email: user.microsoft_email });
+    }
+
+    return res.json({ success: true, linked: true, email: user.microsoft_email });
+  } catch (error) {
+    console.error('[STATUS] Error checking connection:', error.message);
+    return res.json({ success: true, linked: false, email: null });
+  }
+});
+
 app.get('/', authenticate, async (req, res) => {
   try {
     const username = req.user.username;

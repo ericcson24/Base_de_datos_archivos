@@ -708,6 +708,146 @@
   outline-color: #60a5fa;
 }
 
+/* ===== Mobile Responsive ===== */
+@media (max-width: 768px) {
+  .word-toolbar {
+    padding: 8px 12px;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+
+  .word-toolbar-right {
+    gap: 4px;
+    flex-wrap: wrap;
+  }
+
+  .word-toolbar button {
+    padding: 6px 10px;
+    font-size: 13px;
+  }
+
+  .btn-print, .btn-fullscreen, .btn-download {
+    padding: 6px 8px !important;
+  }
+
+  .word-content {
+    padding: 10px;
+  }
+
+  .word-preview {
+    padding: 24px;
+    min-height: auto;
+  }
+
+  .word-preview-quill .ql-editor,
+  .ql-container .ql-editor {
+    padding: 24px;
+    min-height: auto;
+  }
+
+  .ql-container .ql-editor.ql-blank::before {
+    left: 24px;
+    right: 24px;
+  }
+
+  .ql-container {
+    min-height: auto;
+  }
+
+  .ql-toolbar .ql-formats {
+    margin-right: 4px !important;
+    padding-right: 4px;
+  }
+
+  .word-status-bar {
+    padding: 4px 12px;
+    font-size: 11px;
+  }
+
+  .word-status-left, .word-status-right {
+    gap: 8px;
+  }
+
+  .ql-editor .ql-video {
+    max-width: 100%;
+    height: auto;
+    aspect-ratio: 16/9;
+  }
+}
+
+@media (max-width: 480px) {
+  .word-toolbar {
+    padding: 6px 8px;
+    gap: 6px;
+  }
+
+  .word-toolbar-left h3 {
+    font-size: 13px;
+    max-width: 120px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .word-toolbar-right {
+    gap: 3px;
+  }
+
+  .word-toolbar button {
+    padding: 5px 8px;
+    font-size: 12px;
+  }
+
+  .btn-print, .btn-fullscreen, .btn-download {
+    padding: 5px 6px !important;
+    font-size: 12px;
+  }
+
+  .word-content {
+    padding: 6px;
+  }
+
+  .word-preview {
+    padding: 16px;
+  }
+
+  .word-preview-quill .ql-editor,
+  .ql-container .ql-editor {
+    padding: 16px;
+  }
+
+  .ql-container .ql-editor.ql-blank::before {
+    left: 16px;
+    right: 16px;
+  }
+
+  .ql-toolbar {
+    padding: 4px 6px !important;
+  }
+
+  .ql-toolbar .ql-formats {
+    margin-right: 2px !important;
+    padding-right: 2px;
+    margin-bottom: 1px;
+  }
+
+  .ql-snow .ql-picker.ql-font {
+    width: 100px !important;
+  }
+
+  .ql-snow .ql-picker.ql-size {
+    width: 55px !important;
+  }
+
+  .word-status-bar {
+    padding: 3px 8px;
+  }
+
+  .word-status-left span:not(:first-child) {
+    display: none;
+  }
+}
+
 [data-theme="dark"] .ql-toolbar .ql-formats {
   border-right-color: #4b5563;
 }

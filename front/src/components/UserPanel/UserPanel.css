@@ -193,7 +193,8 @@ body {
   color: var(--text-color);
   font-size: var(--font-main);
   min-height: 100vh;
-  width: 100vw;
+  min-height: 100dvh;
+  width: 100%;
   overflow-x: hidden;
   background: transparent;
 }
@@ -201,6 +202,7 @@ body {
 .user-panel {
   display: flex;
   height: 100vh;
+  height: 100dvh;
   overflow: hidden;
   position: relative;
   background: var(--bg-gradient);
@@ -230,6 +232,7 @@ body {
   border: 1px solid var(--sidebar-border);
   min-width: 300px;
   max-width: 500px;
+  box-sizing: border-box;
 }
 
 .modal-content h3 {
@@ -656,13 +659,17 @@ body {
 .main-panel {
   flex: 1;
   margin-left: 0;
-  padding: 0; /* Removed padding to match Calendar */
+  padding: var(--main-padding);
+  padding-top: 0.5rem;
   display: flex;
   flex-direction: column;
   min-width: 0;
   height: 100vh;
+  height: 100dvh;
   overflow-y: auto;
   background: transparent;
+  position: relative;
+  box-sizing: border-box;
 }
 
 .panel-header {
@@ -994,17 +1001,7 @@ input[type="text"]:focus {
     -webkit-backdrop-filter: url(#frosted);
 }
 
-/* MAIN PANEL */
-.main-panel {
-  flex: 1;
-  /* margin-left removed as requested */
-  padding: var(--main-padding);
-  padding-top: 0.5rem;
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
-  position: relative;
-}
+/* MAIN PANEL — merged into first .main-panel definition above */
 
 /* Panel header styles moved above to avoid duplicate definitions */
 
@@ -1467,35 +1464,38 @@ input[type="text"]:focus {
 
 /* RESPONSIVE */
 @media (max-width: 768px) {
-  .sidebar {
-    position: fixed;
-    left: -100%;
-    width: 280px;
-    z-index: 1000;
-    top: 1rem;
-    height: calc(100vh - 2rem);
-  }
-
-  .sidebar.show {
-    left: 0;
-  }
+  /* Sidebar rules are in UserPanelMobile.css — only non-sidebar overrides here */
 
   .main-panel {
     margin-left: 0;
-    padding: 1rem;
-    padding-top: 1rem;
+    height: auto;
+    min-height: 100vh;
+    min-height: 100dvh;
   }
 
   .panel-title {
-    font-size: 1.5rem;
+    font-size: 1.3rem;
+  }
+
+  .panel-header {
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+
+  .main-panel > .panel-header {
+    padding: 10px 12px;
+    border-radius: 12px;
   }
 
   .file-grid {
-    max-height: 90vh; /* Aumentado de 60vh a 90vh también para móviles */
+    max-height: none;
+    min-height: 300px;
   }
 
   .main-content-container {
     flex-direction: column;
+    overflow: visible;
+    min-height: 0;
   }
 
   .editor-panels-container {
@@ -2295,11 +2295,11 @@ input[type="text"]:focus {
 
 /* Estilos para el botón IA — misma estructura cuadrada que search-container con tinte púrpura */
 .ai-container {
-  border: 1px solid rgba(139, 92, 246, 0.18);
+  border: 1px solid rgba(14, 165, 233, 0.18);
   color: var(--control-text);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
-  background: rgba(139, 92, 246, 0.06);
+  background: rgba(14, 165, 233, 0.06);
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   overflow: hidden;
 }
@@ -2309,15 +2309,15 @@ input[type="text"]:focus {
 }
 
 .ai-container.collapsed:hover {
-  background: rgba(139, 92, 246, 0.12);
-  border-color: rgba(139, 92, 246, 0.3);
+  background: rgba(14, 165, 233, 0.12);
+  border-color: rgba(14, 165, 233, 0.3);
 }
 
 .ai-container.expanded {
   border-radius: 10px;
-  background: rgba(139, 92, 246, 0.06);
-  border-color: rgba(139, 92, 246, 0.25);
-  box-shadow: 0 1px 4px rgba(139, 92, 246, 0.1);
+  background: rgba(14, 165, 233, 0.06);
+  border-color: rgba(14, 165, 233, 0.25);
+  box-shadow: 0 1px 4px rgba(14, 165, 233, 0.1);
 }
 
 .ai-container .ai-input {
@@ -2333,25 +2333,25 @@ input[type="text"]:focus {
 }
 
 .ai-container .ai-input::placeholder {
-  color: rgba(139, 92, 246, 0.45);
+  color: rgba(14, 165, 233, 0.45);
   font-size: 13px;
   line-height: normal;
 }
 
 /* Dark mode AI */
 [data-theme="dark"] .ai-container {
-  background: rgba(139, 92, 246, 0.08);
-  border-color: rgba(139, 92, 246, 0.15);
+  background: rgba(14, 165, 233, 0.08);
+  border-color: rgba(14, 165, 233, 0.15);
 }
 
 [data-theme="dark"] .ai-container.collapsed:hover {
-  background: rgba(139, 92, 246, 0.15);
-  border-color: rgba(139, 92, 246, 0.3);
+  background: rgba(14, 165, 233, 0.15);
+  border-color: rgba(14, 165, 233, 0.3);
 }
 
 [data-theme="dark"] .ai-container.expanded {
-  background: rgba(139, 92, 246, 0.1);
-  border-color: rgba(139, 92, 246, 0.25);
+  background: rgba(14, 165, 233, 0.1);
+  border-color: rgba(14, 165, 233, 0.25);
   box-shadow: 0 1px 4px rgba(0, 0, 0, 0.2);
 }
 

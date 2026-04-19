@@ -6,7 +6,7 @@ import React from 'react';
  */
 
 const FILE_TYPE_CONFIGS = {
-  image: { color: '#8b5cf6', label: 'IMG', icon: 'image' },
+  image: { color: '#0ea5e9', label: 'IMG', icon: 'image' },
   video: { color: '#ef4444', label: 'VID', icon: 'video' },
   audio: { color: '#f59e0b', label: 'MP3', icon: 'audio' },
   pdf:   { color: '#dc2626', label: 'PDF', icon: 'pdf' },

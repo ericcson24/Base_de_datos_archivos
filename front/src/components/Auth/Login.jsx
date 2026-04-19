@@ -13,8 +13,6 @@ const Login = ({ onLogin, onSwitchToRegister, onThemeToggle, isDarkMode }) => {
   });
   const [errors, setErrors] = useState({});
   const [isLoading, setIsLoading] = useState(false);
-  const [isRecovering, setIsRecovering] = useState(false);
-  const [recoveryMessage, setRecoveryMessage] = useState('');
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -36,44 +34,10 @@ const Login = ({ onLogin, onSwitchToRegister, onThemeToggle, isDarkMode }) => {
     if (!formData.username.trim()) {
       newErrors.username = t('auth.username') + ' ' + t('common.error').toLowerCase();
     }
-    if (!isRecovering && !formData.password) {
+    if (!formData.password) {
       newErrors.password = t('auth.password') + ' ' + t('common.error').toLowerCase();
     }
     return newErrors;
-  };
-
-  const handleRecovery = async (e) => {
-    e.preventDefault();
-    if (!formData.username.trim()) {
-      setErrors({ username: t('auth.recoveryInstruction') });
-      return;
-    }
-
-    setIsLoading(true);
-    setErrors({});
-    setRecoveryMessage('');
-
-    try {
-      const response = await fetch('/api/auth/recover-password', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ username: formData.username }),
-      });
-
-      const data = await response.json();
-
-      if (data.success) {
-        setRecoveryMessage(data.message);
-      } else {
-        setErrors({ general: data.message || t('common.error') });
-      }
-    } catch (error) {
-      setErrors({ general: t('common.error') });
-    } finally {
-      setIsLoading(false);
-    }
   };
 
   const handleSubmit = async (e) => {
@@ -138,74 +102,10 @@ const Login = ({ onLogin, onSwitchToRegister, onThemeToggle, isDarkMode }) => {
       </div>
 
       <FormContainer
-        title={isRecovering ? t('auth.recover') : t('auth.loginTitle')}
-        subtitle={isRecovering ? t('auth.recoveryInstruction') : "Accede a tu nube personal"}
+        title={t('auth.loginTitle')}
+        subtitle="Accede a tu nube personal"
         maxWidth="400px"
       >
-        {isRecovering ? (
-          <form onSubmit={handleRecovery} className="login-form">
-            {recoveryMessage ? (
-              <div className="success-message">
-                {recoveryMessage}
-                <div className="success-message-actions">
-                  <Button
-                    type="button"
-                    variant="secondary"
-                    onClick={() => {
-                      setIsRecovering(false);
-                      setRecoveryMessage('');
-                    }}
-                    fullWidth
-                  >
-                    {t('auth.backToLogin')}
-                  </Button>
-                </div>
-              </div>
-            ) : (
-              <>
-                {errors.general && (
-                  <div className="error-message general-error">
-                    {errors.general}
-                  </div>
-                )}
-
-                <Input
-                  type="text"
-                  name="username"
-                  placeholder={t('auth.username')}
-                  value={formData.username}
-                  onChange={handleChange}
-                  error={errors.username}
-                  icon=""
-                  autoComplete="username"
-                />
-
-                <Button
-                  type="submit"
-                  variant="primary"
-                  size="large"
-                  loading={isLoading}
-                  fullWidth
-                >
-                  {isLoading ? t('auth.sending') : t('auth.sendRecovery')}
-                </Button>
-
-                <div className="form-footer">
-                  <button
-                    type="button"
-                    className="link-button"
-                    onClick={() => {
-                      setIsRecovering(false);
-                      setErrors({});
-                    }}
-                  >
-                    {t('auth.backToLogin')}
-                  </button>
-                </div>
-              </>
-            )}
-          </form>
-        ) : (
           <form onSubmit={handleSubmit} className="login-form">
             {errors.general && (
               <div className="error-message general-error">
@@ -235,19 +135,6 @@ const Login = ({ onLogin, onSwitchToRegister, onThemeToggle, isDarkMode }) => {
               autoComplete="current-password"
             />
 
-            <div className="forgot-password-container">
-              <button
-                type="button"
-                className="link-button forgot-password-btn"
-                onClick={() => {
-                  setIsRecovering(true);
-                  setErrors({});
-                }}
-              >
-                {t('auth.forgotPassword')}
-              </button>
-            </div>
-
             <Button
               type="submit"
               variant="primary"
@@ -273,7 +160,6 @@ const Login = ({ onLogin, onSwitchToRegister, onThemeToggle, isDarkMode }) => {
               </div>
             )}
           </form>
-        )}
       </FormContainer>
     </div>
   );

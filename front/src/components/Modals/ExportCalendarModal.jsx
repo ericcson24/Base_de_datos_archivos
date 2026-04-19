@@ -73,7 +73,7 @@ const ExportCalendarModal = ({ onClose }) => {
       'Preset4': '#16a34a', 'Green category': '#16a34a',
       'Preset5': '#0d9488', 'Teal category': '#0d9488',
       'Preset6': '#2563eb', 'Blue category': '#2563eb',
-      'Preset7': '#7c3aed', 'Purple category': '#7c3aed',
+      'Preset7': '#0284c7', 'Purple category': '#0284c7',
       'Preset8': '#db2777', 'Pink category': '#db2777',
       'Preset9': '#64748b', 'Steel category': '#64748b',
     };

@@ -28,14 +28,14 @@
 
 /* Variants */
 .button-primary {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: linear-gradient(135deg, #2563eb 0%, #0891b2 100%);
   color: white;
-  box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+  box-shadow: 0 4px 15px rgba(37, 99, 235, 0.4);
 }
 
 .button-primary:hover:not(:disabled) {
   transform: translateY(-2px);
-  box-shadow: 0 6px 20px rgba(102, 126, 234, 0.6);
+  box-shadow: 0 6px 20px rgba(37, 99, 235, 0.6);
 }
 
 .button-secondary {
@@ -124,6 +124,7 @@
   .button {
     padding: 14px 20px;
     font-size: 16px; /* Prevent zoom on iOS */
+    border-radius: 10px;
   }
 
   .button-small {
@@ -132,7 +133,11 @@
   }
 
   .button-large {
-    padding: 18px 24px;
+    padding: 16px 20px;
     font-size: 16px;
+  }
+
+  .button-primary:hover:not(:disabled) {
+    transform: none; /* Disable hover lift on touch */
   }
 }

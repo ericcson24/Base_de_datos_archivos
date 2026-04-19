@@ -11,7 +11,7 @@ const SLIDE_BACKGROUNDS = [
   { id: 'light-gray', label: 'Light Gray', css: '#f3f4f6', hex: 'F3F4F6' },
   { id: 'dark', label: 'Dark', css: '#1e293b', hex: '1E293B' },
   { id: 'navy', label: 'Navy', css: '#1e3a5f', hex: '1E3A5F' },
-  { id: 'blue', label: 'Blue', css: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', hex: '4472C4' },
+  { id: 'blue', label: 'Blue', css: 'linear-gradient(135deg, #2563eb 0%, #0891b2 100%)', hex: '4472C4' },
   { id: 'green', label: 'Green', css: 'linear-gradient(135deg, #11998e 0%, #38ef7d 100%)', hex: '217346' },
   { id: 'sunset', label: 'Sunset', css: 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)', hex: 'F5576C' },
   { id: 'ocean', label: 'Ocean', css: 'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)', hex: '4FACFE' },
@@ -948,7 +948,7 @@ const PowerPointEditor = ({ fileUrl, fileBlob, file, onClose, onFileSaved }) => 
                   <div className="ppt-template-mini" style={{ background: '#1e293b' }}></div>
                 </button>
                 <button className="ppt-template-btn" onClick={() => addSlide('blue')} title={t('powerPointEditor.blueSlide')}>
-                  <div className="ppt-template-mini" style={{ background: 'linear-gradient(135deg, #667eea, #764ba2)' }}></div>
+                  <div className="ppt-template-mini" style={{ background: 'linear-gradient(135deg, #2563eb, #0891b2)' }}></div>
                 </button>
               </div>
             </div>

@@ -25,6 +25,7 @@ const RDPViewer = ({ connectionId, token, onClose }) => {
     // Fallback credentials modal for when guacd asks mid-connection
     const [pendingRequired, setPendingRequired] = useState(null);
     const [fallbackPassword, setFallbackPassword] = useState('');
+    const wasConnectedRef = useRef(false);
 
     // Start the actual Guacamole connection after user submits credentials
     const startConnection = useCallback(() => {
@@ -76,10 +77,17 @@ const RDPViewer = ({ connectionId, token, onClose }) => {
             const msg = error?.message || '';
             let displayMsg = msg || 'Unknown error';
             // Map common Guacamole status codes to user-friendly messages
-            if (code === 0x0203 || code === 515) displayMsg = t('rdp.authFailed') || 'Authentication failed — check your username and password';
-            else if (code === 0x0200 || code === 512) displayMsg = t('rdp.serverError') || 'Server error — could not connect';
-            else if (code === 0x0308 || code === 776) displayMsg = t('rdp.upstreamError') || 'Remote desktop server unreachable';
-            else if (msg) displayMsg = msg;
+            const msgLower = (msg || '').toLowerCase();
+            const isAuthError = msgLower.includes('authentication') || msgLower.includes('credentials') || msgLower.includes('logon') || msgLower.includes('login');
+            if (code === 0x0203 || code === 515 || code === 769 || code === 0x0301 || isAuthError) {
+                displayMsg = t('rdp.authFailed') || 'Authentication failed \u2014 check your username and password';
+            } else if (code === 0x0200 || code === 512) {
+                displayMsg = t('rdp.serverError') || 'Server error \u2014 could not connect';
+            } else if (code === 0x0308 || code === 776) {
+                displayMsg = t('rdp.upstreamError') || 'Remote desktop server unreachable';
+            } else if (msg) {
+                displayMsg = msg;
+            }
             console.error('RDP Error -', 'code:', code, 'message:', msg, 'display:', displayMsg);
             setConnectionState('ERROR');
             setErrorMsg(displayMsg);
@@ -113,6 +121,7 @@ const RDPViewer = ({ connectionId, token, onClose }) => {
                 case 1: setConnectionState('CONNECTING'); break;
                 case 2: setConnectionState('WAITING'); break;
                 case 3: 
+                    wasConnectedRef.current = true;
                     setConnectionState('CONNECTED');
                     setTimeout(() => {
                         const displayEl = elementRef.current?.querySelector('div');
@@ -120,7 +129,21 @@ const RDPViewer = ({ connectionId, token, onClose }) => {
                     }, 200);
                     break;
                 case 4: setConnectionState('DISCONNECTING'); break;
-                case 5: setConnectionState('DISCONNECTED'); break;
+                case 5:
+                    setConnectionState(prev => {
+                        // Don't overwrite ERROR with DISCONNECTED
+                        if (prev === 'ERROR') return 'ERROR';
+                        return 'DISCONNECTED';
+                    });
+                    // If we never connected, show an error
+                    if (!wasConnectedRef.current) {
+                        setErrorMsg(prev => prev || (t('rdp.connectionFailed') || 'Connection failed \u2014 could not establish remote desktop session'));
+                        setConnectionState(prev => {
+                            if (prev === 'ERROR') return 'ERROR';
+                            return 'ERROR';
+                        });
+                    }
+                    break;
                 default: break;
             }
         };
@@ -464,7 +487,7 @@ const RDPViewer = ({ connectionId, token, onClose }) => {
             ) : null}
 
             {/* Error Overlay */}
-            {connectionState === 'ERROR' && (
+            {(connectionState === 'ERROR' || (connectionState === 'DISCONNECTED' && errorMsg)) && (
                 <div className="rdp-overlay error">
                     <div className="error-icon">⚠️</div>
                     <h3>{t('rdp.error')}</h3>

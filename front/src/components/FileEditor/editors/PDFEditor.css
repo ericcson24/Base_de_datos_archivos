@@ -565,6 +565,7 @@ g:hover .pdf-ann-delete-btn {
   .pdf-toolbar {
     padding: 4px 8px;
     gap: 4px;
+    flex-wrap: wrap;
   }
 
   .pdf-btn-tool {
@@ -579,5 +580,25 @@ g:hover .pdf-ann-delete-btn {
 
   .pdf-viewer-area {
     padding: 10px;
+  }
+}
+
+@media (max-width: 480px) {
+  .pdf-toolbar {
+    padding: 3px 6px;
+    gap: 3px;
+  }
+
+  .pdf-btn-tool {
+    font-size: 10px;
+    padding: 3px 5px;
+  }
+
+  .pdf-iframe {
+    height: 100%;
+  }
+
+  .pdf-viewer-area {
+    padding: 4px;
   }
 }

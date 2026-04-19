@@ -997,12 +997,34 @@ useEffect(() => {
       const result = await response.json();
       
       if (result.success) {
-        // Notification handled by backend
+        loadFiles();
       } else {
         throw new Error(result.message);
       }
     } catch (error) {
       console.error('Error sharing item:', error);
+      throw error;
+    }
+  };
+
+  const handleUnshareUser = async (item, targetUsername) => {
+    try {
+      const response = await fetch('/api/files/unshare', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${getAuthToken()}`
+        },
+        body: JSON.stringify({
+          path: item.path,
+          username: targetUsername
+        })
+      });
+      const result = await response.json();
+      if (!result.success) throw new Error(result.message);
+      loadFiles();
+    } catch (error) {
+      console.error('Error unsharing:', error);
       throw error;
     }
   };
@@ -1554,7 +1576,7 @@ useEffect(() => {
               >
                   {/* Icono IA */}
                   <svg
-                    className="w-4 h-4 flex-shrink-0 text-purple-500"
+                    className="w-4 h-4 flex-shrink-0 text-sky-500"
                     fill="none"
                     stroke="currentColor"
                     viewBox="0 0 24 24"
@@ -1590,8 +1612,8 @@ useEffect(() => {
                       {/* Indicador de indexación */}
                       {indexingStatus && (indexingStatus.isBuilding || !indexingStatus.isIndexed) && (
                         <span className="flex h-2.5 w-2.5 flex-shrink-0 relative" title="Indexando archivos...">
-                          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-purple-400 opacity-75"></span>
-                          <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-purple-500"></span>
+                          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-sky-400 opacity-75"></span>
+                          <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-sky-500"></span>
                         </span>
                       )}
 
@@ -1602,10 +1624,10 @@ useEffect(() => {
                             e.stopPropagation();
                             submitAIQuery();
                           }}
-                          className="flex-shrink-0 flex items-center justify-center w-5 h-5 rounded transition-colors duration-200 hover:bg-purple-100 dark:hover:bg-purple-900/30"
+                          className="flex-shrink-0 flex items-center justify-center w-5 h-5 rounded transition-colors duration-200 hover:bg-sky-100 dark:hover:bg-sky-900/30"
                           title={t('userPanel.sendAIQuery')}
                         >
-                          <svg className="w-3.5 h-3.5 text-purple-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <svg className="w-3.5 h-3.5 text-sky-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
                           </svg>
                         </button>
@@ -1951,6 +1973,7 @@ useEffect(() => {
         isOpen={showShareModal}
         onClose={() => setShowShareModal(false)}
         onShare={handleShareItem}
+        onUnshareUser={handleUnshareUser}
         item={shareItem}
       />
 
@@ -2031,8 +2054,8 @@ useEffect(() => {
         <div className="fixed inset-0 bg-black/30 dark:bg-black/50 flex items-center justify-center z-[9999] backdrop-blur-sm">
           <div className="glassmorphism-modal dark:bg-slate-800 rounded-2xl shadow-2xl border border-gray-200 dark:border-slate-600 p-8 flex flex-col items-center gap-4 max-w-sm mx-4">
             <div className="relative">
-              <div className="w-14 h-14 rounded-full border-4 border-purple-200 dark:border-purple-900 border-t-purple-500 animate-spin"></div>
-              <svg className="w-6 h-6 text-purple-500 absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <div className="w-14 h-14 rounded-full border-4 border-sky-200 dark:border-sky-900 border-t-sky-500 animate-spin"></div>
+              <svg className="w-6 h-6 text-sky-500 absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
               </svg>
             </div>

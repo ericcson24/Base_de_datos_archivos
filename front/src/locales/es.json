@@ -38,6 +38,7 @@
     },
     "language": "Idioma",
     "close": "Cerrar",
+    "done": "Listo",
     "minimize": "Minimizar",
     "maximize": "Maximizar",
     "downloadError": "Error al iniciar la descarga",
@@ -114,7 +115,8 @@
     "authenticate": "Autenticar",
     "authFailed": "Autenticaci\u00f3n fallida \u2014 verifica tu usuario y contrase\u00f1a",
     "serverError": "Error del servidor \u2014 no se pudo conectar al escritorio remoto",
-    "upstreamError": "Servidor de escritorio remoto inaccesible"
+    "upstreamError": "Servidor de escritorio remoto inaccesible",
+    "connectionFailed": "Conexi\u00f3n fallida \u2014 no se pudo establecer la sesi\u00f3n de escritorio remoto"
   },
   "folders": {
     "title": "Selecciona una carpeta",
@@ -289,14 +291,23 @@
   },
   "share": {
     "title": "Compartir \"{{name}}\"",
+    "subtitle": "Añade personas para compartir este archivo",
+    "addPeople": "Añadir personas",
     "targetUser": "Nombre de usuario destino:",
-    "placeholder": "Ej: usuario123",
+    "placeholder": "Buscar usuarios...",
     "sharing": "Compartiendo...",
     "share": "Compartir",
+    "shareWith": "Compartir con {{count}} persona(s)",
+    "sharedSuccess": "Compartido con {{count}} persona(s)",
+    "someErrors": "{{count}} usuario(s) no se pudieron compartir",
     "error": "Error al compartir",
     "unshare": "Dejar de compartir",
     "unshareSuccess": "Se dejó de compartir correctamente",
-    "sharedWith": "Compartido con"
+    "sharedWith": "Compartido con",
+    "peopleWithAccess": "Personas con acceso",
+    "noShares": "Aún no has compartido este archivo",
+    "removeAccess": "Quitar acceso",
+    "sharedOn": "Compartido el {{date}}"
   },
   "move": {
     "title": "Mover \"{{name}}\"",

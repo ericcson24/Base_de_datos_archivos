@@ -701,6 +701,19 @@ wss.on('connection', async (ws, request) => {
                     const errMsg = elements[1] || 'Unknown guacd error';
                     const errCode = elements[2] || '';
                     console.error('*** GUACD ERROR:', errMsg, '| code:', errCode);
+                    
+                    // Detect auth failures and send a clearer error code to the browser
+                    const errLower = errMsg.toLowerCase();
+                    const isAuthFailure = errLower.includes('authentication') || errLower.includes('credentials') || errLower.includes('logon') || errLower.includes('login') || errCode === '769' || errCode === '0x0301';
+                    if (isAuthFailure) {
+                        // Replace with code 515 (CLIENT_UNAUTHORIZED) so the frontend shows auth error
+                        const authErrInstr = formatGuac('error', ['Authentication failure (invalid credentials?)', '515']);
+                        if (ws.readyState === WebSocket.OPEN) {
+                            ws.send(authErrInstr);
+                        }
+                        // Skip forwarding the original error since we sent our own
+                        continue;
+                    }
                 }
                 
                 if (opcode === 'args' && !handshakeComplete) {

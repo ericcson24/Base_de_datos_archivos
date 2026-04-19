@@ -4,6 +4,7 @@
   width: 100%;
   margin: 0 auto;
   padding: 20px;
+  box-sizing: border-box;
 }
 
 .form-header {
@@ -43,14 +44,33 @@
 /* Responsive design */
 @media (max-width: 480px) {
   .form-container-wrapper {
-    padding: 16px;
+    padding: 0;
+    max-width: 100% !important;
   }
 
+  .form-title {
+    font-size: 22px;
+  }
+
+  .form-subtitle {
+    font-size: 13px;
+  }
+
+  .form-header {
+    margin-bottom: 20px;
+  }
+}
+
+@media (max-width: 360px) {
   .form-title {
     font-size: 20px;
   }
 
   .form-subtitle {
-    font-size: 13px;
+    font-size: 12px;
+  }
+
+  .form-header {
+    margin-bottom: 16px;
   }
 }

@@ -128,7 +128,7 @@ const AudioPlayer = ({ fileUrl, file }) => {
       </div>
 
       {/* Player Area */}
-      <div className="flex-1 bg-gradient-to-br from-purple-500 via-pink-500 to-red-500 flex items-center justify-center p-8">
+      <div className="flex-1 bg-gradient-to-br from-sky-500 via-cyan-500 to-teal-500 flex items-center justify-center p-8">
         <div className="text-center">
           {/* Album Art Placeholder */}
           <div className="w-64 h-64 mx-auto mb-8 rounded-2xl bg-white/20 backdrop-blur-md shadow-2xl flex items-center justify-center animate-pulse">

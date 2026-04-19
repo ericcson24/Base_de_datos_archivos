@@ -48,13 +48,13 @@
 }
 
 .btn-save {
-  background: linear-gradient(135deg, #667eea, #764ba2);
+  background: linear-gradient(135deg, #2563eb, #0891b2);
   color: white;
 }
 
 .btn-save:hover:not(:disabled) {
   transform: translateY(-2px);
-  box-shadow: 0 8px 16px rgba(102, 126, 234, 0.4);
+  box-shadow: 0 8px 16px rgba(37, 99, 235, 0.4);
 }
 
 .btn-save:disabled {
@@ -158,8 +158,8 @@
 }
 
 .tab-btn.active {
-  color: #667eea;
-  background: rgba(102, 126, 234, 0.1);
+  color: #2563eb;
+  background: rgba(37, 99, 235, 0.1);
 }
 
 .tab-btn.active::after {
@@ -169,7 +169,7 @@
   left: 0;
   right: 0;
   height: 2px;
-  background: linear-gradient(90deg, #667eea, #764ba2);
+  background: linear-gradient(90deg, #2563eb, #0891b2);
 }
 
 /* ===== Tab Content ===== */
@@ -202,9 +202,9 @@
 
 .btn-action {
   padding: 10px 14px;
-  background: linear-gradient(135deg, rgba(102, 126, 234, 0.9), rgba(118, 75, 162, 0.9));
+  background: linear-gradient(135deg, rgba(37, 99, 235, 0.9), rgba(8, 145, 178, 0.9));
   color: white;
-  border: 1px solid rgba(102, 126, 234, 0.3);
+  border: 1px solid rgba(37, 99, 235, 0.3);
   border-radius: 8px;
   font-size: 13px;
   font-weight: 500;
@@ -213,9 +213,9 @@
 }
 
 .btn-action:hover:not(:disabled) {
-  background: linear-gradient(135deg, #667eea, #764ba2);
-  border-color: rgba(102, 126, 234, 0.6);
-  box-shadow: 0 6px 12px rgba(102, 126, 234, 0.3);
+  background: linear-gradient(135deg, #2563eb, #0891b2);
+  border-color: rgba(37, 99, 235, 0.6);
+  box-shadow: 0 6px 12px rgba(37, 99, 235, 0.3);
   transform: translateY(-2px);
 }
 
@@ -226,8 +226,8 @@
 
 .selected-text-preview {
   padding: 10px 12px;
-  background: rgba(102, 126, 234, 0.15);
-  border-left: 3px solid #667eea;
+  background: rgba(37, 99, 235, 0.15);
+  border-left: 3px solid #2563eb;
   border-radius: 4px;
   font-size: 12px;
   color: rgba(255, 255, 255, 0.8);
@@ -266,8 +266,8 @@
 .query-input:focus {
   outline: none;
   background: rgba(255, 255, 255, 0.08);
-  border-color: rgba(102, 126, 234, 0.6);
-  box-shadow: 0 0 8px rgba(102, 126, 234, 0.2);
+  border-color: rgba(37, 99, 235, 0.6);
+  box-shadow: 0 0 8px rgba(37, 99, 235, 0.2);
 }
 
 /* Analysis Result */
@@ -400,14 +400,14 @@
 .tab-content::-webkit-scrollbar-thumb,
 .analysis-result::-webkit-scrollbar-thumb,
 .highlighted-content::-webkit-scrollbar-thumb {
-  background: rgba(102, 126, 234, 0.4);
+  background: rgba(37, 99, 235, 0.4);
   border-radius: 3px;
 }
 
 .tab-content::-webkit-scrollbar-thumb:hover,
 .analysis-result::-webkit-scrollbar-thumb:hover,
 .highlighted-content::-webkit-scrollbar-thumb:hover {
-  background: rgba(102, 126, 234, 0.6);
+  background: rgba(37, 99, 235, 0.6);
 }
 
 /* ===== Responsive Design ===== */

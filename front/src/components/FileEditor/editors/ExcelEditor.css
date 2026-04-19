@@ -1140,6 +1140,100 @@
   .status-left {
     gap: 10px;
   }
+
+  .formula-bar {
+    padding: 3px 6px;
+    gap: 4px;
+  }
+
+  .cell-reference {
+    min-width: 44px;
+    padding: 3px 6px;
+    font-size: 11px;
+  }
+
+  .formula-input {
+    padding: 3px 6px;
+    font-size: 12px;
+  }
+
+  .toolbar-separator {
+    display: none;
+  }
+
+  .color-picker-label {
+    padding: 3px 4px;
+    gap: 2px;
+  }
+
+  .excel-find-bar {
+    padding: 4px 8px;
+    gap: 6px;
+  }
+
+  .find-group {
+    gap: 3px;
+  }
+
+  .sheet-tabs-bar {
+    padding: 3px 6px;
+    gap: 4px;
+  }
+
+  .sheet-tab {
+    padding: 4px 10px;
+    font-size: 11px;
+  }
+
+  .zoom-controls button {
+    padding: 1px 6px;
+    font-size: 12px;
+  }
+}
+
+@media (max-width: 480px) {
+  .excel-toolbar {
+    padding: 3px 4px;
+    gap: 2px;
+    min-height: 36px;
+  }
+
+  .toolbar-group {
+    gap: 1px;
+  }
+
+  .toolbar-btn {
+    padding: 3px 5px;
+    font-size: 11px;
+    min-height: 26px;
+  }
+
+  .toolbar-select {
+    min-width: 38px;
+    font-size: 10px;
+    padding: 3px 4px;
+  }
+
+  .excel-table th,
+  .excel-table td {
+    min-width: 50px;
+  }
+
+  .excel-table th.corner-cell,
+  .excel-table td.row-header {
+    min-width: 36px;
+    max-width: 36px;
+    width: 36px;
+  }
+
+  .find-input {
+    width: 90px;
+    font-size: 12px;
+  }
+
+  .status-right .stat-item {
+    display: none;
+  }
 }
 
 /* ═══════════════════════════════════════════

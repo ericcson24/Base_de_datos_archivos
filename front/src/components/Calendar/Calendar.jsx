@@ -271,7 +271,8 @@ const Calendar = ({ user, onLogout, onBackToPanel, onBackToFolders, onGoToRemote
       const headers = {};
       if (token) headers['Authorization'] = `Bearer ${token}`;
 
-      const response = await fetch('/api/auth/settings', { 
+      // Use the outlook-service /status endpoint that actually validates the token
+      const response = await fetch('/api/events/status', { 
         headers,
         credentials: 'include' 
       });
@@ -279,8 +280,8 @@ const Calendar = ({ user, onLogout, onBackToPanel, onBackToFolders, onGoToRemote
         const data = await response.json();
         if (data.success) {
           setMicrosoftStatus({
-            linked: data.settings.microsoftLinked,
-            email: data.settings.microsoftEmail
+            linked: data.linked,
+            email: data.email
           });
         }
       }

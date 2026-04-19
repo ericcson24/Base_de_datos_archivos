@@ -312,3 +312,104 @@
   transition: background 0.2s;
 }
 .ie-icon-btn:hover { background: #444; }
+
+/* ===== Mobile Responsive ===== */
+@media (max-width: 768px) {
+  .ie-toolbar {
+    height: auto;
+    min-height: 50px;
+    padding: 6px 10px;
+    gap: 4px;
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+
+  .ie-btn {
+    padding: 6px 8px;
+    font-size: 10px;
+    min-width: 48px;
+  }
+
+  .ie-btn svg {
+    width: 18px;
+    height: 18px;
+  }
+
+  .ie-controls-panel {
+    min-width: auto;
+    width: calc(100% - 20px);
+    max-width: 360px;
+    left: 50%;
+    bottom: 60px;
+    padding: 12px;
+    gap: 10px;
+  }
+
+  .ie-slider-label {
+    font-size: 12px;
+    min-width: 70px;
+  }
+
+  .ie-viewport {
+    padding: 10px;
+  }
+
+  .ie-save-modal {
+    min-width: auto;
+    width: calc(100% - 32px);
+    max-width: 320px;
+    padding: 20px;
+  }
+
+  .ie-rotate-controls {
+    gap: 12px;
+  }
+
+  .ie-icon-btn {
+    width: 36px;
+    height: 36px;
+  }
+}
+
+@media (max-width: 480px) {
+  .ie-toolbar {
+    padding: 4px 6px;
+    gap: 2px;
+  }
+
+  .ie-btn {
+    padding: 4px 6px;
+    font-size: 9px;
+    min-width: 40px;
+    gap: 2px;
+  }
+
+  .ie-btn svg {
+    width: 16px;
+    height: 16px;
+  }
+
+  .ie-controls-panel {
+    bottom: 50px;
+    padding: 10px;
+    gap: 8px;
+  }
+
+  .ie-slider-group {
+    gap: 8px;
+  }
+
+  .ie-slider-label {
+    min-width: 60px;
+    font-size: 11px;
+  }
+
+  .ie-actions {
+    gap: 6px;
+  }
+
+  .ie-action-btn {
+    padding: 5px 10px;
+    font-size: 12px;
+  }
+}

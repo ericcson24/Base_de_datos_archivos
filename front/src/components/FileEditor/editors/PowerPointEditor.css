@@ -856,6 +856,43 @@
   .ppt-canvas-scroll { padding: 16px 8px; }
 }
 
+@media (max-width: 480px) {
+  .ppt-sidebar {
+    width: 48px;
+    min-width: 48px;
+  }
+  .ppt-thumb-preview { width: 38px; }
+  .ppt-slide {
+    width: 320px;
+    padding: 16px;
+    min-height: auto;
+  }
+  .ppt-toolbar {
+    padding: 6px 8px;
+    gap: 6px;
+  }
+  .ppt-toolbar button {
+    padding: 4px 8px;
+    font-size: 12px;
+  }
+  .ppt-toolbar-left h3 {
+    max-width: 80px;
+    font-size: 11px;
+  }
+  .ppt-format-bar {
+    padding: 3px 6px;
+    gap: 3px;
+    flex-wrap: wrap;
+  }
+  .ppt-canvas-scroll {
+    padding: 10px 4px;
+  }
+  .ppt-status-bar {
+    font-size: 10px;
+    padding: 3px 8px;
+  }
+}
+
 /* ═══════════════════════════════════════
    PRINT
    ═══════════════════════════════════════ */

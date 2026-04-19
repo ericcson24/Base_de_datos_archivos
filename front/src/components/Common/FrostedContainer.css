@@ -104,5 +104,25 @@
   .frosted-container.modal {
     padding: 20px;
     margin: 10px;
+    max-width: 100%;
+  }
+}
+
+@media (max-width: 480px) {
+  .frosted-container.modal {
+    padding: 20px 16px;
+    margin: 0;
+    border-radius: 14px;
+  }
+}
+
+@media (max-width: 360px) {
+  .frosted-container {
+    padding: 12px;
+  }
+
+  .frosted-container.modal {
+    padding: 16px 12px;
+    border-radius: 12px;
   }
 }
