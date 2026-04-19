@@ -177,6 +177,14 @@ const initDb = async () => {
       VALUES ('lan_only', 'false'), ('server_id', ''), ('maintenance_mode', 'false')
       ON CONFLICT (setting_key) DO NOTHING
     `);
+
+    // Windows hosts commonly require NLA; using "any" can trigger
+    // intermittent "wrong security type" negotiation errors via guacd.
+    await pool.query(`
+      UPDATE rdp_connections
+      SET security = 'nla'
+      WHERE security IS NULL OR security = '' OR security = 'any'
+    `);
     
     console.log('RDP Database initialized successfully');
   } catch (error) {

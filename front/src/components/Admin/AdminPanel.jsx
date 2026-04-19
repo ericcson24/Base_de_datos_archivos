@@ -46,6 +46,19 @@ const AdminPanel = ({ user, onLogout, onBackToFolders, onThemeToggle, isDarkMode
     return () => clearInterval(timer);
   }, []);
 
+  // Auto-refresh system data every 5 seconds when on system tab
+  useEffect(() => {
+    if (activeTab === 'system') {
+      loadServerInfo();
+      loadSystemStatus();
+      const sysTimer = setInterval(() => {
+        loadServerInfo();
+        loadSystemStatus();
+      }, 5000);
+      return () => clearInterval(sysTimer);
+    }
+  }, [activeTab]);
+
   useEffect(() => {
     if (activeTab === 'security') {
       loadSecurityOverview();
@@ -424,6 +437,17 @@ const AdminPanel = ({ user, onLogout, onBackToFolders, onThemeToggle, isDarkMode
     </div>
   );
 
+  // Auto-refresh dashboard stats every 10 seconds
+  useEffect(() => {
+    if (activeTab === 'dashboard') {
+      const dashTimer = setInterval(() => {
+        loadSystemStatus();
+        loadConnections();
+      }, 10000);
+      return () => clearInterval(dashTimer);
+    }
+  }, [activeTab]);
+
   const renderDashboard = () => (
     <div className="admin-grid">
       <div className="admin-card">
@@ -536,32 +560,144 @@ const AdminPanel = ({ user, onLogout, onBackToFolders, onThemeToggle, isDarkMode
   );
   };
 
-  const renderSystem = () => (
-    <div className="admin-grid">
+  const formatBytes = (bytes) => {
+    if (!bytes || bytes === 0) return '0 B';
+    const k = 1024;
+    const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
+  };
+
+  const formatUptime = (seconds) => {
+    if (!seconds) return '—';
+    const d = Math.floor(seconds / 86400);
+    const h = Math.floor((seconds % 86400) / 3600);
+    const m = Math.floor((seconds % 3600) / 60);
+    if (d > 0) return `${d}d ${h}h ${m}m`;
+    if (h > 0) return `${h}h ${m}m`;
+    return `${m}m`;
+  };
+
+  const ProgressBar = ({ percent, color = '#4caf50' }) => (
+    <div style={{ width: '100%', height: '8px', background: 'var(--bg-secondary, #e0e0e0)', borderRadius: '4px', overflow: 'hidden', marginTop: '6px' }}>
+      <div style={{ width: `${Math.min(percent || 0, 100)}%`, height: '100%', background: (percent || 0) > 90 ? '#ff3b30' : (percent || 0) > 70 ? '#ff9500' : color, borderRadius: '4px', transition: 'width 0.5s ease' }} />
+    </div>
+  );
+
+  const renderSystem = () => {
+    const info = serverInfo || {};
+    const stats = systemData?.server_stats || {};
+    const net = info.network || stats.network || {};
+    const lastUpdated = info.last_updated || stats.last_updated;
+
+    return (
+    <div className="admin-grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '16px' }}>
+      {/* CPU Card */}
       <div className="admin-card">
         <div className="admin-card-header">
-          <h2 className="admin-card-title">{t('admin.serverInfo')}</h2>
+          <h2 className="admin-card-title">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ verticalAlign: 'middle', marginRight: '8px' }}><rect x="4" y="4" width="16" height="16" rx="2"/><rect x="9" y="9" width="6" height="6"/><line x1="9" y1="1" x2="9" y2="4"/><line x1="15" y1="1" x2="15" y2="4"/><line x1="9" y1="20" x2="9" y2="23"/><line x1="15" y1="20" x2="15" y2="23"/><line x1="20" y1="9" x2="23" y2="9"/><line x1="20" y1="14" x2="23" y2="14"/><line x1="1" y1="9" x2="4" y2="9"/><line x1="1" y1="14" x2="4" y2="14"/></svg>
+            CPU
+          </h2>
+          <span style={{ fontSize: '1.4rem', fontWeight: 700 }}>{info.cpu_percent ?? stats.cpu_percent ?? '—'}%</span>
         </div>
-        <div className="admin-info-list">
-          <p><strong>{t('admin.hostname')}:</strong> {serverInfo.hostname}</p>
-          <p><strong>{t('admin.platform')}:</strong> {serverInfo.platform}</p>
-          <p><strong>{t('admin.nodeVersion')}:</strong> {serverInfo.node_version}</p>
-          <p><strong>{t('admin.memory')}:</strong> {systemData.server_stats?.memory_usage}</p>
-          <p><strong>{t('admin.cpuUsage')}:</strong> {systemData.server_stats?.cpu_usage}</p>
+        <ProgressBar percent={info.cpu_percent ?? stats.cpu_percent} color="#007aff" />
+        <div className="admin-info-list" style={{ marginTop: '12px' }}>
+          <p><strong>{t('admin.cpuUsage')}:</strong> {info.cpu_model || stats.cpu_model || '—'}</p>
+          <p><strong>Cores:</strong> {info.cpu_count || stats.cpu_count || '—'}</p>
         </div>
       </div>
+
+      {/* Memory Card */}
       <div className="admin-card">
         <div className="admin-card-header">
-          <h2 className="admin-card-title">{t('admin.systemDiagnostics')}</h2>
+          <h2 className="admin-card-title">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ verticalAlign: 'middle', marginRight: '8px' }}><rect x="2" y="6" width="20" height="12" rx="2"/><line x1="6" y1="10" x2="6" y2="14"/><line x1="10" y1="10" x2="10" y2="14"/><line x1="14" y1="10" x2="14" y2="14"/><line x1="18" y1="10" x2="18" y2="14"/></svg>
+            {t('admin.memory')}
+          </h2>
+          <span style={{ fontSize: '1.4rem', fontWeight: 700 }}>{info.memory_percent ?? stats.memory_percent ?? '—'}%</span>
         </div>
-        <button className="admin-btn admin-btn-primary" onClick={runDiagnostics}>
+        <ProgressBar percent={info.memory_percent ?? stats.memory_percent} color="#34c759" />
+        <div className="admin-info-list" style={{ marginTop: '12px' }}>
+          <p><strong>Total:</strong> {info.memory_total_gb ?? stats.memory_total_gb ?? '—'} GB</p>
+          <p><strong>En uso:</strong> {info.memory_used_gb ?? stats.memory_used_gb ?? '—'} GB</p>
+          <p><strong>{t('admin.free')}:</strong> {info.memory_free_gb ?? stats.memory_free_gb ?? '—'} GB</p>
+        </div>
+      </div>
+
+      {/* Disk Card */}
+      <div className="admin-card">
+        <div className="admin-card-header">
+          <h2 className="admin-card-title">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ verticalAlign: 'middle', marginRight: '8px' }}><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>
+            {t('admin.disk')}
+          </h2>
+          <span style={{ fontSize: '1.4rem', fontWeight: 700 }}>{info.disk_percent ?? stats.disk_percent ?? '—'}%</span>
+        </div>
+        <ProgressBar percent={info.disk_percent ?? stats.disk_percent} color="#ff9500" />
+        <div className="admin-info-list" style={{ marginTop: '12px' }}>
+          <p><strong>Total:</strong> {info.disk_total_gb ?? stats.disk_total_gb ?? '—'} GB</p>
+          <p><strong>En uso:</strong> {info.disk_used_gb ?? stats.disk_used_gb ?? '—'} GB</p>
+          <p><strong>{t('admin.free')}:</strong> {info.disk_free_gb ?? stats.disk_free_gb ?? '—'} GB</p>
+        </div>
+      </div>
+
+      {/* Network Card */}
+      <div className="admin-card">
+        <div className="admin-card-header">
+          <h2 className="admin-card-title">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ verticalAlign: 'middle', marginRight: '8px' }}><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+            {t('admin.network')}
+          </h2>
+        </div>
+        <div className="admin-info-list">
+          <p><strong>↓ Descarga:</strong> {formatBytes(net.rx_sec || 0)}/s</p>
+          <p><strong>↑ Subida:</strong> {formatBytes(net.tx_sec || 0)}/s</p>
+          <p><strong>↓ Total RX:</strong> {formatBytes(net.rx_total || 0)}</p>
+          <p><strong>↑ Total TX:</strong> {formatBytes(net.tx_total || 0)}</p>
+          {net.iface && <p><strong>Interfaz:</strong> {net.iface}</p>}
+        </div>
+      </div>
+
+      {/* Server Info Card */}
+      <div className="admin-card">
+        <div className="admin-card-header">
+          <h2 className="admin-card-title">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ verticalAlign: 'middle', marginRight: '8px' }}><rect x="2" y="2" width="20" height="8" rx="2" ry="2"/><rect x="2" y="14" width="20" height="8" rx="2" ry="2"/><line x1="6" y1="6" x2="6.01" y2="6"/><line x1="6" y1="18" x2="6.01" y2="18"/></svg>
+            {t('admin.serverInfo')}
+          </h2>
+        </div>
+        <div className="admin-info-list">
+          <p><strong>{t('admin.hostname')}:</strong> {info.hostname || stats.hostname || '—'}</p>
+          <p><strong>{t('admin.platform')}:</strong> {info.platform || stats.platform || '—'} ({info.arch || stats.arch || '—'})</p>
+          <p><strong>{t('admin.nodeVersion')}:</strong> {info.node_version || '—'}</p>
+          <p><strong>{t('admin.pid')}:</strong> {info.pid || '—'}</p>
+          <p><strong>Uptime (Sistema):</strong> {formatUptime(info.uptime_seconds ?? stats.uptime_seconds)}</p>
+          <p><strong>Uptime (Proceso):</strong> {formatUptime(info.process_uptime_seconds)}</p>
+        </div>
+      </div>
+
+      {/* Diagnostics Card */}
+      <div className="admin-card">
+        <div className="admin-card-header">
+          <h2 className="admin-card-title">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ verticalAlign: 'middle', marginRight: '8px' }}><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+            {t('admin.systemDiagnostics')}
+          </h2>
+          {lastUpdated && (
+            <span style={{ fontSize: '0.75rem', opacity: 0.5 }}>
+              {new Date(lastUpdated).toLocaleTimeString()}
+            </span>
+          )}
+        </div>
+        <button className="admin-btn admin-btn-primary" onClick={runDiagnostics} style={{ marginBottom: '12px' }}>
           {t('admin.runDiagnostics')}
         </button>
         {diagnostics.length > 0 && (
-          <div className="admin-diagnostics-results" style={{ marginTop: '16px' }}>
+          <div className="admin-diagnostics-results">
             {diagnostics.map((d, i) => (
               <div key={i} className="admin-log-entry">
-                <span className={`status-badge ${d.status === 'ok' ? 'success' : 'error'}`}>{d.status}</span>
+                <span className={`status-badge ${d.status === 'ok' ? 'success' : d.status === 'warning' ? 'warning' : 'error'}`}>{d.status}</span>
                 <span style={{ marginLeft: '8px' }}>{d.name}: {d.message}</span>
               </div>
             ))}
@@ -570,6 +706,7 @@ const AdminPanel = ({ user, onLogout, onBackToFolders, onThemeToggle, isDarkMode
       </div>
     </div>
   );
+  };
 
   const renderLogs = () => (
     <div className="admin-card">

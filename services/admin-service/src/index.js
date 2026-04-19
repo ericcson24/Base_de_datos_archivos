@@ -85,19 +85,68 @@ const getSystemStats = async () => {
     const usedMem = totalMem - freeMem;
     const cpus = os.cpus();
     const uptime = os.uptime();
-    
-    let cpuUsage = '0%';
-    // Simplified CPU usage for Docker environment
-    cpuUsage = '10%'; // Placeholder
+
+    // Real CPU usage via systeminformation
+    let cpuPercent = 0;
+    try {
+      const cpuLoad = await si.currentLoad();
+      cpuPercent = Math.round(cpuLoad.currentLoad * 100) / 100;
+    } catch (e) {
+      // Fallback: calculate from os.cpus() idle times
+      const cpuAvg = cpus.reduce((acc, cpu) => {
+        const total = Object.values(cpu.times).reduce((a, b) => a + b, 0);
+        return acc + (1 - cpu.times.idle / total);
+      }, 0) / cpus.length;
+      cpuPercent = Math.round(cpuAvg * 10000) / 100;
+    }
+
+    // Disk usage
+    let diskInfo = { total: 0, used: 0, free: 0, percent: 0 };
+    try {
+      const disks = await si.fsSize();
+      if (disks.length > 0) {
+        const main = disks[0];
+        diskInfo = {
+          total: Math.round(main.size / 1024 / 1024 / 1024 * 100) / 100,
+          used: Math.round(main.used / 1024 / 1024 / 1024 * 100) / 100,
+          free: Math.round((main.size - main.used) / 1024 / 1024 / 1024 * 100) / 100,
+          percent: Math.round(main.use * 100) / 100
+        };
+      }
+    } catch (e) { /* ignore */ }
+
+    // Network stats
+    let networkInfo = { rx_sec: 0, tx_sec: 0, rx_total: 0, tx_total: 0, iface: '' };
+    try {
+      const nets = await si.networkStats();
+      if (nets.length > 0) {
+        const main = nets[0];
+        networkInfo = {
+          rx_sec: main.rx_sec || 0,
+          tx_sec: main.tx_sec || 0,
+          rx_total: main.rx_bytes || 0,
+          tx_total: main.tx_bytes || 0,
+          iface: main.iface || ''
+        };
+      }
+    } catch (e) { /* ignore */ }
 
     return {
       memory_total_gb: Math.round(totalMem / 1024 / 1024 / 1024 * 100) / 100,
       memory_used_gb: Math.round(usedMem / 1024 / 1024 / 1024 * 100) / 100,
       memory_free_gb: Math.round(freeMem / 1024 / 1024 / 1024 * 100) / 100,
+      memory_percent: Math.round((usedMem / totalMem) * 10000) / 100,
       memory_usage: Math.round((usedMem / totalMem) * 100) + '%',
       cpu_count: cpus.length,
       cpu_model: cpus[0]?.model || 'Unknown',
-      cpu_usage: cpuUsage,
+      cpu_percent: cpuPercent,
+      cpu_usage: cpuPercent + '%',
+      disk_total_gb: diskInfo.total,
+      disk_used_gb: diskInfo.used,
+      disk_free_gb: diskInfo.free,
+      disk_percent: diskInfo.percent,
+      network: networkInfo,
+      uptime_seconds: Math.floor(uptime),
       uptime_hours: Math.round(uptime / 3600 * 100) / 100,
       uptime_days: Math.round(uptime / 86400 * 100) / 100,
       platform: os.platform(),
@@ -341,6 +390,14 @@ app.get('/api/users', requireAdmin, async (req, res) => {
 app.get('/api/server/info', requireAdmin, async (req, res) => {
   try {
     const stats = await getSystemStats();
+    
+    // Docker container count
+    let dockerContainers = 0;
+    try {
+      const { stdout } = await execAsync('cat /proc/1/cgroup 2>/dev/null | head -1');
+      dockerContainers = -1; // running inside docker
+    } catch (e) { /* not in docker or no access */ }
+
     res.json({
       success: true,
       server_info: {
@@ -348,11 +405,25 @@ app.get('/api/server/info', requireAdmin, async (req, res) => {
         platform: stats.platform,
         arch: stats.arch,
         node_version: process.version,
-        uptime: stats.uptime_hours,
-        memory_total: stats.memory_total_gb,
-        memory_free: stats.memory_free_gb,
+        pid: process.pid,
+        uptime_seconds: stats.uptime_seconds,
+        uptime_hours: stats.uptime_hours,
+        uptime_days: stats.uptime_days,
+        process_uptime_seconds: Math.floor(process.uptime()),
+        memory_total_gb: stats.memory_total_gb,
+        memory_used_gb: stats.memory_used_gb,
+        memory_free_gb: stats.memory_free_gb,
+        memory_percent: stats.memory_percent,
         cpu_model: stats.cpu_model,
-        cpu_count: stats.cpu_count
+        cpu_count: stats.cpu_count,
+        cpu_percent: stats.cpu_percent,
+        disk_total_gb: stats.disk_total_gb,
+        disk_used_gb: stats.disk_used_gb,
+        disk_free_gb: stats.disk_free_gb,
+        disk_percent: stats.disk_percent,
+        network: stats.network,
+        environment: process.env.NODE_ENV || 'production',
+        last_updated: stats.last_updated
       }
     });
   } catch (error) {

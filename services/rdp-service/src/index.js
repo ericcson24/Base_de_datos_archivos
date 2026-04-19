@@ -209,7 +209,7 @@ app.post('/initialize-default', async (req, res) => {
             username: '',
             password: '',
             protocol: 'rdp',
-            security: 'any',
+            security: 'nla',
             virtual_ip: '10.10.10.2',
             is_default: true
         };
@@ -217,8 +217,8 @@ app.post('/initialize-default', async (req, res) => {
         const randomServerId = Math.floor(100000 + Math.random() * 900000).toString();
 
         const result = await dbAsync.run(
-            'INSERT INTO rdp_connections (user_id, server_id, name, hostname, port, username, password, protocol, virtual_ip) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
-            [decoded.id || 1, randomServerId, defaultConn.name, defaultConn.hostname, defaultConn.port, defaultConn.username, defaultConn.password, defaultConn.protocol, defaultConn.virtual_ip]
+            'INSERT INTO rdp_connections (user_id, server_id, name, hostname, port, username, password, protocol, security, virtual_ip) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+            [decoded.id || 1, randomServerId, defaultConn.name, defaultConn.hostname, defaultConn.port, defaultConn.username, defaultConn.password, defaultConn.protocol, defaultConn.security, defaultConn.virtual_ip]
         );
 
         res.json({ success: true, connection: { ...defaultConn, id: result.lastID } });
@@ -338,7 +338,7 @@ app.post('/connections', async (req, res) => {
             return res.status(403).json({ error: 'Admin access required' });
         }
 
-        const { name, hostname, port, username, password, protocol } = req.body;
+        const { name, hostname, port, username, password, protocol, security } = req.body;
         
         if (!hostname) {
             return res.status(400).json({ error: 'Hostname/IP is required' });
@@ -357,8 +357,8 @@ app.post('/connections', async (req, res) => {
 
         // We store the REAL hostname for connection, but assign a virtual_ip for display
         await dbAsync.run(
-            'INSERT INTO rdp_connections (user_id, server_id, name, hostname, port, username, password, protocol, virtual_ip) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
-            [decoded.id || 1, randomServerId, name, hostname, port || 3389, username, password, protocol || 'rdp', virtual_ip]
+            'INSERT INTO rdp_connections (user_id, server_id, name, hostname, port, username, password, protocol, security, virtual_ip) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+            [decoded.id || 1, randomServerId, name, hostname, port || 3389, username, password, protocol || 'rdp', security || 'nla', virtual_ip]
         );
 
         res.json({ success: true, virtual_ip });
@@ -722,7 +722,7 @@ wss.on('connection', async (ws, request) => {
                         'domain': connection.domain || '',
                         'username': connection.username || '',
                         'password': connection.password || '',
-                        'security': connection.security || 'any',
+                        'security': connection.security || 'nla',
                         'ignore-cert': 'true',
                         'enable-wallpaper': 'false',
                         'enable-theming': 'false',
