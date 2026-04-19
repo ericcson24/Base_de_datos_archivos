@@ -4,6 +4,7 @@ import Button from '../Common/Button';
 import { useLanguage } from '../../context/LanguageContext';
 import { getAuthToken } from '../../utils/fileUtils';
 import WordEditor from '../FileEditor/editors/WordEditor';
+import ExcelEditor from '../FileEditor/editors/ExcelEditor';
 import './AIResultsModal.css';
 
 // Simple text viewer for preview
@@ -82,23 +83,51 @@ const AIResultsModal = ({ isOpen, onClose, results, onOpenFile, onDownloadFile }
     const ext = selectedFile.name.toLowerCase().split('.').pop();
     const isDocx = ext === 'docx' || ext === 'doc';
     const isPdf = ext === 'pdf';
-    
+    const isImage = ['jpg','jpeg','png','gif','bmp','webp','svg'].includes(ext);
+    const isSpreadsheet = ['xlsx','xls','ods'].includes(ext) || selectedFile.mime_type?.includes('spreadsheet') || selectedFile.mime_type?.includes('excel');
+    const isPresentation = ['pptx','ppt'].includes(ext) || selectedFile.mime_type?.includes('presentation');
+    const isTextReadable = ['txt','md','json','xml','csv','js','ts','jsx','tsx','html','css','py','java','c','cpp','h','sh','yaml','yml','ini','log'].includes(ext);
+
     // Build auth URL for WordEditor
-    // AI adds download_id for compatibility with file-service
+    // encodeURIComponent is required: base64 IDs can contain '/', '+', '=' which break URL path segments
     const targetId = selectedFile.download_id || selectedFile.id;
-    const fileUrl = `/api/files/preview/${targetId}?token=${encodeURIComponent(getAuthToken())}`;
+    const fileUrl = `/api/files/preview/${encodeURIComponent(targetId)}?token=${encodeURIComponent(getAuthToken())}`;
+
+    // No-preview banner for binary formats that can't be shown inline
+    const NoPreviewBanner = ({ icon, label }) => (
+      <div className="viewer-wrapper" style={{ alignItems: 'center', justifyContent: 'center', gap: '1rem', color: '#94a3b8' }}>
+        <span style={{ fontSize: '4rem' }}>{icon}</span>
+        <p style={{ margin: 0, fontSize: '0.95rem', textAlign: 'center', opacity: 0.8 }}>{label}</p>
+        <a
+          href={`/api/files/download/${encodeURIComponent(targetId)}?token=${encodeURIComponent(getAuthToken())}`}
+          download={selectedFile.name}
+          style={{
+            marginTop: '0.5rem',
+            padding: '0.5rem 1.25rem',
+            borderRadius: '8px',
+            background: 'rgba(56,189,248,0.15)',
+            border: '1px solid rgba(56,189,248,0.3)',
+            color: '#38bdf8',
+            textDecoration: 'none',
+            fontSize: '0.875rem',
+            fontWeight: 600,
+          }}
+        >
+          ⬇ Descargar archivo
+        </a>
+      </div>
+    );
 
     if (isPdf) {
-      // Render PDF in an iframe
       return (
-        <div className="viewer-wrapper h-full">
-          <div style={{ display: 'flex', alignItems: 'center', padding: '8px 12px', borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
+        <div className="viewer-wrapper">
+          <div style={{ display: 'flex', alignItems: 'center', padding: '8px 12px', borderBottom: '1px solid rgba(255,255,255,0.1)', flexShrink: 0 }}>
             <span style={{ fontSize: '1.2rem', marginRight: '8px' }}>📕</span>
             <h3 style={{ margin: 0, fontSize: '0.95rem', opacity: 0.9 }}>{selectedFile.name}</h3>
           </div>
           <iframe 
             src={fileUrl}
-            style={{ flex: 1, width: '100%', height: 'calc(100% - 42px)', border: 'none', borderRadius: '0 0 8px 8px', background: 'white' }}
+            style={{ flex: 1, width: '100%', minHeight: 0, border: 'none', borderRadius: '0 0 8px 8px', background: 'white' }}
             title={selectedFile.name}
           />
         </div>
@@ -107,20 +136,54 @@ const AIResultsModal = ({ isOpen, onClose, results, onOpenFile, onDownloadFile }
 
     if (isDocx || selectedFile.mime_type?.includes('word')) {
       return (
-         <div className="viewer-wrapper h-full"> 
-             <WordEditor 
-               file={selectedFile}
-               fileUrl={fileUrl}
-               onClose={() => setSelectedFile(null)}
-               onFileSaved={() => {}}
-               highlightText={selectedHighlight}
-             />
-         </div>
+        <div className="viewer-wrapper">
+          <WordEditor 
+            file={selectedFile}
+            fileUrl={fileUrl}
+            onClose={() => setSelectedFile(null)}
+            onFileSaved={() => {}}
+            highlightText={selectedHighlight}
+          />
+        </div>
       );
-    } else {
-      // Fallback to text viewer
-      return <TextFileViewer fileId={selectedFile.id} highlightText={selectedHighlight} />;
     }
+
+    if (isImage) {
+      return (
+        <div className="viewer-wrapper" style={{ alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.2)', padding: '1rem' }}>
+          <img
+            src={fileUrl}
+            alt={selectedFile.name}
+            style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain', borderRadius: '8px' }}
+          />
+        </div>
+      );
+    }
+
+    if (isSpreadsheet) {
+      return (
+        <div className="viewer-wrapper" style={{ background: '#fff' }}>
+          <ExcelEditor
+            file={selectedFile}
+            fileUrl={fileUrl}
+            onClose={() => setSelectedFile(null)}
+            onFileSaved={() => {}}
+          />
+        </div>
+      );
+    }
+
+    if (isPresentation) {
+      return <NoPreviewBanner icon="📙" label={`Vista previa no disponible para presentaciones.\n${selectedFile.name}`} />;
+    }
+
+    if (isTextReadable) {
+      const textTargetId = selectedFile.download_id || selectedFile.id;
+      return <TextFileViewer fileId={textTargetId} highlightText={selectedHighlight} />;
+    }
+
+    // Unknown binary format
+    return <NoPreviewBanner icon="📄" label={`Vista previa no disponible para este tipo de archivo.\n${selectedFile.name}`} />;
   };
 
   return (

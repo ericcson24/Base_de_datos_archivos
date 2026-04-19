@@ -99,6 +99,19 @@ class AutoSyncService {
         return { synced: 0, updated: 0 };
       }
 
+      // Remove stale DB entries: hidden files (._*, .DS_Store, etc.) that were
+      // indexed before the filter was added.
+      try {
+        const deleteHiddenQuery = `DELETE FROM files WHERE owner_id = $1 AND name LIKE '.%'`;
+        if (this.db.query) {
+          await this.db.query(deleteHiddenQuery.replace('$1', '$1'), [userId]);
+        } else {
+          await this.db.run('DELETE FROM files WHERE owner_id = ? AND name LIKE ".%"', [userId]);
+        }
+      } catch (e) {
+        // Non-fatal
+      }
+
       // Escanear archivos del usuario
       const files = await this.scanDirectory(userDir, userDir);
 
@@ -122,13 +135,25 @@ class AutoSyncService {
   /**
    * Escanea un directorio recursivamente
    */
-  async scanDirectory(dirPath, basePath) {
+  async scanDirectory(dirPath, basePath, depth = 0) {
+    const MAX_DEPTH = 15;
     const files = [];
-    
+
+    // Skip hidden directories (start with '.') and known system/metadata folders
+    const SKIP_DIRS = new Set(['.git', '__MACOSX', 'node_modules', '$RECYCLE.BIN', 'System Volume Information']);
+
+    if (depth > MAX_DEPTH) {
+      console.warn(`⚠️  AutoSync: Max depth (${MAX_DEPTH}) reached at ${dirPath}, skipping deeper.`);
+      return files;
+    }
+
     try {
       const entries = await fs.readdir(dirPath, { withFileTypes: true });
 
       for (const entry of entries) {
+        // Skip hidden files/dirs (dot-prefix: .DS_Store, ._filename, .git, etc.)
+        if (entry.name.startsWith('.')) continue;
+
         const fullPath = path.join(dirPath, entry.name);
 
         if (entry.isFile()) {
@@ -141,8 +166,10 @@ class AutoSyncService {
             relativePath: path.relative(basePath, fullPath)
           });
         } else if (entry.isDirectory()) {
+          // Skip known system directories
+          if (SKIP_DIRS.has(entry.name)) continue;
           // Recursivo
-          const subFiles = await this.scanDirectory(fullPath, basePath);
+          const subFiles = await this.scanDirectory(fullPath, basePath, depth + 1);
           files.push(...subFiles);
         }
       }

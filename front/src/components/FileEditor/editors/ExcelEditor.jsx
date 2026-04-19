@@ -607,6 +607,42 @@ const ExcelEditor = ({ fileUrl, fileBlob, file, onClose, onFileSaved }) => {
     applyCellStyle(prop, current === onVal ? offVal : onVal);
   };
 
+  const handleApplyBorders = (type) => {
+    if (!selectionRange) return;
+    const BORDER_THIN = '1px solid #555';
+    const BORDER_THICK = '2px solid #111';
+    const newStyles = { ...cellStyles };
+    for (let r = selectionRange.startRow; r <= selectionRange.endRow; r++) {
+      for (let c = selectionRange.startCol; c <= selectionRange.endCol; c++) {
+        const key = `${r}-${c}`;
+        const current = { ...(newStyles[key] || {}) };
+        delete current.borderTop;
+        delete current.borderBottom;
+        delete current.borderLeft;
+        delete current.borderRight;
+        if (type === 'all') {
+          current.borderTop = BORDER_THIN;
+          current.borderBottom = BORDER_THIN;
+          current.borderLeft = BORDER_THIN;
+          current.borderRight = BORDER_THIN;
+        } else if (type === 'outside') {
+          if (r === selectionRange.startRow) current.borderTop = BORDER_THIN;
+          if (r === selectionRange.endRow)   current.borderBottom = BORDER_THIN;
+          if (c === selectionRange.startCol) current.borderLeft = BORDER_THIN;
+          if (c === selectionRange.endCol)   current.borderRight = BORDER_THIN;
+        } else if (type === 'thick') {
+          current.borderTop = BORDER_THICK;
+          current.borderBottom = BORDER_THICK;
+          current.borderLeft = BORDER_THICK;
+          current.borderRight = BORDER_THICK;
+        }
+        // type === 'none': borders already cleared above
+        newStyles[key] = current;
+      }
+    }
+    setCellStyles(newStyles);
+  };
+
   // ═══════════════════════════════════════════
   //  SORT
   // ═══════════════════════════════════════════
@@ -940,6 +976,7 @@ const ExcelEditor = ({ fileUrl, fileBlob, file, onClose, onFileSaved }) => {
 
       // Start typing → enter edit mode
       if (e.key.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey) {
+        e.preventDefault(); // prevent browser from typing the char twice in the newly focused input
         setEditingCell({ ...selectedCell });
         setEditValue(e.key);
         setFormulaValue(e.key);
@@ -955,9 +992,16 @@ const ExcelEditor = ({ fileUrl, fileBlob, file, onClose, onFileSaved }) => {
   // Auto-focus edit input when entering edit mode
   useEffect(() => {
     if (editingCell && editInputRef.current) {
-      editInputRef.current.focus();
-      const len = editInputRef.current.value.length;
-      editInputRef.current.setSelectionRange(len, len);
+      const el = editInputRef.current;
+      // setTimeout ensures the key event has fully finished before focusing,
+      // preventing the character from being delivered twice to the input
+      setTimeout(() => {
+        if (el) {
+          el.focus();
+          const len = el.value.length;
+          el.setSelectionRange(len, len);
+        }
+      }, 0);
     }
   }, [editingCell]);
 
@@ -1106,6 +1150,23 @@ const ExcelEditor = ({ fileUrl, fileBlob, file, onClose, onFileSaved }) => {
         </div>
         <div className="toolbar-separator" />
 
+        {/* Borders */}
+        <div className="toolbar-group">
+          <button onClick={() => handleApplyBorders('all')} className="toolbar-btn" disabled={!selectedCell} title="Todos los bordes">
+            <span className="border-icon all-borders"></span>
+          </button>
+          <button onClick={() => handleApplyBorders('outside')} className="toolbar-btn" disabled={!selectedCell} title="Bordes exteriores">
+            <span className="border-icon outside-borders"></span>
+          </button>
+          <button onClick={() => handleApplyBorders('thick')} className="toolbar-btn" disabled={!selectedCell} title="Bordes gruesos">
+            <span className="border-icon thick-borders"></span>
+          </button>
+          <button onClick={() => handleApplyBorders('none')} className="toolbar-btn" disabled={!selectedCell} title="Sin bordes">
+            <span className="border-icon no-borders"></span>
+          </button>
+        </div>
+        <div className="toolbar-separator" />
+
         {/* Data tools */}
         <div className="toolbar-group">
           <button onClick={autoSum} className="toolbar-btn" disabled={!selectedCell} title={t('excelEditor.autoSum')}>Σ</button>
@@ -1245,6 +1306,14 @@ const ExcelEditor = ({ fileUrl, fileBlob, file, onClose, onFileSaved }) => {
                   const isEdit = editingCell?.row === rowIndex && editingCell?.col === colIndex;
                   const isFindMatch = findMatchSet.has(`${rowIndex}-${colIndex}`);
 
+                  // Split: border props go on <td>, visual props on inner <div>/<input>
+                  const { borderTop, borderBottom, borderLeft, borderRight, ...innerStyle } = style;
+                  const tdBorderStyle = {};
+                  if (borderTop)    tdBorderStyle.borderTop    = borderTop;
+                  if (borderBottom) tdBorderStyle.borderBottom = borderBottom;
+                  if (borderLeft)   tdBorderStyle.borderLeft   = borderLeft;
+                  if (borderRight)  tdBorderStyle.borderRight  = borderRight;
+
                   return (
                     <td
                       key={colIndex}
@@ -1254,7 +1323,7 @@ const ExcelEditor = ({ fileUrl, fileBlob, file, onClose, onFileSaved }) => {
                       onClick={(e) => handleCellClick(rowIndex, colIndex, e)}
                       onDoubleClick={() => handleCellDoubleClick(rowIndex, colIndex)}
                       onContextMenu={(e) => handleContextMenu(e, rowIndex, colIndex)}
-                      style={{ width: columnWidths[colIndex] ? `${columnWidths[colIndex]}px` : undefined }}
+                      style={{ width: columnWidths[colIndex] ? `${columnWidths[colIndex]}px` : undefined, ...tdBorderStyle }}
                     >
                       {isEdit ? (
                         <input
@@ -1264,10 +1333,10 @@ const ExcelEditor = ({ fileUrl, fileBlob, file, onClose, onFileSaved }) => {
                           value={editValue}
                           onChange={(e) => { setEditValue(e.target.value); setFormulaValue(e.target.value); }}
                           onBlur={() => confirmEdit()}
-                          style={style}
+                          style={innerStyle}
                         />
                       ) : (
-                        <div className="cell-display" style={style}>
+                        <div className="cell-display" style={innerStyle}>
                           {formatCellValue(cell)}
                         </div>
                       )}

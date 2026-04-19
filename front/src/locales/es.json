@@ -989,10 +989,13 @@
     "sharedWithUsers": "compartido con {{users}}",
     "customizeFolder": "Personalizar carpeta",
     "folderColor": "Color",
-    "folderIcon": "Icono"
+    "folderIcon": "Icono",
+    "excludeFromAI": "Excluir de IA",
+    "includeInAI": "Incluir en IA",
+    "excludedFromAIMsg": "\"{{name}}\" excluido de la IA",
+    "includedInAIMsg": "\"{{name}}\" incluido en la IA"
   },
   "aiResults": {
-    "title": "Resultados de Búsqueda IA",
     "aiResponse": "Respuesta de la IA",
     "sources": "Fuentes Utilizadas",
     "relevantFiles": "Archivos Relevantes",

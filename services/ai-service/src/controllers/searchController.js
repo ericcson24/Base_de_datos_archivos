@@ -146,8 +146,9 @@ const searchFiles = async (req, res) => {
             `SELECT id, name, physical_path, size, mime_type 
              FROM files 
              WHERE owner_id = $1
+               AND name NOT LIKE '.%'
              ORDER BY created_at DESC 
-             LIMIT 10`,
+             LIMIT 20`,
             [userId]
         );
         
@@ -163,6 +164,55 @@ const searchFiles = async (req, res) => {
         }
     }
 
+    // Supplementary type-aware search: detect if the query implies a specific file type
+    // and guarantee those files are in the candidate list regardless of filename match.
+    {
+      const q = query.toLowerCase();
+      let typeMimeFilter = null;
+      let typeExtFilter = null;
+
+      if (/hoja|excel|xlsx?|calcu|spreadsheet|tabla/.test(q)) {
+        typeMimeFilter = '%spreadsheet%';
+        typeExtFilter = ['%.xlsx', '%.xls', '%.ods', '%.csv'];
+      } else if (/pdf/.test(q)) {
+        typeMimeFilter = '%pdf%';
+        typeExtFilter = ['%.pdf'];
+      } else if (/word|docx?|documento/.test(q)) {
+        typeMimeFilter = '%word%';
+        typeExtFilter = ['%.docx', '%.doc'];
+      } else if (/imagen|photo|foto|png|jpg|jpeg|gif/.test(q)) {
+        typeMimeFilter = 'image/%';
+        typeExtFilter = ['%.png', '%.jpg', '%.jpeg', '%.gif'];
+      }
+
+      if (typeMimeFilter || typeExtFilter) {
+        const extConditions = (typeExtFilter || []).map((_, i) => `name ILIKE $${i + 3}`).join(' OR ');
+        const mimeCondition = typeMimeFilter ? `mime_type ILIKE $2` : 'FALSE';
+        const whereClause = [mimeCondition, extConditions].filter(Boolean).join(' OR ');
+        const params = [userId, typeMimeFilter || '', ...(typeExtFilter || [])];
+
+        const typeFiles = await db.query(
+          `SELECT id, name, physical_path, size, mime_type
+           FROM files
+           WHERE owner_id = $1 AND name NOT LIKE '.%' AND (${whereClause})
+           ORDER BY created_at DESC
+           LIMIT 15`,
+          params
+        );
+
+        const currentIds = new Set(relevantFiles.map(f => f.id));
+        for (const file of typeFiles.rows) {
+          if (!currentIds.has(file.id)) {
+            relevantFiles.unshift(file); // prioritise type matches
+            currentIds.add(file.id);
+          }
+        }
+        if (typeFiles.rows.length > 0) {
+          console.log(`[AI SEARCH] Type-aware supplement: added ${typeFiles.rows.length} type-matched files.`);
+        }
+      }
+    }
+
     if (!relevantFiles || relevantFiles.length === 0) {
       return res.json({
         success: true,
@@ -171,6 +221,41 @@ const searchFiles = async (req, res) => {
         sources: [],
         indexStatus: 'empty'
       });
+    }
+
+    // Filter out AI-excluded paths for this user
+    {
+      try {
+        const userRow = await db.query('SELECT username FROM users WHERE id = $1', [userId]);
+        const username = userRow.rows[0]?.username;
+        if (username) {
+          const exclRows = await db.query('SELECT path FROM ai_exclusions WHERE username = $1', [username]);
+          const excludedPaths = (exclRows.rows || []).map(r => r.path.replace(/\\/g, '/'));
+          if (excludedPaths.length > 0) {
+            const uploadRoot = '/app/uploads';
+            relevantFiles = relevantFiles.filter(file => {
+              if (!file.physical_path) return true;
+              // Get the user-relative path from the physical path
+              const normalized = file.physical_path.replace(/\\/g, '/');
+              let rel = '';
+              if (normalized.startsWith(uploadRoot + '/' + username + '/')) {
+                rel = normalized.slice((uploadRoot + '/' + username + '/').length);
+              }
+              if (!rel) return true;
+              for (const excl of excludedPaths) {
+                if (rel === excl || rel.startsWith(excl + '/')) return false;
+              }
+              return true;
+            });
+            console.log(`[AI SEARCH] After exclusion filter: ${relevantFiles.length} files`);
+          }
+        }
+      } catch (e) {
+        // ai_exclusions table might not exist yet on first boot, skip silently
+        if (!e.message?.includes('ai_exclusions')) {
+          console.warn('[AI SEARCH] Error fetching AI exclusions:', e.message);
+        }
+      }
     }
 
     // Deduplicate files by name + physical_path to avoid reporting the same file multiple times
@@ -221,7 +306,15 @@ const searchFiles = async (req, res) => {
         
         containerPath = containerPath.replace(/\\/g, '/');
 
-        if (containerPath.includes('/Datos/')) {
+        // Priority: if path already points inside the container's uploads dir, use it as-is.
+        // This MUST come first to prevent the /Datos/ split from mis-routing paths that
+        // contain "Datos" as a subfolder name and belong to a different user.
+        if (containerPath.startsWith('/app/uploads/')) {
+             // Already correct container path — no conversion needed
+        } else if (containerPath.startsWith('uploads/')) {
+             containerPath = path.join('/app', containerPath);
+        } else if (containerPath.includes('/Datos/')) {
+             // Legacy Windows host path like C:/Users/.../Datos/username/file.ext
              const parts = containerPath.split('/Datos/');
              if (parts.length > 1) {
                  containerPath = path.join('/app/uploads', parts[1]);
@@ -231,10 +324,6 @@ const searchFiles = async (req, res) => {
              if (parts.length > 1) {
                  containerPath = path.join('/app/uploads', parts[1]);
              }
-        } else if (containerPath.startsWith('/app/uploads/')) {
-             // Already correct container path
-        } else if (containerPath.startsWith('uploads/')) {
-             containerPath = path.join('/app', containerPath);
         } else if (!path.isAbsolute(containerPath) || !containerPath.startsWith('/')) {
              containerPath = path.join('/app/uploads', containerPath);
         }

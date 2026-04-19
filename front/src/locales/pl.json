@@ -862,7 +862,11 @@
     "sharedWithUsers": "udostępnione dla {{users}}",
     "customizeFolder": "Dostosuj folder",
     "folderColor": "Kolor",
-    "folderIcon": "Ikona"
+    "folderIcon": "Ikona",
+    "excludeFromAI": "Wyklucz z AI",
+    "includeInAI": "Uwzględnij w AI",
+    "excludedFromAIMsg": "\"{{name}}\" wykluczone z AI",
+    "includedInAIMsg": "\"{{name}}\" uwzględnione w AI"
   },
   "aiResults": {
     "title": "Wyniki Wyszukiwania AI",

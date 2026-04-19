@@ -890,7 +890,11 @@
     "sharedWithUsers": "shared with {{users}}",
     "customizeFolder": "Customize folder",
     "folderColor": "Color",
-    "folderIcon": "Icon"
+    "folderIcon": "Icon",
+    "excludeFromAI": "Exclude from AI",
+    "includeInAI": "Include in AI",
+    "excludedFromAIMsg": "\"{{name}}\" excluded from AI",
+    "includedInAIMsg": "\"{{name}}\" included in AI"
   },
   "rdp": {
     "connectTitle": "Remote Desktop Connection",

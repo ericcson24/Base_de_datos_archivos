@@ -333,14 +333,14 @@
   padding: 10px 12px;
   border-radius: 8px;
   border: 1px solid var(--admin-border-light);
-  background: rgba(255, 255, 255, 0.5);
+  background-color: rgba(255, 255, 255, 0.5);
   color: inherit;
   font-family: inherit;
 }
 
 [data-theme='dark'] .admin-input {
   border: 1px solid var(--admin-border-dark);
-  background: rgba(0, 0, 0, 0.3);
+  background-color: rgba(0, 0, 0, 0.3);
 }
 
 .admin-input:focus {

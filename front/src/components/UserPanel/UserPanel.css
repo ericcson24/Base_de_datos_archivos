@@ -2293,37 +2293,62 @@ input[type="text"]:focus {
   z-index: 9999 !important;
 }
 
-/* Estilos para el botón IA — misma estructura cuadrada que search-container con tinte púrpura */
+/* ── AI Container — Dark Metal Glass ── */
 .ai-container {
-  border: 1px solid rgba(14, 165, 233, 0.18);
+  border: 1px solid rgba(129, 140, 248, 0.18);
   color: var(--control-text);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  background: rgba(14, 165, 233, 0.06);
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  backdrop-filter: blur(20px) saturate(160%);
+  -webkit-backdrop-filter: blur(20px) saturate(160%);
+  background: linear-gradient(
+    135deg,
+    rgba(129, 140, 248, 0.06),
+    rgba(56, 189, 248, 0.04),
+    rgba(192, 132, 252, 0.05)
+  );
+  transition: all 0.35s cubic-bezier(0.4, 0, 0.2, 1);
   overflow: hidden;
+  box-shadow:
+    0 0 0 1px rgba(255, 255, 255, 0.03) inset,
+    0 1px 0 rgba(255, 255, 255, 0.04) inset;
 }
 
 .ai-container.collapsed {
-  border-radius: 10px;
+  border-radius: 12px;
 }
 
 .ai-container.collapsed:hover {
-  background: rgba(14, 165, 233, 0.12);
-  border-color: rgba(14, 165, 233, 0.3);
+  background: linear-gradient(
+    135deg,
+    rgba(129, 140, 248, 0.12),
+    rgba(56, 189, 248, 0.08),
+    rgba(192, 132, 252, 0.1)
+  );
+  border-color: rgba(129, 140, 248, 0.3);
+  box-shadow:
+    0 0 0 1px rgba(255, 255, 255, 0.05) inset,
+    0 1px 0 rgba(255, 255, 255, 0.06) inset,
+    0 0 20px -4px rgba(129, 140, 248, 0.15);
 }
 
 .ai-container.expanded {
-  border-radius: 10px;
-  background: rgba(14, 165, 233, 0.06);
-  border-color: rgba(14, 165, 233, 0.25);
-  box-shadow: 0 1px 4px rgba(14, 165, 233, 0.1);
+  border-radius: 12px;
+  background: linear-gradient(
+    135deg,
+    rgba(129, 140, 248, 0.08),
+    rgba(56, 189, 248, 0.06),
+    rgba(192, 132, 252, 0.07)
+  );
+  border-color: rgba(129, 140, 248, 0.25);
+  box-shadow:
+    0 0 0 1px rgba(255, 255, 255, 0.04) inset,
+    0 4px 16px -2px rgba(129, 140, 248, 0.12);
 }
 
 .ai-container .ai-input {
   color: var(--control-text);
   height: 100%;
   line-height: normal;
+  background: transparent;
 }
 
 .ai-container .ai-input:focus {
@@ -2333,30 +2358,54 @@ input[type="text"]:focus {
 }
 
 .ai-container .ai-input::placeholder {
-  color: rgba(14, 165, 233, 0.45);
+  color: rgba(129, 140, 248, 0.45);
   font-size: 13px;
   line-height: normal;
 }
 
-/* Dark mode AI */
+/* Dark mode AI — deeper metallic glass */
 [data-theme="dark"] .ai-container {
-  background: rgba(14, 165, 233, 0.08);
-  border-color: rgba(14, 165, 233, 0.15);
+  background: linear-gradient(
+    135deg,
+    rgba(129, 140, 248, 0.1),
+    rgba(56, 189, 248, 0.06),
+    rgba(192, 132, 252, 0.08)
+  );
+  border-color: rgba(129, 140, 248, 0.15);
+  box-shadow:
+    0 0 0 1px rgba(255, 255, 255, 0.04) inset,
+    0 1px 0 rgba(255, 255, 255, 0.05) inset;
 }
 
 [data-theme="dark"] .ai-container.collapsed:hover {
-  background: rgba(14, 165, 233, 0.15);
-  border-color: rgba(14, 165, 233, 0.3);
+  background: linear-gradient(
+    135deg,
+    rgba(129, 140, 248, 0.16),
+    rgba(56, 189, 248, 0.1),
+    rgba(192, 132, 252, 0.12)
+  );
+  border-color: rgba(129, 140, 248, 0.35);
+  box-shadow:
+    0 0 0 1px rgba(255, 255, 255, 0.06) inset,
+    0 0 24px -4px rgba(129, 140, 248, 0.2);
 }
 
 [data-theme="dark"] .ai-container.expanded {
-  background: rgba(14, 165, 233, 0.1);
-  border-color: rgba(14, 165, 233, 0.25);
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.2);
+  background: linear-gradient(
+    135deg,
+    rgba(129, 140, 248, 0.12),
+    rgba(56, 189, 248, 0.08),
+    rgba(192, 132, 252, 0.1)
+  );
+  border-color: rgba(129, 140, 248, 0.28);
+  box-shadow:
+    0 0 0 1px rgba(255, 255, 255, 0.05) inset,
+    0 4px 20px -2px rgba(0, 0, 0, 0.25),
+    0 0 30px -6px rgba(129, 140, 248, 0.15);
 }
 
 [data-theme="dark"] .ai-container .ai-input::placeholder {
-  color: rgba(167, 139, 250, 0.5);
+  color: rgba(192, 132, 252, 0.45);
 }
 
 /* Estilos para archivos recientes - Rediseño elegante */

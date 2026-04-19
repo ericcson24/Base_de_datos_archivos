@@ -175,7 +175,25 @@ const UserPanel = ({ user, onLogout, onBackToFolders, onThemeToggle, isDarkMode,
     };
 
     checkStatus();
-    const interval = setInterval(checkStatus, 3000);
+    // Only keep polling while the index is actively building; once ready, a single check is enough.
+    const interval = setInterval(async () => {
+      try {
+        const token = localStorage.getItem('auth_token');
+        const res = await fetch('/api/ai/indexing-status', {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        if (res.ok) {
+          const data = await res.json();
+          setIndexingStatus(data);
+          // Stop polling once index is ready and not actively building
+          if (data.isIndexed && !data.isBuilding) {
+            clearInterval(interval);
+          }
+        }
+      } catch (err) {
+        console.error('Error checking indexing status:', err);
+      }
+    }, 15000); // poll at most every 15s
     return () => clearInterval(interval);
   }, [isAIExpanded]);
 
@@ -866,9 +884,35 @@ useEffect(() => {
   };
 
   // Save a shared file to own files (copies the file, removes from shared)
+  const handleToggleAIExclude = async (item) => {
+    const itemPath = (item.path || '').replace(/\\/g, '/');
+    try {
+      const response = await fetch('/api/files/ai-exclude/toggle', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${getAuthToken()}`
+        },
+        body: JSON.stringify({ path: itemPath })
+      });
+      const result = await response.json();
+      if (result.success) {
+        const msg = result.excluded
+          ? (t('contextMenu.excludedFromAIMsg') || `"${item.name}" excluido de la IA`)
+          : (t('contextMenu.includedInAIMsg') || `"${item.name}" incluido en la IA`);
+        addToast(msg, 'success');
+        loadFiles();
+      } else {
+        addToast(t('common.error'), 'error');
+      }
+    } catch (error) {
+      console.error('Error toggling AI exclusion:', error);
+      addToast(t('common.error'), 'error');
+    }
+  };
+
   // Unshare - Owner removes sharing for a file (removes ALL shares for that file)
   const handleUnshare = async (item) => {
-    if (!item.sharedWith || item.sharedWith.length === 0) return;
     try {
       let allSuccess = true;
       for (const targetUsername of item.sharedWith) {
@@ -1576,11 +1620,18 @@ useEffect(() => {
               >
                   {/* Icono IA */}
                   <svg
-                    className="w-4 h-4 flex-shrink-0 text-sky-500"
+                    className="w-4 h-4 flex-shrink-0"
                     fill="none"
-                    stroke="currentColor"
+                    stroke="url(#aiIconGrad)"
                     viewBox="0 0 24 24"
                   >
+                    <defs>
+                      <linearGradient id="aiIconGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                        <stop offset="0%" stopColor="#c084fc" />
+                        <stop offset="50%" stopColor="#818cf8" />
+                        <stop offset="100%" stopColor="#38bdf8" />
+                      </linearGradient>
+                    </defs>
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
                   </svg>
 
@@ -1612,8 +1663,8 @@ useEffect(() => {
                       {/* Indicador de indexación */}
                       {indexingStatus && (indexingStatus.isBuilding || !indexingStatus.isIndexed) && (
                         <span className="flex h-2.5 w-2.5 flex-shrink-0 relative" title="Indexando archivos...">
-                          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-sky-400 opacity-75"></span>
-                          <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-sky-500"></span>
+                          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-indigo-400 opacity-75"></span>
+                          <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-indigo-500"></span>
                         </span>
                       )}
 
@@ -1624,10 +1675,10 @@ useEffect(() => {
                             e.stopPropagation();
                             submitAIQuery();
                           }}
-                          className="flex-shrink-0 flex items-center justify-center w-5 h-5 rounded transition-colors duration-200 hover:bg-sky-100 dark:hover:bg-sky-900/30"
+                          className="flex-shrink-0 flex items-center justify-center w-5 h-5 rounded transition-colors duration-200 hover:bg-indigo-100 dark:hover:bg-indigo-900/30"
                           title={t('userPanel.sendAIQuery')}
                         >
-                          <svg className="w-3.5 h-3.5 text-sky-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <svg className="w-3.5 h-3.5 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
                           </svg>
                         </button>
@@ -1855,6 +1906,7 @@ useEffect(() => {
                     onSaveToMyFiles={currentView === 'shared' ? handleSaveToMyFiles : (item.pinnedFromShared ? handleUnpinFromPanel : undefined)}
                     onRemoveShared={currentView === 'shared' ? handleRemoveShared : undefined}
                     onCustomizeFolder={openCustomizeFolder}
+                    onToggleAIExclude={currentView !== 'shared' ? handleToggleAIExclude : undefined}
                   />
                 ))}
 
@@ -2049,18 +2101,46 @@ useEffect(() => {
         fileType={createFileType}
       />
 
-      {/* AI Loading Overlay */}
+      {/* AI Loading Overlay — Dark Metal Glass */}
       {isAILoading && (
-        <div className="fixed inset-0 bg-black/30 dark:bg-black/50 flex items-center justify-center z-[9999] backdrop-blur-sm">
-          <div className="glassmorphism-modal dark:bg-slate-800 rounded-2xl shadow-2xl border border-gray-200 dark:border-slate-600 p-8 flex flex-col items-center gap-4 max-w-sm mx-4">
+        <div className="fixed inset-0 bg-black/40 dark:bg-black/60 flex items-center justify-center z-[9999] backdrop-blur-md">
+          <div className="relative rounded-2xl p-8 flex flex-col items-center gap-5 max-w-sm mx-4 border overflow-hidden"
+               style={{
+                 background: 'linear-gradient(135deg, rgba(15,23,42,0.88), rgba(30,41,59,0.82), rgba(15,23,42,0.9))',
+                 borderColor: 'rgba(129,140,248,0.2)',
+                 backdropFilter: 'blur(40px) saturate(180%)',
+                 WebkitBackdropFilter: 'blur(40px) saturate(180%)',
+                 boxShadow: 'inset 0 0 0 1px rgba(255,255,255,0.06), inset 0 1px 0 rgba(255,255,255,0.08), 0 25px 60px -12px rgba(0,0,0,0.5), 0 0 80px -20px rgba(129,140,248,0.12)',
+               }}>
+            {/* Animated glow ring behind spinner */}
+            <div className="absolute inset-0 rounded-2xl opacity-30 pointer-events-none"
+                 style={{
+                   background: 'radial-gradient(circle at 50% 30%, rgba(129,140,248,0.15), transparent 70%)',
+                 }} />
             <div className="relative">
-              <div className="w-14 h-14 rounded-full border-4 border-sky-200 dark:border-sky-900 border-t-sky-500 animate-spin"></div>
-              <svg className="w-6 h-6 text-sky-500 absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <div className="w-16 h-16 rounded-full border-[3px] animate-spin"
+                   style={{
+                     borderColor: 'rgba(129,140,248,0.15)',
+                     borderTopColor: '#818cf8',
+                     borderRightColor: '#38bdf8',
+                     filter: 'drop-shadow(0 0 8px rgba(129,140,248,0.3))',
+                   }} />
+              <svg className="w-7 h-7 absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2" fill="none" stroke="url(#aiGradient)" viewBox="0 0 24 24">
+                <defs>
+                  <linearGradient id="aiGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                    <stop offset="0%" stopColor="#c084fc" />
+                    <stop offset="50%" stopColor="#818cf8" />
+                    <stop offset="100%" stopColor="#38bdf8" />
+                  </linearGradient>
+                </defs>
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
               </svg>
             </div>
-            <p className="text-base font-semibold text-gray-800 dark:text-slate-100">{t('userPanel.aiLoading')}</p>
-            <p className="text-sm text-gray-500 dark:text-slate-400 text-center">{t('userPanel.aiLoadingDescription')}</p>
+            <p className="text-base font-semibold text-slate-200"
+               >
+              {t('userPanel.aiLoading')}
+            </p>
+            <p className="text-sm text-slate-400 text-center">{t('userPanel.aiLoadingDescription')}</p>
           </div>
         </div>
       )}

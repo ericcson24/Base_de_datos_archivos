@@ -59,6 +59,23 @@ const authenticate = (req, res, next) => {
   }
 };
 
+// Create ai_exclusions table if it doesn't exist (run once on startup)
+(async () => {
+  try {
+    await dbAsync.run(`
+      CREATE TABLE IF NOT EXISTS ai_exclusions (
+        id SERIAL PRIMARY KEY,
+        username TEXT NOT NULL,
+        path TEXT NOT NULL,
+        UNIQUE(username, path)
+      )
+    `);
+    console.log('[FILE-SERVICE] ai_exclusions table ready');
+  } catch (e) {
+    console.error('[FILE-SERVICE] Error creating ai_exclusions table:', e.message);
+  }
+})();
+
 // Helper para logs
 async function logAction(username, action, details) {
   try {
@@ -196,6 +213,22 @@ app.get('/list', authenticate, async (req, res) => {
       }
     } catch (e) { /* table might not exist yet */ }
 
+    // Fetch AI exclusions for this user
+    let aiExcludedPaths = new Set();
+    try {
+      const exclusions = await dbAsync.all('SELECT path FROM ai_exclusions WHERE username = ?', [owner || username]);
+      if (exclusions) exclusions.forEach(e => aiExcludedPaths.add(e.path.replace(/\\/g, '/')));
+    } catch (e) { /* table might not exist yet */ }
+
+    // Helper: check if a normalized path is excluded (exact match or inside excluded folder)
+    const isAIExcluded = (np) => {
+      if (aiExcludedPaths.has(np)) return true;
+      for (const excl of aiExcludedPaths) {
+        if (np.startsWith(excl + '/')) return true;
+      }
+      return false;
+    };
+
     for (const item of items) {
       const fullPath = path.join(targetDir, item.name);
       const relativePath = path.join(requestedPath, item.name);
@@ -219,7 +252,8 @@ app.get('/list', authenticate, async (req, res) => {
           sharedWith: isShared ? sharedWith : undefined,
           owner: owner || username,
           folder_color: meta.color || null,
-          folder_icon: meta.icon || null
+          folder_icon: meta.icon || null,
+          ai_excluded: isAIExcluded(normalizedPath)
         });
       } else {
         const stats = await fs.stat(fullPath);
@@ -233,7 +267,8 @@ app.get('/list', authenticate, async (req, res) => {
           extension: path.extname(item.name).toLowerCase(),
           shared: isShared,
           sharedWith: isShared ? sharedWith : undefined,
-          owner: owner || username
+          owner: owner || username,
+          ai_excluded: isAIExcluded(normalizedPath)
         });
       }
     }
@@ -564,6 +599,48 @@ app.patch('/folder-customize', authenticate, async (req, res) => {
     res.json({ success: true, message: 'Carpeta personalizada', color: color || '#5f9ee9', icon: icon || 'default' });
   } catch (error) {
     console.error('Error customizing folder:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// --- AI Exclusion endpoints ---
+
+// GET /ai-exclude - returns all excluded paths for the current user
+app.get('/ai-exclude', authenticate, async (req, res) => {
+  try {
+    const username = req.user.username;
+    const rows = await dbAsync.all('SELECT path FROM ai_exclusions WHERE username = ?', [username]);
+    res.json({ success: true, paths: (rows || []).map(r => r.path) });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// POST /ai-exclude/toggle - toggle AI exclusion for a file or folder path
+app.post('/ai-exclude/toggle', authenticate, async (req, res) => {
+  try {
+    const username = req.user.username;
+    let { path: itemPath } = req.body;
+    if (!itemPath) return res.status(400).json({ success: false, message: 'path requerido' });
+
+    // Normalize to forward slashes
+    itemPath = itemPath.replace(/\\/g, '/');
+
+    // Security: path must not escape the user directory
+    const fullPath = path.join(UPLOAD_DIR, username, itemPath);
+    if (!fullPath.startsWith(path.join(UPLOAD_DIR, username))) {
+      return res.status(403).json({ success: false, message: 'Acceso denegado' });
+    }
+
+    const existing = await dbAsync.get('SELECT id FROM ai_exclusions WHERE username = ? AND path = ?', [username, itemPath]);
+    if (existing) {
+      await dbAsync.run('DELETE FROM ai_exclusions WHERE username = ? AND path = ?', [username, itemPath]);
+      res.json({ success: true, excluded: false });
+    } else {
+      await dbAsync.run('INSERT INTO ai_exclusions (username, path) VALUES (?, ?)', [username, itemPath]);
+      res.json({ success: true, excluded: true });
+    }
+  } catch (error) {
     res.status(500).json({ success: false, message: error.message });
   }
 });
