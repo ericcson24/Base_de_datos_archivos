@@ -99,14 +99,23 @@ class AutoSyncService {
         return { synced: 0, updated: 0 };
       }
 
-      // Remove stale DB entries: hidden files (._*, .DS_Store, etc.) that were
+      // Remove stale DB entries: hidden and ignored system-ish files that were
       // indexed before the filter was added.
       try {
-        const deleteHiddenQuery = `DELETE FROM files WHERE owner_id = $1 AND name LIKE '.%'`;
         if (this.db.query) {
-          await this.db.query(deleteHiddenQuery.replace('$1', '$1'), [userId]);
+          await this.db.query(
+            `DELETE FROM files
+             WHERE owner_id = $1
+               AND (name LIKE '.%' OR LOWER(name) LIKE '%.ini' OR LOWER(name) LIKE '%.lnk')`,
+            [userId]
+          );
         } else {
-          await this.db.run('DELETE FROM files WHERE owner_id = ? AND name LIKE ".%"', [userId]);
+          await this.db.run(
+            `DELETE FROM files
+             WHERE owner_id = ?
+               AND (name LIKE '.%' OR LOWER(name) LIKE '%.ini' OR LOWER(name) LIKE '%.lnk')`,
+            [userId]
+          );
         }
       } catch (e) {
         // Non-fatal
@@ -151,8 +160,12 @@ class AutoSyncService {
       const entries = await fs.readdir(dirPath, { withFileTypes: true });
 
       for (const entry of entries) {
-        // Skip hidden files/dirs (dot-prefix: .DS_Store, ._filename, .git, etc.)
+        // Skip hidden files/dirs and ignored system-ish file types
         if (entry.name.startsWith('.')) continue;
+        if (!entry.isDirectory()) {
+          const ext = path.extname(entry.name).toLowerCase();
+          if (ext === '.ini' || ext === '.lnk') continue;
+        }
 
         const fullPath = path.join(dirPath, entry.name);
 

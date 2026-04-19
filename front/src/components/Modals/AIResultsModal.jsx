@@ -63,6 +63,13 @@ const AIResultsModal = ({ isOpen, onClose, results, onOpenFile, onDownloadFile }
   const [selectedFile, setSelectedFile] = useState(null);
   const [selectedHighlight, setSelectedHighlight] = useState(null);
 
+  React.useEffect(() => {
+    if (isOpen) {
+      setSelectedFile(null);
+      setSelectedHighlight(null);
+    }
+  }, [isOpen, results]);
+
   if (!isOpen || !results) return null;
 
   const { response, files = [], sources = [], highlights = [] } = results;

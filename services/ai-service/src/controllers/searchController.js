@@ -258,6 +258,19 @@ const searchFiles = async (req, res) => {
       }
     }
 
+    // Exclude file types the AI should ignore entirely
+    {
+      const ignoredExtensions = ['.ini', '.lnk'];
+      const beforeCount = relevantFiles.length;
+      relevantFiles = relevantFiles.filter(file => {
+        const lowerName = (file.name || '').toLowerCase();
+        return !ignoredExtensions.some(ext => lowerName.endsWith(ext));
+      });
+      if (relevantFiles.length < beforeCount) {
+        console.log(`[AI SEARCH] Ignored ${beforeCount - relevantFiles.length} files by extension filter`);
+      }
+    }
+
     // Deduplicate files by name + physical_path to avoid reporting the same file multiple times
     {
       const seen = new Set();

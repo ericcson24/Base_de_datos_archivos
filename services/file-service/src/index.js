@@ -203,6 +203,13 @@ app.get('/list', authenticate, async (req, res) => {
 
     console.log(`[DEBUG] Found ${items.length} items`);
     let files = [];
+    const ignoredExtensions = new Set(['.ini', '.lnk']);
+    const isIgnoredItem = (name, isDirectory = false) => {
+      if (!name) return false;
+      if (name.startsWith('.')) return true;
+      if (isDirectory) return false;
+      return ignoredExtensions.has(path.extname(name).toLowerCase());
+    };
 
     // Fetch folder metadata (colors/icons)
     let folderMeta = {};
@@ -230,6 +237,8 @@ app.get('/list', authenticate, async (req, res) => {
     };
 
     for (const item of items) {
+      if (isIgnoredItem(item.name, item.isDirectory())) continue;
+
       const fullPath = path.join(targetDir, item.name);
       const relativePath = path.join(requestedPath, item.name);
       
@@ -304,8 +313,8 @@ app.get('/list', authenticate, async (req, res) => {
                 shared: true,
                 pinnedFromShared: true
               };
-              // Apply search filter if active
-              if (!searchQuery || pinnedFile.name.toLowerCase().includes(searchQuery.toLowerCase())) {
+              // Apply ignored extensions + search filter
+              if (!isIgnoredItem(pinnedFile.name, pinnedFile.type === 'folder') && (!searchQuery || pinnedFile.name.toLowerCase().includes(searchQuery.toLowerCase()))) {
                 files.push(pinnedFile);
               }
             } catch (e) {
