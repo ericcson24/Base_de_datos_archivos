@@ -445,7 +445,7 @@ const Calendar = ({ user, onLogout, onBackToPanel, onBackToFolders, onGoToRemote
       setIsLoadingEvents(false);
       isFetchingRef.current = false;
     }
-  }, [viewUserId, isRangeCovered]);
+  }, [viewUserId, isRangeCovered, user.username]);
 
   // Force reload (clears cache) - used after create/edit/delete
   const reloadEvents = useCallback(async () => {
@@ -468,12 +468,41 @@ const Calendar = ({ user, onLogout, onBackToPanel, onBackToFolders, onGoToRemote
   }, [loadEvents]);
 
   useEffect(() => {
-    // Clear cache when switching user view
+    // Clear cache when switching user view or when logged-in user changes
     eventsCacheRef.current.clear();
     loadedRangesRef.current = [];
     loadCategories();
     loadEvents();
-  }, [loadCategories, loadEvents]);
+  }, [loadCategories, loadEvents, user.username]);
+
+  // Auto-sync: if Microsoft is linked but we got 0 events, trigger a sync and reload
+  const hasSyncRetried = useRef(false);
+  useEffect(() => {
+    if (hasSyncRetried.current) return;
+    // Only retry when: linked, no events loaded, not currently fetching, and viewing own calendar
+    if (microsoftStatus.linked && events.length === 0 && !isLoadingEvents && !isFetchingRef.current && !viewUserId) {
+      hasSyncRetried.current = true;
+      const doSync = async () => {
+        try {
+          const token = getAuthToken();
+          const headers = {};
+          if (token) headers['Authorization'] = `Bearer ${token}`;
+          const syncRes = await fetch('/api/events/sync', { method: 'POST', headers, credentials: 'include' });
+          if (syncRes.ok) {
+            await reloadEvents();
+          }
+        } catch (err) {
+          console.error('Auto-sync retry failed:', err);
+        }
+      };
+      doSync();
+    }
+  }, [microsoftStatus.linked, events.length, isLoadingEvents, viewUserId, reloadEvents]);
+
+  // Reset sync retry flag when user changes
+  useEffect(() => {
+    hasSyncRetried.current = false;
+  }, [user.username]);
 
   const toggleCategory = (categoryName) => {
     const newSelected = new Set(selectedCategories);

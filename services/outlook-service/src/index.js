@@ -49,6 +49,22 @@ function getAuthenticatedClient(accessToken) {
   });
 }
 
+// --- Token refresh lock per user to avoid race conditions ---
+const tokenRefreshLocks = new Map(); // userId -> Promise
+
+async function withTokenRefreshLock(userId, fn) {
+  // If a refresh is already in progress for this user, wait for it
+  const existing = tokenRefreshLocks.get(userId);
+  if (existing) {
+    return existing;
+  }
+  const promise = fn().finally(() => {
+    tokenRefreshLocks.delete(userId);
+  });
+  tokenRefreshLocks.set(userId, promise);
+  return promise;
+}
+
 // --- Auto-refresh Microsoft tokens ---
 // Refreshes an expired access_token using the stored refresh_token
 async function refreshAccessToken(userId, refreshToken) {
@@ -117,7 +133,7 @@ async function getValidAccessToken(user) {
     if (err.statusCode === 401 || err.code === 'InvalidAuthenticationToken' || 
         (err.message && (err.message.includes('JWT is not well formed') || err.message.includes('Access token has expired') || err.message.includes('Lifetime validation failed')))) {
       console.log(`[TOKEN] Access token expired for user ID ${user.id}, attempting refresh...`);
-      const newToken = await refreshAccessToken(user.id, user.microsoft_refresh_token);
+      const newToken = await withTokenRefreshLock(user.id, () => refreshAccessToken(user.id, user.microsoft_refresh_token));
       return newToken; // null if refresh failed
     }
     // Some other error (network, etc.) - return existing token and let caller handle
@@ -226,7 +242,9 @@ app.get('/status', authenticate, async (req, res) => {
     const validToken = await getValidAccessToken(user);
 
     if (!validToken) {
-      // Token expired AND refresh failed — connection is dead
+      // Token expired AND refresh failed — connection is dead, clean up
+      console.log(`[STATUS] Clearing dead tokens for user ${req.user.username}`);
+      await dbAsync.run('UPDATE users SET microsoft_access_token = NULL, microsoft_refresh_token = NULL WHERE id = ?', [user.id]);
       return res.json({ success: true, linked: false, email: user.microsoft_email });
     }
 
@@ -236,6 +254,74 @@ app.get('/status', authenticate, async (req, res) => {
     return res.json({ success: true, linked: false, email: null });
   }
 });
+
+// Helper: fetch events from Microsoft Graph and upsert into DB
+// Returns the array of formatted events from MS, or [] on failure
+async function syncEventsFromMicrosoft(user, start, end) {
+    const validToken = await getValidAccessToken(user);
+    if (!validToken) return [];
+    const client = getAuthenticatedClient(validToken);
+
+    let msQuery = client.api('/me/calendar/events')
+        .header('Prefer', 'outlook.timezone="UTC"')
+        .select('id,subject,bodyPreview,start,end,location,webLink,isAllDay,categories')
+        .top(200);
+
+    if (start && end) {
+        const startISO = new Date(start).toISOString();
+        const endISO = new Date(end).toISOString();
+        msQuery = msQuery.filter(`start/dateTime ge '${startISO}' and end/dateTime le '${endISO}'`);
+    }
+
+    const eventsResponse = await msQuery.get();
+    const formatted = [];
+
+    for (const event of eventsResponse.value) {
+        let startTime, endTime;
+        if (event.isAllDay) {
+            startTime = utcDateTimeToMadridDate(event.start.dateTime);
+            endTime = utcDateTimeToMadridDate(event.end.dateTime);
+        } else {
+            startTime = event.start.dateTime.endsWith('Z') ? event.start.dateTime : event.start.dateTime + 'Z';
+            endTime = event.end.dateTime.endsWith('Z') ? event.end.dateTime : event.end.dateTime + 'Z';
+        }
+
+        await dbAsync.run(`
+            INSERT INTO calendar_events (microsoft_id, user_id, subject, body_preview, start_time, end_time, is_all_day, location, web_link, categories, last_synced)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+            ON CONFLICT(microsoft_id) DO UPDATE SET
+            subject=excluded.subject,
+            body_preview=excluded.body_preview,
+            start_time=excluded.start_time,
+            end_time=excluded.end_time,
+            is_all_day=excluded.is_all_day,
+            location=excluded.location,
+            web_link=excluded.web_link,
+            categories=excluded.categories,
+            last_synced=CURRENT_TIMESTAMP
+        `, [
+            event.id, user.id, event.subject, event.bodyPreview,
+            startTime, endTime, event.isAllDay ? 1 : 0,
+            event.location?.displayName, event.webLink,
+            JSON.stringify(event.categories || [])
+        ]);
+
+        formatted.push({
+            id: event.id,
+            title: event.subject,
+            start: event.isAllDay ? startTime : startTime,
+            end: event.isAllDay ? endTime : endTime,
+            allDay: event.isAllDay || false,
+            location: event.location?.displayName,
+            description: event.bodyPreview,
+            url: event.webLink,
+            categories: event.categories || [],
+            source: 'microsoft'
+        });
+    }
+
+    return formatted;
+}
 
 app.get('/', authenticate, async (req, res) => {
   try {
@@ -291,63 +377,39 @@ app.get('/', authenticate, async (req, res) => {
         };
     });
 
-    // Send response immediately (fast!)
+    // 3. If DB has events, return them immediately and sync in background
+    // If DB is EMPTY but user has Microsoft token, do SYNCHRONOUS sync (otherwise user sees nothing)
+    const isOwnCalendar = targetUserIds.length === 1 && targetUserIds[0] === user.id;
+    const dbIsEmpty = formattedEvents.length === 0;
+    const hasMicrosoftToken = !!user.microsoft_access_token;
+
+    if (dbIsEmpty && hasMicrosoftToken && isOwnCalendar && !syncInProgress.get(user.id)) {
+        // Synchronous sync: user sees empty calendar otherwise
+        syncInProgress.set(user.id, true);
+        try {
+            console.log(`[SYNC] DB empty for user ${username}, doing synchronous sync...`);
+            const msEvents = await syncEventsFromMicrosoft(user, start, end);
+            console.log(`[SYNC] Synchronous sync completed for user ${username}: ${msEvents.length} events`);
+            return res.json(msEvents);
+        } catch (msError) {
+            console.error('[SYNC] Synchronous sync failed:', msError.message || msError);
+            // Return empty array - DB had nothing and sync failed
+            return res.json(formattedEvents);
+        } finally {
+            syncInProgress.delete(user.id);
+        }
+    }
+
+    // DB has events - return immediately
     res.json(formattedEvents);
 
-    // 3. Sync with Microsoft in BACKGROUND (non-blocking, after response sent)
-    if (user.microsoft_access_token && !syncInProgress.get(user.id)) {
+    // Background sync (non-blocking, after response sent)
+    if (hasMicrosoftToken && isOwnCalendar && !syncInProgress.get(user.id)) {
         syncInProgress.set(user.id, true);
         setImmediate(async () => {
             try {
-                const validToken = await getValidAccessToken(user);
-                if (!validToken) throw new Error('Token refresh failed');
-                const client = getAuthenticatedClient(validToken);
-                
-                let msQuery = client.api('/me/calendar/events')
-                    .header('Prefer', 'outlook.timezone="UTC"')
-                    .select('id,subject,bodyPreview,start,end,location,webLink,isAllDay,categories')
-                    .top(100);
-
-                if (start && end) {
-                    const startISO = new Date(start).toISOString();
-                    const endISO = new Date(end).toISOString();
-                    msQuery = msQuery.filter(`start/dateTime ge '${startISO}' and end/dateTime le '${endISO}'`);
-                }
-                
-                const eventsResponse = await msQuery.get();
-
-                for (const event of eventsResponse.value) {
-                    // For all-day events, convert UTC dateTime back to Madrid date (Prefer UTC header shifts midnight)
-                    let startTime, endTime;
-                    if (event.isAllDay) {
-                        startTime = utcDateTimeToMadridDate(event.start.dateTime);
-                        endTime = utcDateTimeToMadridDate(event.end.dateTime);
-                    } else {
-                        startTime = event.start.dateTime.endsWith('Z') ? event.start.dateTime : event.start.dateTime + 'Z';
-                        endTime = event.end.dateTime.endsWith('Z') ? event.end.dateTime : event.end.dateTime + 'Z';
-                    }
-
-                    await dbAsync.run(`
-                        INSERT INTO calendar_events (microsoft_id, user_id, subject, body_preview, start_time, end_time, is_all_day, location, web_link, categories, last_synced)
-                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
-                        ON CONFLICT(microsoft_id) DO UPDATE SET
-                        subject=excluded.subject,
-                        body_preview=excluded.body_preview,
-                        start_time=excluded.start_time,
-                        end_time=excluded.end_time,
-                        is_all_day=excluded.is_all_day,
-                        location=excluded.location,
-                        web_link=excluded.web_link,
-                        categories=excluded.categories,
-                        last_synced=CURRENT_TIMESTAMP
-                    `, [
-                        event.id, user.id, event.subject, event.bodyPreview,
-                        startTime, endTime, event.isAllDay ? 1 : 0,
-                        event.location?.displayName, event.webLink,
-                        JSON.stringify(event.categories || [])
-                    ]);
-                }
-                console.log(`[SYNC] Background sync completed for user ${username}: ${eventsResponse.value.length} events`);
+                await syncEventsFromMicrosoft(user, start, end);
+                console.log(`[SYNC] Background sync completed for user ${username}`);
             } catch (msError) {
                 console.error('[SYNC] Background Microsoft sync failed:', msError.message || msError);
             } finally {
@@ -464,53 +526,21 @@ app.post('/sync', authenticate, async (req, res) => {
       return sendResponse(res, 400, { error: 'No vinculado' });
     }
 
-    const validToken = await getValidAccessToken(user);
-    if (!validToken) return sendResponse(res, 401, { error: 'Token expirado, reconecta tu cuenta' });
-    const client = getAuthenticatedClient(validToken);
     const now = new Date();
     const start = new Date(now); start.setMonth(start.getMonth() - 1);
     const end = new Date(now); end.setMonth(end.getMonth() + 6);
 
-    const eventsResponse = await client.api('/me/calendar/events')
-        .header('Prefer', 'outlook.timezone="UTC"')
-        .select('id,subject,bodyPreview,start,end,location,webLink,isAllDay,categories')
-        .filter(`start/dateTime ge '${start.toISOString()}' and end/dateTime le '${end.toISOString()}'`)
-        .top(200)
-        .get();
+    const msEvents = await syncEventsFromMicrosoft(user, start.toISOString(), end.toISOString());
 
-    let syncedCount = 0;
-    for (const event of eventsResponse.value) {
-        // For all-day events, convert UTC dateTime back to Madrid date (Prefer UTC header shifts midnight)
-        let startTime, endTime;
-        if (event.isAllDay) {
-            startTime = utcDateTimeToMadridDate(event.start.dateTime);
-            endTime = utcDateTimeToMadridDate(event.end.dateTime);
-        } else {
-            startTime = event.start.dateTime.endsWith('Z') ? event.start.dateTime : event.start.dateTime + 'Z';
-            endTime = event.end.dateTime.endsWith('Z') ? event.end.dateTime : event.end.dateTime + 'Z';
-        }
-
-        await dbAsync.run(`
-            INSERT INTO calendar_events (microsoft_id, user_id, subject, body_preview, start_time, end_time, is_all_day, location, web_link, categories, last_synced)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
-            ON CONFLICT(microsoft_id) DO UPDATE SET
-            subject=excluded.subject,
-            body_preview=excluded.body_preview,
-            start_time=excluded.start_time,
-            end_time=excluded.end_time,
-            is_all_day=excluded.is_all_day,
-            location=excluded.location,
-            web_link=excluded.web_link,
-            categories=excluded.categories,
-            last_synced=CURRENT_TIMESTAMP
-        `, [
-            event.id, user.id, event.subject, event.bodyPreview, startTime, endTime,
-            event.isAllDay ? 1 : 0, event.location?.displayName, event.webLink, JSON.stringify(event.categories || [])
-        ]);
-        syncedCount++;
+    if (msEvents.length === 0 && user.microsoft_access_token) {
+      // Sync returned nothing - check if token is actually dead
+      const validToken = await getValidAccessToken(user);
+      if (!validToken) {
+        return sendResponse(res, 401, { error: 'Token expirado, reconecta tu cuenta' });
+      }
     }
 
-    sendResponse(res, 200, { success: true, message: `Sincronizados ${syncedCount} eventos` });
+    sendResponse(res, 200, { success: true, message: `Sincronizados ${msEvents.length} eventos` });
   } catch (error) {
     console.error('Error syncing:', error);
     res.status(500).json({ error: 'Error de sincronización' });

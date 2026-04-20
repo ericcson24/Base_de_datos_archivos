@@ -512,6 +512,7 @@ function App() {
         }}
       >
         <Calendar
+          key={user.username}
           user={user}
           onLogout={handleLogout}
           onBackToPanel={() => {
