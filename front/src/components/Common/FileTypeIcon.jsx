@@ -1,7 +1,5 @@
 import React from 'react';
 
-/**
-
 const FILE_TYPE_CONFIGS = {
   image: { color: '#0ea5e9', label: 'IMG', icon: 'image' },
   video: { color: '#ef4444', label: 'VID', icon: 'video' },

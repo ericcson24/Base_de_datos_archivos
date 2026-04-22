@@ -1,6 +1,4 @@
-/**
-
-/**
+﻿
 function generateDocumentCacheKey(userId, documentId, analysisType, customQuery = null) {
   const normalized = customQuery 
     ? customQuery.toLowerCase().replace(/\s+/g, '_')
@@ -8,7 +6,6 @@ function generateDocumentCacheKey(userId, documentId, analysisType, customQuery 
   return `doc_${userId}_${documentId}_${normalized}`;
 }
 
-/**
 function extractExcerpt(content, startPosition, length = 200) {
   if (startPosition < 0 || startPosition >= content.length) {
     return content.substring(0, Math.min(length, content.length));
@@ -16,7 +13,6 @@ function extractExcerpt(content, startPosition, length = 200) {
   return content.substring(startPosition, Math.min(startPosition + length, content.length));
 }
 
-/**
 function splitContentIntoChunks(content, maxChunkSize = 5000) {
   const chunks = [];
   let currentPosition = 0;
@@ -34,7 +30,6 @@ function splitContentIntoChunks(content, maxChunkSize = 5000) {
   return chunks;
 }
 
-/**
 function validateDocumentContent(content) {
   if (!content || typeof content !== 'string') {
     throw new Error('Invalid document content');
@@ -51,7 +46,6 @@ function validateDocumentContent(content) {
   return true;
 }
 
-/**
 function normalizeContent(content) {
   return content
     .toLowerCase()
@@ -59,7 +53,6 @@ function normalizeContent(content) {
     .trim();
 }
 
-/**
 function getDocumentStats(content) {
   const lines = content.split('\n');
   const words = content.split(/\s+/).filter(w => w.length > 0);
@@ -74,7 +67,6 @@ function getDocumentStats(content) {
   };
 }
 
-/**
 function buildAnalysisPrompt(analysisType, documentTitle, documentStats) {
   const basePrompt = `You are a professional document analyst with expertise in content evaluation, business analysis, and technical documentation.
 You are analyzing a document titled "${documentTitle}".
@@ -130,7 +122,6 @@ Include examples from the document to illustrate points.`,
   return typePrompts[analysisType] || basePrompt;
 }
 
-/**
 function buildFragmentExplanationPrompt(documentTitle) {
   return `You are a professional document analyst with expertise in detailed content analysis.
 You are analyzing a specific passage from a document titled "${documentTitle}".
@@ -148,7 +139,6 @@ Respond in Spanish (español) unless the text is in English.
 Be thorough and detailed.`;
 }
 
-/**
 function buildEditSuggestionPrompt() {
   return `You are a professional editor and writing consultant with expertise in business, technical, and academic writing.
 Review the provided text and provide specific improvement suggestions in these areas:
@@ -172,7 +162,6 @@ Respond in Spanish (español) unless the text is in English.
 Prioritize high-impact changes.`;
 }
 
-/**
 function buildHighlightingPrompt() {
   return `You are a document analyst helping to identify the most important content for highlighting.
 Analyze the text and identify sections that should be highlighted based on:
@@ -196,7 +185,6 @@ Sort by importance (high to low).
 Include 3-5 high importance highlights, 2-4 medium importance highlights.`;
 }
 
-/**
 function parseHighlightsFromResponse(response, fullText = '', maxHighlights = 10) {
   try {
     const jsonMatch = response.match(/\[[\s\S]*\]/);
@@ -232,14 +220,12 @@ function parseHighlightsFromResponse(response, fullText = '', maxHighlights = 10
   }
 }
 
-/**
 function isDocumentFile(filename) {
   const documentExtensions = ['.txt', '.md', '.pdf', '.docx', '.doc', '.rtf', '.csv', '.json', '.xml'];
   const ext = filename.toLowerCase().substring(filename.lastIndexOf('.'));
   return documentExtensions.includes(ext);
 }
 
-/**
 function getDocumentType(filename) {
   const ext = filename.toLowerCase().substring(filename.lastIndexOf('.'));
   const typeMap = {

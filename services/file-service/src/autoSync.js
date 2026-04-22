@@ -1,4 +1,4 @@
-/**
+
 
 const fs = require('fs').promises;
 const fsSync = require('fs');
@@ -12,7 +12,7 @@ class AutoSyncService {
     this.isFirstSync = true;
   }
 
-  /**
+  
   start() {
     console.log('🔄 AutoSync: Servicio iniciado');
     
@@ -27,7 +27,7 @@ class AutoSyncService {
     }, this.syncInterval);
   }
 
-  /**
+ 
   async syncAllUsers() {
     try {
       const startTime = Date.now();
@@ -75,7 +75,7 @@ class AutoSyncService {
     }
   }
 
-  /**
+ 
   async syncUserFiles(userId, username) {
     const userDir = path.join(this.uploadDir, username);
     let syncedCount = 0;
@@ -123,7 +123,7 @@ class AutoSyncService {
     return { synced: syncedCount, updated: updatedCount };
   }
 
-  /**
+ 
   async scanDirectory(dirPath, basePath, depth = 0) {
     const MAX_DEPTH = 15;
     const files = [];
@@ -168,7 +168,7 @@ class AutoSyncService {
     return files;
   }
 
-  /**
+ 
   async syncFile(userId, fileInfo) {
     try {
       let existing = null;
@@ -219,7 +219,7 @@ class AutoSyncService {
     }
   }
 
-  /**
+ 
   getMimeType(filename) {
     const ext = path.extname(filename).toLowerCase();
     const mimeTypes = {
@@ -245,7 +245,7 @@ class AutoSyncService {
     return mimeTypes[ext] || 'application/octet-stream';
   }
 
-  /**
+ 
   async forceSyncNow() {
     console.log('🔄 AutoSync: Sincronización forzada...');
     await this.syncAllUsers();

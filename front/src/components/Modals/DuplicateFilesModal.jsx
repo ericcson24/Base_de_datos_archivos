@@ -2,8 +2,6 @@ import React from 'react';
 import { useLanguage } from '../../context/LanguageContext';
 import './DuplicateFilesModal.css';
 
-/**
- *
 const DuplicateFilesModal = ({ isOpen, duplicateNames = [], onReplace, onKeepBoth, onSkip, onClose }) => {
   const { t } = useLanguage();
 

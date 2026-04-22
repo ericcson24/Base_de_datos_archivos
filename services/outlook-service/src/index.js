@@ -146,9 +146,22 @@ function convertToSpainTime(dateStr, isAllDay = false) {
   }
   return dateStr;
 }
-}
+
+app.patch('/events/:id', authenticate, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { subject, body, startTime, endTime, location, isAllDay, categories } = req.body;
+    const username = req.user.username;
+    const user = await dbAsync.get('SELECT id, microsoft_access_token, microsoft_refresh_token, role FROM users WHERE username = ?', [username]);
+    const isAdminOrBoss = user.role === 'admin' || user.role === 'boss';
+
+    let event = null;
+    if (!isNaN(id)) {
+      try {
+        event = await dbAsync.get('SELECT * FROM calendar_events WHERE id = ? AND user_id = ?', [id, user.id]);
+      } catch (e) { }
     }
-    
+
     if (!event) {
         event = await dbAsync.get('SELECT * FROM calendar_events WHERE microsoft_id = ? AND user_id = ?', [id, user.id]);
     }

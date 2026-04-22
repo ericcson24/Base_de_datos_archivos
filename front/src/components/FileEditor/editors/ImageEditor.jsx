@@ -165,8 +165,9 @@ const ImageEditor = ({ fileUrl, file }) => {
     
     let newRect = { ...cropRect };
     
-    /* 
+     /*
        Handles: tl, tc, tr, cl, cr, bl, bc, br, move
+     */
     
     if (dragHandle === 'move') {
         newRect.x += dx;

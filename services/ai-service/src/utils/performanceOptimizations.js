@@ -1,5 +1,4 @@
-/**
-
+﻿
 class ParallelAnalysisBatcher {
   constructor(maxConcurrent = 3) {
     this.maxConcurrent = maxConcurrent;
@@ -8,7 +7,6 @@ class ParallelAnalysisBatcher {
     this.results = new Map();
   }
 
-  /**
   async add(taskId, analysisFunction) {
     return new Promise((resolve, reject) => {
       this.queue.push({
@@ -22,7 +20,6 @@ class ParallelAnalysisBatcher {
     });
   }
 
-  /**
   async process() {
     while (this.active < this.maxConcurrent && this.queue.length > 0) {
       this.active++;
@@ -50,12 +47,10 @@ class ParallelAnalysisBatcher {
     }
   }
 
-  /**
   getResult(taskId) {
     return this.results.get(taskId);
   }
 
-  /**
   clearOldResults(maxAge = 60 * 60 * 1000) {
     const now = Date.now();
     for (const [taskId, result] of this.results) {
@@ -65,7 +60,6 @@ class ParallelAnalysisBatcher {
     }
   }
 
-  /**
   getStats() {
     return {
       queueLength: this.queue.length,
@@ -78,7 +72,6 @@ class ParallelAnalysisBatcher {
     };
   }
 
-  /**
   getAverageProcessingTime() {
     if (this.results.size === 0) return 0;
     const times = Array.from(this.results.values()).map(r => r.processingTime);
@@ -86,7 +79,6 @@ class ParallelAnalysisBatcher {
   }
 }
 
-/**
 class QueryOptimizer {
   constructor(db, maxPoolConnections = 10) {
     this.db = db;
@@ -95,7 +87,6 @@ class QueryOptimizer {
     this.activeQueries = 0;
   }
 
-  /**
   async execute(query, params, cacheKey = null, cacheDuration = 300000) {
     const fullCacheKey = cacheKey || this.generateCacheKey(query, params);
 
@@ -119,21 +110,18 @@ class QueryOptimizer {
     }
   }
 
-  /**
   async executeBatch(queries) {
     return Promise.all(
       queries.map(q => this.execute(q.query, q.params, q.cacheKey, q.cacheDuration))
     );
   }
 
-  /**
   generateCacheKey(query, params) {
     const normalizedQuery = query.replace(/\s+/g, ' ').trim();
     const paramString = JSON.stringify(params || []);
     return `query_${normalizedQuery}_${paramString}`.substring(0, 100);
   }
 
-  /**
   invalidateCache(pattern) {
     for (const key of this.queryCache.keys()) {
       if (key.includes(pattern)) {
@@ -142,7 +130,6 @@ class QueryOptimizer {
     }
   }
 
-  /**
   getStats() {
     return {
       cacheSize: this.queryCache.size,
@@ -152,7 +139,6 @@ class QueryOptimizer {
     };
   }
 
-  /**
   cleanup(maxAge = 60 * 60 * 1000) {
     const now = Date.now();
     for (const [key, entry] of this.queryCache) {
@@ -163,14 +149,12 @@ class QueryOptimizer {
   }
 }
 
-/**
 class RateLimiter {
   constructor(maxRequestsPerMinute = 60) {
     this.maxRequestsPerMinute = maxRequestsPerMinute;
     this.userRequests = new Map();
   }
 
-  /**
   canMakeRequest(userId) {
     const now = Date.now();
     const userKey = `user_${userId}`;
@@ -200,7 +184,6 @@ class RateLimiter {
     };
   }
 
-  /**
   getStats() {
     return {
       activeUsers: this.userRequests.size,
@@ -209,7 +192,6 @@ class RateLimiter {
     };
   }
 
-  /**
   cleanup() {
     const now = Date.now();
     for (const [key, requests] of this.userRequests) {
@@ -223,7 +205,6 @@ class RateLimiter {
   }
 }
 
-/**
 class PerformanceMonitor {
   constructor() {
     this.metrics = {
@@ -236,7 +217,6 @@ class PerformanceMonitor {
     };
   }
 
-  /**
   recordApiCall(responseTime, cacheHit = false, error = false) {
     this.metrics.apiCalls++;
     if (cacheHit) {
@@ -256,7 +236,6 @@ class PerformanceMonitor {
     this.updateAverageResponseTime();
   }
 
-  /**
   updateAverageResponseTime() {
     if (this.metrics.responseTimes.length === 0) {
       this.metrics.averageResponseTime = 0;
@@ -267,7 +246,6 @@ class PerformanceMonitor {
     this.metrics.averageResponseTime = (sum / this.metrics.responseTimes.length).toFixed(2);
   }
 
-  /**
   getReport() {
     const hitRate = this.metrics.apiCalls > 0
       ? ((this.metrics.cacheHits / this.metrics.apiCalls) * 100).toFixed(2)
@@ -289,7 +267,6 @@ class PerformanceMonitor {
     };
   }
 
-  /**
   calculateQuality() {
     const errorRate = this.metrics.apiCalls > 0
       ? (this.metrics.errors / this.metrics.apiCalls)
@@ -298,7 +275,6 @@ class PerformanceMonitor {
     return Math.max(0, 100 - (errorRate * 100)).toFixed(2);
   }
 
-  /**
   reset() {
     this.metrics = {
       apiCalls: 0,

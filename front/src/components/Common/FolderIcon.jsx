@@ -1,7 +1,5 @@
 import React from 'react';
 
-/**
-
 const FOLDER_ICONS = {
   default: null,
   star: (

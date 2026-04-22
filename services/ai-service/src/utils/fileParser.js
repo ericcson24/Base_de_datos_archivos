@@ -1,11 +1,10 @@
-const fs = require('fs').promises;
+﻿const fs = require('fs').promises;
 const path = require('path');
 const mammoth = require('mammoth');
 const xlsx = require('xlsx');
 const pdf = require('pdf-parse');
 const officeParser = require('office-text-extractor');
 
-/**
 async function extractTextFromFile(filePath, mimeType) {
   try {
     try {

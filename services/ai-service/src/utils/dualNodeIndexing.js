@@ -1,5 +1,3 @@
-/**
-
 const db = require('./database');
 const NodeCache = require('node-cache');
 const { sendNotification } = require('./notificationClient');
@@ -31,7 +29,7 @@ class DualNodeIndexing {
     console.log('Incremental Indexing iniciado');
   }
 
-  /**
+  // Periodically rebuild or incrementally refresh per-user file indexes.
   async performUpdate(fullRebuild = false) {
     if (this.isUpdating) {
         console.log('Indexing already in progress, skipping cycle.');
@@ -81,7 +79,7 @@ class DualNodeIndexing {
     }
   }
 
-  /**
+  // Refresh cached index entries and progress state for one user.
   async refreshUserIndex(userId) {
     try {
         this.userProgress.set(userId, { state: 'indexing', percent: 0, file: 'Cargando...', total: 0, current: 0 });
@@ -140,7 +138,7 @@ class DualNodeIndexing {
     }
   }
 
-  /**
+  // Derive a relative folder path for ranking/search display.
   extractFolderPath(physicalPath, fileName) {
     if (!physicalPath) return '';
     
@@ -171,7 +169,7 @@ class DualNodeIndexing {
     return '';
   }
 
-  /**
+  // Search over pre-tokenized filename and folder terms.
 
   searchFiles(userId, query) {
     const userFiles = this.cache.get(`user_${userId}_files`);

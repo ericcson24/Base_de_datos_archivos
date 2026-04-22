@@ -1,8 +1,6 @@
-/**
-
+﻿
 const NodeCache = require('node-cache');
 
-/**
 const hotCache = new NodeCache({ 
   stdTTL: 120,
   checkperiod: 60,
@@ -15,13 +13,10 @@ const warmCache = new NodeCache({
   useClones: false
 });
 
-/**
 const contentIndex = new Map();
 
-/**
 const userDocumentMap = new Map();
 
-/**
 const performanceMetrics = {
   hotCacheHits: 0,
   warmCacheHits: 0,
@@ -32,7 +27,6 @@ const performanceMetrics = {
   averageQueryTime: 0,
 };
 
-/**
 function getCachedAnalysis(userId, documentId, analysisType) {
   const hotKey = generateHotCacheKey(userId, documentId, analysisType);
   
@@ -54,7 +48,6 @@ function getCachedAnalysis(userId, documentId, analysisType) {
   return { result: null, cached: false, cacheLevel: null };
 }
 
-/**
 function cacheAnalysis(userId, documentId, analysisType, result) {
   const hotKey = generateHotCacheKey(userId, documentId, analysisType);
   const warmKey = generateWarmCacheKey(userId, documentId, analysisType);
@@ -71,17 +64,14 @@ function cacheAnalysis(userId, documentId, analysisType, result) {
   userDocumentMap.get(userId).add(documentId);
 }
 
-/**
 function generateHotCacheKey(userId, documentId, analysisType) {
   return `hot_${userId}_${documentId}_${analysisType}`;
 }
 
-/**
 function generateWarmCacheKey(userId, documentId, analysisType) {
   return `warm_${userId}_${documentId}_${analysisType}`;
 }
 
-/**
 function indexDocumentContent(userId, documentId, analysisResult) {
   const keywords = extractKeywords(analysisResult.analysis || '');
   
@@ -98,7 +88,6 @@ function indexDocumentContent(userId, documentId, analysisResult) {
   performanceMetrics.indexedDocuments++;
 }
 
-/**
 function extractKeywords(text, maxKeywords = 10) {
   if (!text) return [];
 
@@ -126,7 +115,6 @@ function extractKeywords(text, maxKeywords = 10) {
     .map(([word]) => word);
 }
 
-/**
 function searchIndex(userId, searchTerm, limit = 5) {
   const searchLower = searchTerm.toLowerCase();
   const results = [];
@@ -151,7 +139,6 @@ function searchIndex(userId, searchTerm, limit = 5) {
     .slice(0, limit);
 }
 
-/**
 function invalidateUserCache(userId) {
   const hotKeys = hotCache.keys()
     .filter(key => key.includes(`_${userId}_`));
@@ -168,7 +155,6 @@ function invalidateUserCache(userId) {
   userDocumentMap.delete(userId);
 }
 
-/**
 function invalidateDocumentCache(userId, documentId) {
   const hotKeys = hotCache.keys()
     .filter(key => key.includes(`_${userId}_${documentId}_`));
@@ -182,7 +168,6 @@ function invalidateDocumentCache(userId, documentId) {
   contentIndex.delete(indexKey);
 }
 
-/**
 function getDetailedCacheStats() {
   const totalCacheHits = performanceMetrics.hotCacheHits + performanceMetrics.warmCacheHits;
   const totalRequests = totalCacheHits + performanceMetrics.cacheMisses;
@@ -208,13 +193,11 @@ function getDetailedCacheStats() {
   };
 }
 
-/**
 function recordQueryTime(durationMs) {
   performanceMetrics.totalQueryTime += durationMs;
   performanceMetrics.queryCount++;
 }
 
-/**
 function resetMetrics() {
   performanceMetrics.hotCacheHits = 0;
   performanceMetrics.warmCacheHits = 0;
@@ -225,7 +208,6 @@ function resetMetrics() {
   performanceMetrics.averageQueryTime = 0;
 }
 
-/**
 function cleanupOldCache() {
   const now = Date.now();
   const maxAge = 24 * 60 * 60 * 1000;

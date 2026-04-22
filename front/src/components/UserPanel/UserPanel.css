@@ -170,6 +170,7 @@
   background: var(--bg-gradient);
 }
 
+* {
   box-sizing: border-box;
   margin: 0;
   padding: 0;
