@@ -16,14 +16,14 @@ const Toast = ({ id, title, message, type = 'info', duration = 3000, onClose }) 
     setIsExiting(true);
     setTimeout(() => {
       onClose(id);
-    }, 300); // Match animation duration
+    }, 300);
   };
 
   const getIcon = () => {
     switch (type) {
       case 'success': return '✅';
       case 'error': return '❌';
-      case 'warning': return '⚠️';
+      case 'warning': return '[Warning]';
       default: return 'ℹ️';
     }
   };
@@ -38,7 +38,7 @@ const Toast = ({ id, title, message, type = 'info', duration = 3000, onClose }) 
         </div>
       </div>
       <button className="toast-close" onClick={handleClose}>
-        ✕
+        x
       </button>
     </div>
   );

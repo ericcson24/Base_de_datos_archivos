@@ -12,7 +12,6 @@ const ExcelEditor = ({ fileUrl, fileBlob, file, onClose, onFileSaved }) => {
   const { t } = useLanguage();
   const { addToast } = useToast();
 
-  // ─── Core state ───
   const [workbook, setWorkbook] = useState(null);
   const [activeSheet, setActiveSheet] = useState('');
   const [data, setData] = useState([]);
@@ -20,45 +19,35 @@ const ExcelEditor = ({ fileUrl, fileBlob, file, onClose, onFileSaved }) => {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
 
-  // ─── Selection ───
   const [selectedCell, setSelectedCell] = useState(null);
   const [selectionEnd, setSelectionEnd] = useState(null);
   const [editingCell, setEditingCell] = useState(null);
   const [editValue, setEditValue] = useState('');
 
-  // ─── Styling ───
   const [cellStyles, setCellStyles] = useState({});
   const [mergedCells, setMergedCells] = useState({});
 
-  // ─── History ───
   const [history, setHistory] = useState([]);
   const [historyIndex, setHistoryIndex] = useState(-1);
 
-  // ─── UI ───
   const [formulaValue, setFormulaValue] = useState('');
   const [zoom, setZoom] = useState(100);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [columnWidths, setColumnWidths] = useState({});
 
-  // ─── Find & Replace ───
   const [showFind, setShowFind] = useState(false);
   const [findText, setFindText] = useState('');
   const [replaceText, setReplaceText] = useState('');
   const [findMatches, setFindMatches] = useState([]);
   const [currentMatch, setCurrentMatch] = useState(-1);
 
-  // ─── Context menu ───
   const [contextMenu, setContextMenu] = useState(null);
 
-  // ─── Refs ───
   const containerRef = useRef(null);
   const gridRef = useRef(null);
   const editInputRef = useRef(null);
   const findInputRef = useRef(null);
 
-  // ═══════════════════════════════════════════
-  //  COMPUTED VALUES
-  // ═══════════════════════════════════════════
 
   const selectionRange = useMemo(() => {
     if (!selectedCell) return null;
@@ -110,9 +99,6 @@ const ExcelEditor = ({ fileUrl, fileBlob, file, onClose, onFileSaved }) => {
     return s;
   }, [findMatches]);
 
-  // ═══════════════════════════════════════════
-  //  FULLSCREEN & ZOOM
-  // ═══════════════════════════════════════════
 
   const toggleFullscreen = () => {
     if (!document.fullscreenElement) {
@@ -132,9 +118,6 @@ const ExcelEditor = ({ fileUrl, fileBlob, file, onClose, onFileSaved }) => {
   const handleZoomOut = () => setZoom(prev => Math.max(prev - 10, 50));
   const handleZoomReset = () => setZoom(100);
 
-  // ═══════════════════════════════════════════
-  //  LOAD FILE
-  // ═══════════════════════════════════════════
 
   const parseSheet = (sheet, wbParam) => {
     const jsonData = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '' });
@@ -142,7 +125,6 @@ const ExcelEditor = ({ fileUrl, fileBlob, file, onClose, onFileSaved }) => {
     jsonData.forEach(row => { while (row.length < MIN_COLS) row.push(''); });
     setData(jsonData);
 
-    // ─── Extract cell styles from workbook ───
     const styles = {};
     try {
       const wbRef = wbParam || workbook;
@@ -223,7 +205,6 @@ const ExcelEditor = ({ fileUrl, fileBlob, file, onClose, onFileSaved }) => {
     }
     setCellStyles(styles);
 
-    // ─── Extract merged cells ───
     const merges = {};
     if (sheet['!merges'] && sheet['!merges'].length > 0) {
       sheet['!merges'].forEach(merge => {
@@ -240,7 +221,6 @@ const ExcelEditor = ({ fileUrl, fileBlob, file, onClose, onFileSaved }) => {
     }
     setMergedCells(merges);
 
-    // ─── Extract column widths ───
     if (sheet['!cols']) {
       const widths = {};
       sheet['!cols'].forEach((col, idx) => {
@@ -254,7 +234,6 @@ const ExcelEditor = ({ fileUrl, fileBlob, file, onClose, onFileSaved }) => {
       setColumnWidths({});
     }
 
-    // Initialize history
     setHistory([JSON.parse(JSON.stringify(jsonData))]);
     setHistoryIndex(0);
   };
@@ -308,14 +287,10 @@ const ExcelEditor = ({ fileUrl, fileBlob, file, onClose, onFileSaved }) => {
     } finally {
       setLoading(false);
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fileUrl, fileBlob]);
 
   useEffect(() => { loadFile(); }, [loadFile]);
 
-  // ═══════════════════════════════════════════
-  //  HISTORY (UNDO / REDO)
-  // ═══════════════════════════════════════════
 
   const saveToHistory = (newData) => {
     const newHistory = history.slice(0, historyIndex + 1);
@@ -341,9 +316,6 @@ const ExcelEditor = ({ fileUrl, fileBlob, file, onClose, onFileSaved }) => {
     }
   };
 
-  // ═══════════════════════════════════════════
-  //  CELL OPERATIONS
-  // ═══════════════════════════════════════════
 
   const handleCellChange = (rowIndex, colIndex, value) => {
     const newData = data.map(row => [...row]);
@@ -355,7 +327,6 @@ const ExcelEditor = ({ fileUrl, fileBlob, file, onClose, onFileSaved }) => {
 
   const handleCellClick = (rowIndex, colIndex, e) => {
     if (editingCell) {
-      // Commit current edit before moving
       handleCellChange(editingCell.row, editingCell.col, editValue);
       setEditingCell(null);
     }
@@ -435,9 +406,6 @@ const ExcelEditor = ({ fileUrl, fileBlob, file, onClose, onFileSaved }) => {
     setEditingCell(null);
   };
 
-  // ═══════════════════════════════════════════
-  //  ROW / COLUMN OPERATIONS
-  // ═══════════════════════════════════════════
 
   const addRow = () => {
     const newData = [...data, new Array(data[0]?.length || MIN_COLS).fill('')];
@@ -491,9 +459,6 @@ const ExcelEditor = ({ fileUrl, fileBlob, file, onClose, onFileSaved }) => {
     saveToHistory(newData);
   };
 
-  // ═══════════════════════════════════════════
-  //  SHEET BUILDER (preserves merges & widths)
-  // ═══════════════════════════════════════════
 
   const buildSheet = () => {
     const newSheet = XLSX.utils.aoa_to_sheet(data);
@@ -511,7 +476,6 @@ const ExcelEditor = ({ fileUrl, fileBlob, file, onClose, onFileSaved }) => {
       Object.entries(columnWidths).forEach(([idx, w]) => { cols[parseInt(idx)] = { wpx: w }; });
       newSheet['!cols'] = cols;
     }
-    // Preserve cell styles for known formatted cells
     Object.entries(cellStyles).forEach(([key, style]) => {
       const [r, c] = key.split('-').map(Number);
       const addr = XLSX.utils.encode_cell({ r, c });
@@ -524,9 +488,6 @@ const ExcelEditor = ({ fileUrl, fileBlob, file, onClose, onFileSaved }) => {
     return newSheet;
   };
 
-  // ═══════════════════════════════════════════
-  //  FORMAT CELL VALUE
-  // ═══════════════════════════════════════════
 
   const formatCellValue = (val) => {
     if (val === null || val === undefined || val === '') return '';
@@ -537,9 +498,6 @@ const ExcelEditor = ({ fileUrl, fileBlob, file, onClose, onFileSaved }) => {
     return String(val);
   };
 
-  // ═══════════════════════════════════════════
-  //  SHEET MANAGEMENT
-  // ═══════════════════════════════════════════
 
   const handleSheetChange = (sheetName) => {
     workbook.Sheets[activeSheet] = buildSheet();
@@ -585,9 +543,6 @@ const ExcelEditor = ({ fileUrl, fileBlob, file, onClose, onFileSaved }) => {
     }
   };
 
-  // ═══════════════════════════════════════════
-  //  CELL STYLING
-  // ═══════════════════════════════════════════
 
   const applyCellStyle = (style, value) => {
     if (!selectionRange) return;
@@ -638,22 +593,17 @@ const ExcelEditor = ({ fileUrl, fileBlob, file, onClose, onFileSaved }) => {
           current.borderLeft = BORDER_THICK;
           current.borderRight = BORDER_THICK;
         }
-        // type === 'none': borders already cleared above
         newStyles[key] = current;
       }
     }
     setCellStyles(newStyles);
   };
 
-  // ═══════════════════════════════════════════
-  //  SORT
-  // ═══════════════════════════════════════════
 
   const sortColumn = (colIndex, ascending = true) => {
     const newData = [...data].sort((a, b) => {
       const va = a[colIndex] ?? '';
       const vb = b[colIndex] ?? '';
-      // Empty cells go to bottom
       if (va === '' && vb === '') return 0;
       if (va === '') return 1;
       if (vb === '') return -1;
@@ -667,9 +617,6 @@ const ExcelEditor = ({ fileUrl, fileBlob, file, onClose, onFileSaved }) => {
     addToast(ascending ? t('excelEditor.sortedAsc') : t('excelEditor.sortedDesc'), 'info', 2000);
   };
 
-  // ═══════════════════════════════════════════
-  //  FIND & REPLACE
-  // ═══════════════════════════════════════════
 
   const findInSheet = (text) => {
     if (!text) { setFindMatches([]); setCurrentMatch(-1); return; }
@@ -733,9 +680,6 @@ const ExcelEditor = ({ fileUrl, fileBlob, file, onClose, onFileSaved }) => {
     addToast(`${count} ${t('excelEditor.replacements')}`, 'success', 2000);
   };
 
-  // ═══════════════════════════════════════════
-  //  PRINT, DOWNLOAD, AUTO-SUM
-  // ═══════════════════════════════════════════
 
   const handlePrint = () => {
     const printWin = window.open('', '_blank');
@@ -791,9 +735,6 @@ const ExcelEditor = ({ fileUrl, fileBlob, file, onClose, onFileSaved }) => {
     }
   };
 
-  // ═══════════════════════════════════════════
-  //  CONTEXT MENU & CLIPBOARD
-  // ═══════════════════════════════════════════
 
   const handleContextMenu = (e, rowIndex, colIndex) => {
     e.preventDefault();
@@ -845,12 +786,9 @@ const ExcelEditor = ({ fileUrl, fileBlob, file, onClose, onFileSaved }) => {
       });
       setData(newData);
       saveToHistory(newData);
-    } catch (e) { /* clipboard may not be available */ }
+    } catch (e) {  }
   };
 
-  // ═══════════════════════════════════════════
-  //  COLUMN RESIZE
-  // ═══════════════════════════════════════════
 
   const handleColumnResize = (colIndex, e) => {
     e.preventDefault();
@@ -870,16 +808,12 @@ const ExcelEditor = ({ fileUrl, fileBlob, file, onClose, onFileSaved }) => {
     document.addEventListener('mouseup', onUp);
   };
 
-  // ═══════════════════════════════════════════
-  //  KEYBOARD NAVIGATION
-  // ═══════════════════════════════════════════
 
   useEffect(() => {
     const handleKeyDown = (e) => {
       const isFindBar = e.target.closest('.excel-find-bar');
       const isFormulaInput = e.target.classList?.contains('formula-input');
 
-      // ── Global shortcuts ──
       if ((e.ctrlKey || e.metaKey) && e.key === 'f') {
         e.preventDefault();
         setShowFind(prev => !prev);
@@ -894,10 +828,8 @@ const ExcelEditor = ({ fileUrl, fileBlob, file, onClose, onFileSaved }) => {
         return;
       }
 
-      // Let find bar handle its own events
       if (isFindBar) return;
 
-      // Let formula input handle its own events (except Enter)
       if (isFormulaInput) {
         if (e.key === 'Enter') {
           e.preventDefault();
@@ -909,7 +841,6 @@ const ExcelEditor = ({ fileUrl, fileBlob, file, onClose, onFileSaved }) => {
         return;
       }
 
-      // ── Ctrl combos ──
       if (e.ctrlKey || e.metaKey) {
         if (e.key === 'z' && !e.shiftKey) { e.preventDefault(); undo(); return; }
         if (e.key === 'y' || (e.shiftKey && e.key === 'z')) { e.preventDefault(); redo(); return; }
@@ -923,7 +854,6 @@ const ExcelEditor = ({ fileUrl, fileBlob, file, onClose, onFileSaved }) => {
 
       if (!selectedCell) return;
 
-      // ── Editing mode ──
       if (editingCell) {
         if (e.key === 'Enter') {
           e.preventDefault();
@@ -941,10 +871,9 @@ const ExcelEditor = ({ fileUrl, fileBlob, file, onClose, onFileSaved }) => {
           setSelectionEnd(null);
           setFormulaValue(data[selectedCell.row]?.[newCol] ?? '');
         }
-        return; // Let other keys reach the cell input naturally
+        return;
       }
 
-      // ── Navigation mode ──
       if (e.key === 'F2') {
         e.preventDefault();
         handleCellDoubleClick(selectedCell.row, selectedCell.col);
@@ -976,9 +905,8 @@ const ExcelEditor = ({ fileUrl, fileBlob, file, onClose, onFileSaved }) => {
         return;
       }
 
-      // Start typing → enter edit mode
       if (e.key.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey) {
-        e.preventDefault(); // prevent browser from typing the char twice in the newly focused input
+        e.preventDefault();
         setEditingCell({ ...selectedCell });
         setEditValue(e.key);
         setFormulaValue(e.key);
@@ -987,16 +915,12 @@ const ExcelEditor = ({ fileUrl, fileBlob, file, onClose, onFileSaved }) => {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedCell, selectionEnd, editingCell, editValue, data, history, historyIndex,
       cellStyles, showFind, selectionRange, formulaValue, contextMenu]);
 
-  // Auto-focus edit input when entering edit mode
   useEffect(() => {
     if (editingCell && editInputRef.current) {
       const el = editInputRef.current;
-      // setTimeout ensures the key event has fully finished before focusing,
-      // preventing the character from being delivered twice to the input
       setTimeout(() => {
         if (el) {
           el.focus();
@@ -1007,9 +931,6 @@ const ExcelEditor = ({ fileUrl, fileBlob, file, onClose, onFileSaved }) => {
     }
   }, [editingCell]);
 
-  // ═══════════════════════════════════════════
-  //  SAVE
-  // ═══════════════════════════════════════════
 
   const handleSave = async () => {
     try {
@@ -1040,9 +961,6 @@ const ExcelEditor = ({ fileUrl, fileBlob, file, onClose, onFileSaved }) => {
     }
   };
 
-  // ═══════════════════════════════════════════
-  //  RENDER
-  // ═══════════════════════════════════════════
 
   if (loading) return (
     <div className="excel-editor">
@@ -1063,7 +981,7 @@ const ExcelEditor = ({ fileUrl, fileBlob, file, onClose, onFileSaved }) => {
 
   return (
     <div className={`excel-editor ${isFullscreen ? 'fullscreen' : ''}`} ref={containerRef}>
-      {/* ─── Toolbar ─── */}
+      
       <div className="excel-toolbar">
         <div className="toolbar-group">
           <button onClick={handleSave} disabled={saving} className="toolbar-btn save-btn" title={t('excelEditor.save')}>
@@ -1077,7 +995,7 @@ const ExcelEditor = ({ fileUrl, fileBlob, file, onClose, onFileSaved }) => {
         </div>
         <div className="toolbar-separator" />
 
-        {/* Font formatting */}
+        
         <div className="toolbar-group">
           <button
             onClick={() => toggleStyle('fontWeight', 'bold', 'normal')}
@@ -1097,7 +1015,7 @@ const ExcelEditor = ({ fileUrl, fileBlob, file, onClose, onFileSaved }) => {
         </div>
         <div className="toolbar-separator" />
 
-        {/* Font size */}
+        
         <div className="toolbar-group">
           <select
             className="toolbar-select"
@@ -1113,7 +1031,7 @@ const ExcelEditor = ({ fileUrl, fileBlob, file, onClose, onFileSaved }) => {
         </div>
         <div className="toolbar-separator" />
 
-        {/* Colors */}
+        
         <div className="toolbar-group">
           <label className="color-picker-label" title={t('excelEditor.textColor')}>
             <span className="color-icon">A</span>
@@ -1126,7 +1044,7 @@ const ExcelEditor = ({ fileUrl, fileBlob, file, onClose, onFileSaved }) => {
         </div>
         <div className="toolbar-separator" />
 
-        {/* Alignment */}
+        
         <div className="toolbar-group">
           <button
             onClick={() => applyCellStyle('textAlign', 'left')}
@@ -1152,7 +1070,7 @@ const ExcelEditor = ({ fileUrl, fileBlob, file, onClose, onFileSaved }) => {
         </div>
         <div className="toolbar-separator" />
 
-        {/* Borders */}
+        
         <div className="toolbar-group">
           <button onClick={() => handleApplyBorders('all')} className="toolbar-btn" disabled={!selectedCell} title="Todos los bordes">
             <span className="border-icon all-borders"></span>
@@ -1169,7 +1087,7 @@ const ExcelEditor = ({ fileUrl, fileBlob, file, onClose, onFileSaved }) => {
         </div>
         <div className="toolbar-separator" />
 
-        {/* Data tools */}
+        
         <div className="toolbar-group">
           <button onClick={autoSum} className="toolbar-btn" disabled={!selectedCell} title={t('excelEditor.autoSum')}>Σ</button>
           <button onClick={() => selectedCell && sortColumn(selectedCell.col, true)} className="toolbar-btn" disabled={!selectedCell} title={t('excelEditor.sortAsc')}>
@@ -1181,16 +1099,16 @@ const ExcelEditor = ({ fileUrl, fileBlob, file, onClose, onFileSaved }) => {
         </div>
         <div className="toolbar-separator" />
 
-        {/* Row / Column add */}
+        
         <div className="toolbar-group">
           <button onClick={addRow} className="toolbar-btn" title={t('excelEditor.insertRowBelow')}>➕ {t('excelEditor.row')}</button>
           <button onClick={addColumn} className="toolbar-btn" title={t('excelEditor.insertColRight')}>➕ {t('excelEditor.col')}</button>
         </div>
         <div className="toolbar-separator" />
 
-        {/* Actions */}
+        
         <div className="toolbar-group">
-          <button onClick={() => { setShowFind(!showFind); if (!showFind) setTimeout(() => findInputRef.current?.focus(), 100); }} className={`toolbar-btn ${showFind ? 'active' : ''}`} title={`${t('excelEditor.find')} (Ctrl+F)`}>🔍</button>
+          <button onClick={() => { setShowFind(!showFind); if (!showFind) setTimeout(() => findInputRef.current?.focus(), 100); }} className={`toolbar-btn ${showFind ? 'active' : ''}`} title={`${t('excelEditor.find')} (Ctrl+F)`}>[Search]</button>
           <button onClick={handlePrint} className="toolbar-btn" title={t('common.print') || 'Print'}>🖨️</button>
           <button onClick={handleDownload} className="toolbar-btn" title={t('common.download') || 'Download'}>⬇️</button>
           <button onClick={toggleFullscreen} className="toolbar-btn" title={isFullscreen ? (t('common.exitFullscreen') || 'Exit Fullscreen') : (t('common.fullscreen') || 'Fullscreen')}>
@@ -1202,11 +1120,11 @@ const ExcelEditor = ({ fileUrl, fileBlob, file, onClose, onFileSaved }) => {
         <span className="file-name">{file.name}</span>
       </div>
 
-      {/* ─── Find & Replace Bar ─── */}
+      
       {showFind && (
         <div className="excel-find-bar">
           <div className="find-group">
-            <label className="find-label">🔍</label>
+            <label className="find-label">[Search]</label>
             <input
               ref={findInputRef}
               type="text"
@@ -1235,11 +1153,11 @@ const ExcelEditor = ({ fileUrl, fileBlob, file, onClose, onFileSaved }) => {
             <button onClick={replaceOne} className="find-action-btn" disabled={findMatches.length === 0}>{t('excelEditor.replaceOne')}</button>
             <button onClick={replaceAll} className="find-action-btn" disabled={findMatches.length === 0}>{t('excelEditor.replaceAll')}</button>
           </div>
-          <button onClick={() => setShowFind(false)} className="find-close-btn">✕</button>
+          <button onClick={() => setShowFind(false)} className="find-close-btn">x</button>
         </div>
       )}
 
-      {/* ─── Formula Bar ─── */}
+      
       <div className="formula-bar">
         <span className="cell-reference">
           {selectedCell ? `${XLSX.utils.encode_col(selectedCell.col)}${selectedCell.row + 1}` : '—'}
@@ -1262,7 +1180,7 @@ const ExcelEditor = ({ fileUrl, fileBlob, file, onClose, onFileSaved }) => {
         />
       </div>
 
-      {/* ─── Grid ─── */}
+      
       <div className="excel-grid" ref={gridRef} style={{ zoom: zoom / 100 }}>
         <table className="excel-table">
           <thead>
@@ -1308,7 +1226,6 @@ const ExcelEditor = ({ fileUrl, fileBlob, file, onClose, onFileSaved }) => {
                   const isEdit = editingCell?.row === rowIndex && editingCell?.col === colIndex;
                   const isFindMatch = findMatchSet.has(`${rowIndex}-${colIndex}`);
 
-                  // Split: border props go on <td>, visual props on inner <div>/<input>
                   const { borderTop, borderBottom, borderLeft, borderRight, ...innerStyle } = style;
                   const tdBorderStyle = {};
                   if (borderTop)    tdBorderStyle.borderTop    = borderTop;
@@ -1351,7 +1268,7 @@ const ExcelEditor = ({ fileUrl, fileBlob, file, onClose, onFileSaved }) => {
         </table>
       </div>
 
-      {/* ─── Context Menu ─── */}
+      
       {contextMenu && (
         <div className="excel-context-menu" style={{ top: contextMenu.y, left: contextMenu.x }}>
           <button onClick={() => { insertRowAbove(contextMenu.row); setContextMenu(null); }}>
@@ -1368,10 +1285,10 @@ const ExcelEditor = ({ fileUrl, fileBlob, file, onClose, onFileSaved }) => {
           </button>
           <div className="context-separator" />
           <button className="context-danger" onClick={() => { deleteRow(contextMenu.row); setContextMenu(null); }}>
-            🗑️ {t('excelEditor.deleteRow')}
+            [Delete] {t('excelEditor.deleteRow')}
           </button>
           <button className="context-danger" onClick={() => { deleteColumn(contextMenu.col); setContextMenu(null); }}>
-            🗑️ {t('excelEditor.deleteCol')}
+            [Delete] {t('excelEditor.deleteCol')}
           </button>
           <div className="context-separator" />
           <button onClick={() => { sortColumn(contextMenu.col, true); setContextMenu(null); }}>
@@ -1385,7 +1302,7 @@ const ExcelEditor = ({ fileUrl, fileBlob, file, onClose, onFileSaved }) => {
             📋 {t('excelEditor.copy')}
           </button>
           <button onClick={() => { pasteFromClipboard(); setContextMenu(null); }}>
-            📌 {t('excelEditor.paste')}
+            [Pin] {t('excelEditor.paste')}
           </button>
           <button onClick={() => { clearSelection(); setContextMenu(null); }}>
             🧹 {t('excelEditor.clearContents')}
@@ -1393,7 +1310,7 @@ const ExcelEditor = ({ fileUrl, fileBlob, file, onClose, onFileSaved }) => {
         </div>
       )}
 
-      {/* ─── Bottom: Sheet Tabs + Status Bar ─── */}
+      
       <div className="excel-bottom-bar">
         <div className="sheet-tabs-bar">
           <div className="sheet-tabs">
@@ -1410,7 +1327,7 @@ const ExcelEditor = ({ fileUrl, fileBlob, file, onClose, onFileSaved }) => {
             <button onClick={addSheet} className="add-sheet-btn" title={t('excelEditor.addSheet')}>+</button>
           </div>
           <div className="sheet-actions">
-            <button onClick={deleteSheet} className="action-btn" title={t('excelEditor.deleteSheet')}>🗑️</button>
+            <button onClick={deleteSheet} className="action-btn" title={t('excelEditor.deleteSheet')}>[Delete]</button>
             <button onClick={renameSheet} className="action-btn" title={t('excelEditor.renameSheet')}>✏️</button>
           </div>
         </div>

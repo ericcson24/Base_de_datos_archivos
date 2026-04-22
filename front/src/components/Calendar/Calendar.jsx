@@ -1,4 +1,4 @@
-﻿import React, { useEffect, useRef, useState, useCallback } from 'react';
+import React, { useEffect, useRef, useState, useCallback } from 'react';
 import FullCalendar from '@fullcalendar/react';
 import dayGridPlugin from '@fullcalendar/daygrid';
 import timeGridPlugin from '@fullcalendar/timegrid';
@@ -30,13 +30,10 @@ const DailyTimeline = ({ events, headerActions }) => {
     return () => clearInterval(timer);
   }, []);
 
-  // Scroll to current time on mount
   useEffect(() => {
     if (containerRef.current) {
       const minutes = new Date().getHours() * 60 + new Date().getMinutes();
       const percent = minutes / 1440;
-      // Scroll to center the current time
-      // Container width is scrollWidth. Visible width is clientWidth.
       const scrollWidth = containerRef.current.scrollWidth;
       const clientWidth = containerRef.current.clientWidth;
       const targetScroll = (scrollWidth * percent) - (clientWidth / 2);
@@ -66,7 +63,7 @@ const DailyTimeline = ({ events, headerActions }) => {
     if (!isDragging) return;
     e.preventDefault();
     const x = e.pageX - containerRef.current.offsetLeft;
-    const walk = (x - startX) * 1.5; // Scroll-fast multiplier
+    const walk = (x - startX) * 1.5;
     containerRef.current.scrollLeft = scrollLeft - walk;
   };
 
@@ -80,7 +77,6 @@ const DailyTimeline = ({ events, headerActions }) => {
     return eventStart < endOfDay && eventEnd > startOfDay;
   });
 
-  // Separate all-day vs timed events
   const allDayEvents = todaysEvents.filter(e => e.allDay);
   const timedEvents = todaysEvents.filter(e => !e.allDay);
 
@@ -98,7 +94,7 @@ const DailyTimeline = ({ events, headerActions }) => {
         <h3>{t('calendar.todayDate', { date: today.toLocaleDateString(language === 'es' ? 'es-ES' : language === 'pl' ? 'pl-PL' : 'en-US', { weekday: 'long', day: 'numeric', month: 'long' }) })}</h3>
         {headerActions && <div className="daily-timeline-actions">{headerActions}</div>}
       </div>
-      {/* All-day events shown as compact tags above the timeline */}
+      
       {allDayEvents.length > 0 && (
         <div className="timeline-allday-bar">
           {allDayEvents.map((event, idx) => (
@@ -122,7 +118,7 @@ const DailyTimeline = ({ events, headerActions }) => {
         onMouseMove={handleMouseMove}
       >
         <div className="daily-timeline-track">
-        {/* Overlay para el pasado */}
+        
         <div className="timeline-past-overlay" style={{ width: `${currentTimePos}%` }}></div>
 
         {Array.from({ length: 25 }).map((_, i) => (
@@ -177,26 +173,23 @@ const Calendar = ({ user, onLogout, onBackToPanel, onBackToFolders, onGoToRemote
   const [showRDPModal, setShowRDPModal] = useState(false);
   const [showAIModal, setShowAIModal] = useState(false);
   const [categories, setCategories] = useState([]);
-  // Initialize selectedCategories with a default value or empty set, but we'll populate it after loading categories
   const [selectedCategories, setSelectedCategories] = useState(new Set());
   const [isSidebarOpen, setIsSidebarOpen] = useState(window.innerWidth > 768);
   const [events, setEvents] = useState([]);
   const [isLoadingEvents, setIsLoadingEvents] = useState(false);
   const isFetchingRef = useRef(false);
-  const eventsCacheRef = useRef(new Map()); // Cache: eventId -> event data
-  const loadedRangesRef = useRef([]); // Track which date ranges have been loaded
+  const eventsCacheRef = useRef(new Map());
+  const loadedRangesRef = useRef([]);
   
-  // Estado para el panel lateral del día
   const [selectedDay, setSelectedDay] = useState(null);
   const [isDayPanelOpen, setIsDayPanelOpen] = useState(false);
 
-  // Admin View State
   const [users, setUsers] = useState([]);
   const [groups, setGroups] = useState([]);
   const [viewUserId, setViewUserId] = useState('');
-  const [selectedGroupId, setSelectedGroupId] = useState(''); // For "View All" group context
-  const [calendarViewMode, setCalendarViewMode] = useState('mine'); // 'mine' or 'others'
-  const [expandedGroups, setExpandedGroups] = useState({}); // { groupId: boolean }
+  const [selectedGroupId, setSelectedGroupId] = useState('');
+  const [calendarViewMode, setCalendarViewMode] = useState('mine');
+  const [expandedGroups, setExpandedGroups] = useState({});
 
   useEffect(() => {
     if (user.role === 'admin' || user.role === 'boss') {
@@ -206,19 +199,16 @@ const Calendar = ({ user, onLogout, onBackToPanel, onBackToFolders, onGoToRemote
           const headers = {};
           if (token) headers['Authorization'] = `Bearer ${token}`;
           
-          // Fetch Users
           const usersRes = await fetch('/api/users/users', { headers });
           if (usersRes.ok) {
             const data = await usersRes.json();
             if (data.success) setUsers(data.users);
           }
 
-          // Fetch Groups
           const groupsRes = await fetch('/api/users/groups', { headers });
           if (groupsRes.ok) {
             const data = await groupsRes.json();
             if (data.success) {
-              // Fetch members for each group
               const groupsWithMembers = await Promise.all(data.groups.map(async (group) => {
                 const membersRes = await fetch(`/api/users/groups/${group.id}/members`, { headers });
                 const membersData = await membersRes.json();
@@ -244,7 +234,7 @@ const Calendar = ({ user, onLogout, onBackToPanel, onBackToFolders, onGoToRemote
 
   const handleUserSelect = (targetUserId) => {
     setViewUserId(targetUserId);
-    setSelectedGroupId(''); // Clear group selection when selecting specific user
+    setSelectedGroupId('');
   };
 
   const handleGroupSelect = (group) => {
@@ -271,7 +261,6 @@ const Calendar = ({ user, onLogout, onBackToPanel, onBackToFolders, onGoToRemote
       const headers = {};
       if (token) headers['Authorization'] = `Bearer ${token}`;
 
-      // Use the outlook-service /status endpoint that actually validates the token
       const response = await fetch('/api/events/status', { 
         headers,
         credentials: 'include' 
@@ -294,7 +283,6 @@ const Calendar = ({ user, onLogout, onBackToPanel, onBackToFolders, onGoToRemote
     fetchStatus();
   }, [fetchStatus]);
 
-  // Helper to generate consistent color from string (Fallback for missing categories)
   const stringToColor = (str) => {
     let hash = 0;
     for (let i = 0; i < str.length; i++) {
@@ -317,9 +305,7 @@ const Calendar = ({ user, onLogout, onBackToPanel, onBackToFolders, onGoToRemote
       const headers = {};
       if (token) headers['Authorization'] = `Bearer ${token}`;
 
-      // If viewing a specific user, try to fetch their categories
       let url = '/api/events/categories';
-      // Fetch specific user categories if viewing a SINGLE user OR a group (comma separated)
       if (viewUserId) {
         url += `?userId=${viewUserId}`;
       }
@@ -330,13 +316,10 @@ const Calendar = ({ user, onLogout, onBackToPanel, onBackToFolders, onGoToRemote
       });
       if (response.ok) {
         const categoriesData = await response.json();
-        // Ensure we have an array
         const safeCategoriesData = Array.isArray(categoriesData) ? categoriesData : [];
         const allCategories = [...safeCategoriesData, ...defaultCategories];
         setCategories(allCategories);
         
-        // Update selected categories if it's the first load OR if we switched users
-        // We want to select all by default when switching contexts
         setSelectedCategories(new Set(allCategories.map(cat => cat.name)));
       } else {
         console.warn('Failed to load categories, using defaults');
@@ -352,14 +335,12 @@ const Calendar = ({ user, onLogout, onBackToPanel, onBackToFolders, onGoToRemote
            setSelectedCategories(new Set(defaultCategories.map(cat => cat.name)));
       }
     }
-  }, [t, viewUserId]); // Add viewUserId dependency
+  }, [t, viewUserId]);
 
-  // Effect to sync categories from events (Fallback)
   useEffect(() => {
     if (events.length > 0) {
       const eventCategories = new Set();
       events.forEach(e => {
-        // Check both direct property (raw) and extendedProps (FullCalendar object)
         const cats = e.categories || e.extendedProps?.categories;
         if (cats) {
           cats.forEach(c => eventCategories.add(c));
@@ -382,9 +363,8 @@ const Calendar = ({ user, onLogout, onBackToPanel, onBackToFolders, onGoToRemote
         return prevCategories;
       });
     }
-  }, [events]); // Run when events change
+  }, [events]);
 
-  // Check if a date range is already covered by cached ranges
   const isRangeCovered = useCallback((start, end) => {
     return loadedRangesRef.current.some(r => r.start <= start && r.end >= end);
   }, []);
@@ -397,13 +377,11 @@ const Calendar = ({ user, onLogout, onBackToPanel, onBackToFolders, onGoToRemote
       start = new Date(startDate);
       end = new Date(endDate);
     } else {
-      // Default: load ±2 months around current date (much smaller than ±1 year)
       const now = new Date();
       start = new Date(now.getFullYear(), now.getMonth() - 2, 1);
-      end = new Date(now.getFullYear(), now.getMonth() + 3, 0); // End of month+2
+      end = new Date(now.getFullYear(), now.getMonth() + 3, 0);
     }
 
-    // Skip if this range is already loaded (cache hit)
     if (isRangeCovered(start.getTime(), end.getTime())) {
       return;
     }
@@ -428,15 +406,12 @@ const Calendar = ({ user, onLogout, onBackToPanel, onBackToFolders, onGoToRemote
       if (response.ok) {
         const eventsData = await response.json();
         
-        // Merge into cache (keyed by event id)
         eventsData.forEach(ev => {
           eventsCacheRef.current.set(ev.id, ev);
         });
 
-        // Track loaded range
         loadedRangesRef.current.push({ start: start.getTime(), end: end.getTime() });
 
-        // Set all cached events as current state
         setEvents(Array.from(eventsCacheRef.current.values()));
       }
     } catch (error) {
@@ -447,13 +422,11 @@ const Calendar = ({ user, onLogout, onBackToPanel, onBackToFolders, onGoToRemote
     }
   }, [viewUserId, isRangeCovered, user.username]);
 
-  // Force reload (clears cache) - used after create/edit/delete
   const reloadEvents = useCallback(async () => {
     eventsCacheRef.current.clear();
     loadedRangesRef.current = [];
     isFetchingRef.current = false;
 
-    // Use the currently visible range from FullCalendar (if available) to reload
     const api = calendarRef.current?.getApi();
     if (api) {
       const view = api.view;
@@ -468,18 +441,15 @@ const Calendar = ({ user, onLogout, onBackToPanel, onBackToFolders, onGoToRemote
   }, [loadEvents]);
 
   useEffect(() => {
-    // Clear cache when switching user view or when logged-in user changes
     eventsCacheRef.current.clear();
     loadedRangesRef.current = [];
     loadCategories();
     loadEvents();
   }, [loadCategories, loadEvents, user.username]);
 
-  // Auto-sync: if Microsoft is linked but we got 0 events, trigger a sync and reload
   const hasSyncRetried = useRef(false);
   useEffect(() => {
     if (hasSyncRetried.current) return;
-    // Only retry when: linked, no events loaded, not currently fetching, and viewing own calendar
     if (microsoftStatus.linked && events.length === 0 && !isLoadingEvents && !isFetchingRef.current && !viewUserId) {
       hasSyncRetried.current = true;
       const doSync = async () => {
@@ -499,7 +469,6 @@ const Calendar = ({ user, onLogout, onBackToPanel, onBackToFolders, onGoToRemote
     }
   }, [microsoftStatus.linked, events.length, isLoadingEvents, viewUserId, reloadEvents]);
 
-  // Reset sync retry flag when user changes
   useEffect(() => {
     hasSyncRetried.current = false;
   }, [user.username]);
@@ -515,21 +484,17 @@ const Calendar = ({ user, onLogout, onBackToPanel, onBackToFolders, onGoToRemote
   };
 
   const filteredEvents = events.filter(event => {
-    // If no categories are selected, show all events
     if (selectedCategories.size === 0) return true;
     
     const eventCats = event.categories || event.extendedProps?.categories;
     
-    // If event has no categories, check if "No Category" is selected
     if (!eventCats || eventCats.length === 0) {
       return selectedCategories.has(t('calendar.noCategory')) || selectedCategories.has('no-category');
     }
     
-    // Check if any of the event's categories are selected
     return eventCats.some(category => selectedCategories.has(category));
   }).map(event => {
-    // Assign color based on the first category found
-    let eventColor = '#3788d8'; // Default blue
+    let eventColor = '#3788d8';
     let eventBorderColor = '#3788d8';
 
     const eventCats = event.categories || event.extendedProps?.categories;
@@ -542,7 +507,6 @@ const Calendar = ({ user, onLogout, onBackToPanel, onBackToFolders, onGoToRemote
         eventBorderColor = category.hexColor;
       }
     } else {
-       // Check for "Sin categoría" color
        const noCat = categories.find(c => c.id === 'no-category');
        if (noCat) {
          eventColor = noCat.hexColor;
@@ -559,12 +523,11 @@ const Calendar = ({ user, onLogout, onBackToPanel, onBackToFolders, onGoToRemote
   });
 
   const handleEventClick = (clickInfo) => {
-    clickInfo.jsEvent.preventDefault(); // Prevent default behavior (like following links)
+    clickInfo.jsEvent.preventDefault();
     setModalState({ isOpen: true, mode: 'view', event: clickInfo.event });
   };
 
   const handleDateSelect = (selectInfo) => {
-    // Si se selecciona un día completo en la vista mensual -> Abrir panel lateral
     if (selectInfo.view.type === 'dayGridMonth' && selectInfo.allDay) {
       setSelectedDay(selectInfo.start);
       setIsDayPanelOpen(true);
@@ -572,7 +535,6 @@ const Calendar = ({ user, onLogout, onBackToPanel, onBackToFolders, onGoToRemote
       return;
     }
 
-    // Si es una selección de hora (en el panel lateral o vista semanal) -> Crear evento
     setModalState({
       isOpen: true,
       mode: 'create',
@@ -584,7 +546,6 @@ const Calendar = ({ user, onLogout, onBackToPanel, onBackToFolders, onGoToRemote
       }
     });
     
-    // Deseleccionar en el calendario principal si es necesario
     if (calendarRef.current) {
         calendarRef.current.getApi().unselect();
     }
@@ -629,36 +590,36 @@ const Calendar = ({ user, onLogout, onBackToPanel, onBackToFolders, onGoToRemote
 
   return (
     <div className="calendar-layout">
-      {/* Mobile Header */}
+      
       <div className="mobile-header">
         <div className="logo-container">
           <img src="/icons/nube.svg" alt="Logo" className="logo-icon" />
           <span>{t('calendar.title')}</span>
         </div>
         <button className="hamburger-btn" onClick={() => setMobileSidebarOpen(!mobileSidebarOpen)}>
-          ☰
+          [Menu]
         </button>
       </div>
 
-      {/* Sidebar Overlay */}
+      
       <div 
         className={`sidebar-overlay ${mobileSidebarOpen ? 'visible' : ''}`}
         onClick={() => setMobileSidebarOpen(false)}
       ></div>
 
-      {/* Sidebar */}
+      
       <div className={`calendar-sidebar ${isSidebarOpen ? 'open' : ''} ${mobileSidebarOpen ? 'open' : ''}`}>
         <div className="sidebar-header">
           <div className="logo-container">
             <img src="/icons/nube.svg" alt="Logo" className="logo-icon" />
             <span>{t('calendar.title')}</span>
           </div>
-          {/* Close button for mobile sidebar */}
+          
           <button 
             className="mobile-close-btn" 
             onClick={() => setMobileSidebarOpen(false)}
           >
-            ✕
+            x
           </button>
         </div>
 
@@ -761,7 +722,7 @@ const Calendar = ({ user, onLogout, onBackToPanel, onBackToFolders, onGoToRemote
                       
                       {expandedGroups[group.id] && (
                         <div className="group-members" style={{ paddingLeft: '10px', marginTop: '5px', borderLeft: '2px solid var(--border-color)' }}>
-                          {/* "View All" Button */}
+                          
                           <button 
                             className="view-all-btn"
                             style={{ 
@@ -878,7 +839,7 @@ const Calendar = ({ user, onLogout, onBackToPanel, onBackToFolders, onGoToRemote
         </div>
       </div>
 
-      {/* Main Content */}
+      
       <div className="calendar-main">
         {!microsoftStatus.linked && (
           <div className="bg-red-50 dark:bg-red-900/20 border-l-4 border-red-500 p-4 m-4 rounded shadow-sm flex justify-between items-center">
@@ -933,11 +894,10 @@ const Calendar = ({ user, onLogout, onBackToPanel, onBackToFolders, onGoToRemote
               events={filteredEvents}
               eventClick={handleEventClick}
               select={handleDateSelect}
-              unselectAuto={false} // Keep selection visible when modal opens
+              unselectAuto={false}
               eventDrop={handleEventDrop}
               eventResize={handleEventResize}
               datesSet={(dateInfo) => {
-                // Load events for the new visible range + buffer
                 const bufferStart = new Date(dateInfo.start);
                 bufferStart.setMonth(bufferStart.getMonth() - 1);
                 const bufferEnd = new Date(dateInfo.end);
@@ -949,7 +909,7 @@ const Calendar = ({ user, onLogout, onBackToPanel, onBackToFolders, onGoToRemote
         </div>
       </div>
 
-      {/* Panel Lateral del Día */}
+      
       <DayPanel 
         isOpen={isDayPanelOpen} 
         date={selectedDay} 
@@ -981,7 +941,7 @@ const Calendar = ({ user, onLogout, onBackToPanel, onBackToFolders, onGoToRemote
           selectedDates={modalState.selectedDates}
           onClose={() => {
             setModalState({ ...modalState, isOpen: false });
-            calendarRef.current?.getApi()?.unselect(); // Clear selection when modal closes
+            calendarRef.current?.getApi()?.unselect();
           }}
           user={user}
           initialAssignMode={selectedGroupId ? 'group' : (viewUserId ? 'user' : 'me')}
@@ -992,19 +952,16 @@ const Calendar = ({ user, onLogout, onBackToPanel, onBackToFolders, onGoToRemote
               let url = mode === 'create' ? '/api/events/' : `/api/events/${modalState.event.id}`;
               let method = mode === 'create' ? 'POST' : 'PUT';
               
-              // Handle Group Assignment
               if (eventData.assignMode === 'group' && eventData.groupId) {
                 url = '/api/events/group';
                 method = 'POST';
               }
 
-              // Handle User Assignment
               if (eventData.assignMode === 'user' && eventData.targetUserId) {
                 url = '/api/events/assign-user';
                 method = 'POST';
               }
 
-              // Append "Created by" if assigning to others (only on create)
               if (mode === 'create' && (eventData.assignMode === 'group' || eventData.assignMode === 'user')) {
                  const createdByText = `\n\n(Tarea creada por ${user.username})`;
                  if (eventData.description) {
@@ -1033,7 +990,7 @@ const Calendar = ({ user, onLogout, onBackToPanel, onBackToFolders, onGoToRemote
               const result = await response.json();
 
               setModalState({ ...modalState, isOpen: false });
-              calendarRef.current?.getApi()?.unselect(); // Clear selection
+              calendarRef.current?.getApi()?.unselect();
               await reloadEvents();
               
               if (eventData.assignMode === 'group') {
@@ -1064,7 +1021,7 @@ const Calendar = ({ user, onLogout, onBackToPanel, onBackToFolders, onGoToRemote
               });
               if (!response.ok) throw new Error('Error deleting event');
               setModalState({ ...modalState, isOpen: false });
-              calendarRef.current?.getApi()?.unselect(); // Clear selection
+              calendarRef.current?.getApi()?.unselect();
               await reloadEvents();
               addToast(t('calendar.eventDeleted'), 'success');
             } catch (error) {

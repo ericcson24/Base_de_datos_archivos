@@ -13,7 +13,6 @@ const DocumentAIEditor = ({
   const { showToast } = useContext(ToastContext);
   const { language } = useContext(LanguageContext);
 
-  // States
   const [content, setContent] = useState(document?.content || '');
   const [selectedText, setSelectedText] = useState('');
   const [activeTab, setActiveTab] = useState('editor');
@@ -25,7 +24,6 @@ const DocumentAIEditor = ({
   const [isDirty, setIsDirty] = useState(false);
   const editorRef = useRef(null);
 
-  // Translations
   const t = {
     en: {
       title: 'AI Document Editor',
@@ -75,13 +73,11 @@ const DocumentAIEditor = ({
 
   const labels = t[language] || t.en;
 
-  // Handle content change
   const handleContentChange = (e) => {
     setContent(e.target.value);
     setIsDirty(true);
   };
 
-  // Get selected text
   const handleTextSelect = () => {
     const editor = editorRef.current;
     if (editor) {
@@ -90,7 +86,6 @@ const DocumentAIEditor = ({
     }
   };
 
-  // Perform analysis
   const performAnalysis = useCallback(async (type, customText = null) => {
     if (!content.trim()) {
       showToast('El documento está vacío', 'error');
@@ -146,7 +141,6 @@ const DocumentAIEditor = ({
     }
   }, [content, document, showToast, labels]);
 
-  // Get highlights
   const getHighlights = useCallback(async () => {
     if (!content.trim()) {
       showToast('El documento está vacío', 'error');
@@ -184,7 +178,6 @@ const DocumentAIEditor = ({
     }
   }, [content, document, showToast, labels]);
 
-  // Get edit suggestions
   const getEditSuggestions = useCallback(async () => {
     if (!content.trim()) {
       showToast('El documento está vacío', 'error');
@@ -223,7 +216,6 @@ const DocumentAIEditor = ({
     }
   }, [content, document, showToast, labels]);
 
-  // Save changes
   const handleSave = async () => {
     try {
       if (onSave) {
@@ -237,11 +229,9 @@ const DocumentAIEditor = ({
     }
   };
 
-  // Calculate stats
   const wordCount = content.trim().split(/\s+/).length;
   const charCount = content.length;
 
-  // Render highlighted text
   const renderHighlightedContent = () => {
     if (!highlights.length) {
       return content;
@@ -255,7 +245,6 @@ const DocumentAIEditor = ({
     sortedHighlights.forEach((highlight, idx) => {
       const { start, end, importance } = highlight;
 
-      // Add text before highlight
       if (start > lastEnd) {
         result.push(
           <span key={`text-${lastEnd}`}>
@@ -264,7 +253,6 @@ const DocumentAIEditor = ({
         );
       }
 
-      // Add highlighted text
       const highlightClass = `highlight-${importance || 'medium'}`;
       result.push(
         <span key={`highlight-${idx}`} className={`highlighted-text ${highlightClass}`}>
@@ -275,7 +263,6 @@ const DocumentAIEditor = ({
       lastEnd = end;
     });
 
-    // Add remaining text
     if (lastEnd < content.length) {
       result.push(
         <span key={`text-${lastEnd}`}>
@@ -310,7 +297,7 @@ const DocumentAIEditor = ({
       </div>
 
       <div className="editor-container">
-        {/* Main Editor */}
+        
         <div className="editor-main">
           <textarea
             ref={editorRef}
@@ -327,7 +314,7 @@ const DocumentAIEditor = ({
           </div>
         </div>
 
-        {/* AI Panel */}
+        
         <div className="ai-panel">
           <div className="ai-tabs">
             <button
@@ -350,7 +337,7 @@ const DocumentAIEditor = ({
             </button>
           </div>
 
-          {/* Tab Content */}
+          
           <div className="tab-content">
             {activeTab === 'editor' && (
               <div className="analysis-controls">

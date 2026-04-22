@@ -4,7 +4,7 @@ const dualNodeIndexing = require('../utils/dualNodeIndexing');
 const { getCachedResult, setCachedResult } = require('../utils/cache');
 const { extractTextFromFile } = require('../utils/fileParser');
 const dotenv = require('dotenv');
-const fs = require('fs').promises; // Add fs for analyzeFile
+const fs = require('fs').promises;
 const path = require('path');
 
 dotenv.config();
@@ -22,7 +22,6 @@ const handleCommand = async (req, res) => {
 
     console.log(`[AI COMMAND] Usuario ${userId}: "${query}"`);
 
-    // Prompt for Gemini to classify and extract command
     const prompt = `Eres un asistente que controla el panel de usuario.
 El usuario dice: "${query}"
 
@@ -51,7 +50,6 @@ Si no reconoces la acción o no es segura, responde:
     const result = await model.generateContent(prompt);
     let aiResponse = result.response.text().trim();
     
-    // Cleanup JSON
     aiResponse = aiResponse.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
 
     let commandData;
@@ -65,7 +63,6 @@ Si no reconoces la acción o no es segura, responde:
       return res.json({ success: false, message: commandData.error });
     }
 
-    // Ejecutar acción en BD si es persistente
     if (commandData.action === 'change_theme') {
       await db.query('UPDATE users SET theme_preference = $1 WHERE id = $2', [commandData.value, userId]);
     } else if (commandData.action === 'change_language') {
@@ -94,17 +91,14 @@ const searchFiles = async (req, res) => {
     console.log(`[AI SEARCH] Usuario ${userId}: "${query}"`);
     console.log(`[DEBUG] Headers:`, JSON.stringify(req.headers));
 
-    // Verificar cache primero
     const cachedResult = getCachedResult(userId, query);
     if (cachedResult) {
       console.log(`[AI SEARCH] Resultado desde cache`);
       return res.json({ ...cachedResult, cached: true });
     }
 
-    // 1. Intentar búsqueda rápida en índice primario
     let relevantFiles = dualNodeIndexing.searchFiles(userId, query);
 
-    // MOCK MODE FOR TESTING
     if (req.headers['x-test-mode'] === 'isolation') {
         console.log('[TEST MODE] Returning mock files for isolation test');
         if (userId == 1) {
@@ -125,9 +119,7 @@ const searchFiles = async (req, res) => {
             }];
         }
     } else if (relevantFiles === null) {
-      // Índice aún no está listo, intentamos búsqueda en BD
       console.log(`[AI SEARCH] Índice primario no listo, buscando en BD`);
-      // 1. Buscar por nombre o ruta (incluye carpetas)
       const filesResult = await db.query(
         `SELECT id, name, physical_path, size, mime_type 
          FROM files 
@@ -139,7 +131,6 @@ const searchFiles = async (req, res) => {
       relevantFiles = filesResult.rows;
     }
 
-    // Si después de todo (índice o BD por nombre) tenemos pocos resultados, ampliaremos con recientes
     if (!relevantFiles || relevantFiles.length < 5) {
         console.log(`[AI SEARCH] Pocas coincidencias explícitas, recuperando archivos recientes para contexto.`);
         const recentFiles = await db.query(
@@ -152,10 +143,8 @@ const searchFiles = async (req, res) => {
             [userId]
         );
         
-        // Inicializar si es null
         if (!relevantFiles) relevantFiles = [];
         
-        // Añadir archivos recientes que no estén ya en la lista
         const currentIds = new Set(relevantFiles.map(f => f.id));
         for (const file of recentFiles.rows) {
             if (!currentIds.has(file.id)) {
@@ -164,8 +153,6 @@ const searchFiles = async (req, res) => {
         }
     }
 
-    // Supplementary type-aware search: detect if the query implies a specific file type
-    // and guarantee those files are in the candidate list regardless of filename match.
     {
       const q = query.toLowerCase();
       let typeMimeFilter = null;
@@ -203,7 +190,7 @@ const searchFiles = async (req, res) => {
         const currentIds = new Set(relevantFiles.map(f => f.id));
         for (const file of typeFiles.rows) {
           if (!currentIds.has(file.id)) {
-            relevantFiles.unshift(file); // prioritise type matches
+            relevantFiles.unshift(file);
             currentIds.add(file.id);
           }
         }
@@ -223,7 +210,6 @@ const searchFiles = async (req, res) => {
       });
     }
 
-    // Filter out AI-excluded paths for this user
     {
       try {
         const userRow = await db.query('SELECT username FROM users WHERE id = $1', [userId]);
@@ -235,7 +221,6 @@ const searchFiles = async (req, res) => {
             const uploadRoot = '/app/uploads';
             relevantFiles = relevantFiles.filter(file => {
               if (!file.physical_path) return true;
-              // Get the user-relative path from the physical path
               const normalized = file.physical_path.replace(/\\/g, '/');
               let rel = '';
               if (normalized.startsWith(uploadRoot + '/' + username + '/')) {
@@ -251,22 +236,17 @@ const searchFiles = async (req, res) => {
           }
         }
       } catch (e) {
-        // ai_exclusions table might not exist yet on first boot, skip silently
         if (!e.message?.includes('ai_exclusions')) {
           console.warn('[AI SEARCH] Error fetching AI exclusions:', e.message);
         }
       }
     }
 
-    // Exclude file types the AI should ignore entirely
     {
       const ignoredExtensions = [
         '.ini', '.lnk',
-        // Installers / executables
         '.exe', '.msi', '.msix', '.msixbundle', '.appx', '.dmg', '.pkg', '.deb', '.rpm',
-        // Archives (content not indexed)
         '.zip', '.rar', '.7z', '.tar', '.gz', '.bz2', '.xz',
-        // Binary blobs / dumps
         '.iso', '.img', '.bin', '.dat', '.dll', '.so', '.dylib',
       ];
       const beforeCount = relevantFiles.length;
@@ -279,7 +259,6 @@ const searchFiles = async (req, res) => {
       }
     }
 
-    // Deduplicate files by name + physical_path to avoid reporting the same file multiple times
     {
       const seen = new Set();
       const deduped = [];
@@ -296,8 +275,6 @@ const searchFiles = async (req, res) => {
       relevantFiles = deduped;
     }
 
-    // 2. ENRIQUECER CON CONTENIDO REAL (Lectura de archivos)
-    // Filtramos archivos irrelevantes o inexistentes. Analizamos hasta 10 archivos para mayor contexto.
     const topFiles = relevantFiles.slice(0, 10);
     const validFiles = [];
     const contextParts = [];
@@ -311,12 +288,11 @@ const searchFiles = async (req, res) => {
       if (file.physical_path) {
         let containerPath = file.physical_path;
         
-        // Handle shared files: "shared:ownerUsername:fileName"
         if (containerPath.startsWith('shared:')) {
           const sharedParts = containerPath.split(':');
           if (sharedParts.length >= 3) {
             const ownerUsername = sharedParts[1];
-            const sharedFileName = sharedParts.slice(2).join(':'); // handle colons in filenames
+            const sharedFileName = sharedParts.slice(2).join(':');
             containerPath = `/app/uploads/${ownerUsername}/${sharedFileName}`;
             console.log(`[AI SEARCH] Shared file resolved: ${file.physical_path} -> ${containerPath}`);
           } else {
@@ -327,15 +303,10 @@ const searchFiles = async (req, res) => {
         
         containerPath = containerPath.replace(/\\/g, '/');
 
-        // Priority: if path already points inside the container's uploads dir, use it as-is.
-        // This MUST come first to prevent the /Datos/ split from mis-routing paths that
-        // contain "Datos" as a subfolder name and belong to a different user.
         if (containerPath.startsWith('/app/uploads/')) {
-             // Already correct container path — no conversion needed
         } else if (containerPath.startsWith('uploads/')) {
              containerPath = path.join('/app', containerPath);
         } else if (containerPath.includes('/Datos/')) {
-             // Legacy Windows host path like C:/Users/.../Datos/username/file.ext
              const parts = containerPath.split('/Datos/');
              if (parts.length > 1) {
                  containerPath = path.join('/app/uploads', parts[1]);
@@ -352,35 +323,26 @@ const searchFiles = async (req, res) => {
         containerPath = containerPath.replace(/\/\//g, '/');
 
         try {
-          // Check existence first
           await fs.access(containerPath);
           exists = true;
 
           const fullText = await extractTextFromFile(containerPath, file.mime_type || '');
-          // Give PDFs more context (they tend to have shorter meaningful text per page)
           const isPdf = (file.mime_type || '').includes('pdf') || (file.name || '').toLowerCase().endsWith('.pdf');
           const snippetLength = isPdf ? 3000 : 1000;
           contentSnippet = fullText.substring(0, snippetLength).replace(/[ \t]+/g, ' ').replace(/\n{3,}/g, '\n\n').trim();
           
-          // Add to valid list if it exists
           
-          // Calculate relative path for file-service ID compatibility
-          // file-service expects: Base64(relativePath) where relativePath starts from user folder
-          // containerPath is likely /app/uploads/username/file.ext
           let downloadId = null;
           let folderPath = file.folder_path || '';
           const uploadRoot = '/app/uploads';
           
           if (containerPath.startsWith(uploadRoot)) {
-             // rel -> "username/folder/file.ext"
              const rel = path.relative(uploadRoot, containerPath);
              const parts = rel.split(path.sep);
              if (parts.length > 1) {
-                 // Discard username part -> "folder/file.ext"
                  const userRelative = parts.slice(1).join('/');
                  downloadId = Buffer.from(userRelative).toString('base64'); 
                  
-                 // Extract folder path if not already set
                  if (!folderPath) {
                    const lastSlash = userRelative.lastIndexOf('/');
                    if (lastSlash > 0) {
@@ -391,7 +353,6 @@ const searchFiles = async (req, res) => {
                  downloadId = Buffer.from(rel).toString('base64');
              }
           } else {
-             // If we can't determine structure, try using name or leaf
              downloadId = Buffer.from(file.name).toString('base64');
           }
 
@@ -409,19 +370,15 @@ Contenido (Extracto): "${contentSnippet || 'Contenido vacío o ilegible'}"
 
         } catch (err) {
           console.warn(`[AI SEARCH] Omitiendo archivo ${file.id} (${file.name}): ${err.message}`);
-          // If file not found (ENOENT) or unreadable, we skip adding it to context and validFiles
-          // This prevents "ghost" files from showing up in UI
         }
       }
     }
 
     const filesContext = contextParts.join('\n');
     
-    // Update relevantFiles to only include those we actually found/processed
     relevantFiles = validFiles;
 
     if (relevantFiles.length === 0) {
-       // Fallback message if all files were filtered out
        return res.json({
         success: true,
         response: `Encontré referencias a archivos, pero parecen no estar disponibles físicamente en el servidor.`,
@@ -432,7 +389,6 @@ Contenido (Extracto): "${contentSnippet || 'Contenido vacío o ilegible'}"
       });
     }
 
-    // 3. Prompt para Gemini con contenido real
     const prompt = `Eres un asistente de búsqueda documental inteligente.
 El usuario busca: "${query}"
 
@@ -462,17 +418,13 @@ Instrucciones:
 
 Si no encuentras nada relevante, devuelve "highlights": [] y una respuesta explicativa.`;
 
-    // 4. Llamar a Gemini
     const model = genAI.getGenerativeModel({ model: 'gemini-flash-latest', generationConfig: { responseMimeType: "application/json" } });
     const result = await model.generateContent(prompt);
     let aiResponseText = result.response.text();
 
-    // Parse JSON response
     let finalResponse = { answer: aiResponseText, highlights: [] };
     try {
-        // Cleanup potential markdown fences and leading prose before the JSON body
         let cleaned = aiResponseText.replace(/```json\s*/gi, '').replace(/```\s*/g, '').trim();
-        // If the model prepended text, grab the first {...} block
         const firstBrace = cleaned.indexOf('{');
         const lastBrace = cleaned.lastIndexOf('}');
         if (firstBrace > 0 && lastBrace > firstBrace) {
@@ -480,7 +432,6 @@ Si no encuentras nada relevante, devuelve "highlights": [] y una respuesta expli
         }
         finalResponse = JSON.parse(cleaned);
 
-        // Sometimes the model double-wraps: { answer: "{ \"answer\": ..., \"highlights\": [...] }", highlights: [] }
         if (typeof finalResponse.answer === 'string') {
             const inner = finalResponse.answer.trim();
             if (inner.startsWith('{') && inner.endsWith('}')) {
@@ -492,16 +443,14 @@ Si no encuentras nada relevante, devuelve "highlights": [] y una respuesta expli
                             highlights: innerParsed.highlights || finalResponse.highlights || []
                         };
                     }
-                } catch (_) { /* keep outer */ }
+                } catch (_) {  }
             }
         }
     } catch (e) {
-        // Fallback for non-JSON response
         console.warn('[AI SEARCH] Failed to parse AI JSON response, using raw text:', e.message);
         finalResponse.answer = aiResponseText;
     }
 
-    // Final safety: answer must be a plain string, never an object or JSON dump
     if (typeof finalResponse.answer !== 'string') {
         try { finalResponse.answer = JSON.stringify(finalResponse.answer); } catch (_) { finalResponse.answer = String(finalResponse.answer); }
     }
@@ -509,9 +458,6 @@ Si no encuentras nada relevante, devuelve "highlights": [] y una respuesta expli
         finalResponse.highlights = [];
     }
 
-    // Narrow down the "relevant files" list to those actually cited by the AI (highlights)
-    // or whose name appears in the AI answer. This avoids returning unrelated "filler"
-    // files that were only added as recent-file context.
     {
       const highlights = finalResponse.highlights || [];
       const citedIds = new Set(highlights.map(h => h.fileId).filter(id => id != null));
@@ -521,7 +467,6 @@ Si no encuentras nada relevante, devuelve "highlights": [] y una respuesta expli
         const name = (file.name || '').toLowerCase();
         if (!name) return false;
         if (answerText.includes(name)) return true;
-        // Also try matching by base name (without extension) when it's long enough
         const base = name.replace(/\.[^.]+$/, '');
         return base.length >= 4 && answerText.includes(base);
       };
@@ -540,7 +485,6 @@ Si no encuentras nada relevante, devuelve "highlights": [] y una respuesta expli
           relevantFiles = filtered;
         }
       } else {
-        // No highlights: keep only files whose name matches the query or that the AI mentioned
         const filtered = relevantFiles.filter(f => nameMatches(f) || queryMatchesName(f));
         if (filtered.length > 0 && filtered.length < relevantFiles.length) {
           console.log(`[AI SEARCH] Narrowed relevant files ${relevantFiles.length} -> ${filtered.length} based on name/query match`);
@@ -549,7 +493,6 @@ Si no encuentras nada relevante, devuelve "highlights": [] y una respuesta expli
       }
     }
 
-    // Guardar en cache
     setCachedResult(userId, query, {
       success: true,
       response: finalResponse.answer,
@@ -624,7 +567,6 @@ const analyzeFile = async (req, res) => {
 
     console.log(`[AI FILE ANALYSIS] Usuario ${userId} solicita análisis de archivo ${fileId}`);
 
-    // Obtener información del archivo de la BD
     const fileResult = await db.query(
       `SELECT id, name, physical_path, size, mime_type 
        FROM files 
@@ -638,7 +580,6 @@ const analyzeFile = async (req, res) => {
 
     const file = fileResult.rows[0];
 
-    // Verificar que el archivo tenga physical_path
     if (!file.physical_path) {
       return res.status(400).json({ 
         error: 'Archivo sin ruta física',
@@ -646,12 +587,10 @@ const analyzeFile = async (req, res) => {
       });
     }
 
-    // Leer el archivo
     let content;
     try {
       const buffer = await fs.readFile(file.physical_path);
       
-      // Si es texto, convertir a string
       if (file.mime_type && file.mime_type.startsWith('text/')) {
         content = buffer.toString('utf-8');
       } else {
@@ -665,7 +604,6 @@ const analyzeFile = async (req, res) => {
       });
     }
 
-    // Analizar con Gemini
     const prompt = `Analiza este archivo: "${file.name}" (${file.mime_type})
 
 Proporciona:
@@ -674,9 +612,8 @@ Proporciona:
 3. Sugerencias de uso o mejoras
 
 Contenido:
-${content.substring(0, 10000)}`; // Limitar a primeros 10KB
+${content.substring(0, 10000)}`;
 
-    // (Use gemini-flash-latest)
     const model = genAI.getGenerativeModel({ model: 'gemini-flash-latest' });
     const result = await model.generateContent(prompt);
     const analysis = await result.response;

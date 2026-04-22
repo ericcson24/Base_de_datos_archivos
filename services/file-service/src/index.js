@@ -1,4 +1,4 @@
-﻿require('dotenv').config();
+require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const multer = require('multer');
@@ -11,21 +11,15 @@ const ffmpeg = require('fluent-ffmpeg');
 const { dbAsync } = require('./database/db');
 
 const JWT_SECRET = process.env.JWT_SECRET || 'fallback-secret-change-me';
-// const { syncDiskToDb } = require('./utils/syncDiskToDb');
 
 const app = express();
 const PORT = process.env.PORT || 5004;
 const UPLOAD_DIR = process.env.UPLOAD_DIR || path.join(__dirname, 'uploads');
 
-// Ensure upload directory exists
 if (!fsSync.existsSync(UPLOAD_DIR)){
     fsSync.mkdirSync(UPLOAD_DIR, { recursive: true });
 }
 
-// Initial Sync Scanning (Windows Server style)
-// setTimeout(() => {
-//    syncDiskToDb(UPLOAD_DIR).catch(err => console.error('Sync failed:', err));
-// }, 5000); // Wait 5s for DB to be ready
 
 app.use(cors({
   origin: true,
@@ -33,7 +27,6 @@ app.use(cors({
 }));
 app.use(express.json());
 
-// Middleware de autenticación simple
 const authenticate = (req, res, next) => {
   const authHeader = req.headers.authorization;
   let token = null;
@@ -59,7 +52,6 @@ const authenticate = (req, res, next) => {
   }
 };
 
-// Create ai_exclusions table if it doesn't exist (run once on startup)
 (async () => {
   try {
     await dbAsync.run(`
@@ -76,7 +68,6 @@ const authenticate = (req, res, next) => {
   }
 })();
 
-// Helper para logs
 async function logAction(username, action, details) {
   try {
     const user = await dbAsync.get('SELECT id FROM users WHERE username = ?', [username]);
@@ -91,23 +82,18 @@ async function logAction(username, action, details) {
   }
 }
 
-// Configurar multer
-// Helper: reject any path/filename containing traversal or absolute-root segments.
 const isUnsafePathSegment = (p) => {
   if (p === undefined || p === null) return false;
   const s = String(p).replace(/\\/g, '/');
   if (s.includes('..')) return true;
   if (path.isAbsolute(s)) return true;
-  if (/^[a-zA-Z]:[\\/]/.test(s)) return true; // Windows drive-letter
+  if (/^[a-zA-Z]:[\\/]/.test(s)) return true;
   return false;
 };
 
-// Helper: strip traversal from an original filename (never allow it to escape its target dir).
 const sanitizeFilename = (name) => {
   if (!name) return `file_${Date.now()}`;
-  // Keep only the basename, strip null bytes and leading dots.
   const base = path.basename(String(name)).replace(/\0/g, '').replace(/^\.+/, '');
-  // Fall back if completely empty after sanitization.
   return base || `file_${Date.now()}`;
 };
 
@@ -121,7 +107,6 @@ const storage = multer.diskStorage({
       }
       const userRoot = path.resolve(UPLOAD_DIR, username);
       const fullPath = path.resolve(userRoot, uploadPath);
-      // Ensure the resolved path is still within the user's own folder.
       if (fullPath !== userRoot && !fullPath.startsWith(userRoot + path.sep)) {
         return cb(new Error('Ruta fuera del ámbito del usuario'));
       }
@@ -134,7 +119,6 @@ const storage = multer.diskStorage({
   },
   filename: (req, file, cb) => {
     const safeOriginal = sanitizeFilename(file.originalname);
-    // Si se solicita renombrar duplicados, generar un nombre único
     if (req.body.duplicateAction === 'rename') {
       const username = req.user ? req.user.username : 'unknown';
       const uploadPath = req.body.path || '';
@@ -162,13 +146,11 @@ const storage = multer.diskStorage({
 const upload = multer({
   storage: storage,
   limits: {
-    // Per-file cap (2 GB) to prevent runaway uploads; adjust via env if needed.
     fileSize: parseInt(process.env.MAX_UPLOAD_BYTES || String(2 * 1024 * 1024 * 1024), 10),
     files: 200
   }
 });
 
-// Configuración de multer para actualización de archivos (usa carpeta temporal)
 const uploadTemp = multer({
   dest: '/tmp/uploads',
   limits: {
@@ -176,13 +158,11 @@ const uploadTemp = multer({
   }
 });
 
-// --- Rutas ---
 
 app.get('/', (req, res) => {
   res.send('File Service is running');
 });
 
-// Listar archivos
 app.get('/list', authenticate, async (req, res) => {
   try {
     console.log(`[DEBUG] List request from ${req.user.username} for path: ${req.query.path}`);
@@ -196,7 +176,6 @@ app.get('/list', authenticate, async (req, res) => {
 
     let targetDir;
     if (owner && owner !== username) {
-       // Authorization: the requested path must match a share with us (exact or ancestor)
        const normReq = (requestedPath || '').replace(/\\/g, '/');
        let allowed = false;
        try {
@@ -207,11 +186,10 @@ app.get('/list', authenticate, async (req, res) => {
           for (const s of (shares || [])) {
              const sp = (s.path || '').replace(/\\/g, '/');
              if (sp === normReq || normReq === sp || normReq.startsWith(sp + '/') || sp.startsWith(normReq + '/') || normReq === '') {
-                // Only allow: exact match, inside shared folder, OR listing the ancestor path (shared folder itself at its parent)
                 if (sp === normReq || normReq.startsWith(sp + '/')) { allowed = true; break; }
              }
           }
-       } catch (e) { /* ignore */ }
+       } catch (e) {  }
        if (!allowed) {
           return res.status(403).json({ success: false, message: 'No tienes acceso a esta carpeta' });
        }
@@ -222,7 +200,6 @@ app.get('/list', authenticate, async (req, res) => {
     
     console.log(`[DEBUG] Target directory: ${targetDir}`);
 
-    // Asegurar directorio usuario
     if (!owner || owner === username) {
         try {
             await fs.access(path.join(UPLOAD_DIR, username));
@@ -241,19 +218,16 @@ app.get('/list', authenticate, async (req, res) => {
 
     const items = await fs.readdir(targetDir, { withFileTypes: true });
 
-    // If viewing a shared user's folder, fetch their avatar once
     let viewingOwnerAvatarUrl = null;
     if (owner && owner !== username) {
       try {
         const ownerRow = await dbAsync.get('SELECT avatar_url FROM users WHERE username = ?', [owner]);
         viewingOwnerAvatarUrl = (ownerRow && ownerRow.avatar_url) || null;
-      } catch (e) { /* ignore */ }
+      } catch (e) {  }
     }
     
-    // FETCH SHARED STATUS
     let sharedPaths = new Set();
-    let sharedWithMap = {}; // path -> [usernames]
-    // Only check if we are viewing our own files (user is owner)
+    let sharedWithMap = {};
     if (!owner || owner === username) {
         try {
              const shares = await dbAsync.all('SELECT path, shared_with_username FROM shared_files WHERE owner_username = ?', [username]);
@@ -279,23 +253,20 @@ app.get('/list', authenticate, async (req, res) => {
       return ignoredExtensions.has(path.extname(name).toLowerCase());
     };
 
-    // Fetch folder metadata (colors/icons)
     let folderMeta = {};
     try {
       const metas = await dbAsync.all('SELECT folder_path, color, icon FROM folder_metadata WHERE username = ?', [owner || username]);
       if (metas) {
         metas.forEach(m => { folderMeta[m.folder_path] = { color: m.color, icon: m.icon }; });
       }
-    } catch (e) { /* table might not exist yet */ }
+    } catch (e) {  }
 
-    // Fetch AI exclusions for this user
     let aiExcludedPaths = new Set();
     try {
       const exclusions = await dbAsync.all('SELECT path FROM ai_exclusions WHERE username = ?', [owner || username]);
       if (exclusions) exclusions.forEach(e => aiExcludedPaths.add(e.path.replace(/\\/g, '/')));
-    } catch (e) { /* table might not exist yet */ }
+    } catch (e) {  }
 
-    // Helper: check if a normalized path is excluded (exact match or inside excluded folder)
     const isAIExcluded = (np) => {
       if (aiExcludedPaths.has(np)) return true;
       for (const excl of aiExcludedPaths) {
@@ -310,7 +281,6 @@ app.get('/list', authenticate, async (req, res) => {
       const fullPath = path.join(targetDir, item.name);
       const relativePath = path.join(requestedPath, item.name);
       
-      // Check shared status (normalize paths)
       const normalizedPath = relativePath.replace(/\\/g, '/');
       const winPath = relativePath.replace(/\//g, '\\');
       const isShared = sharedPaths.has(normalizedPath) || sharedPaths.has(winPath) || sharedPaths.has(relativePath);
@@ -352,13 +322,11 @@ app.get('/list', authenticate, async (req, res) => {
       }
     }
 
-    // Filtering
     const searchQuery = req.query.search;
     if (searchQuery) {
         files = files.filter(file => file.name.toLowerCase().includes(searchQuery.toLowerCase()));
     }
 
-    // Include pinned shared files in the main listing (only at root level, own files view)
     if ((!requestedPath || requestedPath === '') && (!owner || owner === username)) {
       try {
         const pinnedShares = await dbAsync.all(
@@ -366,7 +334,6 @@ app.get('/list', authenticate, async (req, res) => {
           [username]
         );
         if (pinnedShares && pinnedShares.length > 0) {
-          // Build avatar map for all distinct owners in pinned shares
           const pinnedOwners = [...new Set(pinnedShares.map(s => s.owner_username))];
           const pinnedAvatarMap = {};
           if (pinnedOwners.length) {
@@ -376,7 +343,7 @@ app.get('/list', authenticate, async (req, res) => {
                 pinnedOwners
               );
               for (const r of rows || []) pinnedAvatarMap[r.username] = r.avatar_url || null;
-            } catch (e) { /* ignore */ }
+            } catch (e) {  }
           }
           for (const share of pinnedShares) {
             const fullPath = path.join(UPLOAD_DIR, share.owner_username, share.path);
@@ -398,12 +365,10 @@ app.get('/list', authenticate, async (req, res) => {
                 pinned_to_panel: true,
                 pinnedFromShared: true
               };
-              // Apply ignored extensions + search filter
               if (!isIgnoredItem(pinnedFile.name, pinnedFile.type === 'folder') && (!searchQuery || pinnedFile.name.toLowerCase().includes(searchQuery.toLowerCase()))) {
                 files.push(pinnedFile);
               }
             } catch (e) {
-              // File might have been deleted by owner
             }
           }
         }
@@ -412,7 +377,6 @@ app.get('/list', authenticate, async (req, res) => {
       }
     }
 
-    // Sorting
     const sortBy = req.query.sortBy;
     const order = req.query.order === 'desc' ? -1 : 1;
 
@@ -446,7 +410,6 @@ app.get('/list', authenticate, async (req, res) => {
   }
 });
 
-// Helper: resolve file path from base64 ID (supports own files and shared files)
 async function resolveFilePath(fileId, username) {
     let decoded;
     try {
@@ -455,20 +418,17 @@ async function resolveFilePath(fileId, username) {
         return { error: 'ID inválido', status: 400 };
     }
 
-    // Check if it's a shared file (shared:ownerUsername:path)
     if (decoded.startsWith('shared:')) {
         const parts = decoded.split(':');
         if (parts.length < 3) return { error: 'ID compartido inválido', status: 400 };
         const ownerUsername = parts[1];
-        const filePath = parts.slice(2).join(':'); // path may contain colons
+        const filePath = parts.slice(2).join(':');
 
-        // Verify the share exists in DB (exact path OR a parent folder shared with us)
         let share = await dbAsync.get(
             'SELECT * FROM shared_files WHERE owner_username = ? AND shared_with_username = ? AND path = ?',
             [ownerUsername, username, filePath]
         );
         if (!share) {
-            // Walk up ancestors: folder/sub/file.txt -> folder/sub -> folder
             const segments = filePath.split('/').filter(Boolean);
             for (let i = segments.length - 1; i > 0; i--) {
                 const ancestor = segments.slice(0, i).join('/');
@@ -497,7 +457,6 @@ async function resolveFilePath(fileId, username) {
         };
     }
 
-    // Own file
     const fullPath = path.join(UPLOAD_DIR, username, decoded);
     if (!fullPath.startsWith(path.join(UPLOAD_DIR, username))) {
         return { error: 'Acceso denegado', status: 403 };
@@ -506,7 +465,6 @@ async function resolveFilePath(fileId, username) {
     return { fullPath, filePath: decoded, ownerUsername: username, isShared: false, permission: 'owner' };
 }
 
-// Descargar archivo
 app.get('/download/:fileId', authenticate, async (req, res) => {
   try {
     const { fileId } = req.params;
@@ -529,7 +487,6 @@ app.get('/download/:fileId', authenticate, async (req, res) => {
   }
 });
 
-// Crear archivo vacío
 app.post('/create', authenticate, async (req, res) => {
   try {
     const { name, path: relativePath, type } = req.body;
@@ -537,7 +494,6 @@ app.post('/create', authenticate, async (req, res) => {
     
     if (!name) return res.status(400).json({ success: false, message: 'Nombre requerido' });
 
-    // Agregar extensión automáticamente según el tipo si no la tiene
     let fileName = name;
     const extensionMap = {
       'word': '.docx',
@@ -560,7 +516,6 @@ app.post('/create', authenticate, async (req, res) => {
         return res.status(400).json({ success: false, message: 'El archivo ya existe' });
     } catch (e) {}
 
-    // Create proper Office documents instead of empty files
     const ext = path.extname(fileName).toLowerCase();
     if (ext === '.docx') {
       const zip = new JSZip();
@@ -581,28 +536,20 @@ app.post('/create', authenticate, async (req, res) => {
       await fs.writeFile(fullPath, buf);
     } else if (ext === '.pptx') {
       const zip = new JSZip();
-      // [Content_Types].xml
       zip.file('[Content_Types].xml', '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/ppt/presentation.xml" ContentType="application/vnd.openxmlformats-officedocument.presentationml.presentation.main+xml"/><Override PartName="/ppt/slides/slide1.xml" ContentType="application/vnd.openxmlformats-officedocument.presentationml.slide+xml"/><Override PartName="/ppt/slideLayouts/slideLayout1.xml" ContentType="application/vnd.openxmlformats-officedocument.presentationml.slideLayout+xml"/><Override PartName="/ppt/slideMasters/slideMaster1.xml" ContentType="application/vnd.openxmlformats-officedocument.presentationml.slideMaster+xml"/><Override PartName="/ppt/theme/theme1.xml" ContentType="application/vnd.openxmlformats-officedocument.theme+xml"/><Override PartName="/docProps/core.xml" ContentType="application/vnd.openxmlformats-package.core-properties+xml"/><Override PartName="/docProps/app.xml" ContentType="application/vnd.openxmlformats-officedocument.extended-properties+xml"/></Types>');
-      // _rels/.rels
       zip.folder('_rels').file('.rels', '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="ppt/presentation.xml"/><Relationship Id="rId2" Type="http://schemas.openxmlformats.org/package/2006/relationships/metadata/core-properties" Target="docProps/core.xml"/><Relationship Id="rId3" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/extended-properties" Target="docProps/app.xml"/></Relationships>');
-      // docProps
       zip.folder('docProps').file('core.xml', '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><cp:coreProperties xmlns:cp="http://schemas.openxmlformats.org/package/2006/metadata/core-properties" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:dcterms="http://purl.org/dc/terms/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"><dc:creator>ProyectoNube</dc:creator></cp:coreProperties>');
       zip.folder('docProps').file('app.xml', '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Properties xmlns="http://schemas.openxmlformats.org/officeDocument/2006/extended-properties"><Application>ProyectoNube</Application><Slides>1</Slides></Properties>');
       const ppt = zip.folder('ppt');
-      // presentation.xml
       ppt.file('presentation.xml', '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><p:presentation xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" saveSubsetFonts="1"><p:sldMasterIdLst><p:sldMasterId id="2147483648" r:id="rId1"/></p:sldMasterIdLst><p:sldIdLst><p:sldId id="256" r:id="rId2"/></p:sldIdLst><p:sldSz cx="9144000" cy="6858000" type="screen4x3"/><p:notesSz cx="6858000" cy="9144000"/><p:defaultTextStyle><a:defPPr><a:defRPr lang="es-ES"/></a:defPPr></p:defaultTextStyle></p:presentation>');
       ppt.folder('_rels').file('presentation.xml.rels', '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/slideMaster" Target="slideMasters/slideMaster1.xml"/><Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/slide" Target="slides/slide1.xml"/><Relationship Id="rId3" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/theme" Target="theme/theme1.xml"/></Relationships>');
-      // theme
       ppt.folder('theme').file('theme1.xml', '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><a:theme xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" name="Office Theme"><a:themeElements><a:clrScheme name="Office"><a:dk1><a:sysClr val="windowText" lastClr="000000"/></a:dk1><a:lt1><a:sysClr val="window" lastClr="FFFFFF"/></a:lt1><a:dk2><a:srgbClr val="44546A"/></a:dk2><a:lt2><a:srgbClr val="E7E6E6"/></a:lt2><a:accent1><a:srgbClr val="4472C4"/></a:accent1><a:accent2><a:srgbClr val="ED7D31"/></a:accent2><a:accent3><a:srgbClr val="A5A5A5"/></a:accent3><a:accent4><a:srgbClr val="FFC000"/></a:accent4><a:accent5><a:srgbClr val="5B9BD5"/></a:accent5><a:accent6><a:srgbClr val="70AD47"/></a:accent6><a:hlink><a:srgbClr val="0563C1"/></a:hlink><a:folHlink><a:srgbClr val="954F72"/></a:folHlink></a:clrScheme><a:fontScheme name="Office"><a:majorFont><a:latin typeface="Calibri Light"/><a:ea typeface=""/><a:cs typeface=""/></a:majorFont><a:minorFont><a:latin typeface="Calibri"/><a:ea typeface=""/><a:cs typeface=""/></a:minorFont></a:fontScheme><a:fmtScheme name="Office"><a:fillStyleLst><a:solidFill><a:schemeClr val="phClr"/></a:solidFill><a:gradFill rotWithShape="1"><a:gsLst><a:gs pos="0"><a:schemeClr val="phClr"><a:tint val="50000"/></a:schemeClr></a:gs><a:gs pos="100000"><a:schemeClr val="phClr"/></a:gs></a:gsLst></a:gradFill><a:gradFill rotWithShape="1"><a:gsLst><a:gs pos="0"><a:schemeClr val="phClr"><a:tint val="50000"/></a:schemeClr></a:gs><a:gs pos="100000"><a:schemeClr val="phClr"/></a:gs></a:gsLst></a:gradFill></a:fillStyleLst><a:lnStyleLst><a:ln w="6350"><a:solidFill><a:schemeClr val="phClr"/></a:solidFill></a:ln><a:ln w="12700"><a:solidFill><a:schemeClr val="phClr"/></a:solidFill></a:ln><a:ln w="19050"><a:solidFill><a:schemeClr val="phClr"/></a:solidFill></a:ln></a:lnStyleLst><a:effectStyleLst><a:effectStyle><a:effectLst/></a:effectStyle><a:effectStyle><a:effectLst/></a:effectStyle><a:effectStyle><a:effectLst/></a:effectStyle></a:effectStyleLst><a:bgFillStyleLst><a:solidFill><a:schemeClr val="phClr"/></a:solidFill><a:solidFill><a:schemeClr val="phClr"><a:tint val="95000"/></a:schemeClr></a:solidFill><a:solidFill><a:schemeClr val="phClr"/></a:solidFill></a:bgFillStyleLst></a:fmtScheme></a:themeElements><a:objectDefaults/><a:extraClrSchemeLst/></a:theme>');
-      // slideMaster
       const smFolder = ppt.folder('slideMasters');
       smFolder.file('slideMaster1.xml', '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><p:sldMaster xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><p:cSld><p:bg><p:bgRef idx="1001"><a:schemeClr val="bg1"/></p:bgRef></p:bg><p:spTree><p:nvGrpSpPr><p:cNvPr id="1" name=""/><p:cNvGrpSpPr/><p:nvPr/></p:nvGrpSpPr><p:grpSpPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="0" cy="0"/><a:chOff x="0" y="0"/><a:chExt cx="0" cy="0"/></a:xfrm></p:grpSpPr></p:spTree></p:cSld><p:clrMap bg1="lt1" tx1="dk1" bg2="lt2" tx2="dk2" accent1="accent1" accent2="accent2" accent3="accent3" accent4="accent4" accent5="accent5" accent6="accent6" hlink="hlink" folHlink="folHlink"/><p:sldLayoutIdLst><p:sldLayoutId id="2147483649" r:id="rId1"/></p:sldLayoutIdLst><p:txStyles><p:titleStyle><a:lvl1pPr algn="ctr"><a:defRPr sz="4400" kern="1200"><a:solidFill><a:schemeClr val="tx1"/></a:solidFill><a:latin typeface="+mj-lt"/><a:ea typeface="+mj-ea"/><a:cs typeface="+mj-cs"/></a:defRPr></a:lvl1pPr></p:titleStyle><p:bodyStyle><a:lvl1pPr marL="342900" indent="-342900"><a:defRPr sz="2400" kern="1200"><a:solidFill><a:schemeClr val="tx1"/></a:solidFill><a:latin typeface="+mn-lt"/><a:ea typeface="+mn-ea"/><a:cs typeface="+mn-cs"/></a:defRPr></a:lvl1pPr></p:bodyStyle><p:otherStyle><a:lvl1pPr><a:defRPr sz="1800" kern="1200"><a:solidFill><a:schemeClr val="tx1"/></a:solidFill><a:latin typeface="+mn-lt"/><a:ea typeface="+mn-ea"/><a:cs typeface="+mn-cs"/></a:defRPr></a:lvl1pPr></p:otherStyle></p:txStyles></p:sldMaster>');
       smFolder.folder('_rels').file('slideMaster1.xml.rels', '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/slideLayout" Target="../slideLayouts/slideLayout1.xml"/><Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/theme" Target="../theme/theme1.xml"/></Relationships>');
-      // slideLayout
       const slFolder = ppt.folder('slideLayouts');
       slFolder.file('slideLayout1.xml', '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><p:sldLayout xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" type="blank" preserve="1"><p:cSld name="Blank"><p:spTree><p:nvGrpSpPr><p:cNvPr id="1" name=""/><p:cNvGrpSpPr/><p:nvPr/></p:nvGrpSpPr><p:grpSpPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="0" cy="0"/><a:chOff x="0" y="0"/><a:chExt cx="0" cy="0"/></a:xfrm></p:grpSpPr></p:spTree></p:cSld><p:clrMapOvr><a:masterClrMapping/></p:clrMapOvr></p:sldLayout>');
       slFolder.folder('_rels').file('slideLayout1.xml.rels', '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/slideMaster" Target="../slideMasters/slideMaster1.xml"/></Relationships>');
-      // slide
       const slideFolder = ppt.folder('slides');
       slideFolder.file('slide1.xml', '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><p:sld xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><p:cSld><p:spTree><p:nvGrpSpPr><p:cNvPr id="1" name=""/><p:cNvGrpSpPr/><p:nvPr/></p:nvGrpSpPr><p:grpSpPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="0" cy="0"/><a:chOff x="0" y="0"/><a:chExt cx="0" cy="0"/></a:xfrm></p:grpSpPr></p:spTree></p:cSld><p:clrMapOvr><a:masterClrMapping/></p:clrMapOvr></p:sld>');
       slideFolder.folder('_rels').file('slide1.xml.rels', '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/slideLayout" Target="../slideLayouts/slideLayout1.xml"/></Relationships>');
@@ -629,7 +576,6 @@ app.post('/create', authenticate, async (req, res) => {
   }
 });
 
-// Subir archivos
 app.post('/upload', authenticate, upload.array('files'), async (req, res) => {
     if (!req.files || req.files.length === 0) {
         return res.status(400).json({ success: false, message: 'No files uploaded.' });
@@ -642,9 +588,7 @@ app.post('/upload', authenticate, upload.array('files'), async (req, res) => {
       path: path.relative(path.join(UPLOAD_DIR, req.user.username), file.path)
     }));
 
-    // Log each file individually for "Recent Files" tracking
     for (const file of req.files) {
-        // We log the relative path if possible, or just the name
         const relPath = path.relative(path.join(UPLOAD_DIR, req.user.username), file.path);
         await logAction(req.user.username, 'FILE_UPLOAD', `Subido archivo: ${relPath}`);
     }
@@ -652,7 +596,6 @@ app.post('/upload', authenticate, upload.array('files'), async (req, res) => {
     res.json({ success: true, files: fileDetails });
 });
 
-// Crear carpeta
 app.post('/folder', authenticate, async (req, res) => {
   try {
     const { name, path: folderPath } = req.body;
@@ -674,7 +617,6 @@ app.post('/folder', authenticate, async (req, res) => {
   }
 });
 
-// Customize folder (color/icon)
 app.patch('/folder-customize', authenticate, async (req, res) => {
   try {
     const { folderPath, color, icon } = req.body;
@@ -682,10 +624,8 @@ app.patch('/folder-customize', authenticate, async (req, res) => {
     
     if (!folderPath) return res.status(400).json({ success: false, message: 'folderPath requerido' });
     
-    // Normalize the path
     const normalizedPath = folderPath.replace(/\\/g, '/');
     
-    // Verify folder exists
     const fullPath = path.join(UPLOAD_DIR, username, normalizedPath);
     try {
       const stats = await fs.stat(fullPath);
@@ -696,7 +636,6 @@ app.patch('/folder-customize', authenticate, async (req, res) => {
       return res.status(404).json({ success: false, message: 'Carpeta no encontrada' });
     }
     
-    // Upsert metadata
     await dbAsync.run(`
       INSERT INTO folder_metadata (username, folder_path, color, icon, updated_at)
       VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)
@@ -715,9 +654,7 @@ app.patch('/folder-customize', authenticate, async (req, res) => {
   }
 });
 
-// --- AI Exclusion endpoints ---
 
-// GET /ai-exclude - returns all excluded paths for the current user
 app.get('/ai-exclude', authenticate, async (req, res) => {
   try {
     const username = req.user.username;
@@ -728,17 +665,14 @@ app.get('/ai-exclude', authenticate, async (req, res) => {
   }
 });
 
-// POST /ai-exclude/toggle - toggle AI exclusion for a file or folder path
 app.post('/ai-exclude/toggle', authenticate, async (req, res) => {
   try {
     const username = req.user.username;
     let { path: itemPath } = req.body;
     if (!itemPath) return res.status(400).json({ success: false, message: 'path requerido' });
 
-    // Normalize to forward slashes
     itemPath = itemPath.replace(/\\/g, '/');
 
-    // Security: path must not escape the user directory
     const fullPath = path.join(UPLOAD_DIR, username, itemPath);
     if (!fullPath.startsWith(path.join(UPLOAD_DIR, username))) {
       return res.status(403).json({ success: false, message: 'Acceso denegado' });
@@ -757,14 +691,12 @@ app.post('/ai-exclude/toggle', authenticate, async (req, res) => {
   }
 });
 
-// Eliminar
 app.delete('/:fileId', authenticate, async (req, res) => {
   try {
     const { fileId } = req.params;
     const username = req.user.username;
     const decoded = Buffer.from(fileId, 'base64').toString();
 
-    // Case A: recipient deleting a file that was shared with them -> just remove the share row
     if (decoded.startsWith('shared:')) {
         const parts = decoded.split(':');
         if (parts.length < 3) {
@@ -776,7 +708,6 @@ app.delete('/:fileId', authenticate, async (req, res) => {
             'DELETE FROM shared_files WHERE path = ? AND owner_username = ? AND shared_with_username = ?',
             [filePath, ownerUsername, username]
         );
-        // Remove it from this user's recent/audit logs so it disappears from "recientes"
         await dbAsync.run(
             `DELETE FROM audit_logs
              WHERE username = ?
@@ -788,7 +719,6 @@ app.delete('/:fileId', authenticate, async (req, res) => {
         return res.json({ success: true, message: 'Quitado de tus archivos' });
     }
 
-    // Case B: owner deleting their own file/folder
     const filePath = decoded;
     const fullPath = path.join(UPLOAD_DIR, username, filePath);
 
@@ -805,7 +735,6 @@ app.delete('/:fileId', authenticate, async (req, res) => {
         await logAction(username, 'FILE_DELETE', `Eliminado archivo: ${filePath}`);
     }
 
-    // Cascade: notify recipients then remove any shares pointing at this path (or children for folders)
     try {
         const affectedShares = await dbAsync.all(
             `SELECT DISTINCT shared_with_username, path FROM shared_files
@@ -829,7 +758,7 @@ app.delete('/:fileId', authenticate, async (req, res) => {
                         })
                     });
                 }
-            } catch (e) { /* best effort */ }
+            } catch (e) {  }
         }
         await dbAsync.run(
             `DELETE FROM shared_files
@@ -838,23 +767,21 @@ app.delete('/:fileId', authenticate, async (req, res) => {
         );
     } catch (e) { console.warn('Cascade share cleanup failed:', e.message); }
 
-    // Cascade: remove folder_metadata rows
     try {
         await dbAsync.run(
             `DELETE FROM folder_metadata
              WHERE username = ? AND (folder_path = ? OR folder_path LIKE ?)`,
             [username, filePath, `${filePath}/%`]
         );
-    } catch (e) { /* table may not exist */ }
+    } catch (e) {  }
 
-    // Cascade: remove ai_exclusions rows
     try {
         await dbAsync.run(
             `DELETE FROM ai_exclusions
              WHERE username = ? AND (path = ? OR path LIKE ?)`,
             [username, filePath, `${filePath}/%`]
         );
-    } catch (e) { /* table may not exist */ }
+    } catch (e) {  }
 
     res.json({ success: true, message: 'Eliminado exitosamente' });
   } catch (error) {
@@ -863,7 +790,6 @@ app.delete('/:fileId', authenticate, async (req, res) => {
   }
 });
 
-// Renombrar
 app.put('/:fileId/rename', authenticate, async (req, res) => {
   try {
     const { fileId } = req.params;
@@ -889,7 +815,6 @@ app.put('/:fileId/rename', authenticate, async (req, res) => {
 
     await fs.rename(fullPath, newPath);
 
-    // Cascade: update shares / metadata / ai_exclusions to point at the new path
     try {
         await dbAsync.run(
             `UPDATE shared_files SET path = ? WHERE owner_username = ? AND path = ?`,
@@ -913,7 +838,7 @@ app.put('/:fileId/rename', authenticate, async (req, res) => {
              WHERE username = ? AND folder_path LIKE ?`,
             [newRelPath, filePath.length + 1, username, `${filePath}/%`]
         );
-    } catch (e) { /* table may not exist */ }
+    } catch (e) {  }
     try {
         await dbAsync.run(
             `UPDATE ai_exclusions SET path = ? WHERE username = ? AND path = ?`,
@@ -925,7 +850,7 @@ app.put('/:fileId/rename', authenticate, async (req, res) => {
              WHERE username = ? AND path LIKE ?`,
             [newRelPath, filePath.length + 1, username, `${filePath}/%`]
         );
-    } catch (e) { /* table may not exist */ }
+    } catch (e) {  }
 
     await logAction(username, 'FILE_RENAME', `Renombrado: ${filePath} -> ${newRelPath}`);
 
@@ -936,7 +861,6 @@ app.put('/:fileId/rename', authenticate, async (req, res) => {
   }
 });
 
-// Mover
 app.post('/:fileId/move', authenticate, async (req, res) => {
   try {
     const { fileId } = req.params;
@@ -959,7 +883,6 @@ app.post('/:fileId/move', authenticate, async (req, res) => {
 
     await fs.rename(fullPath, fullDest);
 
-    // Cascade the path change in shares / metadata / ai_exclusions
     try {
         await dbAsync.run(
             `UPDATE shared_files SET path = ? WHERE owner_username = ? AND path = ?`,
@@ -983,7 +906,7 @@ app.post('/:fileId/move', authenticate, async (req, res) => {
              WHERE username = ? AND folder_path LIKE ?`,
             [newRelPath, filePath.length + 1, username, `${filePath}/%`]
         );
-    } catch (e) { /* table may not exist */ }
+    } catch (e) {  }
     try {
         await dbAsync.run(
             `UPDATE ai_exclusions SET path = ? WHERE username = ? AND path = ?`,
@@ -995,7 +918,7 @@ app.post('/:fileId/move', authenticate, async (req, res) => {
              WHERE username = ? AND path LIKE ?`,
             [newRelPath, filePath.length + 1, username, `${filePath}/%`]
         );
-    } catch (e) { /* table may not exist */ }
+    } catch (e) {  }
 
     await logAction(username, 'FILE_MOVE', `Movido: ${filePath} -> ${newRelPath}`);
 
@@ -1006,7 +929,6 @@ app.post('/:fileId/move', authenticate, async (req, res) => {
   }
 });
 
-// Guardar contenido
 app.put('/:fileId/content', authenticate, async (req, res) => {
   try {
     const { fileId } = req.params;
@@ -1036,7 +958,6 @@ app.put('/:fileId/content', authenticate, async (req, res) => {
   }
 });
 
-// Update complete file (replace with new file upload)
 app.put('/:fileId', authenticate, uploadTemp.single('file'), async (req, res) => {
   try {
     const { fileId } = req.params;
@@ -1051,7 +972,6 @@ app.put('/:fileId', authenticate, uploadTemp.single('file'), async (req, res) =>
 
     const resolved = await resolveFilePath(fileId, req.user.username);
     if (resolved.error) {
-      // Clean up temp file
       try { await fs.unlink(req.file.path); } catch(e) {}
       return res.status(resolved.status).json({ success: false, message: resolved.error });
     }
@@ -1062,21 +982,17 @@ app.put('/:fileId', authenticate, uploadTemp.single('file'), async (req, res) =>
     
     const fullPath = resolved.fullPath;
 
-    // Eliminar archivo existente si existe
     try {
       await fs.unlink(fullPath);
     } catch (unlinkErr) {
-      // Si no existe, no pasa nada
       if (unlinkErr.code !== 'ENOENT') {
         console.warn('Warning unlinking old file:', unlinkErr);
       }
     }
 
-    // Copiar el archivo nuevo (no podemos usar rename entre diferentes filesystems)
     console.log('[PUT] Copying file from', req.file.path, 'to', fullPath);
     await fs.copyFile(req.file.path, fullPath);
     
-    // Eliminar el archivo temporal
     await fs.unlink(req.file.path);
     console.log('[PUT] File saved successfully');
 
@@ -1088,7 +1004,6 @@ app.put('/:fileId', authenticate, uploadTemp.single('file'), async (req, res) =>
   }
 });
 
-// Preview / Ver contenido
 app.get('/preview/:fileId', authenticate, async (req, res) => {
   try {
     const { fileId } = req.params;
@@ -1106,8 +1021,6 @@ app.get('/preview/:fileId', authenticate, async (req, res) => {
         return res.status(404).json({ success: false, message: 'Archivo no encontrado' });
     }
 
-    // NOTE: FILE_OPEN logging is handled by POST /log-open from frontend
-    // Do NOT log here to avoid duplicate entries (preview is also called for thumbnails, AI viewer, etc.)
 
     res.sendFile(resolved.fullPath, { headers: { 'Content-Disposition': 'inline' } });
   } catch (error) {
@@ -1116,7 +1029,6 @@ app.get('/preview/:fileId', authenticate, async (req, res) => {
   }
 });
 
-// Log file open from frontend (for recents tracking)
 app.post('/log-open', authenticate, async (req, res) => {
   try {
     const { fileId } = req.body;
@@ -1133,13 +1045,11 @@ app.post('/log-open', authenticate, async (req, res) => {
     res.json({ success: true });
   } catch (error) {
     console.error('Error logging file open:', error);
-    res.status(200).json({ success: false }); // Don't block UI
+    res.status(200).json({ success: false });
   }
 });
 
-// --- Missing Endpoints Implementation ---
 
-// Recent files (Stub)
 app.get('/recent', authenticate, async (req, res) => {
   try {
     const username = req.user.username;
@@ -1149,8 +1059,6 @@ app.get('/recent', authenticate, async (req, res) => {
         return res.json({ success: true, files: [] });
     }
 
-    // Get recent file actions from audit_logs
-    // We look for CREATE_FILE, FILE_UPLOAD, FILE_EDIT, FOLDER_UPLOAD, FILE_OPEN
     const logs = await dbAsync.all(
         `SELECT details, timestamp, action FROM audit_logs 
          WHERE user_id = ? AND action IN ('CREATE_FILE', 'FILE_UPLOAD', 'FILE_EDIT', 'FOLDER_UPLOAD', 'FILE_OPEN') 
@@ -1198,14 +1106,12 @@ app.get('/recent', authenticate, async (req, res) => {
         const uniqueKey = isShared ? `shared:${sharedOwner}:${filePath}` : filePath;
 
         if (filePath && !processedPaths.has(uniqueKey)) {
-            // Determine the actual full path based on whether it's shared
             const ownerDir = isShared ? sharedOwner : username;
             const fullPath = path.join(UPLOAD_DIR, ownerDir, filePath);
             try {
                 const stats = await fs.stat(fullPath);
                 
                 if (isShared) {
-                  // For shared files, build the same ID format as shared-with-me
                   const idString = `shared:${sharedOwner}:${filePath}`;
                   recentFiles.push({
                     id: Buffer.from(idString).toString('base64'),
@@ -1233,7 +1139,6 @@ app.get('/recent', authenticate, async (req, res) => {
                 }
                 processedPaths.add(uniqueKey);
             } catch (e) {
-                // File might have been deleted
             }
         }
     }
@@ -1245,7 +1150,6 @@ app.get('/recent', authenticate, async (req, res) => {
   }
 });
 
-// Shared with me
 app.get('/shared-with-me', authenticate, async (req, res) => {
     try {
         const username = req.user.username;
@@ -1254,7 +1158,6 @@ app.get('/shared-with-me', authenticate, async (req, res) => {
             [username]
         );
 
-        // Build a map of owner -> avatar_url to avoid N+1 queries
         const ownerSet = [...new Set((sharedFiles || []).map(s => s.owner_username))];
         const avatarMap = {};
         if (ownerSet.length) {
@@ -1270,7 +1173,6 @@ app.get('/shared-with-me', authenticate, async (req, res) => {
              const fullPath = path.join(UPLOAD_DIR, share.owner_username, share.path);
              try {
                  const stats = await fs.stat(fullPath);
-                 // We use a prefix for ID to identify shared files in download/preview
                  const idString = `shared:${share.owner_username}:${share.path}`;
                  
                  files.push({
@@ -1288,7 +1190,6 @@ app.get('/shared-with-me', authenticate, async (req, res) => {
                     extension: path.extname(share.path).toLowerCase()
                  });
              } catch (e) {
-                 // File might have been deleted, ignore
              }
         }
         res.json({ success: true, files });
@@ -1298,7 +1199,6 @@ app.get('/shared-with-me', authenticate, async (req, res) => {
     }
 });
 
-// Shared folders (Returns distinct owners who share with current user)
 app.get('/shared-folders', authenticate, async (req, res) => {
     try {
         const username = req.user.username;
@@ -1326,7 +1226,6 @@ app.get('/shared-folders', authenticate, async (req, res) => {
     }
 });
 
-// Share
 app.post('/share', authenticate, async (req, res) => {
   try {
     const { path: filePath, username: targetUsername, permission: rawPermission } = req.body;
@@ -1341,20 +1240,17 @@ app.post('/share', authenticate, async (req, res) => {
         return res.status(400).json({ success: false, message: 'No puedes compartir contigo mismo' });
     }
 
-    // Verify target user exists
     const user = await dbAsync.get('SELECT id FROM users WHERE username = ?', [targetUsername]);
     if (!user) {
         return res.status(404).json({ success: false, message: 'Usuario destino no encontrado' });
     }
     
-    // Verify file exists
     try {
         await fs.access(path.join(UPLOAD_DIR, ownerUsername, filePath));
     } catch {
         return res.status(404).json({ success: false, message: 'Archivo no encontrado' });
     }
 
-    // Insert or update permission if already shared
     const existing = await dbAsync.get(
         'SELECT id FROM shared_files WHERE path = ? AND owner_username = ? AND shared_with_username = ?',
         [filePath, ownerUsername, targetUsername]
@@ -1371,7 +1267,6 @@ app.post('/share', authenticate, async (req, res) => {
         );
     }
 
-    // Send notification to the target user (only on new share, not permission update)
     const fileName = filePath.split('/').pop() || filePath;
     if (!existing) {
       try {
@@ -1394,14 +1289,13 @@ app.post('/share', authenticate, async (req, res) => {
             })
         });
         if (!notifRes.ok) {
-            console.warn('⚠️ Notification service returned error:', notifRes.status);
+            console.warn('[Warning] Notification service returned error:', notifRes.status);
         }
       } catch (notifErr) {
-          console.warn('⚠️ Could not send share notification:', notifErr.message);
+          console.warn('[Warning] Could not send share notification:', notifErr.message);
       }
     }
 
-    // Also Log
     await logAction(ownerUsername, 'FILE_SHARE', `Compartido ${filePath} con ${targetUsername} (${permission})`);
 
     res.json({ success: true, message: `Compartido con ${targetUsername}`, permission });
@@ -1411,7 +1305,6 @@ app.post('/share', authenticate, async (req, res) => {
   }
 });
 
-// Share with an entire group (expands to members)
 app.post('/share-with-group', authenticate, async (req, res) => {
   try {
     const { path: filePath, groupId, permission: rawPermission } = req.body;
@@ -1422,14 +1315,12 @@ app.post('/share-with-group', authenticate, async (req, res) => {
       return res.status(400).json({ success: false, message: 'Faltan datos' });
     }
 
-    // Verify file exists
     try {
         await fs.access(path.join(UPLOAD_DIR, ownerUsername, filePath));
     } catch {
         return res.status(404).json({ success: false, message: 'Archivo no encontrado' });
     }
 
-    // Fetch group members via user-service
     let members = [];
     try {
         const token = req.headers.authorization;
@@ -1464,7 +1355,6 @@ app.post('/share-with-group', authenticate, async (req, res) => {
                 [filePath, ownerUsername, member.username, permission]
             );
             added++;
-            // Notify
             try {
                 await fetch('http://notification-service:5002/create', {
                     method: 'POST',
@@ -1478,7 +1368,7 @@ app.post('/share-with-group', authenticate, async (req, res) => {
                         metadata: { notifType: 'file_share', from: ownerUsername, fileName, path: filePath, permission, viaGroup: true }
                     })
                 });
-            } catch (e) { /* best effort */ }
+            } catch (e) {  }
         }
     }
 
@@ -1490,7 +1380,6 @@ app.post('/share-with-group', authenticate, async (req, res) => {
   }
 });
 
-// Update permission on an existing share
 app.put('/share/permission', authenticate, async (req, res) => {
   try {
     const { path: filePath, username: targetUsername, permission: rawPermission } = req.body;
@@ -1508,7 +1397,6 @@ app.put('/share/permission', authenticate, async (req, res) => {
     if (result.changes === 0) {
       return res.status(404).json({ success: false, message: 'Compartición no encontrada' });
     }
-    // Notify target of the permission change
     try {
         const target = await dbAsync.get('SELECT id FROM users WHERE username = ?', [targetUsername]);
         if (target) {
@@ -1525,7 +1413,7 @@ app.put('/share/permission', authenticate, async (req, res) => {
                 })
             });
         }
-    } catch (e) { /* best effort */ }
+    } catch (e) {  }
     await logAction(ownerUsername, 'FILE_SHARE_PERM', `Permiso de ${filePath} con ${targetUsername} -> ${permission}`);
     res.json({ success: true, permission });
   } catch (error) {
@@ -1534,7 +1422,6 @@ app.put('/share/permission', authenticate, async (req, res) => {
   }
 });
 
-// Unshare - Remove a share
 app.post('/unshare', authenticate, async (req, res) => {
   try {
     const { path: filePath, username: targetUsername } = req.body;
@@ -1553,7 +1440,6 @@ app.post('/unshare', authenticate, async (req, res) => {
       return res.status(404).json({ success: false, message: 'Compartición no encontrada' });
     }
 
-    // Remove the file from the target user's recent/audit logs so it disappears from their recientes
     try {
         await dbAsync.run(
             `DELETE FROM audit_logs
@@ -1564,7 +1450,6 @@ app.post('/unshare', authenticate, async (req, res) => {
         );
     } catch (e) { console.warn('Could not clean recent logs on unshare:', e.message); }
 
-    // Notify target user that access was revoked
     try {
         const target = await dbAsync.get('SELECT id FROM users WHERE username = ?', [targetUsername]);
         if (target) {
@@ -1581,7 +1466,7 @@ app.post('/unshare', authenticate, async (req, res) => {
                 })
             });
         }
-    } catch (e) { /* best effort */ }
+    } catch (e) {  }
 
     await logAction(ownerUsername, 'FILE_UNSHARE', `Dejado de compartir ${filePath} con ${targetUsername}`);
     res.json({ success: true, message: `Dejado de compartir con ${targetUsername}` });
@@ -1591,7 +1476,6 @@ app.post('/unshare', authenticate, async (req, res) => {
   }
 });
 
-// Unshare with everyone for this file
 app.post('/unshare-all', authenticate, async (req, res) => {
   try {
     const { path: filePath } = req.body;
@@ -1609,14 +1493,13 @@ app.post('/unshare-all', authenticate, async (req, res) => {
 
     await dbAsync.run('DELETE FROM shared_files WHERE path = ? AND owner_username = ?', [filePath, ownerUsername]);
 
-    // Clean up recents + notify
     for (const s of shares) {
       try {
         await dbAsync.run(
           `DELETE FROM audit_logs WHERE username = ? AND action = 'FILE_OPEN' AND details LIKE ?`,
           [s.shared_with_username, `%${filePath} (compartido por ${ownerUsername})%`]
         );
-      } catch (e) { /* ignore */ }
+      } catch (e) {  }
       try {
         const target = await dbAsync.get('SELECT id FROM users WHERE username = ?', [s.shared_with_username]);
         if (target) {
@@ -1633,7 +1516,7 @@ app.post('/unshare-all', authenticate, async (req, res) => {
             })
           });
         }
-      } catch (e) { /* best effort */ }
+      } catch (e) {  }
     }
 
     await logAction(ownerUsername, 'FILE_UNSHARE_ALL', `Dejado de compartir ${filePath} con todos (${shares.length})`);
@@ -1644,7 +1527,6 @@ app.post('/unshare-all', authenticate, async (req, res) => {
   }
 });
 
-// Remove shared file from recipient's view (recipient removes the share from their panel)
 app.post('/remove-shared', authenticate, async (req, res) => {
   try {
     const { path: filePath, ownerUsername } = req.body;
@@ -1663,7 +1545,6 @@ app.post('/remove-shared', authenticate, async (req, res) => {
       return res.status(404).json({ success: false, message: 'Share not found' });
     }
 
-    // Also scrub recent-files entries for this user pointing at the removed share
     try {
         await dbAsync.run(
             `DELETE FROM audit_logs
@@ -1682,7 +1563,6 @@ app.post('/remove-shared', authenticate, async (req, res) => {
   }
 });
 
-// Save shared file to own files (actually copy the file and remove the share)
 app.post('/save-to-my-files', authenticate, async (req, res) => {
   try {
     const { path: filePath, ownerUsername, destinationPath } = req.body;
@@ -1692,7 +1572,6 @@ app.post('/save-to-my-files', authenticate, async (req, res) => {
       return res.status(400).json({ success: false, message: 'Missing path or ownerUsername' });
     }
 
-    // Verify the share exists
     const share = await dbAsync.get(
       'SELECT * FROM shared_files WHERE path = ? AND owner_username = ? AND shared_with_username = ?',
       [filePath, ownerUsername, username]
@@ -1702,22 +1581,18 @@ app.post('/save-to-my-files', authenticate, async (req, res) => {
       return res.status(404).json({ success: false, message: 'Share not found' });
     }
 
-    // Source: owner's file
     const sourcePath = path.join(UPLOAD_DIR, ownerUsername, filePath);
     
-    // Destination: user's own directory (root or specified destination)
     const destFolder = destinationPath || '';
     const fileName = path.basename(filePath);
     let destPath = path.join(UPLOAD_DIR, username, destFolder, fileName);
 
-    // Verify source exists
     try {
       await fs.access(sourcePath);
     } catch (e) {
       return res.status(404).json({ success: false, message: 'Source file no longer exists' });
     }
 
-    // Handle name collision - add (1), (2) etc.
     const destDir = path.dirname(destPath);
     await fs.mkdir(destDir, { recursive: true });
     
@@ -1728,7 +1603,6 @@ app.post('/save-to-my-files', authenticate, async (req, res) => {
     
     try {
       await fs.access(destPath);
-      // File exists, find unique name
       while (true) {
         finalName = `${baseName} (${counter})${ext}`;
         destPath = path.join(destDir, finalName);
@@ -1736,14 +1610,12 @@ app.post('/save-to-my-files', authenticate, async (req, res) => {
           await fs.access(destPath);
           counter++;
         } catch {
-          break; // Name is available
+          break;
         }
       }
     } catch {
-      // Destination doesn't exist, good to go
     }
 
-    // Copy the file or directory
     const sourceStats = await fs.stat(sourcePath);
     if (sourceStats.isDirectory()) {
       await copyDir(sourcePath, destPath);
@@ -1751,7 +1623,6 @@ app.post('/save-to-my-files', authenticate, async (req, res) => {
       await fs.copyFile(sourcePath, destPath);
     }
 
-    // Remove the share record (no longer shared, user has their own copy)
     await dbAsync.run(
       'DELETE FROM shared_files WHERE path = ? AND owner_username = ? AND shared_with_username = ?',
       [filePath, ownerUsername, username]
@@ -1765,7 +1636,6 @@ app.post('/save-to-my-files', authenticate, async (req, res) => {
   }
 });
 
-// Unpin shared file from panel
 app.post('/unpin-from-panel', authenticate, async (req, res) => {
   try {
     const { path: filePath, ownerUsername } = req.body;
@@ -1787,7 +1657,6 @@ app.post('/unpin-from-panel', authenticate, async (req, res) => {
   }
 });
 
-// Pin shared file to panel
 app.post('/pin-to-panel', authenticate, async (req, res) => {
   try {
     const { path: filePath, ownerUsername } = req.body;
@@ -1811,7 +1680,6 @@ app.post('/pin-to-panel', authenticate, async (req, res) => {
   }
 });
 
-// Helper to recursively copy directory
 async function copyDir(src, dest) {
   await fs.mkdir(dest, { recursive: true });
   const entries = await fs.readdir(src, { withFileTypes: true });
@@ -1826,7 +1694,6 @@ async function copyDir(src, dest) {
   }
 }
 
-// Get shares info for a specific file (who is it shared with)
 app.get('/shares', authenticate, async (req, res) => {
   try {
     const filePath = req.query.path;
@@ -1851,13 +1718,12 @@ app.get('/shares', authenticate, async (req, res) => {
   }
 });
 
-// List user's files (for external services like AI/calendar to browse)
 app.get('/user-files', authenticate, async (req, res) => {
   try {
     const username = req.user.username;
     const requestedPath = req.query.path || '';
     const searchQuery = req.query.search || '';
-    const includeShared = req.query.includeShared !== 'false'; // default true
+    const includeShared = req.query.includeShared !== 'false';
 
     if (requestedPath.includes('..')) {
       return res.status(400).json({ success: false, message: 'Ruta inválida' });
@@ -1872,7 +1738,7 @@ app.get('/user-files', authenticate, async (req, res) => {
       const items = await fs.readdir(targetDir, { withFileTypes: true });
       for (const item of items) {
         const relativePath = path.join(requestedPath, item.name).replace(/\\/g, '/');
-        if (item.isDirectory()) continue; // Only return files for attachment selection
+        if (item.isDirectory()) continue;
 
         const stats = await fs.stat(path.join(targetDir, item.name));
         files.push({
@@ -1886,10 +1752,8 @@ app.get('/user-files', authenticate, async (req, res) => {
         });
       }
     } catch (e) {
-      // own folder may not exist yet - that's fine, continue to shared
     }
 
-    // Also include files shared with the user so they can attach them too
     if (includeShared && !requestedPath) {
       try {
         const shared = await dbAsync.all(
@@ -1912,12 +1776,11 @@ app.get('/user-files', authenticate, async (req, res) => {
               owner: s.owner_username,
               shared: true
             });
-          } catch (e) { /* file moved/deleted */ }
+          } catch (e) {  }
         }
-      } catch (e) { /* no shares */ }
+      } catch (e) {  }
     }
 
-    // Search filter
     if (searchQuery) {
       files = files.filter(f => f.name.toLowerCase().includes(searchQuery.toLowerCase()));
     }
@@ -1929,7 +1792,6 @@ app.get('/user-files', authenticate, async (req, res) => {
   }
 });
 
-// Duplicate
 app.post('/:fileId/duplicate', authenticate, async (req, res) => {
   try {
     const { fileId } = req.params;
@@ -1942,8 +1804,6 @@ app.post('/:fileId/duplicate', authenticate, async (req, res) => {
     const ext = path.extname(resolved.fullPath);
     const baseName = path.basename(resolved.fullPath, ext);
 
-    // For shared files, the duplicate goes to the recipient's own home (at root).
-    // For owned files, the duplicate stays in the same folder.
     let newPath;
     let destRelPath;
     if (resolved.isShared) {
@@ -1983,7 +1843,6 @@ app.post('/:fileId/duplicate', authenticate, async (req, res) => {
   }
 });
 
-// Upload folder (Single file handling with relative path)
 app.post('/upload-folder', authenticate, upload.single('file'), async (req, res) => {
     try {
         if (!req.file) {
@@ -1995,8 +1854,6 @@ app.post('/upload-folder', authenticate, upload.single('file'), async (req, res)
         let finalPath;
         
         if (relativePath) {
-             // Use relativePath to maintain structure
-             // relativePath includes filename, so dirname gets the folder structure
              finalPath = path.join(UPLOAD_DIR, username, currentPath || '', path.dirname(relativePath));
         } else {
              finalPath = path.join(UPLOAD_DIR, username, currentPath || '');
@@ -2016,15 +1873,12 @@ app.post('/upload-folder', authenticate, upload.single('file'), async (req, res)
     }
 });
 
-// --- MEDIA EDITING ENDPOINTS ---
 
-// Helper to get absolute path safely
 const getAbsolutePath = (username, relativePath) => {
     const safePath = path.normalize(relativePath).replace(/^(\.\.[\/\\])+/, '');
     return path.join(UPLOAD_DIR, username, safePath);
 };
 
-// Save edited image (overwrite or copy)
 app.post('/image/save', authenticate, upload.single('file'), async (req, res) => {
     try {
         if (!req.file) {
@@ -2045,10 +1899,8 @@ app.post('/image/save', authenticate, upload.single('file'), async (req, res) =>
         
         const targetPath = path.join(targetDir, targetFilename);
         
-        // Move uploaded file to target
         await fs.rename(req.file.path, targetPath);
         
-        // Update DB if needed (AutoSync will catch it eventually, but we can log)
         await logAction(username, 'IMAGE_EDIT', `Imagen editada: ${targetFilename}`);
         
         res.json({ success: true, message: 'Imagen guardada exitosamente' });
@@ -2059,15 +1911,11 @@ app.post('/image/save', authenticate, upload.single('file'), async (req, res) =>
     }
 });
 
-// Process video with FFmpeg
 app.post('/video/edit', authenticate, async (req, res) => {
   try {
     const { path: relativePath, startTime, endTime, filters, saveAsCopy, rotation } = req.body;
     const username = req.user.username;
     
-    // Construct absolute path securely
-    // Implementation assumption: getAbsolutePath helper exists or logic is inline
-    // Replicating safe join logic:
     const safePath = path.normalize(relativePath).replace(/^(\.\.[\/\\])+/, '');
     const inputPath = path.join(UPLOAD_DIR, username, safePath);
     
@@ -2077,7 +1925,6 @@ app.post('/video/edit', authenticate, async (req, res) => {
     
     const ext = path.extname(inputPath);
     const basename = path.basename(inputPath, ext);
-    // Create new filename
     const outputFilename = saveAsCopy 
         ? `${basename}_copy_${Date.now()}${ext}`
         : `${basename}_temp_${Date.now()}${ext}`;
@@ -2087,7 +1934,6 @@ app.post('/video/edit', authenticate, async (req, res) => {
 
     let command = ffmpeg(inputPath);
 
-    // Apply Trim
     if (startTime !== undefined && endTime !== undefined) {
         command.setStartTime(startTime);
         command.setDuration(endTime - startTime);
@@ -2095,13 +1941,8 @@ app.post('/video/edit', authenticate, async (req, res) => {
     
     const complexFilters = [];
     
-    // Apply EQ (Brightness, Contrast, Saturation)
     if (filters) {
         const { brightness, contrast, saturation } = filters;
-        // Map 0-200 slider (100 default) to ffmpeg values
-        // brightness: -1.0 to 1.0 (default 0). (val - 100) / 100
-        // contrast: -2.0 to 2.0 (default 1). val / 100
-        // saturation: 0.0 to 3.0 (default 1). val / 100
         
         const b = (brightness !== undefined) ? (brightness - 100) / 100 : 0;
         const c = (contrast !== undefined) ? contrast / 100 : 1;
@@ -2111,10 +1952,6 @@ app.post('/video/edit', authenticate, async (req, res) => {
             complexFilters.push(`eq=brightness=${b}:contrast=${c}:saturation=${s}`);
         }
         
-        // Rotation (transpose)
-        // 90 = transpose=1 (clock)
-        // 180 = transpose=2,transpose=2 (counter-clock twice? = 180) OR transpose=1,transpose=1
-        // 270 = transpose=2 (counter-clock)
         if (filters.rotation) {
              const rot = parseInt(filters.rotation) % 360;
              if (rot === 90) complexFilters.push('transpose=1');
@@ -2127,13 +1964,11 @@ app.post('/video/edit', authenticate, async (req, res) => {
         command.complexFilter(complexFilters);
     }
     
-    // Run FFmpeg
     command
         .on('end', async () => {
              if (saveAsCopy) {
                  res.json({ success: true, message: 'Video guardado como copia' });
              } else {
-                 // Overwrite: Delete original, rename output to original
                  try {
                      await fs.unlink(inputPath);
                      await fs.rename(outputPath, inputPath);
@@ -2157,7 +1992,6 @@ app.post('/video/edit', authenticate, async (req, res) => {
 
 const AutoSyncService = require('./autoSync');
 
-// Iniciar servicio de sincronización automática
 console.log(' Inicializando AutoSyncService...');
 const syncService = new AutoSyncService(dbAsync, UPLOAD_DIR);
 syncService.start();

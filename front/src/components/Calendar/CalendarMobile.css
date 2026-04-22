@@ -1,7 +1,5 @@
 
-/* =========================================
-   CALENDAR MOBILE RESPONSIVENESS
-   ========================================= */
+
 
 @media (max-width: 768px) {
   :root {
@@ -15,7 +13,6 @@
     height: 100dvh;
   }
 
-  /* Sidebar Mobile Logic */
   .calendar-sidebar {
     position: fixed;
     top: 0;
@@ -36,7 +33,6 @@
     transform: translateX(0);
   }
 
-  /* Overlay */
   .sidebar-overlay {
     display: none;
     position: fixed;
@@ -50,7 +46,6 @@
     display: block;
   }
 
-  /* Main Content */
   .calendar-main {
     width: 100%;
     height: 100%;
@@ -65,7 +60,6 @@
     display: none;
   }
 
-  /* Mobile Header */
   .mobile-header {
     display: flex;
     align-items: center;
@@ -106,7 +100,6 @@
     -webkit-tap-highlight-color: transparent;
   }
 
-  /* Daily Timeline - compact on mobile */
   .daily-timeline-wrapper {
     padding: 0.5rem 0.75rem 0.25rem;
   }
@@ -115,7 +108,6 @@
     height: 45px;
   }
 
-  /* Calendar View - CRITICAL: explicit height so FullCalendar renders */
   .calendar-view {
     padding: 0.5rem;
     flex: none;
@@ -129,7 +121,6 @@
     box-sizing: border-box;
   }
 
-  /* FullCalendar toolbar - stack on mobile */
   .fc .fc-toolbar {
     flex-wrap: wrap;
     gap: 0.4rem;
@@ -168,13 +159,11 @@
     padding: 1px 3px !important;
   }
 
-  /* Day Panel - full width on mobile */
   .day-panel {
     width: 100%;
     max-width: 100%;
   }
 
-  /* Sidebar footer safe area */
   .sidebar-footer {
     padding-bottom: calc(1rem + env(safe-area-inset-bottom, 0px));
   }
@@ -185,7 +174,6 @@
   }
 }
 
-/* Extra small screens */
 @media (max-width: 480px) {
   .calendar-view {
     padding: 0.25rem;

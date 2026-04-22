@@ -8,7 +8,6 @@ import ExcelEditor from '../FileEditor/editors/ExcelEditor';
 import PowerPointEditor from '../FileEditor/editors/PowerPointEditor';
 import './FileViewerModal.css';
 
-// Wrapper para Excel con modo de solo lectura inicial
 const ExcelViewerWrapper = ({ file, onFileSaved }) => {
   const [isEditing, setIsEditing] = useState(false);
   const { t } = useLanguage();
@@ -16,7 +15,7 @@ const ExcelViewerWrapper = ({ file, onFileSaved }) => {
   if (!isEditing) {
     return (
       <div className="viewer-content office-viewer flex flex-col items-center justify-center h-full p-8">
-        <div className="text-6xl mb-4">📊</div>
+        <div className="text-6xl mb-4">[Chart]</div>
         <h3 className="text-xl font-semibold mb-2 text-gray-900 dark:text-slate-100">{file.name}</h3>
         <p className="text-gray-600 dark:text-gray-400 text-center mb-6">
           {t('fileViewer.clickToEditExcel')}
@@ -44,7 +43,6 @@ const ExcelViewerWrapper = ({ file, onFileSaved }) => {
   );
 };
 
-// Wrapper para PowerPoint con modo de solo lectura inicial
 const PowerPointViewerWrapper = ({ file, onFileSaved }) => {
   const [isEditing, setIsEditing] = useState(false);
   const { t } = useLanguage();
@@ -52,7 +50,7 @@ const PowerPointViewerWrapper = ({ file, onFileSaved }) => {
   if (!isEditing) {
     return (
       <div className="viewer-content office-viewer flex flex-col items-center justify-center h-full p-8">
-        <div className="text-6xl mb-4">📽️</div>
+        <div className="text-6xl mb-4">[Slides]</div>
         <h3 className="text-xl font-semibold mb-2 text-gray-900 dark:text-slate-100">{file.name}</h3>
         <p className="text-gray-600 dark:text-gray-400 text-center mb-6">
           {t('fileViewer.clickToEditPowerPoint')}
@@ -152,7 +150,6 @@ const TextFileViewer = ({ fileId, fileName, onLoad, onError }) => {
 
 const FileViewerModal = ({ file, onClose, user }) => {
   const fileType = getFileType(file.name);
-  // Word y archivos de Office se manejan internamente, no necesitan loading inicial
   const [loading, setLoading] = useState(fileType !== 'word' && fileType !== 'text' && fileType !== 'powerpoint' && fileType !== 'excel');
   const [error, setError] = useState(null);
   const [authenticatedUrl, setAuthenticatedUrl] = useState(null);
@@ -160,7 +157,6 @@ const FileViewerModal = ({ file, onClose, user }) => {
   const { addToast } = useToast();
 
   const loadAuthenticatedPreview = useCallback(async () => {
-    // Permitir preview para word, excel y powerpoint aunque canPreview diga false
     if (!canPreview(file.name) && !canEdit(file.name)) {
       setLoading(false);
       return;
@@ -169,7 +165,6 @@ const FileViewerModal = ({ file, onClose, user }) => {
     try {
       const url = await getAuthenticatedPreviewUrl(file.id, file.name);
       setAuthenticatedUrl(url);
-      // Si es word, no necesitamos authenticatedUrl aquí, el componente lo maneja
       if (fileType !== 'word') {
         setLoading(false);
       }
@@ -181,7 +176,6 @@ const FileViewerModal = ({ file, onClose, user }) => {
   }, [file.id, file.name, fileType, t, canEdit, canPreview]);
 
   useEffect(() => {
-    // Solo mostrar loading para archivos que necesitan URL autenticada
     if (fileType !== 'word' && fileType !== 'text' && fileType !== 'powerpoint' && fileType !== 'excel') {
       setLoading(true);
     }
@@ -317,7 +311,6 @@ const FileViewerModal = ({ file, onClose, user }) => {
     }
   };
 
-  // Determinar si es un archivo de Office para ajustar el tamaño del modal
   const isOfficeFile = ['word', 'excel', 'powerpoint'].includes(fileType);
 
   return (

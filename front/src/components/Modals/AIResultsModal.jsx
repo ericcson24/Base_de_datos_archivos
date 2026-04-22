@@ -7,7 +7,6 @@ import WordEditor from '../FileEditor/editors/WordEditor';
 import ExcelEditor from '../FileEditor/editors/ExcelEditor';
 import './AIResultsModal.css';
 
-// Simple text viewer for preview
 const TextFileViewer = ({ fileId, highlightText }) => {
   const [content, setContent] = React.useState('');
   const { t } = useLanguage();
@@ -32,11 +31,9 @@ const TextFileViewer = ({ fileId, highlightText }) => {
 
   if (!content) return <div>Loading...</div>;
 
-  // Render text with highlighting
   const renderContent = () => {
     if (!highlightText) return content;
     
-    // Escape regex characters
     const parts = content.split(new RegExp(`(${highlightText.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'gi'));
     return (
       <span>
@@ -82,7 +79,7 @@ const AIResultsModal = ({ isOpen, onClose, results, onOpenFile, onDownloadFile }
   const renderViewer = () => {
     if (!selectedFile) return (
       <div className="empty-viewer-state">
-        <span className="text-6xl mb-4 opacity-50">👁️</span>
+        <span className="text-6xl mb-4 opacity-50">[Show]</span>
         <p>{t('aiResults.selectFileToView') || 'Selecciona un archivo para ver su contenido'}</p>
       </div>
     );
@@ -95,12 +92,9 @@ const AIResultsModal = ({ isOpen, onClose, results, onOpenFile, onDownloadFile }
     const isPresentation = ['pptx','ppt'].includes(ext) || selectedFile.mime_type?.includes('presentation');
     const isTextReadable = ['txt','md','json','xml','csv','js','ts','jsx','tsx','html','css','py','java','c','cpp','h','sh','yaml','yml','ini','log'].includes(ext);
 
-    // Build auth URL for WordEditor
-    // encodeURIComponent is required: base64 IDs can contain '/', '+', '=' which break URL path segments
     const targetId = selectedFile.download_id || selectedFile.id;
     const fileUrl = `/api/files/preview/${encodeURIComponent(targetId)}?token=${encodeURIComponent(getAuthToken())}`;
 
-    // No-preview banner for binary formats that can't be shown inline
     const NoPreviewBanner = ({ icon, label }) => (
       <div className="viewer-wrapper" style={{ alignItems: 'center', justifyContent: 'center', gap: '1rem', color: '#94a3b8' }}>
         <span style={{ fontSize: '4rem' }}>{icon}</span>
@@ -189,7 +183,6 @@ const AIResultsModal = ({ isOpen, onClose, results, onOpenFile, onDownloadFile }
       return <TextFileViewer fileId={textTargetId} highlightText={selectedHighlight} />;
     }
 
-    // Unknown binary format
     return <NoPreviewBanner icon="📄" label={`Vista previa no disponible para este tipo de archivo.\n${selectedFile.name}`} />;
   };
 
@@ -206,12 +199,12 @@ const AIResultsModal = ({ isOpen, onClose, results, onOpenFile, onDownloadFile }
             {t('aiResults.title')}
           </h2>
           <button className="close-button" onClick={onClose}>
-            ✕
+            x
           </button>
         </div>
 
         <div className="modal-body-split">
-          {/* LEFT PANEL: Results List */}
+          
           <div className="results-panel">
                <div className="ai-response-section">
                 <h3>{t('aiResults.aiResponse')}</h3>
@@ -220,7 +213,7 @@ const AIResultsModal = ({ isOpen, onClose, results, onOpenFile, onDownloadFile }
                 </div>
               </div>
 
-              {/* Files Section */}
+              
               {files.length > 0 ? (
                 <div className="files-section">
                   <h3>{t('aiResults.relevantFiles')} ({files.length})</h3>
@@ -243,10 +236,10 @@ const AIResultsModal = ({ isOpen, onClose, results, onOpenFile, onDownloadFile }
                                 <div className="file-meta">
                                   {file.folder_path && (
                                     <span className="file-folder-path" title={file.folder_path}>
-                                      📁 {file.folder_path} •{' '}
+                                      📁 {file.folder_path} *{' '}
                                     </span>
                                   )}
-                                  {formatFileSize(file.size)} • {formatDate(file.upload_date || file.created_at)}
+                                  {formatFileSize(file.size)} * {formatDate(file.upload_date || file.created_at)}
                                 </div>
                               </div>
                             </div>
@@ -295,7 +288,7 @@ const AIResultsModal = ({ isOpen, onClose, results, onOpenFile, onDownloadFile }
               )}
           </div>
 
-          {/* RIGHT PANEL: Viewer */}
+          
           <div className={`viewer-panel ${selectedFile ? 'visible' : ''}`}>
                {renderViewer()}
           </div>
@@ -305,7 +298,6 @@ const AIResultsModal = ({ isOpen, onClose, results, onOpenFile, onDownloadFile }
   );
 };
 
-// Helper functions
 const getFileIcon = (mimeTypeOrName) => {
   if (!mimeTypeOrName) return '📄';
   
@@ -316,10 +308,10 @@ const getFileIcon = (mimeTypeOrName) => {
   if (mimeType.includes('word') || name.endsWith('.docx') || name.endsWith('.doc')) return '📘';
   if (mimeType.includes('excel') || name.endsWith('.xlsx') || name.endsWith('.xls')) return '📗';
   if (mimeType.includes('powerpoint') || name.endsWith('.pptx') || name.endsWith('.ppt')) return '📙';
-  if (mimeType.includes('image') || /\.(jpg|jpeg|png|gif|bmp|svg)$/.test(name)) return '🖼️';
+  if (mimeType.includes('image') || /\.(jpg|jpeg|png|gif|bmp|svg)$/.test(name)) return '[Image]';
   if (mimeType.includes('video') || /\.(mp4|avi|mov|mkv)$/.test(name)) return '🎬';
-  if (mimeType.includes('audio') || /\.(mp3|wav|ogg)$/.test(name)) return '🎵';
-  if (mimeType.includes('zip') || mimeType.includes('compressed') || /\.(zip|rar|7z)$/.test(name)) return '📦';
+  if (mimeType.includes('audio') || /\.(mp3|wav|ogg)$/.test(name)) return '[Audio]';
+  if (mimeType.includes('zip') || mimeType.includes('compressed') || /\.(zip|rar|7z)$/.test(name)) return '[Archive]';
   if (mimeType.includes('text') || name.endsWith('.txt')) return '📃';
   
   return '📄';

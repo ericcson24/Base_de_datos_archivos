@@ -14,7 +14,6 @@ const ZipViewer = ({ file }) => {
 
   useEffect(() => {
     loadZipContents();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [file]);
 
   const loadZipContents = async () => {
@@ -22,7 +21,6 @@ const ZipViewer = ({ file }) => {
       setLoading(true);
       setError(null);
 
-      // Importar JSZip dinámicamente
       const JSZip = (await import('jszip')).default;
       
       const zip = new JSZip();
@@ -66,13 +64,13 @@ const ZipViewer = ({ file }) => {
     
     const ext = entry.name.split('.').pop().toLowerCase();
     const iconMap = {
-      'jpg': '🖼️', 'jpeg': '🖼️', 'png': '🖼️', 'gif': '🖼️', 'bmp': '🖼️',
+      'jpg': '[Image]', 'jpeg': '[Image]', 'png': '[Image]', 'gif': '[Image]', 'bmp': '[Image]',
       'pdf': '📄',
-      'doc': '📝', 'docx': '📝', 'txt': '📝',
-      'xls': '📊', 'xlsx': '📊', 'csv': '📊',
-      'zip': '📦', 'rar': '📦', '7z': '📦',
+      'doc': '[Text]', 'docx': '[Text]', 'txt': '[Text]',
+      'xls': '[Chart]', 'xlsx': '[Chart]', 'csv': '[Chart]',
+      'zip': '[Archive]', 'rar': '[Archive]', '7z': '[Archive]',
       'mp4': '🎬', 'avi': '🎬', 'mkv': '🎬', 'mov': '🎬',
-      'mp3': '🎵', 'wav': '🎵', 'ogg': '🎵',
+      'mp3': '[Audio]', 'wav': '[Audio]', 'ogg': '[Audio]',
       'js': '📜', 'jsx': '📜', 'ts': '📜', 'tsx': '📜',
       'html': '🌐', 'css': '🎨', 'json': '⚙️'
     };
@@ -89,7 +87,6 @@ const ZipViewer = ({ file }) => {
     try {
       const ext = entry.name.split('.').pop().toLowerCase();
       
-      // Archivos de texto/código
       if (['txt', 'js', 'jsx', 'ts', 'tsx', 'html', 'css', 'json', 'xml', 'md'].includes(ext)) {
         const content = await entry.entry.async('string');
         setPreviewContent({
@@ -98,7 +95,6 @@ const ZipViewer = ({ file }) => {
           language: ext
         });
       }
-      // Imágenes
       else if (['jpg', 'jpeg', 'png', 'gif', 'bmp', 'svg'].includes(ext)) {
         const blob = await entry.entry.async('blob');
         const url = URL.createObjectURL(blob);
@@ -107,7 +103,6 @@ const ZipViewer = ({ file }) => {
           url: url
         });
       }
-      // PDF
       else if (ext === 'pdf') {
         const blob = await entry.entry.async('blob');
         const url = URL.createObjectURL(blob);
@@ -197,7 +192,7 @@ const ZipViewer = ({ file }) => {
   return (
     <div className="zip-viewer">
       <div className="zip-header">
-        <h3>📦 {file.name}</h3>
+        <h3>[Archive] {file.name}</h3>
         <div className="zip-stats">
           <span>{entries.length} {t('zipViewer.files')}</span>
           <span>{formatSize(entries.reduce((sum, e) => sum + e.size, 0))}</span>
@@ -256,7 +251,7 @@ const ZipViewer = ({ file }) => {
                 className="close-preview"
                 onClick={() => setSelectedEntry(null)}
               >
-                ✕
+                x
               </button>
             </div>
 
@@ -288,7 +283,7 @@ const ZipViewer = ({ file }) => {
 
               {previewContent?.type === 'unsupported' && (
                 <div className="preview-message">
-                  <p>⚠️ {previewContent.message}</p>
+                  <p>[Warning] {previewContent.message}</p>
                   <button onClick={() => handleDownload(selectedEntry)}>
                     {t('zipViewer.downloadFile')}
                   </button>

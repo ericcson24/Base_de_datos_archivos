@@ -109,20 +109,17 @@
     overflow: hidden;
 }
 
-/* Only hide cursor when connected */
 .rdp-display.cursor-hidden {
     cursor: none;
 }
 
-/* Ensure the Guacamole display element fills the container and receives events */
 .rdp-display > div {
     outline: none !important;
-    touch-action: none; /* Prevent browser touch gestures interfering with remote desktop */
+    touch-action: none; 
     position: relative;
 }
 
 .rdp-display canvas {
-    /* Let Guacamole manage sizing via display.scale() — no constraints */
     display: block;
 }
 
@@ -144,7 +141,6 @@
     background: rgba(50, 0, 0, 0.9);
 }
 
-/* Status dot for WAITING state */
 .status-dot.waiting { background-color: #ff9800; animation: pulse 1s infinite; }
 .status-dot.idle { background-color: #9e9e9e; }
 .status-dot.disconnecting { background-color: #ff9800; }
@@ -169,7 +165,6 @@
     to { transform: rotate(360deg); }
 }
 
-/* ===== Credentials Modal ===== */
 .rdp-credentials-overlay {
     position: fixed;
     inset: 0;

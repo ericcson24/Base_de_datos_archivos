@@ -1,8 +1,5 @@
-/* =========================================
-   REMOTE PAGE DESKTOP STYLES
-   ========================================= */
 
-/* Hide mobile elements by default */
+
 .mobile-header {
   display: none;
 }
@@ -15,7 +12,6 @@
   display: none;
 }
 
-/* Desktop-specific adjustments */
 @media (min-width: 769px) {
   .remote-sidebar {
     min-width: 300px;

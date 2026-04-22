@@ -15,7 +15,6 @@ const UPLOAD_DIR = process.env.UPLOAD_DIR || '/app/uploads';
 app.use(cors({ origin: true, credentials: true }));
 app.use(express.json());
 
-// ── Auth middleware ──
 const requireAdmin = (req, res, next) => {
   try {
     const authHeader = req.headers.authorization;
@@ -30,13 +29,11 @@ const requireAdmin = (req, res, next) => {
   }
 };
 
-// ── Folders to ignore when scanning C:\Users ──
 const SYSTEM_PROFILES = new Set([
   'public', 'default', 'default user', 'all users',
   'defaultapppool', 'desktop.ini', '.net v4.5', '.net v4.5 classic'
 ]);
 
-// ── Helper: detect Windows user profiles from mounted dir ──
 function detectWindowsUsers() {
   try {
     if (!fs.existsSync(HOST_USERS_DIR)) {
@@ -49,13 +46,11 @@ function detectWindowsUsers() {
       if (!entry.isDirectory()) continue;
       const name = entry.name;
       if (SYSTEM_PROFILES.has(name.toLowerCase())) continue;
-      // Check if it looks like a real user profile (has Desktop or NTUSER.DAT)
       const profilePath = path.join(HOST_USERS_DIR, name);
       const hasDesktop = fs.existsSync(path.join(profilePath, 'Desktop'));
       const hasDocuments = fs.existsSync(path.join(profilePath, 'Documents'));
       const hasDownloads = fs.existsSync(path.join(profilePath, 'Downloads'));
       if (hasDesktop || hasDocuments || hasDownloads) {
-        // Gather folder sizes
         const folders = [];
         if (hasDesktop) folders.push({ type: 'desktop', path: path.join(profilePath, 'Desktop'), count: countFiles(path.join(profilePath, 'Desktop')) });
         if (hasDocuments) folders.push({ type: 'documents', path: path.join(profilePath, 'Documents'), count: countFiles(path.join(profilePath, 'Documents')) });
@@ -84,7 +79,7 @@ const SKIP_DIRS = new Set([
 ]);
 
 function countFiles(dir, depth = 0) {
-  if (depth > 3) return 0; // Limit depth for speed
+  if (depth > 3) return 0;
   try {
     let count = 0;
     const entries = fs.readdirSync(dir, { withFileTypes: true });
@@ -98,7 +93,6 @@ function countFiles(dir, depth = 0) {
   } catch (_) { return 0; }
 }
 
-// ── Helper: recursively list files ──
 function listFilesRecursive(dir, basePath = '') {
   const results = [];
   try {
@@ -118,13 +112,10 @@ function listFilesRecursive(dir, basePath = '') {
       }
     }
   } catch (err) {
-    // Permission denied or similar
   }
   return results;
 }
 
-// ── Helper: copy directory recursively ──
-// ── Helper: copy directory recursively (async, non-blocking) ──
 const MAX_FILES_PER_SYNC = 200;
 const fsPromises = require('fs').promises;
 
@@ -149,7 +140,7 @@ async function copyDirRecursiveAsync(src, dest, counter = { copied: 0 }, depth =
           const srcStat = await fsPromises.stat(srcPath);
           if (srcStat.mtime > destStat.mtime || srcStat.size !== destStat.size) needCopy = true;
         } catch (_) {
-          needCopy = true; // dest doesn't exist
+          needCopy = true;
         }
         if (needCopy) {
           await fsPromises.copyFile(srcPath, destPath);
@@ -158,19 +149,14 @@ async function copyDirRecursiveAsync(src, dest, counter = { copied: 0 }, depth =
         }
       }
     } catch (err) {
-      // Silently skip permission errors
     }
   }
   return copied;
 }
 
-// ═══════════════════════════════════════
-// ROUTES
-// ═══════════════════════════════════════
 
 app.get('/', (req, res) => res.send('Windows Integration Service running'));
 
-// ── GET /api/windows/users - List detected Windows users ──
 app.get('/api/windows/users', requireAdmin, (req, res) => {
   try {
     const windowsUsers = detectWindowsUsers();
@@ -180,13 +166,11 @@ app.get('/api/windows/users', requireAdmin, (req, res) => {
   }
 });
 
-// ── GET /api/windows/users/:username/folders - Browse Windows user folders ──
 app.get('/api/windows/users/:username/folders', requireAdmin, (req, res) => {
   try {
     const { username } = req.params;
-    const { folder, subpath } = req.query; // folder = desktop|documents|downloads
+    const { folder, subpath } = req.query;
     
-    // Validate: no path traversal
     if (username.includes('..') || username.includes('/') || username.includes('\\')) {
       return res.status(400).json({ success: false, message: 'Invalid username' });
     }
@@ -201,12 +185,10 @@ app.get('/api/windows/users/:username/folders', requireAdmin, (req, res) => {
     if (folder && folderMap[folder]) {
       let targetPath = path.join(profilePath, folderMap[folder]);
       if (subpath) {
-        // Validate subpath
         const cleanSub = path.normalize(subpath).replace(/^(\.\.(\/|\\|$))+/, '');
         targetPath = path.join(targetPath, cleanSub);
       }
       
-      // Ensure we don't escape the profile directory
       const resolvedTarget = path.resolve(targetPath);
       const resolvedProfile = path.resolve(profilePath);
       if (!resolvedTarget.startsWith(resolvedProfile)) {
@@ -219,7 +201,6 @@ app.get('/api/windows/users/:username/folders', requireAdmin, (req, res) => {
       const files = listFilesRecursive(targetPath);
       res.json({ success: true, folder: folder, files });
     } else {
-      // Return all available folders
       const folders = {};
       for (const [key, name] of Object.entries(folderMap)) {
         const p = path.join(profilePath, name);
@@ -234,7 +215,6 @@ app.get('/api/windows/users/:username/folders', requireAdmin, (req, res) => {
   }
 });
 
-// ── GET /api/windows/links - Get all linked accounts ──
 app.get('/api/windows/links', requireAdmin, async (req, res) => {
   try {
     const links = await dbAsync.all(`
@@ -249,7 +229,6 @@ app.get('/api/windows/links', requireAdmin, async (req, res) => {
   }
 });
 
-// ── POST /api/windows/link - Link a cloud user to a Windows user ──
 app.post('/api/windows/link', requireAdmin, async (req, res) => {
   try {
     const { cloud_username, windows_username, sync_desktop = true, sync_documents = true, sync_downloads = true } = req.body;
@@ -258,19 +237,16 @@ app.post('/api/windows/link', requireAdmin, async (req, res) => {
       return res.status(400).json({ success: false, message: 'Both cloud and windows username required' });
     }
 
-    // Validate Windows user exists
     const profilePath = path.join(HOST_USERS_DIR, windows_username);
     if (!fs.existsSync(profilePath)) {
       return res.status(400).json({ success: false, message: `Windows profile "${windows_username}" not found` });
     }
 
-    // Validate cloud user exists
     const cloudUser = await dbAsync.get("SELECT id FROM users WHERE username = ?", [cloud_username]);
     if (!cloudUser) {
       return res.status(400).json({ success: false, message: `Cloud user "${cloud_username}" not found` });
     }
 
-    // Check if either is already linked
     const existingCloud = await dbAsync.get("SELECT id FROM windows_user_links WHERE cloud_username = ?", [cloud_username]);
     if (existingCloud) {
       return res.status(400).json({ success: false, message: `Cloud user "${cloud_username}" already linked` });
@@ -294,7 +270,6 @@ app.post('/api/windows/link', requireAdmin, async (req, res) => {
   }
 });
 
-// ── DELETE /api/windows/link/:id - Unlink ──
 app.delete('/api/windows/link/:id', requireAdmin, async (req, res) => {
   try {
     await dbAsync.run("DELETE FROM windows_user_links WHERE id = ?", [req.params.id]);
@@ -304,7 +279,6 @@ app.delete('/api/windows/link/:id', requireAdmin, async (req, res) => {
   }
 });
 
-// ── PUT /api/windows/link/:id - Update sync settings ──
 app.put('/api/windows/link/:id', requireAdmin, async (req, res) => {
   try {
     const { sync_enabled, sync_desktop, sync_documents, sync_downloads } = req.body;
@@ -326,7 +300,6 @@ app.put('/api/windows/link/:id', requireAdmin, async (req, res) => {
   }
 });
 
-// ── POST /api/windows/sync/:id - Trigger manual sync for a linked account ──
 app.post('/api/windows/sync/:id', requireAdmin, async (req, res) => {
   try {
     const link = await dbAsync.get("SELECT * FROM windows_user_links WHERE id = ?", [req.params.id]);
@@ -343,7 +316,6 @@ app.post('/api/windows/sync/:id', requireAdmin, async (req, res) => {
   }
 });
 
-// ── POST /api/windows/sync-all - Sync all linked accounts ──
 app.post('/api/windows/sync-all', requireAdmin, async (req, res) => {
   try {
     const links = await dbAsync.all("SELECT * FROM windows_user_links WHERE sync_enabled = true");
@@ -363,7 +335,6 @@ app.post('/api/windows/sync-all', requireAdmin, async (req, res) => {
   }
 });
 
-// ── POST /api/windows/auto-create - Auto-create cloud users from Windows users ──
 app.post('/api/windows/auto-create', requireAdmin, async (req, res) => {
   try {
     const { users: selectedUsers, defaultPassword, defaultRole = 'user', autoLink = true } = req.body;
@@ -382,28 +353,24 @@ app.post('/api/windows/auto-create', requireAdmin, async (req, res) => {
     
     for (const winUser of selectedUsers) {
       try {
-        // Check if cloud user already exists
         const existing = await dbAsync.get("SELECT id FROM users WHERE username = ?", [winUser]);
         if (existing) {
           skipped.push(winUser);
           continue;
         }
         
-        // Create user
         const result = await dbAsync.run(
           "INSERT INTO users (username, role, created_at) VALUES (?, ?, ?)",
           [winUser, defaultRole, new Date().toISOString()]
         );
         const userId = result.lastID;
         
-        // Create credentials
         const hashedPassword = await bcrypt.hash(defaultPassword, 10);
         await dbAsync.run(
           "INSERT INTO user_credentials (user_id, password_hash, updated_at) VALUES (?, ?, ?)",
           [userId, hashedPassword, new Date().toISOString()]
         );
         
-        // Auto-link if requested
         if (autoLink) {
           const profilePath = path.join(HOST_USERS_DIR, winUser);
           if (fs.existsSync(profilePath)) {
@@ -413,7 +380,6 @@ app.post('/api/windows/auto-create', requireAdmin, async (req, res) => {
                 [winUser, winUser]
               );
             } catch (_) {
-              // Link might already exist
             }
           }
         }
@@ -434,7 +400,6 @@ app.post('/api/windows/auto-create', requireAdmin, async (req, res) => {
   }
 });
 
-// ── Sync helper function ──
 async function syncLinkedUser(link) {
   const result = { desktop: 0, documents: 0, downloads: 0, total: 0 };
   const userUploadDir = path.join(UPLOAD_DIR, link.cloud_username);
@@ -469,7 +434,6 @@ async function syncLinkedUser(link) {
   return result;
 }
 
-// ── Background auto-sync (every 5 minutes) ──
 let autoSyncInterval = null;
 
 async function runAutoSync() {
@@ -494,14 +458,11 @@ async function runAutoSync() {
   }
 }
 
-// ── Start ──
 initDatabase().then(() => {
   app.listen(PORT, () => {
     console.log(`[windows-service] Running on port ${PORT}`);
     
-    // Start auto-sync every 15 seconds
     autoSyncInterval = setInterval(runAutoSync, 15 * 1000);
-    // Run initial sync after 10 seconds
     setTimeout(runAutoSync, 10000);
   });
 }).catch(err => {

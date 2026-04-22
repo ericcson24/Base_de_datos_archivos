@@ -374,7 +374,6 @@
   }
 }
 
-/* ===== Mobile Responsive ===== */
 @media (max-width: 768px) {
   .zip-header {
     padding: 1rem;

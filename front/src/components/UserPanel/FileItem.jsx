@@ -5,7 +5,6 @@ import { useLanguage } from '../../context/LanguageContext';
 import FolderIcon from '../Common/FolderIcon';
 import FileTypeIcon from '../Common/FileTypeIcon';
 
-// Helper: build Excel preview HTML table
 const buildExcelPreviewHtml = (XLSX, ws) => {
   const hasData = ws && ws['!ref'];
   const range = hasData ? XLSX.utils.decode_range(ws['!ref']) : { s: { r: 0, c: 0 }, e: { r: 7, c: 5 } };
@@ -42,7 +41,6 @@ const buildExcelPreviewHtml = (XLSX, ws) => {
   return html;
 };
 
-// Helper: build PowerPoint preview HTML slides
 const buildPptxPreviewHtml = async (zip) => {
   const slideFiles = Object.keys(zip.files)
     .filter(f => /ppt\/slides\/slide\d+\.xml/.test(f))
@@ -60,7 +58,6 @@ const buildPptxPreviewHtml = async (zip) => {
     let title = '';
     let contents = [];
 
-    // Method 1: Parse <p:sp> shape blocks to detect titles vs content
     const spMatches = xml.match(/<p:sp[\s>]([\s\S]*?)<\/p:sp>/g) || [];
     for (const sp of spMatches) {
       const isTitle = /<p:ph[^>]*type="(title|ctrTitle)"/i.test(sp);
@@ -77,7 +74,6 @@ const buildPptxPreviewHtml = async (zip) => {
       }
     }
 
-    // Method 2: Fallback — if no shapes matched, extract ALL <a:t> text directly
     if (!title && contents.length === 0) {
       const allTextMatches = xml.match(/<a:t[^>]*>([^<]+)<\/a:t>/g);
       if (allTextMatches) {
@@ -89,7 +85,6 @@ const buildPptxPreviewHtml = async (zip) => {
       }
     }
 
-    // If no explicit title found, promote first content
     if (!title && contents.length > 0) {
       title = contents.shift();
     }
@@ -99,25 +94,23 @@ const buildPptxPreviewHtml = async (zip) => {
 
   const hasContent = slides.some(s => s.title || s.contents.length > 0);
 
-  // Build HTML — even for empty slides, show a nice slide placeholder
   const slideHtml = slides.length > 0 ? slides.map((s) => {
     let h = '<div class="pptx-slide">';
     if (s.title) {
       h += `<div class="pptx-title">${s.title.replace(/&/g, '&amp;').replace(/</g, '&lt;')}</div>`;
     } else if (!hasContent) {
-      h += '<div class="pptx-empty-placeholder">📽️</div>';
+      h += '<div class="pptx-empty-placeholder">[Slides]</div>';
     }
     if (s.contents.length > 0) {
       h += s.contents.map(c => `<div class="pptx-content">${c.replace(/&/g, '&amp;').replace(/</g, '&lt;')}</div>`).join('');
     }
     h += '</div>';
     return h;
-  }).join('') : '<div class="pptx-slide"><div class="pptx-empty-placeholder">📽️</div></div>';
+  }).join('') : '<div class="pptx-slide"><div class="pptx-empty-placeholder">[Slides]</div></div>';
 
   return slideHtml;
 };
 
-// Lazy-loaded Office preview for grid thumbnails
 const OfficePreview = React.memo(({ fileId, fileType, fileName }) => {
   const [content, setContent] = useState(null);
   const [error, setError] = useState(false);
@@ -146,7 +139,6 @@ const OfficePreview = React.memo(({ fileId, fileType, fileName }) => {
           const XLSX = await import('xlsx');
           const wb = XLSX.read(new Uint8Array(buf), { type: 'array', cellStyles: true, cellDates: true });
           const ws = wb.Sheets[wb.SheetNames[0]];
-          // Always generate preview — even for empty sheets (shows empty grid)
           const html = buildExcelPreviewHtml(XLSX, ws);
           if (!cancelled) setContent({ type: 'html', data: html });
 
@@ -191,11 +183,9 @@ const OfficePreview = React.memo(({ fileId, fileType, fileName }) => {
   );
 });
 
-// Small owner avatar. Shows image when url provided, else colored initial circle.
 const OwnerAvatar = ({ username, url, size = 20, title }) => {
   const [errored, setErrored] = useState(false);
   const initial = (username || '?').trim().charAt(0).toUpperCase();
-  // Deterministic color from username
   let hash = 0;
   for (let i = 0; i < (username || '').length; i++) hash = (hash * 31 + username.charCodeAt(i)) | 0;
   const hue = Math.abs(hash) % 360;
@@ -234,7 +224,6 @@ const FileItem = ({ item, onFolderClick, onDelete, onRename, onMove, onView, onO
   const fileType = item.type === 'file' ? getFileType(item.name) : null;
   const isOfficeType = ['word', 'excel', 'powerpoint'].includes(fileType);
 
-  // Load preview thumbnails for previewable files (images, PDFs, videos)
   useEffect(() => {
     if (item.type !== 'file' || !canPreview(item.name)) return;
     
@@ -259,7 +248,6 @@ const FileItem = ({ item, onFolderClick, onDelete, onRename, onMove, onView, onO
 
   const handleDragStart = (e) => {
     if (item.type === 'file') {
-      // Set internal drag data so we can identify this as an internal file drag
       e.dataTransfer.setData('application/x-internal-file', JSON.stringify({ id: item.id, name: item.name, path: item.path }));
       e.dataTransfer.effectAllowed = 'move';
       onDragStart(item, e);
@@ -272,12 +260,10 @@ const FileItem = ({ item, onFolderClick, onDelete, onRename, onMove, onView, onO
     }
   };
 
-  // Folder drop target handlers - for receiving files dragged onto folders
   const handleFolderDragOver = (e) => {
     if (item.type !== 'folder') return;
     e.preventDefault();
     e.stopPropagation();
-    // Only accept internal file drags
     if (e.dataTransfer.types.includes('application/x-internal-file')) {
       e.dataTransfer.dropEffect = 'move';
       setIsDragOverFolder(true);
@@ -297,7 +283,6 @@ const FileItem = ({ item, onFolderClick, onDelete, onRename, onMove, onView, onO
     if (item.type !== 'folder') return;
     e.preventDefault();
     e.stopPropagation();
-    // Only reset if we're leaving the folder element itself, not a child
     const rect = e.currentTarget.getBoundingClientRect();
     const { clientX, clientY } = e;
     if (clientX < rect.left || clientX > rect.right || clientY < rect.top || clientY > rect.bottom) {
@@ -326,11 +311,9 @@ const FileItem = ({ item, onFolderClick, onDelete, onRename, onMove, onView, onO
     if (item.type === 'folder') {
       onFolderClick(item);
     } else {
-      // Prioridad 1: Archivos previsualizable (imágenes, videos, PDFs) y editables (Office)
       if (canPreview(item.name) || canEdit(item.name)) {
         onView(item);
       }
-      // Prioridad 2: Descargar otros archivos
       else {
         downloadFile(item.id, item.name, t);
       }
@@ -342,30 +325,23 @@ const FileItem = ({ item, onFolderClick, onDelete, onRename, onMove, onView, onO
     
     if (!menuOpen) {
       const rect = e.target.getBoundingClientRect();
-      // Usamos dimensiones estimadas un poco más generosas para los cálculos
       const menuHeight = 350;
       const menuWidth = 200;
       
       let top = rect.bottom + 8;
       let left = rect.right - menuWidth;
       
-      // Ajuste de altura - Si no cabe abajo, intentamos arriba
       if (top + menuHeight > window.innerHeight) {
         const spaceAbove = rect.top - 8;
         const spaceBelow = window.innerHeight - rect.bottom - 8;
         
         if (spaceAbove > spaceBelow) {
-          // Si hay más espacio arriba, lo colocamos arriba
-          // Pero nos aseguramos de no salirnos por el borde superior
           top = Math.max(8, rect.top - menuHeight - 8);
         } else {
-          // Si hay más espacio abajo, lo dejamos abajo aunque sea apretado
-          // El CSS (max-height + overflow) se encargará del resto
           top = rect.bottom + 8;
         }
       }
       
-      // Ajuste horizontal
       if (left < 8) {
         left = Math.max(8, rect.left);
       }
@@ -387,8 +363,6 @@ const FileItem = ({ item, onFolderClick, onDelete, onRename, onMove, onView, onO
     const canShowPreview = canPreview(item.name);
     const isShared = isSharedView || item.shared;
     
-    // Shared files from another user (recipient view): same menu as normal file,
-    // but "Delete" only removes the share from the recipient (not from owner).
     const isRecipient = isShared && item.owner && item.owner !== 'me' && !item.sharedWith;
     const isReadOnly = isRecipient && item.permission === 'read';
     
@@ -596,7 +570,6 @@ const FileItem = ({ item, onFolderClick, onDelete, onRename, onMove, onView, onO
     );
   };
 
-  // Render file preview thumbnail or fallback icon
   const renderFilePreview = (size = 'grid') => {
     const iconSize = size === 'grid' ? 48 : 28;
     const containerClass = size === 'grid' ? 'grid-preview-container' : 'list-preview-container';
@@ -609,7 +582,6 @@ const FileItem = ({ item, onFolderClick, onDelete, onRename, onMove, onView, onO
       );
     }
 
-    // Office documents (Word, Excel, PowerPoint) — grid: rich preview, list: icon
     if (isOfficeType) {
       if (size === 'grid') {
         return (
@@ -621,7 +593,6 @@ const FileItem = ({ item, onFolderClick, onDelete, onRename, onMove, onView, onO
           </div>
         );
       }
-      // List view: just show the icon with type color
       return <FileTypeIcon type={fileType} size={iconSize} />;
     }
 
@@ -681,7 +652,7 @@ const FileItem = ({ item, onFolderClick, onDelete, onRename, onMove, onView, onO
           {fileType === 'text' && size === 'list' && (
             <FileTypeIcon type={fileType} size={iconSize} />
           )}
-          {/* Extension badge */}
+          
           <div className="preview-ext-badge">
             {item.name.split('.').pop()?.toUpperCase()}
           </div>
@@ -689,7 +660,6 @@ const FileItem = ({ item, onFolderClick, onDelete, onRename, onMove, onView, onO
       );
     }
 
-    // Fallback: SVG icon
     return <FileTypeIcon type={fileType} size={iconSize} />;
   };
 

@@ -1,7 +1,6 @@
 import React from 'react';
 import './BaseLayout.css';
 
-// Componente BaseLayout para la estructura general de la aplicación
 const BaseLayout = ({
   children,
   title,

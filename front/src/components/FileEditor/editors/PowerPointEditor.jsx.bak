@@ -522,7 +522,7 @@ const PowerPointEditor = ({ fileUrl, fileBlob, file, onClose, onFileSaved }) => 
   return (
     <div className="powerpoint-editor">
       <div className="editor-header">
-        <h2>📽️ {file.name}</h2>
+        <h2>[Slides] {file.name}</h2>
         <div className="editor-actions">
           {!isEditing ? (
             <button className="btn-edit" onClick={() => setIsEditing(true)}>

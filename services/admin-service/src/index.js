@@ -27,7 +27,6 @@ app.use(cors({
 }));
 app.use(express.json());
 
-// Middleware para verificar si el usuario es administrador
 const requireAdmin = (req, res, next) => {
   try {
     let token = null;
@@ -86,13 +85,11 @@ const getSystemStats = async () => {
     const cpus = os.cpus();
     const uptime = os.uptime();
 
-    // Real CPU usage via systeminformation
     let cpuPercent = 0;
     try {
       const cpuLoad = await si.currentLoad();
       cpuPercent = Math.round(cpuLoad.currentLoad * 100) / 100;
     } catch (e) {
-      // Fallback: calculate from os.cpus() idle times
       const cpuAvg = cpus.reduce((acc, cpu) => {
         const total = Object.values(cpu.times).reduce((a, b) => a + b, 0);
         return acc + (1 - cpu.times.idle / total);
@@ -100,7 +97,6 @@ const getSystemStats = async () => {
       cpuPercent = Math.round(cpuAvg * 10000) / 100;
     }
 
-    // Disk usage
     let diskInfo = { total: 0, used: 0, free: 0, percent: 0 };
     try {
       const disks = await si.fsSize();
@@ -113,9 +109,8 @@ const getSystemStats = async () => {
           percent: Math.round(main.use * 100) / 100
         };
       }
-    } catch (e) { /* ignore */ }
+    } catch (e) {  }
 
-    // Network stats
     let networkInfo = { rx_sec: 0, tx_sec: 0, rx_total: 0, tx_total: 0, iface: '' };
     try {
       const nets = await si.networkStats();
@@ -129,7 +124,7 @@ const getSystemStats = async () => {
           iface: main.iface || ''
         };
       }
-    } catch (e) { /* ignore */ }
+    } catch (e) {  }
 
     return {
       memory_total_gb: Math.round(totalMem / 1024 / 1024 / 1024 * 100) / 100,
@@ -167,7 +162,6 @@ app.get('/', (req, res) => {
   res.send('Admin Service is running');
 });
 
-// Crear usuario
 app.post('/api/users', requireAdmin, async (req, res) => {
   try {
     const { username, password, role = 'user', email } = req.body;
@@ -176,13 +170,11 @@ app.post('/api/users', requireAdmin, async (req, res) => {
       return res.status(400).json({ success: false, message: 'Usuario y contraseña requeridos' });
     }
 
-    // Verificar si existe
     const existing = await dbAsync.get("SELECT id FROM users WHERE username = ?", [username]);
     if (existing) {
       return res.status(400).json({ success: false, message: 'El usuario ya existe' });
     }
 
-    // Crear usuario
     const result = await dbAsync.run(
       "INSERT INTO users (username, role, created_at) VALUES (?, ?, ?)",
       [username, role, new Date().toISOString()]
@@ -190,7 +182,6 @@ app.post('/api/users', requireAdmin, async (req, res) => {
     
     const userId = result.lastID;
 
-    // Crear credenciales
     const hashedPassword = await bcrypt.hash(password, 10);
     await dbAsync.run(
       "INSERT INTO user_credentials (user_id, password_hash, updated_at) VALUES (?, ?, ?)",
@@ -206,7 +197,6 @@ app.post('/api/users', requireAdmin, async (req, res) => {
   }
 });
 
-// Actualizar usuario (Rol y/o Contraseña)
 app.put('/api/users/:id', requireAdmin, async (req, res) => {
   try {
     const { id } = req.params;
@@ -232,11 +222,10 @@ app.put('/api/users/:id', requireAdmin, async (req, res) => {
   }
 });
 
-// Bloquear/Desbloquear usuario
 app.put('/api/users/:id/lock', requireAdmin, async (req, res) => {
   try {
     const { id } = req.params;
-    const { locked } = req.body; // true or false
+    const { locked } = req.body;
 
     await dbAsync.run(
       "UPDATE user_credentials SET is_locked = ? WHERE user_id = ?",
@@ -250,7 +239,6 @@ app.put('/api/users/:id/lock', requireAdmin, async (req, res) => {
   }
 });
 
-// Cambiar contraseña
 app.put('/api/users/:id/password', requireAdmin, async (req, res) => {
   try {
     const { id } = req.params;
@@ -271,25 +259,22 @@ app.put('/api/users/:id/password', requireAdmin, async (req, res) => {
   }
 });
 
-// Eliminar usuario (solo acceso web, NO afecta perfil de Windows Server)
 app.delete('/api/users/:id', requireAdmin, async (req, res) => {
   try {
     const { id } = req.params;
     const user = await dbAsync.get("SELECT username FROM users WHERE id = ?", [id]);
     if (!user) return res.status(404).json({ success: false, message: 'User not found' });
 
-    // Clean up ALL FK-dependent tables
     await dbAsync.run("DELETE FROM shared_files WHERE owner_username = ? OR shared_with_username = ?", [user.username, user.username]);
     await dbAsync.run("DELETE FROM files WHERE owner_id = ?", [id]);
     await dbAsync.run("DELETE FROM folders WHERE owner_id = ?", [id]);
     await dbAsync.run("DELETE FROM group_members WHERE user_id = ?", [id]);
-    // Remove attachments tied to this user's events before deleting the events themselves
     try {
       await dbAsync.run(
         "DELETE FROM event_attachments WHERE event_id IN (SELECT COALESCE(microsoft_id, CAST(id AS TEXT)) FROM calendar_events WHERE user_id = ?) OR attached_by = ? OR file_owner = ?",
         [id, user.username, user.username]
       );
-    } catch (eAtt) { /* table may not exist yet */ }
+    } catch (eAtt) {  }
     await dbAsync.run("DELETE FROM calendar_events WHERE user_id = ?", [id]);
     await dbAsync.run("DELETE FROM notifications WHERE user_id = ?", [id]);
     await dbAsync.run("DELETE FROM admin_inbox WHERE user_id = ?", [id]);
@@ -306,7 +291,6 @@ app.delete('/api/users/:id', requireAdmin, async (req, res) => {
   }
 });
 
-// Obtener logs
 app.get('/api/logs', requireAdmin, async (req, res) => {
   try {
     const logs = await dbAsync.all("SELECT * FROM audit_logs ORDER BY timestamp DESC LIMIT 100");
@@ -318,7 +302,7 @@ app.get('/api/logs', requireAdmin, async (req, res) => {
 
 app.get('/api/status', requireAdmin, async (req, res) => {
   try {
-    console.log('📊 Admin solicitando estado del sistema');
+    console.log('[Chart] Admin solicitando estado del sistema');
     
     const users = await dbAsync.all("SELECT * FROM users");
     const systemStats = await getSystemStats();
@@ -408,17 +392,15 @@ app.get('/api/users', requireAdmin, async (req, res) => {
   }
 });
 
-// Server Info Endpoint
 app.get('/api/server/info', requireAdmin, async (req, res) => {
   try {
     const stats = await getSystemStats();
     
-    // Docker container count
     let dockerContainers = 0;
     try {
       const { stdout } = await execAsync('cat /proc/1/cgroup 2>/dev/null | head -1');
-      dockerContainers = -1; // running inside docker
-    } catch (e) { /* not in docker or no access */ }
+      dockerContainers = -1;
+    } catch (e) {  }
 
     res.json({
       success: true,
@@ -453,14 +435,11 @@ app.get('/api/server/info', requireAdmin, async (req, res) => {
   }
 });
 
-// Server Connections Endpoint
 app.get('/api/server/connections', requireAdmin, async (req, res) => {
   try {
-    // Mock connections data for now, or use systeminformation
     const networkStats = await si.networkStats();
     const connections = await si.networkConnections();
     
-    // Filter for relevant connections (e.g., HTTP, RDP ports)
     const activeConnections = connections.filter(c => c.state === 'ESTABLISHED').length;
     
     res.json({
@@ -478,7 +457,6 @@ app.get('/api/server/connections', requireAdmin, async (req, res) => {
       }
     });
   } catch (error) {
-    // Fallback if systeminformation fails
     res.json({
       success: true,
       connections: {
@@ -491,11 +469,8 @@ app.get('/api/server/connections', requireAdmin, async (req, res) => {
   }
 });
 
-// Inbox/Messages Endpoint
 app.get('/api/inbox', requireAdmin, async (req, res) => {
   try {
-    // Return mock messages or fetch from a table if it existed
-    // For now, return empty or system notifications
     res.json({
       success: true,
       messages: [
@@ -508,11 +483,9 @@ app.get('/api/inbox', requireAdmin, async (req, res) => {
   }
 });
 
-// Diagnostics endpoint
 app.get('/api/diagnostics', requireAdmin, async (req, res) => {
   const diagnostics = [];
 
-  // Check Database
   try {
     await dbAsync.get("SELECT 1");
     diagnostics.push({ name: 'Database', status: 'ok', message: 'Connection successful' });
@@ -520,7 +493,6 @@ app.get('/api/diagnostics', requireAdmin, async (req, res) => {
     diagnostics.push({ name: 'Database', status: 'error', message: e.message });
   }
 
-  // Check Memory
   try {
     const mem = process.memoryUsage();
     const usedMB = Math.round(mem.heapUsed / 1024 / 1024);
@@ -530,7 +502,6 @@ app.get('/api/diagnostics', requireAdmin, async (req, res) => {
     diagnostics.push({ name: 'Memory', status: 'error', message: e.message });
   }
 
-  // Check Disk (via os)
   try {
     const os = require('os');
     const freeMem = Math.round(os.freemem() / 1024 / 1024);
@@ -540,7 +511,6 @@ app.get('/api/diagnostics', requireAdmin, async (req, res) => {
     diagnostics.push({ name: 'System Memory', status: 'error', message: e.message });
   }
 
-  // Check uptime
   try {
     const uptimeSeconds = process.uptime();
     const hours = Math.floor(uptimeSeconds / 3600);
@@ -550,7 +520,6 @@ app.get('/api/diagnostics', requireAdmin, async (req, res) => {
     diagnostics.push({ name: 'Uptime', status: 'error', message: e.message });
   }
 
-  // Check user count
   try {
     const result = await dbAsync.get("SELECT COUNT(*) as count FROM users");
     diagnostics.push({ name: 'Users', status: 'ok', message: `${result.count} registered users` });
@@ -558,17 +527,14 @@ app.get('/api/diagnostics', requireAdmin, async (req, res) => {
     diagnostics.push({ name: 'Users', status: 'error', message: e.message });
   }
 
-  // Check Node version
   diagnostics.push({ name: 'Node.js', status: 'ok', message: process.version });
 
   res.json({ success: true, diagnostics });
 });
 
-// Programar eliminación de usuario
 app.post('/api/users/:id/schedule-deletion', requireAdmin, async (req, res) => {
   try {
     const { id } = req.params;
-    // 5 minutes from now
     const scheduledTime = new Date(Date.now() + 5 * 60 * 1000).toISOString();
     
     await dbAsync.run("UPDATE users SET deletion_scheduled_at = ? WHERE id = ?", [scheduledTime, id]);
@@ -580,7 +546,6 @@ app.post('/api/users/:id/schedule-deletion', requireAdmin, async (req, res) => {
   }
 });
 
-// Cancelar eliminación
 app.post('/api/users/:id/cancel-deletion', requireAdmin, async (req, res) => {
   try {
     const { id } = req.params;
@@ -594,11 +559,7 @@ app.post('/api/users/:id/cancel-deletion', requireAdmin, async (req, res) => {
   }
 });
 
-// ==========================================
-// SECURITY MANAGEMENT ENDPOINTS
-// ==========================================
 
-// GET /api/security/overview - Security dashboard data
 app.get('/api/security/overview', requireAdmin, async (req, res) => {
   try {
     const stats = await dbAsync.get(`
@@ -621,7 +582,6 @@ app.get('/api/security/overview', requireAdmin, async (req, res) => {
       LIMIT 10
     `);
 
-    // Fetch rate limits from auth-service
     let rateLimits = { total: 0, blockedCount: 0, rateLimits: [] };
     try {
       const token = req.headers.authorization;
@@ -633,7 +593,6 @@ app.get('/api/security/overview', requireAdmin, async (req, res) => {
       console.error('Could not fetch rate limits from auth-service:', e.message);
     }
 
-    // Blocked accounts from DB
     let blockedAccounts = [];
     try {
       const baRes = await axios.get(`${AUTH_SERVICE_URL}/security/blocked-accounts`, {
@@ -658,7 +617,6 @@ app.get('/api/security/overview', requireAdmin, async (req, res) => {
   }
 });
 
-// GET /api/security/logs - Security audit logs
 app.get('/api/security/logs', requireAdmin, async (req, res) => {
   try {
     const limit = parseInt(req.query.limit) || 100;
@@ -680,7 +638,6 @@ app.get('/api/security/logs', requireAdmin, async (req, res) => {
   }
 });
 
-// Proxy: Unblock a rate-limited IP
 app.delete('/api/security/rate-limits/:ip', requireAdmin, async (req, res) => {
   try {
     const response = await axios.delete(`${AUTH_SERVICE_URL}/security/rate-limits/${encodeURIComponent(req.params.ip)}`, {
@@ -693,7 +650,6 @@ app.delete('/api/security/rate-limits/:ip', requireAdmin, async (req, res) => {
   }
 });
 
-// Proxy: Clear all rate limits
 app.delete('/api/security/rate-limits', requireAdmin, async (req, res) => {
   try {
     const response = await axios.delete(`${AUTH_SERVICE_URL}/security/rate-limits`, {
@@ -706,7 +662,6 @@ app.delete('/api/security/rate-limits', requireAdmin, async (req, res) => {
   }
 });
 
-// Proxy: Unlock a user account
 app.post('/api/security/unlock-account/:userId', requireAdmin, async (req, res) => {
   try {
     const response = await axios.post(`${AUTH_SERVICE_URL}/security/unlock-account/${req.params.userId}`, {}, {
@@ -719,7 +674,6 @@ app.post('/api/security/unlock-account/:userId', requireAdmin, async (req, res) 
   }
 });
 
-// Background task: Check for expired deletions every minute
 setInterval(async () => {
   try {
     const now = new Date().toISOString();
@@ -737,7 +691,7 @@ setInterval(async () => {
             "DELETE FROM event_attachments WHERE event_id IN (SELECT COALESCE(microsoft_id, CAST(id AS TEXT)) FROM calendar_events WHERE user_id = ?) OR attached_by = ? OR file_owner = ?",
             [user.id, user.username, user.username]
           );
-        } catch (eAtt) { /* table may not exist yet */ }
+        } catch (eAtt) {  }
         await dbAsync.run("DELETE FROM calendar_events WHERE user_id = ?", [user.id]);
         await dbAsync.run("DELETE FROM notifications WHERE user_id = ?", [user.id]);
         await dbAsync.run("DELETE FROM admin_inbox WHERE user_id = ?", [user.id]);
@@ -753,7 +707,7 @@ setInterval(async () => {
   } catch (error) {
     console.error('Error in deletion background task:', error);
   }
-}, 60 * 1000); // Check every minute
+}, 60 * 1000);
 
 app.listen(PORT, () => {
   console.log(`Admin Service running on port ${PORT}`);

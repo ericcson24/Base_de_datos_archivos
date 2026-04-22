@@ -161,7 +161,6 @@
   transition: transform 0.2s ease;
 }
 
-/* Ensure quill fills the zoom wrapper */
 .word-zoom-wrapper > .quill {
   width: 100%;
   max-width: 816px;
@@ -195,7 +194,6 @@
   border-radius: 2px;
 }
 
-/* Bubble theme overrides for read-only view */
 .word-preview-quill .ql-container.ql-bubble {
   border: none;
 }
@@ -234,12 +232,10 @@
   vertical-align: middle;
 }
 
-/* Preserve inline-styled image dimensions (from resize module) */
 .ql-editor img[style*="width"] {
   max-width: 100% !important;
 }
 
-/* Make images clickable for resize in edit mode */
 .ql-snow .ql-editor img {
   cursor: pointer;
   transition: outline 0.15s;
@@ -250,7 +246,6 @@
   outline-offset: 2px;
 }
 
-/* Image resize module handle styles */
 .ql-editor .ql-image-resize-container {
   position: relative;
   display: inline-block;
@@ -262,7 +257,6 @@
   cursor: move;
 }
 
-/* Video embeds */
 .ql-editor .ql-video {
   width: 100%;
   max-width: 640px;
@@ -314,7 +308,6 @@
   to { transform: rotate(360deg); }
 }
 
-/* React Quill overrides */
 .quill {
   display: flex;
   flex-direction: column;
@@ -367,7 +360,6 @@
   right: 48px;
 }
 
-/* Font family dropdown - show actual font names */
 .ql-snow .ql-picker.ql-font {
   width: 150px !important;
 }
@@ -437,7 +429,6 @@
   font-family: Verdana, sans-serif;
 }
 
-/* Font size dropdown - show px values */
 .ql-snow .ql-picker.ql-size {
   width: 75px !important;
 }
@@ -479,7 +470,6 @@
 .ql-snow .ql-picker.ql-size .ql-picker-label[data-value="72px"]::before,
 .ql-snow .ql-picker.ql-size .ql-picker-item[data-value="72px"]::before { content: '72' !important; }
 
-/* Size items show in their actual size (capped) */
 .ql-snow .ql-picker.ql-size .ql-picker-item[data-value="8px"] { font-size: 8px !important; }
 .ql-snow .ql-picker.ql-size .ql-picker-item[data-value="9px"] { font-size: 9px !important; }
 .ql-snow .ql-picker.ql-size .ql-picker-item[data-value="10px"] { font-size: 10px !important; }
@@ -497,7 +487,6 @@
 .ql-snow .ql-picker.ql-size .ql-picker-item[data-value="56px"] { font-size: 19px !important; }
 .ql-snow .ql-picker.ql-size .ql-picker-item[data-value="72px"] { font-size: 20px !important; }
 
-/* Picker dropdown styling */
 .ql-snow .ql-picker.ql-expanded .ql-picker-options {
   max-height: 200px;
   overflow-y: auto;
@@ -505,7 +494,6 @@
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
 }
 
-/* Apply actual fonts in the editor */
 .ql-editor [style*="font-family: arial"] { font-family: Arial, sans-serif !important; }
 .ql-editor [style*="font-family: calibri"] { font-family: Calibri, sans-serif !important; }
 .ql-editor [style*="font-family: comic-sans"] { font-family: 'Comic Sans MS', cursive !important; }
@@ -525,7 +513,6 @@
   color: #000000 !important;
 }
 
-/* Blockquote styling */
 .ql-editor blockquote {
   border-left: 4px solid #3b82f6;
   padding: 8px 16px;
@@ -535,7 +522,6 @@
   border-radius: 0 4px 4px 0;
 }
 
-/* Code block styling */
 .ql-editor .ql-code-block-container,
 .ql-editor pre.ql-syntax,
 .ql-editor pre {
@@ -550,7 +536,6 @@
   margin: 8px 0;
 }
 
-/* Horizontal rule */
 .ql-editor hr {
   border: none;
   border-top: 2px solid #e5e7eb;
@@ -575,7 +560,6 @@
   color: #9ca3af;
 }
 
-/* Dark mode */
 [data-theme="dark"] .word-editor-container {
   background: #1f2937;
 }
@@ -708,7 +692,6 @@
   outline-color: #60a5fa;
 }
 
-/* ===== Mobile Responsive ===== */
 @media (max-width: 768px) {
   .word-toolbar {
     padding: 8px 12px;
@@ -875,7 +858,6 @@
   color: #f3f4f6;
 }
 
-/* Line height dropdown */
 .ql-snow .ql-picker.ql-lineHeight {
   width: 65px !important;
 }
@@ -895,7 +877,6 @@
 .ql-snow .ql-picker.ql-lineHeight .ql-picker-label[data-value="3"]::before,
 .ql-snow .ql-picker.ql-lineHeight .ql-picker-item[data-value="3"]::before { content: '3.0' !important; }
 
-/* Apply line heights in editor */
 .ql-editor [style*="line-height: 1"] { line-height: 1 !important; }
 .ql-editor [style*="line-height: 1.15"] { line-height: 1.15 !important; }
 .ql-editor [style*="line-height: 1.5"] { line-height: 1.5 !important; }

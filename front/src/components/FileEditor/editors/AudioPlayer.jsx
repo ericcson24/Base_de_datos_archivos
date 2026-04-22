@@ -72,7 +72,7 @@ const AudioPlayer = ({ fileUrl, file }) => {
 
   return (
     <div className="audio-player h-full flex flex-col">
-      {/* Hidden Audio Element */}
+      
       <audio
         ref={audioRef}
         src={fileUrl}
@@ -81,10 +81,10 @@ const AudioPlayer = ({ fileUrl, file }) => {
         onEnded={() => setPlaying(false)}
       />
 
-      {/* Toolbar */}
+      
       <div className="toolbar glassmorphism-strong p-4 border-b border-gray-200 dark:border-gray-700">
         <div className="flex flex-wrap gap-3 items-center">
-          {/* Playback Rate */}
+          
           <div className="tool-group flex items-center gap-2">
             <label className="text-xs font-medium text-gray-700 dark:text-gray-300">
               {t('audioPlayer.speed')}:
@@ -102,7 +102,7 @@ const AudioPlayer = ({ fileUrl, file }) => {
             </div>
           </div>
 
-          {/* Volume */}
+          
           <div className="tool-group flex items-center gap-2">
             <label className="text-xs font-medium text-gray-700 dark:text-gray-300">
               🔊 {Math.round(volume * 100)}%
@@ -118,7 +118,7 @@ const AudioPlayer = ({ fileUrl, file }) => {
             />
           </div>
 
-          {/* Actions */}
+          
           <div className="flex gap-2 ml-auto">
             <button className="btn-primary" onClick={handleDownload}>
               💾 {t('audioPlayer.download')}
@@ -127,21 +127,21 @@ const AudioPlayer = ({ fileUrl, file }) => {
         </div>
       </div>
 
-      {/* Player Area */}
+      
       <div className="flex-1 bg-gradient-to-br from-sky-500 via-cyan-500 to-teal-500 flex items-center justify-center p-8">
         <div className="text-center">
-          {/* Album Art Placeholder */}
+          
           <div className="w-64 h-64 mx-auto mb-8 rounded-2xl bg-white/20 backdrop-blur-md shadow-2xl flex items-center justify-center animate-pulse">
             <svg className="w-32 h-32 text-white" fill="currentColor" viewBox="0 0 24 24">
               <path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/>
             </svg>
           </div>
 
-          {/* File Name */}
+          
           <h2 className="text-2xl font-bold text-white mb-2">{file.name}</h2>
           <p className="text-white/80 mb-8">{t('audioPlayer.title')}</p>
 
-          {/* Large Play Button */}
+          
           <button 
             className="w-20 h-20 bg-white/30 backdrop-blur-sm rounded-full flex items-center justify-center hover:bg-white/40 transition-all mx-auto mb-8"
             onClick={togglePlay}
@@ -157,7 +157,7 @@ const AudioPlayer = ({ fileUrl, file }) => {
             )}
           </button>
 
-          {/* Progress */}
+          
           <div className="max-w-md mx-auto">
             <div className="flex items-center gap-3 text-white">
               <span className="text-sm min-w-[45px]">{formatTime(currentTime)}</span>

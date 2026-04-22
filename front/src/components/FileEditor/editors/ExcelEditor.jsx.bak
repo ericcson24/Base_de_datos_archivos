@@ -27,14 +27,14 @@ const ExcelEditor = ({ fileUrl, fileBlob, file, onClose, onFileSaved }) => {
       let isEmpty = false;
 
       if (fileBlob) {
-        console.log('📊 [ExcelEditor] Loading from blob, size:', fileBlob.size);
+        console.log('[Chart] [ExcelEditor] Loading from blob, size:', fileBlob.size);
         if (fileBlob.size === 0) {
           isEmpty = true;
         } else {
           arrayBuffer = await fileBlob.arrayBuffer();
         }
       } else if (fileUrl) {
-        console.log('📊 [ExcelEditor] Loading from URL');
+        console.log('[Chart] [ExcelEditor] Loading from URL');
         const token = getAuthToken();
         const response = await fetch(fileUrl, {
           headers: {
@@ -54,7 +54,7 @@ const ExcelEditor = ({ fileUrl, fileBlob, file, onClose, onFileSaved }) => {
       }
 
       if (isEmpty) {
-        console.log('📊 [ExcelEditor] Empty file - creating new workbook');
+        console.log('[Chart] [ExcelEditor] Empty file - creating new workbook');
         const newWb = XLSX.utils.book_new();
         const ws = XLSX.utils.aoa_to_sheet([['']]);
         XLSX.utils.book_append_sheet(newWb, ws, 'Hoja1');

@@ -5,7 +5,6 @@ import { useLanguage } from '../../../context/LanguageContext';
 import { useToast } from '../../../context/ToastContext';
 import './PowerPointEditor.css';
 
-// ── Background presets for slides ──
 const SLIDE_BACKGROUNDS = [
   { id: 'white', label: 'White', css: '#ffffff', hex: 'FFFFFF' },
   { id: 'light-gray', label: 'Light Gray', css: '#f3f4f6', hex: 'F3F4F6' },
@@ -34,14 +33,12 @@ const PowerPointEditor = ({ fileUrl, fileBlob, file, onClose, onFileSaved }) => 
   const { t } = useLanguage();
   const { addToast } = useToast();
 
-  // ─── Core state ───
   const [slides, setSlides] = useState([DEFAULT_SLIDE()]);
   const [activeSlide, setActiveSlide] = useState(0);
   const [loading, setLoading] = useState(true);
   const [isEditing, setIsEditing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
 
-  // ─── UI state ───
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [isPresentationMode, setIsPresentationMode] = useState(false);
   const [zoom, setZoom] = useState(100);
@@ -50,13 +47,9 @@ const PowerPointEditor = ({ fileUrl, fileBlob, file, onClose, onFileSaved }) => 
   const [dragIndex, setDragIndex] = useState(null);
   const [dragOverIndex, setDragOverIndex] = useState(null);
 
-  // ─── Refs ───
   const containerRef = useRef(null);
   const presentationRef = useRef(null);
 
-  // ═══════════════════════════════════════════
-  //  COMPUTED
-  // ═══════════════════════════════════════════
 
   const currentSlide = slides[activeSlide] || DEFAULT_SLIDE();
   const slideCount = slides.length;
@@ -66,9 +59,6 @@ const PowerPointEditor = ({ fileUrl, fileBlob, file, onClose, onFileSaved }) => 
     return bg === 'dark' || bg === 'navy';
   }, [currentSlide.background]);
 
-  // ═══════════════════════════════════════════
-  //  FULLSCREEN & ZOOM
-  // ═══════════════════════════════════════════
 
   const toggleFullscreen = () => {
     if (!document.fullscreenElement) {
@@ -88,9 +78,6 @@ const PowerPointEditor = ({ fileUrl, fileBlob, file, onClose, onFileSaved }) => 
   const handleZoomOut = () => setZoom(prev => Math.max(prev - 10, 50));
   const handleZoomReset = () => setZoom(100);
 
-  // ═══════════════════════════════════════════
-  //  PRESENTATION MODE
-  // ═══════════════════════════════════════════
 
   const startPresentation = () => {
     setIsPresentationMode(true);
@@ -119,12 +106,8 @@ const PowerPointEditor = ({ fileUrl, fileBlob, file, onClose, onFileSaved }) => 
     };
     window.addEventListener('keydown', handleKey);
     return () => window.removeEventListener('keydown', handleKey);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isPresentationMode, slides.length]);
 
-  // ═══════════════════════════════════════════
-  //  LOAD PRESENTATION
-  // ═══════════════════════════════════════════
 
   const loadPresentation = useCallback(async () => {
     try {
@@ -162,7 +145,6 @@ const PowerPointEditor = ({ fileUrl, fileBlob, file, onClose, onFileSaved }) => 
         return;
       }
 
-      // Try to read as real .pptx (OOXML zip)
       try {
         const zip = await JSZip.loadAsync(arrayBuffer);
         const loadedSlides = [];
@@ -180,18 +162,15 @@ const PowerPointEditor = ({ fileUrl, fileBlob, file, onClose, onFileSaved }) => 
           let titleColor = '#1e3a5f', contentColor = '#333333';
           let titleAlign = 'center', contentAlign = 'left';
 
-          // Parse all shapes with formatting detection
           for (let s = 0; s < spNodes.length; s++) {
             const sp = spNodes[s];
 
-            // Detect placeholder type (title, body, subtitle, etc.)
             const phNodes = sp.getElementsByTagName('p:ph');
             let phType = null;
             if (phNodes.length > 0) {
               phType = phNodes[0].getAttribute('type') || 'body';
             }
 
-            // Extract text with formatting from <p:txBody>
             const txBody = sp.getElementsByTagName('p:txBody');
             if (txBody.length === 0) continue;
 
@@ -206,7 +185,6 @@ const PowerPointEditor = ({ fileUrl, fileBlob, file, onClose, onFileSaved }) => 
               const para = paragraphs[p];
               if (para.nodeName !== 'a:p') continue;
 
-              // Read paragraph alignment
               const pPrs = para.getElementsByTagName('a:pPr');
               if (pPrs.length > 0) {
                 const algn = pPrs[0].getAttribute('algn');
@@ -215,18 +193,15 @@ const PowerPointEditor = ({ fileUrl, fileBlob, file, onClose, onFileSaved }) => 
                 }
               }
 
-              // Read text runs with formatting
               let paraText = '';
               const runs = para.getElementsByTagName('a:r');
               for (let r = 0; r < runs.length; r++) {
                 const run = runs[r];
-                // Read run properties for font size and color
                 const rPrs = run.getElementsByTagName('a:rPr');
                 if (rPrs.length > 0) {
                   const rPr = rPrs[0];
                   const sz = rPr.getAttribute('sz');
                   if (sz && !detectedSize) detectedSize = Math.round(parseInt(sz) / 100);
-                  // Color from solidFill > srgbClr
                   const fills = rPr.getElementsByTagName('a:solidFill');
                   if (fills.length > 0) {
                     const srgbEl = fills[0].getElementsByTagName('a:srgbClr');
@@ -241,7 +216,6 @@ const PowerPointEditor = ({ fileUrl, fileBlob, file, onClose, onFileSaved }) => 
                 }
               }
 
-              // Also check for <a:fld> (field) text like slide numbers
               const fields = para.getElementsByTagName('a:fld');
               for (let f = 0; f < fields.length; f++) {
                 const textNodes = fields[f].getElementsByTagName('a:t');
@@ -257,7 +231,6 @@ const PowerPointEditor = ({ fileUrl, fileBlob, file, onClose, onFileSaved }) => 
 
             if (!shapeText.trim()) continue;
 
-            // Categorize: title or content based on placeholder type
             const isTitle = phType === 'title' || phType === 'ctrTitle';
             if (isTitle && !title) {
               title = shapeText;
@@ -273,14 +246,12 @@ const PowerPointEditor = ({ fileUrl, fileBlob, file, onClose, onFileSaved }) => 
             }
           }
 
-          // Fallback: if no title detected via placeholder, use first shape text
           if (!title && content) {
             const lines = content.split('\n');
             title = lines[0];
             content = lines.slice(1).join('\n');
           }
 
-          // Detect background (solid fills and gradients)
           let bg = 'white';
           const bgPr = xmlDoc.getElementsByTagName('p:bg');
           if (bgPr.length > 0) {
@@ -296,7 +267,6 @@ const PowerPointEditor = ({ fileUrl, fileBlob, file, onClose, onFileSaved }) => 
                 if (rv + gv + bv < 200) bg = 'dark';
               }
             }
-            // Check gradient fill
             const gradFill = bgPr[0].getElementsByTagName('a:gradFill');
             if (gradFill.length > 0 && bg === 'white') {
               const gsLst = gradFill[0].getElementsByTagName('a:gs');
@@ -334,7 +304,6 @@ const PowerPointEditor = ({ fileUrl, fileBlob, file, onClose, onFileSaved }) => 
         console.log('[PowerPointEditor] Not a valid zip/pptx, trying HTML fallback');
       }
 
-      // Fallback: HTML format
       try {
         const htmlText = new TextDecoder().decode(arrayBuffer);
         if (htmlText && htmlText.includes('<!DOCTYPE html>')) {
@@ -357,7 +326,6 @@ const PowerPointEditor = ({ fileUrl, fileBlob, file, onClose, onFileSaved }) => 
         console.log('[PowerPointEditor] Not HTML format');
       }
 
-      // If nothing worked
       const first = DEFAULT_SLIDE();
       first.title = t('powerPointEditor.slideTitle', { num: 1 });
       setSlides([first]);
@@ -370,14 +338,10 @@ const PowerPointEditor = ({ fileUrl, fileBlob, file, onClose, onFileSaved }) => 
     } finally {
       setLoading(false);
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fileBlob, fileUrl]);
 
   useEffect(() => { loadPresentation(); }, [loadPresentation]);
 
-  // ═══════════════════════════════════════════
-  //  SLIDE OPERATIONS
-  // ═══════════════════════════════════════════
 
   const updateSlide = (index, field, value) => {
     const newSlides = slides.map((s, i) => i === index ? { ...s, [field]: value } : s);
@@ -424,7 +388,6 @@ const PowerPointEditor = ({ fileUrl, fileBlob, file, onClose, onFileSaved }) => 
     setActiveSlide(to);
   };
 
-  // ─── Drag & drop for slide reorder ───
   const handleDragStart = (index) => {
     setDragIndex(index);
   };
@@ -448,14 +411,10 @@ const PowerPointEditor = ({ fileUrl, fileBlob, file, onClose, onFileSaved }) => 
     setDragOverIndex(null);
   };
 
-  // ═══════════════════════════════════════════
-  //  KEYBOARD NAVIGATION
-  // ═══════════════════════════════════════════
 
   useEffect(() => {
-    if (isPresentationMode) return; // handled separately
+    if (isPresentationMode) return;
     const handleKey = (e) => {
-      // Only handle when not typing in an input
       const tag = e.target.tagName;
       if (tag === 'INPUT' || tag === 'TEXTAREA') return;
 
@@ -473,12 +432,8 @@ const PowerPointEditor = ({ fileUrl, fileBlob, file, onClose, onFileSaved }) => 
     };
     window.addEventListener('keydown', handleKey);
     return () => window.removeEventListener('keydown', handleKey);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isPresentationMode, slides.length]);
 
-  // ═══════════════════════════════════════════
-  //  DOWNLOAD & PRINT
-  // ═══════════════════════════════════════════
 
   const handleDownload = async () => {
     const blob = await generatePptxBlob();
@@ -510,9 +465,6 @@ const PowerPointEditor = ({ fileUrl, fileBlob, file, onClose, onFileSaved }) => 
     setTimeout(() => printWin.print(), 300);
   };
 
-  // ═══════════════════════════════════════════
-  //  SAVE (OOXML .pptx)
-  // ═══════════════════════════════════════════
 
   const generatePptxBlob = async () => {
     const esc = (str) => String(str || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
@@ -522,7 +474,6 @@ const PowerPointEditor = ({ fileUrl, fileBlob, file, onClose, onFileSaved }) => 
     const CY = 6858000;
     const numSlides = slides.length;
 
-    // [Content_Types].xml
     let ctOverrides = '';
     for (let i = 1; i <= numSlides; i++) {
       ctOverrides += `<Override PartName="/ppt/slides/slide${i}.xml" ContentType="application/vnd.openxmlformats-officedocument.presentationml.slide+xml"/>`;
@@ -595,7 +546,6 @@ const PowerPointEditor = ({ fileUrl, fileBlob, file, onClose, onFileSaved }) => 
       `<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">${presRelsArr.join('')}</Relationships>`
     );
 
-    // theme1.xml (same as before — abbreviated for readability)
     ppt.folder('theme').file('theme1.xml',
       `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>` +
       `<a:theme xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" name="Office Theme">` +
@@ -619,7 +569,6 @@ const PowerPointEditor = ({ fileUrl, fileBlob, file, onClose, onFileSaved }) => 
       `</a:fmtScheme></a:themeElements><a:objectDefaults/><a:extraClrSchemeLst/></a:theme>`
     );
 
-    // slideMaster + slideLayout (same structure as before)
     const smFolder = ppt.folder('slideMasters');
     smFolder.file('slideMaster1.xml',
       `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>` +
@@ -658,7 +607,6 @@ const PowerPointEditor = ({ fileUrl, fileBlob, file, onClose, onFileSaved }) => 
       `</Relationships>`
     );
 
-    // ── Slides ──
     const slideFolder = ppt.folder('slides');
     const slideRelsFolder = slideFolder.folder('_rels');
 
@@ -666,14 +614,12 @@ const PowerPointEditor = ({ fileUrl, fileBlob, file, onClose, onFileSaved }) => 
       let spId = 2;
       let shapes = '';
 
-      // Background
       const bgObj = SLIDE_BACKGROUNDS.find(b => b.id === slide.background) || SLIDE_BACKGROUNDS[0];
       let bgXml = '';
       if (slide.background !== 'white') {
         bgXml = `<p:bg><p:bgPr><a:solidFill><a:srgbClr val="${bgObj.hex}"/></a:solidFill><a:effectLst/></p:bgPr></p:bg>`;
       }
 
-      // Title
       const titleText = slide.title || '';
       const titleColorHex = (slide.titleColor || '#1E3A5F').replace('#', '');
       const titleSz = (slide.titleSize || 36) * 100;
@@ -689,7 +635,6 @@ const PowerPointEditor = ({ fileUrl, fileBlob, file, onClose, onFileSaved }) => 
         spId++;
       }
 
-      // Content
       const contentText = slide.content || '';
       const contentColorHex = (slide.contentColor || '#333333').replace('#', '');
       const contentSz = (slide.contentSize || 18) * 100;
@@ -766,9 +711,6 @@ const PowerPointEditor = ({ fileUrl, fileBlob, file, onClose, onFileSaved }) => 
     }
   };
 
-  // ═══════════════════════════════════════════
-  //  RENDER: PRESENTATION MODE
-  // ═══════════════════════════════════════════
 
   if (isPresentationMode) {
     const slide = slides[activeSlide] || DEFAULT_SLIDE();
@@ -793,15 +735,12 @@ const PowerPointEditor = ({ fileUrl, fileBlob, file, onClose, onFileSaved }) => 
         </div>
         <div className="ppt-presentation-bar">
           <span>{activeSlide + 1} / {slideCount}</span>
-          <button onClick={(e) => { e.stopPropagation(); stopPresentation(); }}>✕ {t('powerPointEditor.exitPresentation')}</button>
+          <button onClick={(e) => { e.stopPropagation(); stopPresentation(); }}>x {t('powerPointEditor.exitPresentation')}</button>
         </div>
       </div>
     );
   }
 
-  // ═══════════════════════════════════════════
-  //  RENDER: LOADING
-  // ═══════════════════════════════════════════
 
   if (loading) {
     return (
@@ -814,16 +753,13 @@ const PowerPointEditor = ({ fileUrl, fileBlob, file, onClose, onFileSaved }) => 
     );
   }
 
-  // ═══════════════════════════════════════════
-  //  SLIDE SORTER VIEW
-  // ═══════════════════════════════════════════
 
   if (showSlideSorter) {
     return (
       <div className="ppt-editor" ref={containerRef}>
         <div className="ppt-toolbar">
           <div className="ppt-toolbar-left">
-            <h3>📽️ {file.name}</h3>
+            <h3>[Slides] {file.name}</h3>
           </div>
           <div className="ppt-toolbar-right">
             <button className="ppt-btn" onClick={() => setShowSlideSorter(false)}>
@@ -858,9 +794,6 @@ const PowerPointEditor = ({ fileUrl, fileBlob, file, onClose, onFileSaved }) => 
     );
   }
 
-  // ═══════════════════════════════════════════
-  //  RENDER: MAIN EDITOR
-  // ═══════════════════════════════════════════
 
   const bgObj = SLIDE_BACKGROUNDS.find(b => b.id === currentSlide.background) || SLIDE_BACKGROUNDS[0];
   const slideBgStyle = bgObj.css.startsWith('linear') ? { background: bgObj.css } : { backgroundColor: bgObj.css };
@@ -868,10 +801,10 @@ const PowerPointEditor = ({ fileUrl, fileBlob, file, onClose, onFileSaved }) => 
 
   return (
     <div className={`ppt-editor ${isFullscreen ? 'fullscreen' : ''}`} ref={containerRef}>
-      {/* ─── Toolbar ─── */}
+      
       <div className="ppt-toolbar">
         <div className="ppt-toolbar-left">
-          <h3>📽️ {file.name}</h3>
+          <h3>[Slides] {file.name}</h3>
         </div>
         <div className="ppt-toolbar-right">
           <button className="ppt-btn" onClick={startPresentation} title={`${t('powerPointEditor.present')} (F5)`}>
@@ -905,7 +838,7 @@ const PowerPointEditor = ({ fileUrl, fileBlob, file, onClose, onFileSaved }) => 
       </div>
 
       <div className="ppt-main">
-        {/* ─── Slides Sidebar ─── */}
+        
         <div className="ppt-sidebar">
           <div className="ppt-sidebar-list">
             {slides.map((slide, index) => {
@@ -955,9 +888,9 @@ const PowerPointEditor = ({ fileUrl, fileBlob, file, onClose, onFileSaved }) => 
           )}
         </div>
 
-        {/* ─── Slide Canvas ─── */}
+        
         <div className="ppt-canvas-area">
-          {/* Format bar (when editing) */}
+          
           {isEditing && (
             <div className="ppt-format-bar">
               <div className="ppt-format-group">
@@ -999,7 +932,7 @@ const PowerPointEditor = ({ fileUrl, fileBlob, file, onClose, onFileSaved }) => 
                       className={`ppt-align-btn ${currentSlide.titleAlign === a ? 'active' : ''}`}
                       onClick={() => updateSlide(activeSlide, 'titleAlign', a)}
                     >
-                      {a === 'left' ? '⫷' : a === 'center' ? '☰' : '⫸'}
+                      {a === 'left' ? '⫷' : a === 'center' ? '[Menu]' : '⫸'}
                     </button>
                   ))}
                 </div>
@@ -1029,7 +962,7 @@ const PowerPointEditor = ({ fileUrl, fileBlob, file, onClose, onFileSaved }) => 
                       className={`ppt-align-btn ${currentSlide.contentAlign === a ? 'active' : ''}`}
                       onClick={() => updateSlide(activeSlide, 'contentAlign', a)}
                     >
-                      {a === 'left' ? '⫷' : a === 'center' ? '☰' : '⫸'}
+                      {a === 'left' ? '⫷' : a === 'center' ? '[Menu]' : '⫸'}
                     </button>
                   ))}
                 </div>
@@ -1040,7 +973,7 @@ const PowerPointEditor = ({ fileUrl, fileBlob, file, onClose, onFileSaved }) => 
                   📄 {t('powerPointEditor.duplicate')}
                 </button>
                 <button className="ppt-format-btn" onClick={() => setShowNotes(!showNotes)} title={t('powerPointEditor.notes')}>
-                  📝 {t('powerPointEditor.notes')}
+                  [Text] {t('powerPointEditor.notes')}
                 </button>
               </div>
             </div>
@@ -1048,7 +981,7 @@ const PowerPointEditor = ({ fileUrl, fileBlob, file, onClose, onFileSaved }) => 
 
           <div className="ppt-canvas-scroll">
             <div className="ppt-canvas-zoom" style={{ transform: `scale(${zoom / 100})`, transformOrigin: 'top center' }}>
-              {/* The slide itself */}
+              
               <div className="ppt-slide" style={slideBgStyle} ref={presentationRef}>
                 {isEditing ? (
                   <>
@@ -1104,12 +1037,12 @@ const PowerPointEditor = ({ fileUrl, fileBlob, file, onClose, onFileSaved }) => 
             </div>
           </div>
 
-          {/* Speaker Notes */}
+          
           {showNotes && isEditing && (
             <div className="ppt-notes-panel">
               <div className="ppt-notes-header">
-                <span>📝 {t('powerPointEditor.speakerNotes')}</span>
-                <button onClick={() => setShowNotes(false)}>✕</button>
+                <span>[Text] {t('powerPointEditor.speakerNotes')}</span>
+                <button onClick={() => setShowNotes(false)}>x</button>
               </div>
               <textarea
                 className="ppt-notes-input"
@@ -1122,11 +1055,11 @@ const PowerPointEditor = ({ fileUrl, fileBlob, file, onClose, onFileSaved }) => 
         </div>
       </div>
 
-      {/* ─── Status Bar ─── */}
+      
       <div className="ppt-status-bar">
         <div className="ppt-status-left">
           <span>{t('powerPointEditor.slideLabel')} {activeSlide + 1} / {slideCount}</span>
-          <span>•</span>
+          <span>*</span>
           <span>{currentSlide.background !== 'white' ? `🎨 ${bgObj.label}` : ''}</span>
         </div>
         <div className="ppt-status-right">

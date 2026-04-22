@@ -47,7 +47,6 @@ const initDatabase = async () => {
       const client = await pool.connect();
       console.log('[windows-service] Connected to PostgreSQL');
 
-      // Create windows_user_links table
       await client.query(`
         CREATE TABLE IF NOT EXISTS windows_user_links (
           id SERIAL PRIMARY KEY,

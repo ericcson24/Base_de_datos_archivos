@@ -3,9 +3,9 @@ import { useLanguage } from '../../context/LanguageContext';
 
 const FILE_TYPE_ICONS = {
   text: '📄',
-  word: '📝',
-  excel: '📊',
-  powerpoint: '📽️'
+  word: '[Text]',
+  excel: '[Chart]',
+  powerpoint: '[Slides]'
 };
 
 const CreateFileModal = ({ isOpen, onClose, onCreateFile, defaultName, fileType }) => {
@@ -16,7 +16,6 @@ const CreateFileModal = ({ isOpen, onClose, onCreateFile, defaultName, fileType 
   useEffect(() => {
     if (isOpen) {
       setFileName(defaultName || '');
-      // Focus and select the name part (without extension)
       setTimeout(() => {
         if (inputRef.current) {
           inputRef.current.focus();

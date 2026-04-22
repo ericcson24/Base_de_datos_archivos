@@ -1,23 +1,6 @@
 import React from 'react';
 
 /**
- * SVG Folder Icon - consistent across all platforms.
- * Supports custom color and size.
- * 
- * Icon options:
- *  - 'default'  : classic folder
- *  - 'open'     : open folder
- *  - 'star'     : folder with star
- *  - 'heart'    : folder with heart
- *  - 'lock'     : folder with lock
- *  - 'shared'   : folder with share icon
- *  - 'music'    : folder with music note
- *  - 'photos'   : folder with image icon
- *  - 'docs'     : folder with document
- *  - 'code'     : folder with code brackets
- *  - 'download' : folder with down arrow
- *  - 'work'     : folder with briefcase
- */
 
 const FOLDER_ICONS = {
   default: null,
@@ -84,10 +67,8 @@ const FOLDER_ICONS = {
 };
 
 const FolderIcon = ({ color = '#5f9ee9', icon = 'default', size = 24, className = '' }) => {
-  // Ensure color is valid
   const folderColor = color || '#5f9ee9';
   
-  // Darken the color slightly for the tab
   const darken = (hex, amount = 0.15) => {
     const num = parseInt(hex.replace('#', ''), 16);
     const r = Math.max(0, (num >> 16) - Math.round(255 * amount));
@@ -108,32 +89,31 @@ const FolderIcon = ({ color = '#5f9ee9', icon = 'default', size = 24, className 
       style={{ display: 'inline-block', verticalAlign: 'middle', flexShrink: 0 }}
       xmlns="http://www.w3.org/2000/svg"
     >
-      {/* Folder tab */}
+      
       <path
         d="M1 4 C1 2.9 1.9 2 3 2 L9 2 C9.6 2 10.1 2.3 10.4 2.7 L11.6 4.3 C11.9 4.7 12.4 5 13 5 L21 5 C22.1 5 23 5.9 23 7 L23 7 L1 7 Z"
         fill={tabColor}
       />
-      {/* Folder body */}
+      
       <rect
         x="1" y="6"
         width="22" height="13"
         rx="2" ry="2"
         fill={folderColor}
       />
-      {/* Subtle highlight */}
+      
       <rect
         x="1" y="6"
         width="22" height="3"
         rx="2" ry="0"
         fill="rgba(255,255,255,0.12)"
       />
-      {/* Optional overlay icon */}
+      
       {overlay}
     </svg>
   );
 };
 
-// Available colors for the color picker
 export const FOLDER_COLORS = [
   { name: 'Azul', value: '#5f9ee9' },
   { name: 'Azul oscuro', value: '#4a7cc4' },
@@ -149,7 +129,6 @@ export const FOLDER_COLORS = [
   { name: 'Negro', value: '#4a5568' },
 ];
 
-// Available icon options
 export const FOLDER_ICON_OPTIONS = [
   { name: 'Por defecto', value: 'default' },
   { name: 'Estrella', value: 'star' },

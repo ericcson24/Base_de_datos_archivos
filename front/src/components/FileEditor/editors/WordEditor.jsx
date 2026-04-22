@@ -8,7 +8,6 @@ import { useLanguage } from '../../../context/LanguageContext';
 import { useToast } from '../../../context/ToastContext';
 import './WordEditor.css';
 
-// Register custom font sizes for Quill
 const Size = Quill.import('attributors/style/size');
 Size.whitelist = [
   '8px', '9px', '10px', '11px', '12px', '14px', '16px', '18px',
@@ -16,7 +15,6 @@ Size.whitelist = [
 ];
 Quill.register(Size, true);
 
-// Register custom font families for Quill
 const Font = Quill.import('attributors/style/font');
 Font.whitelist = [
   'arial', 'calibri', 'comic-sans', 'courier-new', 'georgia',
@@ -25,7 +23,6 @@ Font.whitelist = [
 ];
 Quill.register(Font, true);
 
-// Register custom line heights for Quill
 const Parchment = Quill.import('parchment');
 const LineHeightStyle = new Parchment.Attributor.Style('lineHeight', 'line-height', {
   scope: Parchment.Scope.BLOCK,
@@ -33,7 +30,6 @@ const LineHeightStyle = new Parchment.Attributor.Style('lineHeight', 'line-heigh
 });
 Quill.register(LineHeightStyle, true);
 
-// Extend Image blot to preserve width, height, and style attributes through Delta round-trips
 const ImageBlot = Quill.import('formats/image');
 class StyledImage extends ImageBlot {
   static formats(domNode) {
@@ -186,13 +182,10 @@ const WordEditor = ({ fileUrl, fileBlob, file, onClose, onFileSaved, highlightTe
         return;
       }
 
-      // Determine if this is a real .docx (ZIP) or HTML-based file
-      // Check ZIP magic bytes: PK (0x50, 0x4B)
       const headerBytes = new Uint8Array(arrayBuffer.slice(0, 4));
       const isZip = headerBytes[0] === 0x50 && headerBytes[1] === 0x4B;
 
       if (isZip) {
-        // Real .docx file — go straight to Mammoth
         console.log('[WordEditor] Detected ZIP/.docx format, using Mammoth');
         try {
           const options = {
@@ -219,7 +212,6 @@ const WordEditor = ({ fileUrl, fileBlob, file, onClose, onFileSaved, highlightTe
           };
           let result = await mammoth.convertToHtml({ arrayBuffer }, options);
 
-          // Post-process: ensure all images have proper max-width style
           if (result.value) {
             result = {
               ...result,
@@ -247,11 +239,9 @@ const WordEditor = ({ fileUrl, fileBlob, file, onClose, onFileSaved, highlightTe
           addToast(t('wordEditor.docxReadError'), 'error', 5000);
         }
       } else {
-        // Not a ZIP — try HTML / MHT text formats
         try {
           const htmlText = new TextDecoder().decode(arrayBuffer);
 
-          // Check if HTML
           if (htmlText && htmlText.includes('<!DOCTYPE html>')) {
             console.log('[WordEditor] File is HTML format, extracting body content');
             const parser = new DOMParser();
@@ -269,7 +259,6 @@ const WordEditor = ({ fileUrl, fileBlob, file, onClose, onFileSaved, highlightTe
             }
           }
 
-          // Check MHT format
           if (htmlText.includes('Content-Type: text/html')) {
             console.log('[WordEditor] Detected MHT format, extracting content');
             const lines = htmlText.split('\n');
@@ -300,7 +289,6 @@ const WordEditor = ({ fileUrl, fileBlob, file, onClose, onFileSaved, highlightTe
             }
           }
 
-          // Plain text fallback — just wrap in a paragraph
           if (htmlText && htmlText.trim().length > 0) {
             console.log('[WordEditor] Treating as plain text');
             setContent(`<p>${htmlText.replace(/\n/g, '<br>')}</p>`);
@@ -330,13 +318,11 @@ const WordEditor = ({ fileUrl, fileBlob, file, onClose, onFileSaved, highlightTe
     loadDocument();
   }, [loadDocument]);
 
-  // Setup image paste handler and custom image insertion
   useEffect(() => {
     if (!isEditing || !quillRef.current) return;
     const quill = quillRef.current.getEditor();
     if (!quill) return;
 
-    // Custom image handler for toolbar button
     const toolbar = quill.getModule('toolbar');
     if (toolbar) {
       toolbar.addHandler('image', () => {
@@ -353,7 +339,6 @@ const WordEditor = ({ fileUrl, fileBlob, file, onClose, onFileSaved, highlightTe
             img.onload = () => {
               const range = quill.getSelection(true);
               quill.insertEmbed(range.index, 'image', e.target.result);
-              // After inserting, set the width/height via DOM
               setTimeout(() => {
                 const editor = quill.root;
                 const images = editor.querySelectorAll('img[src^="data:"]');
@@ -381,7 +366,6 @@ const WordEditor = ({ fileUrl, fileBlob, file, onClose, onFileSaved, highlightTe
       });
     }
 
-    // Handle paste events for images
     const handlePaste = (e) => {
       const clipboardData = e.clipboardData;
       if (!clipboardData || !clipboardData.items) return;
@@ -429,9 +413,6 @@ const WordEditor = ({ fileUrl, fileBlob, file, onClose, onFileSaved, highlightTe
 
     quill.root.addEventListener('paste', handlePaste);
 
-    // ── Image Resize System ──
-    // We use a floating overlay positioned relative to the scroll container (.word-content)
-    // instead of inside ql-editor, to avoid Quill interfering with our DOM.
     let activeImg = null;
     let resizeOverlay = null;
 
@@ -453,7 +434,6 @@ const WordEditor = ({ fileUrl, fileBlob, file, onClose, onFileSaved, highlightTe
         removeOverlay();
         quill.deleteText(index, 1);
       } else {
-        // Fallback: remove DOM node directly
         activeImg.remove();
         removeOverlay();
       }
@@ -491,7 +471,6 @@ const WordEditor = ({ fileUrl, fileBlob, file, onClose, onFileSaved, highlightTe
       const scrollParent = quill.root.closest('.word-content');
       if (!scrollParent) return;
 
-      // Ensure scroll parent is positioned
       if (getComputedStyle(scrollParent).position === 'static') {
         scrollParent.style.position = 'relative';
       }
@@ -500,7 +479,6 @@ const WordEditor = ({ fileUrl, fileBlob, file, onClose, onFileSaved, highlightTe
       overlay.className = 'img-resize-overlay';
       overlay.style.cssText = 'position:absolute;border:2px solid #3b82f6;box-sizing:border-box;z-index:100;pointer-events:none;';
 
-      // Corner handles (all 4 corners)
       const corners = ['nw', 'ne', 'sw', 'se'];
       corners.forEach(corner => {
         const h = document.createElement('div');
@@ -546,7 +524,6 @@ const WordEditor = ({ fileUrl, fileBlob, file, onClose, onFileSaved, highlightTe
             img.setAttribute('width', newW);
             img.setAttribute('height', newH);
             updateOverlayPosition();
-            // Update size label
             const lbl = overlay.querySelector('.img-resize-label');
             if (lbl) lbl.textContent = `${newW} × ${newH}`;
           };
@@ -561,14 +538,12 @@ const WordEditor = ({ fileUrl, fileBlob, file, onClose, onFileSaved, highlightTe
         });
       });
 
-      // Size label
       const label = document.createElement('div');
       label.className = 'img-resize-label';
       label.style.cssText = 'position:absolute;bottom:-24px;left:50%;transform:translateX(-50%);background:rgba(0,0,0,0.75);color:#fff;font-size:11px;padding:2px 8px;border-radius:4px;pointer-events:none;white-space:nowrap;font-family:monospace;';
       label.textContent = `${img.offsetWidth || img.naturalWidth} × ${img.offsetHeight || img.naturalHeight}`;
       overlay.appendChild(label);
 
-      // Delete button
       const deleteBtn = document.createElement('button');
       deleteBtn.className = 'img-resize-delete-btn';
       deleteBtn.style.cssText = 'position:absolute;top:-14px;right:-14px;width:28px;height:28px;background:#ef4444;color:#fff;border:2px solid #fff;border-radius:50%;font-size:16px;line-height:1;cursor:pointer;pointer-events:all;z-index:102;display:flex;align-items:center;justify-content:center;box-shadow:0 2px 6px rgba(0,0,0,0.3);transition:background 0.15s;';
@@ -598,7 +573,6 @@ const WordEditor = ({ fileUrl, fileBlob, file, onClose, onFileSaved, highlightTe
       }
     };
 
-    // Use mousedown on document to also catch clicks outside editor
     const handleDocClick = (e) => {
       if (resizeOverlay && !resizeOverlay.contains(e.target)) {
         const img = e.target.closest ? e.target.closest('img') : null;
@@ -632,17 +606,13 @@ const WordEditor = ({ fileUrl, fileBlob, file, onClose, onFileSaved, highlightTe
   const generateDocxBlob = async () => {
     const htmlContent = content;
 
-    // Helper to XML-escape text
     const esc = (str) => String(str || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 
-    // Parse HTML to extract text and images
     const parser = new DOMParser();
     const doc = parser.parseFromString(`<div>${htmlContent}</div>`, 'text/html');
 
-    // Collect images (base64 data URIs) for embedding
-    const images = []; // { rId, data (Uint8Array), ext, cx, cy, node }
+    const images = [];
 
-    // Pre-process images to get their actual dimensions
     const imgNodes = doc.querySelectorAll('img');
     for (let i = 0; i < imgNodes.length; i++) {
       const node = imgNodes[i];
@@ -661,7 +631,6 @@ const WordEditor = ({ fileUrl, fileBlob, file, onClose, onFileSaved, highlightTe
       }
     }
 
-    // Convert a base64 data URI to Uint8Array
     const dataUriToBytes = (dataUri) => {
       const base64 = dataUri.split(',')[1];
       const binary = atob(base64);
@@ -678,16 +647,13 @@ const WordEditor = ({ fileUrl, fileBlob, file, onClose, onFileSaved, highlightTe
       return 'jpeg';
     };
 
-    // Helper: parse CSS color to hex (for OOXML)
     const colorToHex = (color) => {
       if (!color) return null;
-      // Already hex
       if (/^#[0-9a-f]{6}$/i.test(color)) return color.slice(1).toUpperCase();
       if (/^#[0-9a-f]{3}$/i.test(color)) {
         const r = color[1], g = color[2], b = color[3];
         return (r+r+g+g+b+b).toUpperCase();
       }
-      // rgb(r,g,b)
       const m = color.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/);
       if (m) {
         const hex = (n) => parseInt(n).toString(16).padStart(2, '0');
@@ -696,22 +662,17 @@ const WordEditor = ({ fileUrl, fileBlob, file, onClose, onFileSaved, highlightTe
       return null;
     };
 
-    // Helper: parse font-size CSS value to OOXML half-point size
     const cssSizeToHalfPt = (size) => {
       if (!size) return null;
       const px = parseFloat(size);
       if (isNaN(px)) return null;
-      // 1px ≈ 0.75pt, OOXML uses half-points
       return String(Math.round(px * 0.75 * 2));
     };
 
-    // Helper: clean font family name from CSS value
     const cleanFontFamily = (font) => {
       if (!font) return null;
-      // take first family, strip quotes
       const first = font.split(',')[0].trim().replace(/['"]/g, '');
       if (!first) return null;
-      // Map CSS names back to proper names
       const map = {
         'arial': 'Arial', 'calibri': 'Calibri', 'comic-sans': 'Comic Sans MS',
         'courier-new': 'Courier New', 'georgia': 'Georgia', 'helvetica': 'Helvetica',
@@ -721,7 +682,6 @@ const WordEditor = ({ fileUrl, fileBlob, file, onClose, onFileSaved, highlightTe
       return map[first.toLowerCase()] || first;
     };
 
-    // Build OOXML paragraph runs from inline nodes
     const runXml = (el) => {
       let xml = '';
       el.childNodes.forEach(node => {
@@ -737,9 +697,8 @@ const WordEditor = ({ fileUrl, fileBlob, file, onClose, onFileSaved, highlightTe
           const isLink = el.closest('a') !== null || el.tagName?.toLowerCase() === 'a';
           const isCode = el.closest('code') !== null || el.tagName?.toLowerCase() === 'code';
 
-          // Collect font/size/color from inline styles walking up the tree
           let fontFamily = isCode ? 'Courier New' : 'Calibri';
-          let fontSize = '24'; // half-points = 12pt
+          let fontSize = '24';
           let fontColor = isLink ? '0563C1' : null;
           if (isLink) underline = true;
           let bgColor = isCode ? 'f3f4f6' : null;
@@ -769,7 +728,6 @@ const WordEditor = ({ fileUrl, fileBlob, file, onClose, onFileSaved, highlightTe
                 bgColor = colorToHex(bgMatch[1].trim());
               }
             }
-            // Check class-based Quill styles
             if (ancestor.classList) {
               for (let i = 0; i < ancestor.classList.length; i++) {
                 const cls = ancestor.classList[i];
@@ -802,7 +760,6 @@ const WordEditor = ({ fileUrl, fileBlob, file, onClose, onFileSaved, highlightTe
           if (tag === 'br') {
             xml += '<w:r><w:br/></w:r>';
           } else if (tag === 'img') {
-            // Embed image
             const src = node.getAttribute('src') || '';
             if (src.startsWith('data:')) {
               const imgIdx = images.length;
@@ -810,14 +767,12 @@ const WordEditor = ({ fileUrl, fileBlob, file, onClose, onFileSaved, highlightTe
               const ext = getImageExt(src);
               const data = dataUriToBytes(src);
               
-              // Get actual dimensions - check style first (image resize module uses inline styles)
               const imgStyle = node.getAttribute('style') || '';
               const styleW = imgStyle.match(/width:\s*(\d+)/)?.[1];
               const styleH = imgStyle.match(/height:\s*(\d+)/)?.[1];
               let w = parseInt(styleW) || parseInt(node.getAttribute('width')) || parseInt(node.getAttribute('data-real-width')) || 400;
               let h = parseInt(styleH) || parseInt(node.getAttribute('height')) || parseInt(node.getAttribute('data-real-height')) || 300;
               
-              // Clamp to max page width (~6 inches = 5486400 EMU)
               const maxW = 575;
               if (w > maxW) { h = Math.round(h * maxW / w); w = maxW; }
               const cx = w * 9525;
@@ -843,7 +798,6 @@ const WordEditor = ({ fileUrl, fileBlob, file, onClose, onFileSaved, highlightTe
       return xml;
     };
 
-    // Build OOXML paragraphs from block nodes
     let bodyXml = '';
 
     const walkNodes = (container) => {
@@ -858,7 +812,6 @@ const WordEditor = ({ fileUrl, fileBlob, file, onClose, onFileSaved, highlightTe
         if (node.nodeType !== Node.ELEMENT_NODE) return;
         const tag = node.tagName.toLowerCase();
 
-        // Heading levels
         const headingMap = { h1: '1', h2: '2', h3: '3', h4: '4', h5: '5', h6: '6' };
         if (headingMap[tag]) {
           const level = headingMap[tag];
@@ -874,7 +827,6 @@ const WordEditor = ({ fileUrl, fileBlob, file, onClose, onFileSaved, highlightTe
           return;
         }
 
-        // Lists
         if (tag === 'ol' || tag === 'ul') {
           const numId = tag === 'ol' ? '1' : '2';
           const items = node.querySelectorAll(':scope > li');
@@ -902,7 +854,6 @@ const WordEditor = ({ fileUrl, fileBlob, file, onClose, onFileSaved, highlightTe
           return;
         }
 
-        // Tables
         if (tag === 'table') {
           bodyXml += `<w:tbl><w:tblPr><w:tblW w:w="5000" w:type="pct"/><w:tblBorders><w:top w:val="single" w:sz="4" w:space="0" w:color="auto"/><w:left w:val="single" w:sz="4" w:space="0" w:color="auto"/><w:bottom w:val="single" w:sz="4" w:space="0" w:color="auto"/><w:right w:val="single" w:sz="4" w:space="0" w:color="auto"/><w:insideH w:val="single" w:sz="4" w:space="0" w:color="auto"/><w:insideV w:val="single" w:sz="4" w:space="0" w:color="auto"/></w:tblBorders></w:tblPr>`;
           const rows = node.querySelectorAll('tr');
@@ -921,7 +872,6 @@ const WordEditor = ({ fileUrl, fileBlob, file, onClose, onFileSaved, highlightTe
           return;
         }
 
-        // Block elements
         if (['p', 'div', 'blockquote', 'pre', 'li'].includes(tag)) {
           let pPr = '';
           const style = node.getAttribute('style') || '';
@@ -938,7 +888,6 @@ const WordEditor = ({ fileUrl, fileBlob, file, onClose, onFileSaved, highlightTe
               if (cls.startsWith('ql-indent-')) {
                 const level = parseInt(cls.replace('ql-indent-', ''));
                 if (!isNaN(level)) {
-                  // 720 twips = 0.5 inch per indent level
                   ind = `<w:ind w:left="${level * 720}"/>`;
                 }
               }
@@ -950,7 +899,6 @@ const WordEditor = ({ fileUrl, fileBlob, file, onClose, onFileSaved, highlightTe
           if (lhMatch) {
             const val = parseFloat(lhMatch[1]);
             if (!isNaN(val)) {
-              // 240 twips = 1 line (single spacing)
               spacing = `<w:spacing w:line="${Math.round(val * 240)}" w:lineRule="auto"/>`;
             }
           }
@@ -974,7 +922,6 @@ const WordEditor = ({ fileUrl, fileBlob, file, onClose, onFileSaved, highlightTe
           return;
         }
 
-        // Standalone images at block level
         if (tag === 'img') {
           const src = node.getAttribute('src') || '';
           if (src.startsWith('data:')) {
@@ -983,32 +930,26 @@ const WordEditor = ({ fileUrl, fileBlob, file, onClose, onFileSaved, highlightTe
           return;
         }
 
-        // Inline elements at block level
         if (['span', 'strong', 'b', 'em', 'i', 'u', 'a', 's', 'strike', 'del', 'sub', 'sup', 'code'].includes(tag)) {
           const inner = runXml(node);
           if (inner) bodyXml += `<w:p>${inner}</w:p>`;
           return;
         }
 
-        // Fallback
         walkNodes(node);
       });
     };
 
     walkNodes(doc.body);
 
-    // If nothing was generated, add an empty paragraph
     if (!bodyXml) {
       bodyXml = '<w:p><w:r><w:t></w:t></w:r></w:p>';
     }
 
-    // Add page setup (A4 size, standard margins)
     bodyXml += `<w:sectPr><w:pgSz w:w="11906" w:h="16838"/><w:pgMar w:top="1440" w:right="1440" w:bottom="1440" w:left="1440" w:header="708" w:footer="708" w:gutter="0"/></w:sectPr>`;
 
-    // Build the real .docx using JSZip (OOXML structure)
     const zip = new JSZip();
 
-    // Image content type defaults
     const imgExts = [...new Set(images.map(img => img.ext))];
     let imgDefaults = '';
     imgExts.forEach(ext => {
@@ -1016,7 +957,6 @@ const WordEditor = ({ fileUrl, fileBlob, file, onClose, onFileSaved, highlightTe
       imgDefaults += `<Default Extension="${ext}" ContentType="${ct}"/>`;
     });
 
-    // [Content_Types].xml
     zip.file('[Content_Types].xml',
       `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n` +
       `<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">` +
@@ -1028,7 +968,6 @@ const WordEditor = ({ fileUrl, fileBlob, file, onClose, onFileSaved, highlightTe
       `</Types>`
     );
 
-    // _rels/.rels
     zip.folder('_rels').file('.rels',
       `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n` +
       `<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">` +
@@ -1036,7 +975,6 @@ const WordEditor = ({ fileUrl, fileBlob, file, onClose, onFileSaved, highlightTe
       `</Relationships>`
     );
 
-    // word/numbering.xml
     const wordFolder = zip.folder('word');
     wordFolder.file('numbering.xml',
       `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n` +
@@ -1047,7 +985,7 @@ const WordEditor = ({ fileUrl, fileBlob, file, onClose, onFileSaved, highlightTe
       `<w:lvl w:ilvl="2"><w:start w:val="1"/><w:numFmt w:val="lowerRoman"/><w:lvlText w:val="%3."/><w:lvlJc w:val="left"/><w:pPr><w:ind w:left="2160" w:hanging="360"/></w:pPr></w:lvl>` +
       `</w:abstractNum>` +
       `<w:abstractNum w:abstractNumId="2"><w:nsid w:val="87654321"/><w:multiLevelType w:val="hybridMultilevel"/><w:tmpl w:val="87654321"/>` +
-      `<w:lvl w:ilvl="0"><w:start w:val="1"/><w:numFmt w:val="bullet"/><w:lvlText w:val="•"/><w:lvlJc w:val="left"/><w:pPr><w:ind w:left="720" w:hanging="360"/></w:pPr><w:rPr><w:rFonts w:ascii="Symbol" w:hAnsi="Symbol" w:hint="default"/></w:rPr></w:lvl>` +
+      `<w:lvl w:ilvl="0"><w:start w:val="1"/><w:numFmt w:val="bullet"/><w:lvlText w:val="*"/><w:lvlJc w:val="left"/><w:pPr><w:ind w:left="720" w:hanging="360"/></w:pPr><w:rPr><w:rFonts w:ascii="Symbol" w:hAnsi="Symbol" w:hint="default"/></w:rPr></w:lvl>` +
       `<w:lvl w:ilvl="1"><w:start w:val="1"/><w:numFmt w:val="bullet"/><w:lvlText w:val="o"/><w:lvlJc w:val="left"/><w:pPr><w:ind w:left="1440" w:hanging="360"/></w:pPr><w:rPr><w:rFonts w:ascii="Courier New" w:hAnsi="Courier New" w:hint="default"/></w:rPr></w:lvl>` +
       `<w:lvl w:ilvl="2"><w:start w:val="1"/><w:numFmt w:val="bullet"/><w:lvlText w:val="▪"/><w:lvlJc w:val="left"/><w:pPr><w:ind w:left="2160" w:hanging="360"/></w:pPr><w:rPr><w:rFonts w:ascii="Symbol" w:hAnsi="Symbol" w:hint="default"/></w:rPr></w:lvl>` +
       `</w:abstractNum>` +
@@ -1066,7 +1004,6 @@ const WordEditor = ({ fileUrl, fileBlob, file, onClose, onFileSaved, highlightTe
       `<w:body>${bodyXml}</w:body></w:document>`
     );
 
-    // word/_rels/document.xml.rels — include image relationships
     let docRels = `<Relationship Id="rIdNum" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/numbering" Target="numbering.xml"/>`;
     images.forEach(img => {
       docRels += `<Relationship Id="${img.rId}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="media/${img.rId}.${img.ext}"/>`;
@@ -1076,7 +1013,6 @@ const WordEditor = ({ fileUrl, fileBlob, file, onClose, onFileSaved, highlightTe
       `<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">${docRels}</Relationships>`
     );
 
-    // word/media/ — embed image files
     if (images.length > 0) {
       const mediaFolder = wordFolder.folder('media');
       images.forEach(img => {
@@ -1084,7 +1020,6 @@ const WordEditor = ({ fileUrl, fileBlob, file, onClose, onFileSaved, highlightTe
       });
     }
 
-    // Generate the zip as a Blob
     return await zip.generateAsync({
       type: 'blob',
       mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
@@ -1140,7 +1075,6 @@ const WordEditor = ({ fileUrl, fileBlob, file, onClose, onFileSaved, highlightTe
       addToast(t('wordEditor.saveSuccess'), 'success');
       setIsEditing(false);
       
-      // Llamar al callback para actualizar la lista de archivos
       console.log('[WordEditor] Save successful, calling onFileSaved callback');
       if (onFileSaved) {
         console.log('[WordEditor] Executing onFileSaved callback');
@@ -1277,7 +1211,7 @@ const WordEditor = ({ fileUrl, fileBlob, file, onClose, onFileSaved, highlightTe
 
       <div className="word-status-bar">
         <div className="word-status-left">
-          <span>📝 {wordCount} {t('wordEditor.words')}</span>
+          <span>[Text] {wordCount} {t('wordEditor.words')}</span>
           <span>🔤 {charCount} {t('wordEditor.characters')}</span>
           <span>⏱️ {Math.ceil(wordCount / 200)} {t('wordEditor.minRead')}</span>
         </div>

@@ -1,4 +1,3 @@
-/* FolderSelector.css */
 .folder-selector-page {
   font-family: var(--font-main, 'Segoe UI', system-ui, -apple-system, sans-serif);
   background: var(--bg-gradient);
@@ -58,7 +57,6 @@
   font-weight: 600;
 }
 
-/* User Info */
 .user-info {
   background: var(--panel-bg, rgba(255, 255, 255, 0.8));
   border-radius: 0.75rem;
@@ -87,7 +85,6 @@
   letter-spacing: 0.05em;
 }
 
-/* Settings Button Fixed */
 .settings-btn-fixed {
   position: fixed;
   top: 1.5rem;
@@ -114,7 +111,6 @@
   box-shadow: var(--shadow-hover);
 }
 
-/* Folder Buttons - Sidebar style */
 .folder-btn {
   width: 100%;
   padding: 0.875rem 1rem;
@@ -154,7 +150,6 @@
   opacity: 0.8;
 }
 
-/* Logout button */
 .folder-btn-logout {
   color: #ff3b30;
   border-color: rgba(255, 59, 48, 0.15);
@@ -174,7 +169,6 @@
   opacity: 0.85;
 }
 
-/* Dark Mode */
 [data-theme="dark"] .options-container {
   background: var(--sidebar-bg, rgba(15, 15, 15, 0.9));
   border-color: rgba(255, 255, 255, 0.08);
@@ -216,7 +210,6 @@
   border-color: rgba(255, 107, 107, 0.25);
 }
 
-/* Responsive */
 @media (max-width: 640px) {
   .selector-container {
     padding: 1rem;

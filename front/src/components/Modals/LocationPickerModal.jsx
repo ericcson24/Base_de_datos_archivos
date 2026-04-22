@@ -5,7 +5,6 @@ import 'leaflet/dist/leaflet.css';
 import './LocationPickerModal.css';
 import { useLanguage } from '../../context/LanguageContext';
 
-// Fix for default marker icon in React Leaflet
 delete L.Icon.Default.prototype._getIconUrl;
 L.Icon.Default.mergeOptions({
   iconRetinaUrl: require('leaflet/dist/images/marker-icon-2x.png'),
@@ -13,7 +12,6 @@ L.Icon.Default.mergeOptions({
   shadowUrl: require('leaflet/dist/images/marker-shadow.png'),
 });
 
-// Custom marker icon
 const customIcon = new L.Icon({
   iconUrl: require('leaflet/dist/images/marker-icon.png'),
   iconRetinaUrl: require('leaflet/dist/images/marker-icon-2x.png'),
@@ -24,7 +22,6 @@ const customIcon = new L.Icon({
   shadowSize: [41, 41]
 });
 
-// Component to recenter the map
 const RecenterMap = ({ position, zoom }) => {
   const map = useMap();
   useEffect(() => {
@@ -53,7 +50,6 @@ const LocationMarker = ({ position, setPosition, addressLabel }) => {
   ) : null;
 };
 
-// Debounce hook
 function useDebounce(value, delay) {
   const [debounced, setDebounced] = useState(value);
   useEffect(() => {
@@ -79,7 +75,6 @@ const LocationPickerModal = ({ isOpen, onClose, onSelect, initialLocation }) => 
 
   const debouncedQuery = useDebounce(searchQuery, 400);
 
-  // Detect dark mode reactively
   const [isDark, setIsDark] = useState(document.documentElement.getAttribute('data-theme') === 'dark');
 
   useEffect(() => {
@@ -90,10 +85,8 @@ const LocationPickerModal = ({ isOpen, onClose, onSelect, initialLocation }) => 
     return () => observer.disconnect();
   }, []);
 
-  // Initialize position
   useEffect(() => {
     if (isOpen) {
-      // Try to parse initialLocation as coords
       if (initialLocation && typeof initialLocation === 'string') {
         const coordMatch = initialLocation.match(/^(-?\d+\.?\d*),\s*(-?\d+\.?\d*)$/);
         if (coordMatch) {
@@ -104,11 +97,9 @@ const LocationPickerModal = ({ isOpen, onClose, onSelect, initialLocation }) => 
           setSelectedAddress(initialLocation);
           return;
         }
-        // If it's a text address, set it as the search and selected
         setSearchQuery(initialLocation);
         setSelectedAddress(initialLocation);
       }
-      // Default to Madrid
       if (!position) {
         const defaultPos = { lat: 40.416775, lng: -3.703790 };
         setPosition(defaultPos);
@@ -116,9 +107,8 @@ const LocationPickerModal = ({ isOpen, onClose, onSelect, initialLocation }) => 
         setFlyZoom(13);
       }
     }
-  }, [isOpen]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [isOpen]);
 
-  // Auto-search as user types (debounced)
   useEffect(() => {
     if (debouncedQuery.length >= 3) {
       performSearch(debouncedQuery);
@@ -126,9 +116,8 @@ const LocationPickerModal = ({ isOpen, onClose, onSelect, initialLocation }) => 
       setSearchResults([]);
       setShowResults(false);
     }
-  }, [debouncedQuery]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [debouncedQuery]);
 
-  // Reverse geocode when user clicks on map
   useEffect(() => {
     if (!position) return;
     const reverseGeocode = async () => {
@@ -139,7 +128,6 @@ const LocationPickerModal = ({ isOpen, onClose, onSelect, initialLocation }) => 
         );
         const data = await res.json();
         if (data.display_name) {
-          // Build a short, clean address
           const addr = data.address || {};
           const parts = [];
           if (addr.road) parts.push(addr.road + (addr.house_number ? ` ${addr.house_number}` : ''));
@@ -160,7 +148,6 @@ const LocationPickerModal = ({ isOpen, onClose, onSelect, initialLocation }) => 
     reverseGeocode();
   }, [position]);
 
-  // Close results when clicking outside
   useEffect(() => {
     const handleClickOutside = (e) => {
       if (searchRef.current && !searchRef.current.contains(e.target)) {
@@ -175,27 +162,23 @@ const LocationPickerModal = ({ isOpen, onClose, onSelect, initialLocation }) => 
     if (!query || query.length < 3) return;
     setIsSearching(true);
     try {
-      // Bias the search around the current map center if we have one, so that
-      // small POIs close to the user appear higher up in the results.
       let viewbox = '';
       let bounded = '';
       if (position && typeof position.lat === 'number' && typeof position.lng === 'number') {
-        const dLat = 0.7;  // ~70 km radius bias, but NOT bounded so we still get far results
+        const dLat = 0.7;
         const dLng = 1.0;
         const left = position.lng - dLng;
         const right = position.lng + dLng;
         const top = position.lat + dLat;
         const bottom = position.lat - dLat;
         viewbox = `&viewbox=${left},${top},${right},${bottom}`;
-        bounded = ''; // keep results global, only bias
+        bounded = '';
       }
       const lang = (navigator.language || 'es,en').split(',')[0] + ',es,en';
-      // First pass: rich search with bias and more results
       const primary = fetch(
         `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&limit=20&addressdetails=1&namedetails=1&extratags=1&accept-language=${encodeURIComponent(lang)}${viewbox}${bounded}`,
         { headers: { 'Accept': 'application/json' } }
       ).then(r => r.ok ? r.json() : []);
-      // Second pass (Photon by Komoot): much better for POIs/businesses. Soft fallback.
       const photon = fetch(
         `https://photon.komoot.io/api/?q=${encodeURIComponent(query)}&limit=12&lang=${encodeURIComponent((navigator.language || 'es').split('-')[0])}${position ? `&lat=${position.lat}&lon=${position.lng}&location_bias_scale=0.3` : ''}`
       ).then(r => r.ok ? r.json() : null).then(gj => {
@@ -225,7 +208,6 @@ const LocationPickerModal = ({ isOpen, onClose, onSelect, initialLocation }) => 
 
       const [primaryRes, photonRes] = await Promise.all([primary, photon]);
 
-      // Merge, de-dupe by name+lat/lng rounded; prefer Nominatim order, then fill with Photon
       const seen = new Set();
       const merged = [];
       const key = (r) => {
@@ -252,18 +234,18 @@ const LocationPickerModal = ({ isOpen, onClose, onSelect, initialLocation }) => 
   const getResultIcon = (result) => {
     const type = result.type || '';
     const cls = result.class || '';
-    if (cls === 'amenity' || cls === 'shop') return '🏪';
-    if (cls === 'building' || type === 'house') return '🏠';
-    if (type === 'city' || type === 'town') return '🏙️';
-    if (type === 'village' || type === 'hamlet') return '🏘️';
+    if (cls === 'amenity' || cls === 'shop') return '[Shop]';
+    if (cls === 'building' || type === 'house') return '[Home]';
+    if (type === 'city' || type === 'town') return '[City]';
+    if (type === 'village' || type === 'hamlet') return '[Town]';
     if (cls === 'highway' || type === 'road' || type === 'street') return '🛣️';
-    if (cls === 'tourism' || cls === 'leisure') return '🏖️';
-    if (cls === 'office') return '🏢';
-    if (cls === 'aeroway') return '✈️';
-    if (type === 'restaurant' || type === 'cafe') return '🍽️';
-    if (type === 'hospital' || type === 'clinic') return '🏥';
-    if (type === 'school' || type === 'university') return '🎓';
-    return '📍';
+    if (cls === 'tourism' || cls === 'leisure') return '[Tourism]';
+    if (cls === 'office') return '[Office]';
+    if (cls === 'aeroway') return '[Plane]';
+    if (type === 'restaurant' || type === 'cafe') return '[Restaurant]';
+    if (type === 'hospital' || type === 'clinic') return '[Hospital]';
+    if (type === 'school' || type === 'university') return '[School]';
+    return '[Location]';
   };
 
   const getShortName = (result) => {
@@ -308,7 +290,7 @@ const LocationPickerModal = ({ isOpen, onClose, onSelect, initialLocation }) => 
           setFlyTarget(newPos);
           setFlyZoom(16);
         },
-        () => { /* user denied or error */ }
+        () => {  }
       );
     }
   };
@@ -324,7 +306,6 @@ const LocationPickerModal = ({ isOpen, onClose, onSelect, initialLocation }) => 
 
   if (!isOpen) return null;
 
-  // Tile layers
   const lightTile = 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png';
   const darkTile = 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png';
   const tileUrl = isDark ? darkTile : lightTile;
@@ -334,19 +315,19 @@ const LocationPickerModal = ({ isOpen, onClose, onSelect, initialLocation }) => 
     <div className="location-picker-backdrop" onClick={onClose}>
       <div className="location-picker-modal" onClick={(e) => e.stopPropagation()}>
         
-        {/* Header */}
+        
         <div className="picker-header">
           <div className="picker-header-left">
-            <span className="picker-icon">📍</span>
+            <span className="picker-icon">[Location]</span>
             <h3>{t('calendar.selectLocation')}</h3>
           </div>
           <button onClick={onClose} className="close-modal-btn" aria-label="Close">&times;</button>
         </div>
 
-        {/* Search Bar */}
+        
         <div className="picker-search-wrapper" ref={searchRef}>
           <div className="picker-search">
-            <span className="search-icon">🔍</span>
+            <span className="search-icon">[Search]</span>
             <input 
               ref={inputRef}
               type="text" 
@@ -367,12 +348,12 @@ const LocationPickerModal = ({ isOpen, onClose, onSelect, initialLocation }) => 
               autoFocus
             />
             {searchQuery && (
-              <button className="search-clear-btn" onClick={handleReset} aria-label="Clear">✕</button>
+              <button className="search-clear-btn" onClick={handleReset} aria-label="Clear">x</button>
             )}
             {isSearching && <div className="search-spinner" />}
           </div>
 
-          {/* Search Results Dropdown */}
+          
           {showResults && searchResults.length > 0 && (
             <ul className="search-results">
               {searchResults.map((result) => {
@@ -391,15 +372,15 @@ const LocationPickerModal = ({ isOpen, onClose, onSelect, initialLocation }) => 
           )}
         </div>
 
-        {/* Selected Address Banner */}
+        
         {selectedAddress && (
           <div className="selected-address-banner">
-            <span className="banner-pin">📌</span>
+            <span className="banner-pin">[Pin]</span>
             <span className="banner-text">{selectedAddress}</span>
           </div>
         )}
 
-        {/* Map */}
+        
         <div className="map-container">
           <MapContainer 
             center={position || [40.416, -3.703]} 
@@ -412,7 +393,7 @@ const LocationPickerModal = ({ isOpen, onClose, onSelect, initialLocation }) => 
             {flyTarget && <RecenterMap position={flyTarget} zoom={flyZoom} />}
           </MapContainer>
 
-          {/* Map overlay buttons */}
+          
           <div className="map-overlay-controls">
             <button 
               className="map-overlay-btn" 
@@ -427,7 +408,7 @@ const LocationPickerModal = ({ isOpen, onClose, onSelect, initialLocation }) => 
           </div>
         </div>
 
-        {/* Footer */}
+        
         <div className="picker-footer">
           <button className="btn-cancel" onClick={onClose}>{t('calendar.cancel') || 'Cancelar'}</button>
           <button 

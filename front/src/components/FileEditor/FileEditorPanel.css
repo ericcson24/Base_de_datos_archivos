@@ -70,7 +70,6 @@
   background: rgba(30, 30, 40, 0.5);
 }
 
-/* Drop zone styling - INLINE VERSION */
 .editor-drop-zone-inline {
   position: fixed;
   top: 50%;
@@ -115,7 +114,6 @@
   color: #60a5fa;
 }
 
-/* Animations */
 @keyframes panel-enter {
   from {
     opacity: 0;
@@ -131,7 +129,6 @@
   animation: panel-enter 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-/* ===== Mobile Responsive ===== */
 @media (max-width: 768px) {
   .file-editor-panel {
     top: 0 !important;

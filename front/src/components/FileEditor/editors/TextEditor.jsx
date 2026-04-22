@@ -80,10 +80,10 @@ const TextEditor = ({ content, file }) => {
 
   return (
     <div className="text-editor h-full flex flex-col">
-      {/* Toolbar */}
+      
       <div className="toolbar glassmorphism-strong p-4 border-b border-gray-200 dark:border-gray-700">
         <div className="flex flex-wrap gap-3 items-center">
-          {/* Font Size */}
+          
           <div className="tool-group">
             <label className="text-xs font-medium text-gray-700 dark:text-gray-300">
               {t('fileEditor.fontSize')}: {fontSize}px
@@ -98,7 +98,7 @@ const TextEditor = ({ content, file }) => {
             />
           </div>
 
-          {/* Line Height */}
+          
           <div className="tool-group">
             <label className="text-xs font-medium text-gray-700 dark:text-gray-300">
               {t('fileEditor.lineHeight')}: {lineHeight}
@@ -114,7 +114,7 @@ const TextEditor = ({ content, file }) => {
             />
           </div>
 
-          {/* Options */}
+          
           <div className="flex gap-2">
             <button
               className={`btn-tool ${showLineNumbers ? 'active' : ''}`}
@@ -130,19 +130,19 @@ const TextEditor = ({ content, file }) => {
             </button>
           </div>
 
-          {/* Language */}
+          
           <div className="text-sm font-medium text-gray-600 dark:text-gray-400 px-3 py-1 bg-gray-100 dark:bg-gray-800 rounded-lg">
             {getLanguage()}
           </div>
 
-          {/* Stats */}
+          
           <div className="text-xs text-gray-600 dark:text-gray-400 ml-auto flex gap-3">
             <span>{lineCount} {t('fileEditor.lines')}</span>
             <span>{text.length} {t('fileEditor.characters')}</span>
             {hasChanges && <span className="text-orange-500 font-semibold">● {t('fileEditor.unsaved')}</span>}
           </div>
 
-          {/* Actions */}
+          
           <div className="flex gap-2">
             {hasChanges && (
               <button className="btn-secondary" onClick={() => setText(savedText)}>
@@ -163,9 +163,9 @@ const TextEditor = ({ content, file }) => {
         </div>
       </div>
 
-      {/* Editor Area */}
+      
       <div className="flex-1 overflow-hidden flex bg-gray-50 dark:bg-gray-900">
-        {/* Line Numbers */}
+        
         {showLineNumbers && (
           <div className="line-numbers glassmorphism-strong border-r border-gray-200 dark:border-gray-700 p-4 text-right select-none">
             {Array.from({ length: lineCount }, (_, i) => (
@@ -180,7 +180,7 @@ const TextEditor = ({ content, file }) => {
           </div>
         )}
 
-        {/* Text Area */}
+        
         <textarea
           ref={textareaRef}
           value={text}

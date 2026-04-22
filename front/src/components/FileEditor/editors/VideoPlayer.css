@@ -1,8 +1,5 @@
-/* ============================================================
-   Modern Video Player — Netflix / YouTube style
-   ============================================================ */
 
-/* ── Container ──────────────────────────────────────── */
+
 .vp-container {
   position: relative;
   width: 100%;
@@ -32,7 +29,6 @@
   display: block;
 }
 
-/* ── Loading spinner ────────────────────────────────── */
 .vp-loader {
   position: absolute;
   inset: 0;
@@ -56,7 +52,6 @@
   to { transform: rotate(360deg); }
 }
 
-/* ── Big play button ────────────────────────────────── */
 .vp-big-play {
   position: absolute;
   inset: 0;
@@ -84,7 +79,6 @@
   background: rgba(0, 0, 0, 0.6);
 }
 
-/* ── Controls wrapper (bottom gradient) ─────────────── */
 .vp-controls-wrapper {
   position: absolute;
   bottom: 0;
@@ -105,7 +99,6 @@
   pointer-events: all;
 }
 
-/* ── Progress bar ───────────────────────────────────── */
 .vp-progress-container {
   position: relative;
   height: 20px;
@@ -165,7 +158,6 @@
   transform: translateY(-50%) scale(1);
 }
 
-/* ── Progress tooltip ───────────────────────────────── */
 .vp-progress-tooltip {
   position: absolute;
   top: -28px;
@@ -181,7 +173,6 @@
   z-index: 20;
 }
 
-/* ── Control buttons row ────────────────────────────── */
 .vp-controls {
   display: flex;
   align-items: center;
@@ -197,7 +188,6 @@
   gap: 2px;
 }
 
-/* ── Generic button ─────────────────────────────────── */
 .vp-btn {
   display: inline-flex;
   align-items: center;
@@ -222,7 +212,6 @@
   transform: scale(0.92);
 }
 
-/* ── Skip buttons (10s) ─────────────────────────────── */
 .vp-btn-skip {
   position: relative;
 }
@@ -239,7 +228,6 @@
   margin-top: 1px;
 }
 
-/* ── Volume group ───────────────────────────────────── */
 .vp-volume-group {
   display: flex;
   align-items: center;
@@ -299,7 +287,6 @@
   border: none;
 }
 
-/* ── Time display ───────────────────────────────────── */
 .vp-time {
   color: rgba(255, 255, 255, 0.9);
   font-size: 13px;
@@ -310,7 +297,6 @@
   letter-spacing: 0.3px;
 }
 
-/* ── Speed button & menu ────────────────────────────── */
 .vp-speed-group {
   position: relative;
 }
@@ -375,7 +361,6 @@
   font-weight: 600;
 }
 
-/* ── Responsive ─────────────────────────────────────── */
 @media (max-width: 600px) {
   .vp-controls {
     padding: 2px 6px 8px;
@@ -419,7 +404,6 @@
   }
 }
 
-/* Edit Mode Styles */
 .vp-edit-overlay {
   position: absolute;
   inset: 0;
@@ -598,7 +582,7 @@
 .vp-edit-toggle {
     position: absolute;
     top: 20px;
-    right: 60px; /* Left of close button if any, or general positioning */
+    right: 60px; 
     z-index: 25;
     background: rgba(0,0,0,0.6);
     color: white;

@@ -3,17 +3,7 @@ import { useLanguage } from '../../context/LanguageContext';
 import './DuplicateFilesModal.css';
 
 /**
- * Modal shown when uploading files that already exist in the current directory.
- * Offers three choices: Replace, Keep Both (rename), or Skip duplicates.
  *
- * Props:
- *   isOpen        - boolean
- *   duplicateNames - string[] of file names that already exist
- *   onReplace     - callback: overwrite existing files
- *   onKeepBoth    - callback: rename new files with (1), (2), etc.
- *   onSkip        - callback: skip duplicate files
- *   onClose       - callback: cancel upload entirely
- */
 const DuplicateFilesModal = ({ isOpen, duplicateNames = [], onReplace, onKeepBoth, onSkip, onClose }) => {
   const { t } = useLanguage();
 
@@ -25,7 +15,7 @@ const DuplicateFilesModal = ({ isOpen, duplicateNames = [], onReplace, onKeepBot
   return (
     <div className="dup-modal-overlay" onClick={onClose}>
       <div className="dup-modal" onClick={(e) => e.stopPropagation()}>
-        {/* Header */}
+        
         <div className="dup-modal-header">
           <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
             <path d="M12 9v2m0 4h.01M12 3a9 9 0 110 18 9 9 0 010-18z" />
@@ -37,7 +27,7 @@ const DuplicateFilesModal = ({ isOpen, duplicateNames = [], onReplace, onKeepBot
           </h2>
         </div>
 
-        {/* Content */}
+        
         <div className="dup-modal-content">
           <p className="dup-modal-description">
             {count === 1
@@ -60,7 +50,7 @@ const DuplicateFilesModal = ({ isOpen, duplicateNames = [], onReplace, onKeepBot
           )}
         </div>
 
-        {/* Actions */}
+        
         <div className="dup-modal-actions">
           <button className="dup-btn dup-btn-skip" onClick={onSkip}>
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">

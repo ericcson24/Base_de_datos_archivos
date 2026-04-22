@@ -8,7 +8,6 @@ import Calendar from './components/Calendar/Calendar';
 import { NotificationProvider } from './context/NotificationContext';
 import './App.css';
 
-// Utility functions for cookie management
 const setCookie = (name, value, days = 365) => {
   const expires = new Date();
   expires.setTime(expires.getTime() + days * 24 * 60 * 60 * 1000);
@@ -30,17 +29,14 @@ function App() {
   console.log('APP V2 LOADED - DEBUG MODE');
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [user, setUser] = useState(null);
-  const [currentView, setCurrentView] = useState('login'); // 'login', 'folders', 'panel', 'calendar', 'admin'
+  const [currentView, setCurrentView] = useState('login');
   const [isLoading, setIsLoading] = useState(true);
 
-  // Estado para el tema global - ahora usa cookies
   const [isDarkMode, setIsDarkMode] = useState(() => {
-    // Cargar preferencia de las cookies
     const saved = getCookie('theme');
     return saved === 'dark';
   });
 
-  // Aplicar tema cuando cambia
   useEffect(() => {
     const root = document.documentElement;
     if (isDarkMode) {
@@ -54,7 +50,6 @@ function App() {
     }
   }, [isDarkMode]);
 
-  // Función para toggle del tema
   const toggleTheme = () => {
     setIsDarkMode(!isDarkMode);
   };
@@ -63,13 +58,11 @@ function App() {
     setUser(prev => ({ ...prev, ...updatedFields }));
   };
 
-  // Verificar si hay token guardado al cargar la app
   useEffect(() => {
     const checkStoredToken = async () => {
       const storedToken = localStorage.getItem('auth_token');
       
       try {
-        // Verificar si el token es válido haciendo una petición (usa cookie o header)
         const headers = {};
         if (storedToken) {
           headers['Authorization'] = `Bearer ${storedToken}`;
@@ -77,40 +70,32 @@ function App() {
 
         const response = await fetch('/api/auth/verify', {
           headers,
-          credentials: 'include' // Importante para enviar cookies
+          credentials: 'include'
         });
 
         if (response.ok) {
           const data = await response.json();
           
-          // Si el usuario hizo logout recientemente, no deberíamos restaurar la sesión
-          // aunque la cookie persista por alguna razón extraña.
-          // Pero aquí asumimos que si el servidor dice OK, es OK.
           
           const userWithToken = {
             ...data.user,
             token: storedToken || data.token 
           };
           
-          // Normalizar rol
           const role = (userWithToken.role || '').toLowerCase();
           userWithToken.role = role;
           
           setUser(userWithToken);
           setIsLoggedIn(true);
           
-          // Si el backend nos devolvió un token nuevo o recuperado, guardarlo
           if (data.token) {
             localStorage.setItem('auth_token', data.token);
           }
           
-          // Detectar ruta actual y cambiar currentView
           let currentPath = window.location.pathname;
           
-          // Normalizar ruta (eliminar slash final si existe)
           if (currentPath.endsWith('/') && currentPath.length > 1) {
             currentPath = currentPath.slice(0, -1);
-            // Actualizar URL visualmente sin recargar
             window.history.replaceState(null, '', currentPath);
           }
           
@@ -125,7 +110,6 @@ function App() {
           } else if (currentPath === '/remote') {
             setCurrentView('remote');
           } else {
-            // Redirigir según el rol del usuario si está autenticado
             if (role === 'admin') {
               setCurrentView('admin');
               window.history.replaceState(null, '', '/admin');
@@ -135,7 +119,6 @@ function App() {
             }
           }
         } else {
-          // Token inválido o no hay sesión
           localStorage.removeItem('auth_token');
           if (!window.location.search.includes('redirect=calendar')) {
              setCurrentView('login');
@@ -147,14 +130,9 @@ function App() {
         setCurrentView('login');
       }
 
-      // Verificar si hay parámetro redirect=calendar en la URL
       const urlParams = new URLSearchParams(window.location.search);
       const redirect = urlParams.get('redirect');
 
-      // Variable para saber si la autenticación fue exitosa (ya que el estado isLoggedIn no se actualiza inmediatamente)
-      // Podemos inferirlo si setUser fue llamado, pero mejor usar una variable local si pudiéramos.
-      // Como no tenemos variable local accesible fuera del try, verificamos si localStorage tiene token (si fue exitoso lo guardamos/mantuvimos)
-      // O mejor, movemos esta lógica dentro del flujo.
       
       if (redirect === 'calendar') {
         const tokenExists = localStorage.getItem('auth_token');
@@ -173,7 +151,6 @@ function App() {
     checkStoredToken();
   }, []);
 
-  // Detectar cambios en la ruta del navegador
   useEffect(() => {
     const handleLocationChange = () => {
       let currentPath = window.location.pathname;
@@ -196,10 +173,8 @@ function App() {
       }
     };
 
-    // Escuchar cambios en el historial
     window.addEventListener('popstate', handleLocationChange);
     
-    // También verificar la ruta inicial
     handleLocationChange();
 
     return () => {
@@ -220,19 +195,15 @@ function App() {
         }),
       });
 
-      // Verificar si la respuesta es exitosa antes de parsear JSON
       if (!response.ok) {
-        // Intentar obtener el mensaje de error del servidor
         try {
           const errorData = await response.json();
           const error = new Error(errorData.message || `Error HTTP ${response.status}`);
-          error.code = errorData.errorCode; // Adjuntar código de error
+          error.code = errorData.errorCode;
           throw error;
         } catch (jsonError) {
-          // Si ya es el error que lanzamos arriba, relanzarlo
           if (jsonError.code) throw jsonError;
           
-          // Si no hay JSON válido en la respuesta de error, usar el status
           throw new Error(`Error del servidor: ${response.status} ${response.statusText}`);
         }
       }
@@ -245,15 +216,12 @@ function App() {
           token: data.token
         };
         
-        // Normalizar rol para evitar problemas de mayúsculas/minúsculas
         const role = (userWithToken.role || '').toLowerCase();
-        // Asegurarnos de que el rol en el estado esté normalizado
         userWithToken.role = role;
 
         setUser(userWithToken);
         setIsLoggedIn(true);
         
-        // Verificar si es administrador y redirigir apropiadamente
         if (role === 'admin') {
           setCurrentView('admin');
           window.history.pushState(null, '', '/admin');
@@ -264,7 +232,6 @@ function App() {
           console.log('Login exitoso como usuario:', data);
         }
 
-        // Guardar token en localStorage para persistencia
         localStorage.setItem('auth_token', data.token);
       } else {
         throw new Error(data.message);
@@ -276,13 +243,11 @@ function App() {
   };
 
   const handleSelectFolder = (tipo) => {
-    // Aquí puedes manejar la selección de carpeta
     if (tipo === 'remote') {
       setCurrentView('remote');
       window.history.pushState(null, '', '/remote');
       return;
     }
-    // Por ahora, simplemente vamos al panel
     setCurrentView('panel');
     window.history.pushState(null, '', '/panel');
   };
@@ -296,26 +261,21 @@ function App() {
 
   const handleLogout = async () => {
     try {
-      // Llamar al endpoint de logout para limpiar cookies
       await fetch('/api/auth/logout', { 
         method: 'POST',
         credentials: 'include'
       });
 
-      // Limpiar token del localStorage
       localStorage.removeItem('auth_token');
       
-      // Limpiar cookie client-side por si acaso
       deleteCookie('auth_token');
       deleteCookie('connect.sid');
 
       setIsLoggedIn(false);
       setUser(null);
-      // Usar window.location.href para forzar una recarga completa y limpiar estado en memoria
       window.location.href = '/login';
     } catch (error) {
       console.error('Error en logout:', error);
-      // Forzar logout local incluso si falla el servidor
       localStorage.removeItem('auth_token');
       setIsLoggedIn(false);
       setUser(null);
@@ -323,7 +283,6 @@ function App() {
     }
   };
 
-  // Si está cargando, mostrar loading
   if (isLoading) {
     return (
       <div className="App app-loading-container">
@@ -335,7 +294,6 @@ function App() {
     );
   }
 
-  // Si no está logueado, mostrar login
   if (!isLoggedIn) {
     return (
       <div className="App">
@@ -344,7 +302,6 @@ function App() {
     );
   }
 
-  // Si está logueado pero en vista de carpetas
   if (currentView === 'folders') {
     return (
       <div className="App">
@@ -368,7 +325,6 @@ function App() {
     );
   }
 
-  // Si está logueado y es administrador en vista admin
   if (currentView === 'admin' && user && user.role === 'admin') {
     return (
       <NotificationProvider 
@@ -402,7 +358,6 @@ function App() {
     );
   }
 
-  // Si está logueado y en vista de panel
   if (currentView === 'panel' && user) {
     console.log('Renderizando UserPanel con user:', user, 'currentView:', currentView);
     return (
@@ -448,7 +403,6 @@ function App() {
     );
   }
 
-  // Si está logueado y en vista de remote (página independiente)
   if (currentView === 'remote' && user) {
     console.log('Renderizando RemotePage independiente con user:', user);
     return (
@@ -492,7 +446,6 @@ function App() {
     );
   }
 
-  // Si está logueado y en vista de calendario
   if (currentView === 'calendar' && user) {
     return (
       <NotificationProvider 
@@ -536,7 +489,6 @@ function App() {
     );
   }
 
-  // Fallback - agregar debug
   console.log('Fallback render - isLoggedIn:', isLoggedIn, 'currentView:', currentView, 'user:', user);
   return (
     <NotificationProvider 

@@ -3,7 +3,6 @@ import FullCalendar from '@fullcalendar/react';
 import timeGridPlugin from '@fullcalendar/timegrid';
 import interactionPlugin from '@fullcalendar/interaction';
 import { useLanguage } from '../../context/LanguageContext';
-// Styles are imported in parent component (Calendar.css)
 
 const DayPanel = ({ isOpen, date, events, onClose, onTimeSelect, onEventClick }) => {
   const { t, language } = useLanguage();
@@ -21,7 +20,7 @@ const DayPanel = ({ isOpen, date, events, onClose, onTimeSelect, onEventClick })
     <div className={`day-panel ${isOpen ? 'open' : ''}`}>
       <div className="day-panel-header">
         <h3>{date?.toLocaleDateString(language === 'es' ? 'es-ES' : language === 'pl' ? 'pl-PL' : 'en-US', { weekday: 'long', day: 'numeric', month: 'long' })}</h3>
-        <button className="close-panel-btn" onClick={onClose}>✕</button>
+        <button className="close-panel-btn" onClick={onClose}>x</button>
       </div>
       <div className="day-panel-content">
         <FullCalendar

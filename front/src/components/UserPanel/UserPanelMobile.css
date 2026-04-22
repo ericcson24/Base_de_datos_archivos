@@ -1,7 +1,5 @@
 
-/* =========================================
-   MOBILE RESPONSIVENESS
-   ========================================= */
+
 
 @media (max-width: 768px) {
   :root {
@@ -16,7 +14,6 @@
     height: 100dvh;
   }
 
-  /* Sidebar Mobile Logic */
   .sidebar {
     position: fixed;
     top: 0;
@@ -36,7 +33,6 @@
     transform: translateX(0);
   }
 
-  /* Overlay for sidebar */
   .sidebar-overlay {
     display: none;
     position: fixed;
@@ -53,7 +49,6 @@
     display: block;
   }
 
-  /* Main Panel Adjustments */
   .main-panel {
     width: 100%;
     padding: 0.75rem;
@@ -64,7 +59,6 @@
     -webkit-overflow-scrolling: touch;
   }
 
-  /* Mobile Header (Hamburger) */
   .mobile-header {
     display: flex;
     align-items: center;
@@ -93,7 +87,6 @@
     -webkit-tap-highlight-color: transparent;
   }
 
-  /* File Grid */
   .file-grid {
     grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
     gap: 1rem;
@@ -111,7 +104,6 @@
     font-size: 3rem;
   }
 
-  /* Search Controls Bar — stack vertically on mobile */
   .search-controls-bar {
     flex-direction: column !important;
     align-items: stretch !important;
@@ -119,7 +111,6 @@
     padding: 0.75rem !important;
   }
 
-  /* Left section (search + AI): full width, wrap */
   .search-controls-bar > .flex.items-center.space-x-3 {
     max-width: 100% !important;
     width: 100%;
@@ -127,7 +118,6 @@
     gap: 0.5rem;
   }
 
-  /* Search & AI containers */
   .search-container {
     width: 100%;
     margin-bottom: 0;
@@ -160,7 +150,6 @@
     flex: 1 1 100%;
   }
 
-  /* Right section (sort + view controls): single row */
   .search-controls-bar > .flex.items-center.space-x-2 {
     justify-content: flex-end;
     flex-wrap: nowrap;
@@ -174,7 +163,6 @@
     display: none;
   }
 
-  /* Smaller button padding on mobile toolbar */
   .search-controls-bar > .flex.items-center.space-x-2 .p-2 {
     padding: 6px;
   }
@@ -190,7 +178,6 @@
     min-height: auto !important;
   }
 
-  /* Modals */
   .modal-content {
     width: calc(100% - 2rem);
     min-width: 0;
@@ -202,7 +189,6 @@
     box-sizing: border-box;
   }
 
-  /* Hide desktop specific elements if needed */
   .desktop-only {
     display: none !important;
   }
@@ -218,7 +204,6 @@
     -webkit-tap-highlight-color: transparent;
   }
   
-  /* Adjust buttons in sidebar footer */
   .sidebar-footer {
     padding-bottom: calc(1rem + env(safe-area-inset-bottom, 0px));
   }

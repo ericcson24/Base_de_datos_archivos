@@ -9,7 +9,6 @@ const FolderSelector = ({ user, onSelectFolder, onLogout, onThemeToggle, isDarkM
   const [showSettingsModal, setShowSettingsModal] = useState(false);
 
   const handleFolderSelect = (tipo) => {
-    // Establecer cookie como hacía el original
     document.cookie = `carpeta=${tipo}; path=/`;
     onSelectFolder(tipo);
   };
@@ -28,10 +27,10 @@ const FolderSelector = ({ user, onSelectFolder, onLogout, onThemeToggle, isDarkM
 
   return (
     <div className="folder-selector-page">
-      {/* Background */}
+      
       <div className="bg"></div>
 
-      {/* Settings Button */}
+      
       <button
         className="settings-btn-fixed"
         onClick={() => setShowSettingsModal(true)}
@@ -53,11 +52,11 @@ const FolderSelector = ({ user, onSelectFolder, onLogout, onThemeToggle, isDarkM
         <div className="options-container">
           <h2>{t('folders.subtitle')}</h2>
           
-          {/* Mostrar información del usuario */}
+          
           {user && (
             <div className="user-info">
               <p>{t('userPanel.welcome')}, <strong>{user.username}</strong></p>
-              {user.role === 'admin' && <span className="admin-badge">👑 Admin</span>}
+              {user.role === 'admin' && <span className="admin-badge">[Admin] Admin</span>}
             </div>
           )}
 
@@ -82,7 +81,7 @@ const FolderSelector = ({ user, onSelectFolder, onLogout, onThemeToggle, isDarkM
             <FiCalendar className="folder-btn-icon" /> {t('userPanel.calendar')}
           </button>
 
-          {/* Botón de administrador solo para admins */}
+          
           {user && user.role === 'admin' && onGoToAdmin && (
             <button
               className="folder-btn"

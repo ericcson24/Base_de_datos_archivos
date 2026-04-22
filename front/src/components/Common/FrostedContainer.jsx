@@ -4,7 +4,7 @@ import './FrostedContainer.css';
 const FrostedContainer = ({ children, className = '', variant = 'default' }) => {
   return (
     <>
-      {/* SVG Filter Definition */}
+      
       <svg className="frosted-svg-def">
         <defs>
           <filter id="frosted" x="-50%" y="-50%" width="200%" height="200%">
@@ -16,7 +16,7 @@ const FrostedContainer = ({ children, className = '', variant = 'default' }) => 
         </defs>
       </svg>
 
-      {/* Container with frosted effect */}
+      
       <div className={`frosted-container ${variant} ${className}`}>
         {children}
       </div>

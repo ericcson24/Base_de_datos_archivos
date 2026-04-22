@@ -1,9 +1,6 @@
 import React from 'react';
 
 /**
- * SVG File Type Icon - consistent across all platforms.
- * Replaces emoji file icons with proper SVG icons.
- */
 
 const FILE_TYPE_CONFIGS = {
   image: { color: '#0ea5e9', label: 'IMG', icon: 'image' },
@@ -98,24 +95,24 @@ const FileTypeIcon = ({ type = 'file', size = 24, className = '' }) => {
       style={{ display: 'inline-block', verticalAlign: 'middle', flexShrink: 0 }}
       xmlns="http://www.w3.org/2000/svg"
     >
-      {/* File shape with folded corner */}
+      
       <path
         d="M5 1 L15 1 L19 5 L19 20 C19 20.6 18.6 21 18 21 L6 21 C5.4 21 5 20.6 5 20 L5 2 C5 1.4 5.4 1 6 1 Z"
         fill={config.color}
       />
-      {/* Folded corner */}
+      
       <path
         d="M15 1 L15 5 L19 5 Z"
         fill="rgba(255,255,255,0.25)"
       />
-      {/* Subtle top highlight */}
+      
       <rect
         x="5" y="1"
         width="14" height="3"
         rx="1" ry="0"
         fill="rgba(255,255,255,0.08)"
       />
-      {/* Icon overlay */}
+      
       {iconOverlay}
     </svg>
   );

@@ -8,7 +8,6 @@ const VideoPlayer = ({ fileUrl, file }) => {
   const videoRef = useRef(null);
   const containerRef = useRef(null);
   
-  // Player State
   const [playing, setPlaying] = useState(false);
   const [volume, setVolume] = useState(1);
   const [muted, setMuted] = useState(false);
@@ -24,7 +23,6 @@ const VideoPlayer = ({ fileUrl, file }) => {
   const volumeBeforeMute = useRef(1);
   const controlsTimeoutRef = useRef(null);
 
-  // Editor State
   const [isEditing, setIsEditing] = useState(false);
   const [editParams, setEditParams] = useState({
       trimStart: 0,
@@ -34,23 +32,21 @@ const VideoPlayer = ({ fileUrl, file }) => {
       saturation: 100,
       rotation: 0
   });
-  const [trimDragging, setTrimDragging] = useState(null); // 'start', 'end'
+  const [trimDragging, setTrimDragging] = useState(null);
   const [showSaveModal, setShowSaveModal] = useState(false);
   const [processing, setProcessing] = useState(false);
 
-  // Initial Load
   useEffect(() => {
     if (videoRef.current) {
       videoRef.current.load();
       setLoading(true);
       setPlaying(false);
       setCurrentTime(0);
-      setIsEditing(false); // Reset edit mode on file change
+      setIsEditing(false);
       setEditParams(p => ({ ...p, trimStart: 0, trimEnd: 0 }));
     }
   }, [fileUrl]);
 
-  // Handle Controls Visibility
   const resetControlsTimeout = useCallback(() => {
     setShowControls(true);
     if (controlsTimeoutRef.current) clearTimeout(controlsTimeoutRef.current);
@@ -75,10 +71,9 @@ const VideoPlayer = ({ fileUrl, file }) => {
     };
   }, [resetControlsTimeout]);
 
-  // Keyboard Shortcuts
   useEffect(() => {
     const handleKeyDown = (e) => {
-      if (isEditing) return; // Disable shortcuts while editing (except maybe space?)
+      if (isEditing) return;
       
       switch(e.key.toLowerCase()) {
         case ' ':
@@ -122,13 +117,11 @@ const VideoPlayer = ({ fileUrl, file }) => {
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [playing, volume, isEditing]); // dep update
+  }, [playing, volume, isEditing]);
 
-  // Video Events
   const onTimeUpdate = () => {
     if (videoRef.current) {
       setCurrentTime(videoRef.current.currentTime);
-      // Auto-loop preview in edit mode?
       if (isEditing && videoRef.current.currentTime >= editParams.trimEnd && editParams.trimEnd > 0) {
           videoRef.current.currentTime = editParams.trimStart;
       }
@@ -147,7 +140,6 @@ const VideoPlayer = ({ fileUrl, file }) => {
     }
   };
 
-  // Actions
   const togglePlay = () => {
     if (videoRef.current) {
       if (playing) videoRef.current.pause();
@@ -227,13 +219,10 @@ const VideoPlayer = ({ fileUrl, file }) => {
     setShowSpeedMenu(false);
   };
 
-  // --- EDITING LOGIC ---
 
   const toggleEditMode = () => {
       if (isEditing) {
-          // Cancel edit
           setIsEditing(false);
-          // Reset params
           setEditParams(p => ({
               ...p,
               trimStart: 0,
@@ -249,7 +238,6 @@ const VideoPlayer = ({ fileUrl, file }) => {
       }
   };
 
-  // Trim Logic
   const handleTrimDragStart = (e, handle) => {
       e.stopPropagation();
       setTrimDragging(handle);
@@ -258,10 +246,7 @@ const VideoPlayer = ({ fileUrl, file }) => {
 
   const handleTrimMouseMove = (e) => {
       if (!trimDragging || !containerRef.current) return;
-      const rect = containerRef.current.getBoundingClientRect(); // Use container or track relative?
-      // Better to use document mouse move and calculate % relative to track width
-      // Simplified: Assume track is full width minus padding
-      // Let's use the track element ref if possible, but state update is global mouse move
+      const rect = containerRef.current.getBoundingClientRect();
       const track = document.getElementById('vp-trim-track');
       if(track) {
           const trackRect = track.getBoundingClientRect();
@@ -270,7 +255,7 @@ const VideoPlayer = ({ fileUrl, file }) => {
           const time = percent * duration;
           
           if (trimDragging === 'start') {
-              const newStart = Math.min(time, editParams.trimEnd - 1); // min 1 sec diff
+              const newStart = Math.min(time, editParams.trimEnd - 1);
               setEditParams(p => ({ ...p, trimStart: newStart }));
               videoRef.current.currentTime = newStart;
           } else {
@@ -285,7 +270,6 @@ const VideoPlayer = ({ fileUrl, file }) => {
       setTrimDragging(null);
   };
 
-  // Save Logic
   const handleSaveVideo = async (saveAsCopy) => {
       setShowSaveModal(false);
       setProcessing(true);
@@ -299,7 +283,7 @@ const VideoPlayer = ({ fileUrl, file }) => {
                   'Authorization': `Bearer ${token}`
               },
               body: JSON.stringify({
-                  path: file.path, // We need relative path or ID? Endpoint expects path
+                  path: file.path,
                   startTime: editParams.trimStart,
                   endTime: editParams.trimEnd,
                   filters: {
@@ -316,7 +300,6 @@ const VideoPlayer = ({ fileUrl, file }) => {
           if (data.success) {
               alert(t('videoPlayer.saveSuccess') || "Video processed successfully");
               if (!saveAsCopy) {
-                  // Reload video
                   videoRef.current.load();
               }
               setIsEditing(false);
@@ -331,14 +314,9 @@ const VideoPlayer = ({ fileUrl, file }) => {
       }
   };
 
-  // Computed styles for filter preview
   const videoStyle = {
       filter: `brightness(${editParams.brightness}%) contrast(${editParams.contrast}%) saturate(${editParams.saturation}%)`,
       transform: `rotate(${editParams.rotation}deg)`
-      // Note: Rotation via CSS transform works for preview, but controls might get misaligned if not handled.
-      // For simplicity, we rotate the VIDEO element inside the container.
-      // Might strictly clip if container has overflow hidden.
-      // For now, simple standard rotation.
   };
 
   const formatTime = (time) => {
@@ -351,7 +329,6 @@ const VideoPlayer = ({ fileUrl, file }) => {
   const bufferedPercent = duration > 0 ? (buffered / duration) * 100 : 0;
   const progressPercent = duration > 0 ? (currentTime / duration) * 100 : 0;
 
-  // Trim percentages
   const trimStartPct = duration > 0 ? (editParams.trimStart / duration) * 100 : 0;
   const trimEndPct = duration > 0 ? (editParams.trimEnd / duration) * 100 : 100;
 
@@ -363,7 +340,7 @@ const VideoPlayer = ({ fileUrl, file }) => {
       onMouseUp={isEditing ? handleTrimMouseUp : undefined}
     >
       
-      {/* Loading Spinner */}
+      
       {(loading || processing) && (
         <div className="vp-spinner-overlay">
            <div className="vp-spinner"></div>
@@ -371,7 +348,7 @@ const VideoPlayer = ({ fileUrl, file }) => {
         </div>
       )}
 
-      {/* Main Video */}
+      
       <video
         ref={videoRef}
         src={fileUrl}
@@ -385,7 +362,7 @@ const VideoPlayer = ({ fileUrl, file }) => {
         style={videoStyle}
       />
 
-      {/* Edit Toggle Button */}
+      
       {!loading && !processing && (
           <button className="vp-edit-toggle" onClick={toggleEditMode}>
               {isEditing ? <BiX size={20} /> : <BiEdit size={20} />}
@@ -393,23 +370,20 @@ const VideoPlayer = ({ fileUrl, file }) => {
           </button>
       )}
 
-      {/* Standard Controls (Hide in edit mode, or keep?)
-          Let's hide standard controls overlay in edit mode to avoid clutter, 
-          but show standard play/pause in editor panel if needed.
-      */}
+      
       {!isEditing && (
           <>
-            {/* Big Play Button Overlay */}
+            
             {!playing && !loading && (
                 <div className="vp-big-play" onClick={togglePlay}>
                 <svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
                 </div>
             )}
 
-            {/* Bottom Controls */}
+            
             <div className={`vp-controls-wrapper ${showControls || !playing ? 'visible' : ''}`}>
                 
-                {/* Progress Bar */}
+                
                 <div className="vp-progress-container" onClick={(e) => {
                     const rect = e.currentTarget.getBoundingClientRect();
                     const percent = (e.clientX - rect.left) / rect.width;
@@ -499,7 +473,7 @@ const VideoPlayer = ({ fileUrl, file }) => {
           </>
       )}
 
-      {/* Editor Overlay */}
+      
       {isEditing && (
           <div className="vp-edit-overlay">
               <div className="vp-edit-panel">
@@ -515,15 +489,15 @@ const VideoPlayer = ({ fileUrl, file }) => {
                       </div>
                   </div>
 
-                  {/* Trim Track */}
+                  
                   <div className="vp-trim-track" id="vp-trim-track">
-                      {/* Range Fill */}
+                      
                       <div 
                           className="vp-trim-fill" 
                           style={{ left: `${trimStartPct}%`, width: `${trimEndPct - trimStartPct}%` }}
                       />
                       
-                      {/* Start Handle */}
+                      
                       <div 
                           className="vp-trim-handle"
                           style={{ left: `${trimStartPct}%` }}
@@ -532,20 +506,17 @@ const VideoPlayer = ({ fileUrl, file }) => {
                           <div className="vp-trim-time">{formatTime(editParams.trimStart)}</div>
                       </div>
 
-                      {/* End Handle */}
+                      
                       <div 
                            className="vp-trim-handle"
-                           style={{ left: `${trimEndPct}%`, transform: 'translateX(-100%)' }} // Align right side? No, pure left is better but handle width matters
-                           // Better: left is position, but visual center.
-                           // Handle is 12px. center is 6px.
-                           // Actually let's assume left position matches time exactly.
+                           style={{ left: `${trimEndPct}%`, transform: 'translateX(-100%)' }}
                            onMouseDown={(e) => handleTrimDragStart(e, 'end')}
                        >
                            <div className="vp-trim-time">{formatTime(editParams.trimEnd)}</div>
                        </div>
                   </div>
 
-                  {/* Filters */}
+                  
                   <div className="vp-filters-grid">
                       <div className="vp-filter-item">
                           <div className="vp-filter-label">
@@ -582,7 +553,7 @@ const VideoPlayer = ({ fileUrl, file }) => {
                       </div>
                   </div>
 
-                  {/* Action Buttons */}
+                  
                   <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 10 }}>
                       <button className="vp-btn-secondary" style={{ padding: '8px 16px', borderRadius: 6 }} onClick={toggleEditMode}>
                           {t('common.cancel')}
@@ -594,7 +565,7 @@ const VideoPlayer = ({ fileUrl, file }) => {
                   </div>
               </div>
 
-              {/* Save Modal */}
+              
               {showSaveModal && (
                   <div className="vp-save-modal">
                       <h3>{t('imageEditor.saveOptions')}</h3>

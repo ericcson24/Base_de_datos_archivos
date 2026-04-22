@@ -19,7 +19,7 @@ const ShareModal = ({ isOpen, onClose, onShare, onUnshareUser, item }) => {
   const [newSharePermission, setNewSharePermission] = useState('edit');
   const [updatingPerm, setUpdatingPerm] = useState(null);
   const [revokingAll, setRevokingAll] = useState(false);
-  const [mode, setMode] = useState('users'); // 'users' | 'group'
+  const [mode, setMode] = useState('users');
   const [groups, setGroups] = useState([]);
   const [selectedGroupId, setSelectedGroupId] = useState('');
   const [loadingGroups, setLoadingGroups] = useState(false);
@@ -55,7 +55,6 @@ const ShareModal = ({ isOpen, onClose, onShare, onUnshareUser, item }) => {
       setNewSharePermission('edit');
       setMode('users');
       setSelectedGroupId('');
-      // Fetch groups (best effort)
       (async () => {
         setLoadingGroups(true);
         try {
@@ -66,7 +65,7 @@ const ShareModal = ({ isOpen, onClose, onShare, onUnshareUser, item }) => {
             const d = await r.json();
             setGroups(d.groups || []);
           }
-        } catch (e) { /* ignore */ }
+        } catch (e) {  }
         finally { setLoadingGroups(false); }
       })();
     }
@@ -266,7 +265,7 @@ const ShareModal = ({ isOpen, onClose, onShare, onUnshareUser, item }) => {
   return (
     <div className="share-modal-overlay" onClick={onClose}>
       <div className="share-modal-content" onClick={e => e.stopPropagation()}>
-        {/* Header */}
+        
         <div className="share-modal-header">
           <div className="share-modal-icon">
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -284,24 +283,14 @@ const ShareModal = ({ isOpen, onClose, onShare, onUnshareUser, item }) => {
           </button>
         </div>
 
-        {/* Add people section */}
+        
         <div className="share-add-section" ref={wrapperRef}>
-          {/* Mode tabs */}
-          <div className="share-mode-tabs" style={{ display: 'flex', gap: 8, marginBottom: 10 }}>
+          
+          <div className="share-mode-tabs">
             <button
               type="button"
               className={`share-mode-tab ${mode === 'users' ? 'active' : ''}`}
               onClick={() => setMode('users')}
-              style={{
-                padding: '6px 12px',
-                borderRadius: 6,
-                border: '1px solid',
-                borderColor: mode === 'users' ? '#3b82f6' : 'rgba(255,255,255,0.1)',
-                background: mode === 'users' ? 'rgba(59,130,246,0.15)' : 'transparent',
-                color: mode === 'users' ? '#60a5fa' : 'inherit',
-                cursor: 'pointer',
-                fontSize: 13
-              }}
             >
               {t('share.tabUsers') || 'Usuarios'}
             </button>
@@ -309,35 +298,18 @@ const ShareModal = ({ isOpen, onClose, onShare, onUnshareUser, item }) => {
               type="button"
               className={`share-mode-tab ${mode === 'group' ? 'active' : ''}`}
               onClick={() => setMode('group')}
-              style={{
-                padding: '6px 12px',
-                borderRadius: 6,
-                border: '1px solid',
-                borderColor: mode === 'group' ? '#3b82f6' : 'rgba(255,255,255,0.1)',
-                background: mode === 'group' ? 'rgba(59,130,246,0.15)' : 'transparent',
-                color: mode === 'group' ? '#60a5fa' : 'inherit',
-                cursor: 'pointer',
-                fontSize: 13
-              }}
             >
               {t('share.tabGroup') || 'Grupo'}
             </button>
           </div>
 
-          {/* Permission selector for new shares */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
-            <label className="share-input-label" style={{ margin: 0 }}>{t('share.permission') || 'Permiso'}:</label>
+          
+          <div className="share-permission-row">
+            <label className="share-input-label share-permission-label">{t('share.permission') || 'Permiso'}:</label>
             <select
               value={newSharePermission}
               onChange={(e) => setNewSharePermission(e.target.value)}
-              style={{
-                padding: '4px 10px',
-                borderRadius: 6,
-                background: 'rgba(255,255,255,0.05)',
-                border: '1px solid rgba(255,255,255,0.1)',
-                color: 'inherit',
-                fontSize: 13
-              }}
+              className="share-select share-select-compact"
             >
               <option value="edit">{t('share.permEdit') || 'Editor'}</option>
               <option value="read">{t('share.permRead') || 'Solo lectura'}</option>
@@ -430,16 +402,7 @@ const ShareModal = ({ isOpen, onClose, onShare, onUnshareUser, item }) => {
                 value={selectedGroupId}
                 onChange={(e) => setSelectedGroupId(e.target.value)}
                 disabled={loadingGroups || groups.length === 0}
-                style={{
-                  width: '100%',
-                  padding: '8px 10px',
-                  borderRadius: 6,
-                  background: 'rgba(255,255,255,0.05)',
-                  border: '1px solid rgba(255,255,255,0.1)',
-                  color: 'inherit',
-                  fontSize: 13,
-                  marginBottom: 10
-                }}
+                className="share-select share-select-full"
               >
                 <option value="">
                   {loadingGroups
@@ -477,7 +440,7 @@ const ShareModal = ({ isOpen, onClose, onShare, onUnshareUser, item }) => {
           )}
         </div>
 
-        {/* Messages */}
+        
         {error && (
           <div className="share-message share-message-error">
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -495,7 +458,7 @@ const ShareModal = ({ isOpen, onClose, onShare, onUnshareUser, item }) => {
           </div>
         )}
 
-        {/* Current access section */}
+        
         <div className="share-access-section">
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <h4 className="share-access-title">
@@ -560,16 +523,7 @@ const ShareModal = ({ isOpen, onClose, onShare, onUnshareUser, item }) => {
                     onChange={(e) => handleChangePermission(share.shared_with_username, e.target.value)}
                     disabled={updatingPerm === share.shared_with_username}
                     title={t('share.changePermission') || 'Cambiar permiso'}
-                    style={{
-                      padding: '4px 8px',
-                      borderRadius: 6,
-                      background: 'rgba(255,255,255,0.05)',
-                      border: '1px solid rgba(255,255,255,0.1)',
-                      color: 'inherit',
-                      fontSize: 12,
-                      marginRight: 8,
-                      cursor: 'pointer'
-                    }}
+                    className="share-select share-select-row"
                   >
                     <option value="edit">{t('share.permEdit') || 'Editor'}</option>
                     <option value="read">{t('share.permRead') || 'Solo lectura'}</option>
@@ -594,7 +548,7 @@ const ShareModal = ({ isOpen, onClose, onShare, onUnshareUser, item }) => {
           )}
         </div>
 
-        {/* Footer */}
+        
         <div className="share-modal-footer">
           <button className="share-done-btn" onClick={onClose}>
             {t('common.done') || t('common.close')}

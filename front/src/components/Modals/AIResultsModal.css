@@ -1,8 +1,5 @@
-/* ═══════════════════════════════════════════════════════════════
-   AI RESULTS MODAL — Dark Metal Glass / Frosted Liquid Glass
-   ═══════════════════════════════════════════════════════════════ */
 
-/* ── Base Modal ── */
+
 .ai-results-modal {
   width: 96%;
   max-width: 1500px;
@@ -50,7 +47,6 @@
   to { opacity: 1; transform: translateY(0) scale(1); }
 }
 
-/* ── Header ── */
 .ai-results-modal .modal-header {
   display: flex;
   justify-content: space-between;
@@ -112,14 +108,12 @@
   color: #64748b;
 }
 
-/* ── Body ── */
 .ai-results-modal .modal-body {
   padding: 1.5rem;
   flex: 1;
   overflow-y: auto;
 }
 
-/* ── AI Response Section ── */
 .ai-results-modal .ai-response-section {
   margin-bottom: 1.75rem;
 }
@@ -155,7 +149,6 @@
   color: #334155;
 }
 
-/* ── Sources ── */
 .ai-results-modal .sources-section {
   margin-bottom: 1.75rem;
 }
@@ -199,7 +192,6 @@
   color: #4f46e5;
 }
 
-/* ── Files Section ── */
 .ai-results-modal .files-section h3 {
   margin: 0 0 0.85rem 0;
   font-size: 0.8rem;
@@ -314,7 +306,6 @@
   color: #64748b;
 }
 
-/* ── Footer ── */
 .ai-results-modal .modal-footer {
   padding: 1rem 1.5rem;
   border-top: 1px solid rgba(148, 163, 184, 0.1);
@@ -328,7 +319,6 @@
   background: linear-gradient(0deg, rgba(255, 255, 255, 0.4), transparent);
 }
 
-/* ── Highlights ── */
 .file-highlights {
   margin-top: 0.7rem;
   padding: 0.55rem 0.7rem;
@@ -369,7 +359,6 @@
   color: #475569;
 }
 
-/* ── Expanded / Split Mode ── */
 .ai-results-modal.expanded-mode {
   width: 98%;
   max-width: 1700px;
@@ -393,7 +382,6 @@
   border-right: 1px solid rgba(148, 163, 184, 0.1);
 }
 
-/* Custom scrollbar for results panel */
 .results-panel::-webkit-scrollbar {
   width: 5px;
 }
@@ -467,7 +455,6 @@
   color: #92400e;
 }
 
-/* ── Empty viewer state ── */
 .empty-viewer-state {
   display: flex;
   flex-direction: column;
@@ -478,7 +465,6 @@
   gap: 0.5rem;
 }
 
-/* ── Viewer Wrapper ── */
 .viewer-wrapper {
   display: flex;
   flex-direction: column;
@@ -488,7 +474,6 @@
   height: 100%;
 }
 
-/* ── Word Editor Overrides ── */
 .viewer-wrapper .word-editor-container {
   height: 100%;
   display: flex;
@@ -504,7 +489,6 @@
 }
 
 
-/* Dark theme adjustments */
 [data-theme="dark"] .ai-results-modal .ai-response-text {
   background: rgba(66, 133, 244, 0.15);
   border-left-color: rgba(66, 133, 244, 0.7);
@@ -514,7 +498,6 @@
   background: rgba(255, 255, 255, 0.12);
 }
 
-/* Mobile responsive */
 @media (max-width: 768px) {
   .ai-results-modal {
     width: 95%;

@@ -26,7 +26,6 @@ const analyzeDocument = async (req, res) => {
     const { documentId, content, filename, analysisType } = req.body;
     const userId = req.user.id;
 
-    // Validate inputs
     if (!documentId || !content || !analysisType) {
       return res.status(400).json({ error: 'documentId, content, y analysisType son requeridos' });
     }
@@ -37,7 +36,6 @@ const analyzeDocument = async (req, res) => {
 
     validateDocumentContent(content);
 
-    // Check optimized cache first
     const cachedData = getCachedAnalysis(userId, documentId, analysisType);
     if (cachedData.cached) {
       const queryTime = Date.now() - startTime;
@@ -51,16 +49,13 @@ const analyzeDocument = async (req, res) => {
       });
     }
 
-    // Get document stats
     const stats = getDocumentStats(content);
     const documentTitle = filename || `Documento ${documentId}`;
 
-    // Build appropriate prompt
     const systemPrompt = buildAnalysisPrompt(analysisType, documentTitle, stats);
 
     console.log(`[DOCUMENT ANALYSIS] Usuario ${userId}: ${analysisType} - ${documentTitle}`);
 
-    // Call Gemini API (using gemini-flash-latest)
     const model = genAI.getGenerativeModel({ model: 'gemini-flash-latest' });
     
     const result = await model.generateContent({
@@ -90,7 +85,6 @@ const analyzeDocument = async (req, res) => {
       documentTitle
     };
 
-    // Cache result using optimized system
     cacheAnalysis(userId, documentId, analysisType, response);
 
     const queryTime = Date.now() - startTime;
@@ -126,7 +120,6 @@ const explainText = async (req, res) => {
 
     const cacheKey = `explain_${userId}_${documentId}_${fragment.substring(0, 50).replace(/\s+/g, '_')}`;
     
-    // Check cache
     const cachedResult = getCachedResult(userId, cacheKey);
     if (cachedResult) {
       return res.json({ ...cachedResult, cached: true });
@@ -135,7 +128,6 @@ const explainText = async (req, res) => {
     console.log(`[EXPLAIN TEXT] Usuario ${userId}: Explicando fragmento`);
 
     const systemPrompt = buildFragmentExplanationPrompt(documentTitle || 'Documento');
-    // (Using gemini-flash-latest)
     const model = genAI.getGenerativeModel({ model: 'gemini-flash-latest' });
 
     const result = await model.generateContent({
@@ -163,7 +155,6 @@ const explainText = async (req, res) => {
       timestamp: new Date().toISOString()
     };
 
-    // Cache result
     setCachedResult(userId, cacheKey, response);
 
     res.json(response);
@@ -190,7 +181,6 @@ const editSuggestion = async (req, res) => {
 
     const cacheKey = `edit_${userId}_${documentId}`;
     
-    // Check cache
     const cachedResult = getCachedResult(userId, cacheKey);
     if (cachedResult) {
       return res.json({ ...cachedResult, cached: true });
@@ -200,7 +190,6 @@ const editSuggestion = async (req, res) => {
 
     const systemPrompt = buildEditSuggestionPrompt();
     const focusText = focusArea ? `\nEnfoque en: ${focusArea}\n` : '';
-    // (Using gemini-flash-latest)
     const model = genAI.getGenerativeModel({ model: 'gemini-flash-latest' });
 
     const result = await model.generateContent({
@@ -228,7 +217,6 @@ const editSuggestion = async (req, res) => {
       timestamp: new Date().toISOString()
     };
 
-    // Cache result
     setCachedResult(userId, cacheKey, response);
 
     res.json(response);
@@ -255,7 +243,6 @@ const highlightAnalysis = async (req, res) => {
 
     const cacheKey = `highlight_${userId}_${documentId}`;
     
-    // Check cache
     const cachedResult = getCachedResult(userId, cacheKey);
     if (cachedResult) {
       return res.json({ ...cachedResult, cached: true });
@@ -264,7 +251,6 @@ const highlightAnalysis = async (req, res) => {
     console.log(`[HIGHLIGHT ANALYSIS] Usuario ${userId}: Analizando para resaltes`);
 
     const systemPrompt = buildHighlightingPrompt();
-    // (Using gemini-flash-latest)
     const model = genAI.getGenerativeModel({ model: 'gemini-flash-latest' });
 
     const result = await model.generateContent({
@@ -293,7 +279,6 @@ const highlightAnalysis = async (req, res) => {
       timestamp: new Date().toISOString()
     };
 
-    // Cache result
     setCachedResult(userId, cacheKey, response);
 
     res.json(response);

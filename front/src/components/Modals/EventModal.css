@@ -1,8 +1,5 @@
-/* =========================================
-   MODAL DE EVENTOS - ESTILOS ESPECÍFICOS
-   ========================================= */
 
-/* Backdrop ahora alinea el contenido a la derecha */
+
 .modal-backdrop {
   position: fixed;
   top: 0;
@@ -11,8 +8,8 @@
   height: 100vh;
   background: rgba(0, 0, 0, 0.3);
   display: flex;
-  justify-content: flex-end; /* Alineación a la derecha */
-  align-items: stretch; /* Ocupar toda la altura */
+  justify-content: flex-end; 
+  align-items: stretch; 
   z-index: 1000;
   backdrop-filter: blur(2px);
 }
@@ -23,7 +20,7 @@
   box-shadow: -5px 0 30px rgba(0,0,0,0.15);
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
-  width: 450px; /* Ancho fijo tipo sidebar */
+  width: 450px; 
   max-width: 100%;
   height: 100vh;
   max-height: 100vh;
@@ -33,7 +30,7 @@
   color: var(--cal-text, #333);
   display: flex;
   flex-direction: column;
-  border-radius: 0; /* Sin bordes redondeados o solo en la esquina superior izquierda si se prefiere */
+  border-radius: 0; 
 }
 
 @keyframes slideInRight {
@@ -94,7 +91,6 @@
   overflow-y: auto;
 }
 
-/* Scroll bonito para el modal */
 .event-modal::-webkit-scrollbar {
   width: 6px;
 }
@@ -112,7 +108,6 @@
   padding: 0 12px;
 }
 
-/* Location link in view mode */
 .location-detail {
   padding: 0 !important;
 }
@@ -182,7 +177,6 @@
   background: transparent;
 }
 
-/* Estilos de Formulario */
 .form-group {
   margin-bottom: 24px;
 }
@@ -266,7 +260,6 @@
   align-items: center;
 }
 
-/* Category Selector */
 .category-selector {
   display: flex;
   flex-wrap: wrap;
@@ -295,7 +288,6 @@
   box-shadow: 0 2px 8px rgba(0,0,0,0.1);
 }
 
-/* View Mode Tags */
 .categories-tags {
   display: flex;
   flex-wrap: wrap;
@@ -310,7 +302,6 @@
   display: inline-block;
 }
 
-/* Detail View Styles */
 .event-details {
   display: flex;
   flex-direction: column;
@@ -357,7 +348,6 @@
   gap: 16px;
 }
 
-/* Botones */
 .categories-tags {
   display: flex;
   flex-wrap: wrap;
@@ -369,7 +359,7 @@
   border-radius: 16px;
   font-size: 0.85rem;
   font-weight: 500;
-  color: #fff; /* Moved from inline */
+  color: #fff; 
 }
 
 .modal-footer {
@@ -433,7 +423,6 @@
   transform: none !important;
 }
 
-/* Confirm Modal */
 .confirm-modal {
   background: var(--cal-surface, white);
   border-radius: 12px;
@@ -478,7 +467,6 @@
   transform: translateY(-1px);
 }
 
-/* Estilos para inputs de fecha y checkbox */
 .form-input[type="date"],
 .form-input[type="datetime-local"] {
   font-family: inherit;
@@ -545,9 +533,7 @@
   border-color: var(--cal-primary);
 }
 
-/* =========================================
-   ATTACHMENTS STYLES
-   ========================================= */
+
 
 .attachments-list {
   display: flex;
@@ -614,7 +600,6 @@
   background: rgba(239, 68, 68, 0.1);
 }
 
-/* File Picker */
 .file-picker-modal {
   width: 500px !important;
   height: auto !important;
@@ -652,9 +637,7 @@
   color: white;
 }
 
-/* =========================================
-   AI FILE SUGGESTIONS
-   ========================================= */
+
 
 .ai-suggestions-section {
   border-top: 1px solid rgba(14, 165, 233, 0.15);
@@ -860,7 +843,6 @@
   background: rgba(239, 68, 68, 0.08);
 }
 
-/* Manual suggest button */
 .ai-suggest-btn {
   background: linear-gradient(135deg, #0ea5e9 0%, #0284c7 100%);
   color: white !important;

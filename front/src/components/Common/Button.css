@@ -1,4 +1,3 @@
-/* Button.css */
 
 .button {
   display: inline-flex;
@@ -26,7 +25,6 @@
   cursor: wait;
 }
 
-/* Variants */
 .button-primary {
   background: linear-gradient(135deg, #2563eb 0%, #0891b2 100%);
   color: white;
@@ -61,7 +59,6 @@
   box-shadow: 0 6px 20px rgba(239, 68, 68, 0.5);
 }
 
-/* Sizes */
 .button-small {
   padding: 8px 16px;
   font-size: 12px;
@@ -77,12 +74,10 @@
   font-size: 16px;
 }
 
-/* Full width */
 .button-full-width {
   width: 100%;
 }
 
-/* Loading state */
 .button-spinner {
   animation: spin 1s linear infinite;
 }
@@ -92,7 +87,6 @@
   to { transform: rotate(360deg); }
 }
 
-/* Frosted button content */
 .frosted-button-content {
   background: none;
   border: none;
@@ -109,7 +103,6 @@
   cursor: inherit;
 }
 
-/* Dark theme support */
 [data-theme="dark"] .button-secondary {
   color: #e2e8f0;
   border: 1px solid rgba(148, 163, 184, 0.12);
@@ -120,11 +113,10 @@
   background: rgba(148, 163, 184, 0.12);
 }
 
-/* Responsive adjustments */
 @media (max-width: 480px) {
   .button {
     padding: 14px 20px;
-    font-size: 16px; /* Prevent zoom on iOS */
+    font-size: 16px; 
     border-radius: 10px;
   }
 
@@ -139,6 +131,6 @@
   }
 
   .button-primary:hover:not(:disabled) {
-    transform: none; /* Disable hover lift on touch */
+    transform: none; 
   }
 }

@@ -1,11 +1,6 @@
 /**
- * Document Analysis Utilities
- * Helper functions for document processing and analysis
- */
 
 /**
- * Generate cache key for document analysis
- */
 function generateDocumentCacheKey(userId, documentId, analysisType, customQuery = null) {
   const normalized = customQuery 
     ? customQuery.toLowerCase().replace(/\s+/g, '_')
@@ -14,8 +9,6 @@ function generateDocumentCacheKey(userId, documentId, analysisType, customQuery 
 }
 
 /**
- * Extract text excerpt from document
- */
 function extractExcerpt(content, startPosition, length = 200) {
   if (startPosition < 0 || startPosition >= content.length) {
     return content.substring(0, Math.min(length, content.length));
@@ -24,8 +17,6 @@ function extractExcerpt(content, startPosition, length = 200) {
 }
 
 /**
- * Split content into chunks for analysis
- */
 function splitContentIntoChunks(content, maxChunkSize = 5000) {
   const chunks = [];
   let currentPosition = 0;
@@ -44,8 +35,6 @@ function splitContentIntoChunks(content, maxChunkSize = 5000) {
 }
 
 /**
- * Validate document content
- */
 function validateDocumentContent(content) {
   if (!content || typeof content !== 'string') {
     throw new Error('Invalid document content');
@@ -55,7 +44,6 @@ function validateDocumentContent(content) {
     throw new Error('Document is empty');
   }
   
-  // Maximum content size: 50KB
   if (content.length > 50000) {
     throw new Error('Document too large (max 50KB)');
   }
@@ -64,8 +52,6 @@ function validateDocumentContent(content) {
 }
 
 /**
- * Normalize content for comparison
- */
 function normalizeContent(content) {
   return content
     .toLowerCase()
@@ -74,8 +60,6 @@ function normalizeContent(content) {
 }
 
 /**
- * Get document statistics
- */
 function getDocumentStats(content) {
   const lines = content.split('\n');
   const words = content.split(/\s+/).filter(w => w.length > 0);
@@ -86,13 +70,11 @@ function getDocumentStats(content) {
     words: words.length,
     characters: chars,
     averageWordsPerLine: Math.round(words.length / lines.length),
-    readingTimeMinutes: Math.ceil(words.length / 200) // Average reading speed: 200 words/min
+    readingTimeMinutes: Math.ceil(words.length / 200)
   };
 }
 
 /**
- * Build system prompt for document analysis
- */
 function buildAnalysisPrompt(analysisType, documentTitle, documentStats) {
   const basePrompt = `You are a professional document analyst with expertise in content evaluation, business analysis, and technical documentation.
 You are analyzing a document titled "${documentTitle}".
@@ -149,8 +131,6 @@ Include examples from the document to illustrate points.`,
 }
 
 /**
- * Build system prompt for text fragment explanation
- */
 function buildFragmentExplanationPrompt(documentTitle) {
   return `You are a professional document analyst with expertise in detailed content analysis.
 You are analyzing a specific passage from a document titled "${documentTitle}".
@@ -169,8 +149,6 @@ Be thorough and detailed.`;
 }
 
 /**
- * Build system prompt for edit suggestions
- */
 function buildEditSuggestionPrompt() {
   return `You are a professional editor and writing consultant with expertise in business, technical, and academic writing.
 Review the provided text and provide specific improvement suggestions in these areas:
@@ -195,8 +173,6 @@ Prioritize high-impact changes.`;
 }
 
 /**
- * Build system prompt for text highlighting analysis
- */
 function buildHighlightingPrompt() {
   return `You are a document analyst helping to identify the most important content for highlighting.
 Analyze the text and identify sections that should be highlighted based on:
@@ -221,11 +197,8 @@ Include 3-5 high importance highlights, 2-4 medium importance highlights.`;
 }
 
 /**
- * Parse highlights from AI response (improved version)
- */
 function parseHighlightsFromResponse(response, fullText = '', maxHighlights = 10) {
   try {
-    // Try to extract JSON from response
     const jsonMatch = response.match(/\[[\s\S]*\]/);
     if (!jsonMatch) {
       return [];
@@ -233,7 +206,6 @@ function parseHighlightsFromResponse(response, fullText = '', maxHighlights = 10
 
     const highlights = JSON.parse(jsonMatch[0]);
     
-    // Validate and process results
     const processedHighlights = highlights
       .filter(h => h.text || (typeof h.start === 'number' && typeof h.end === 'number'))
       .map((h, idx) => ({
@@ -246,7 +218,6 @@ function parseHighlightsFromResponse(response, fullText = '', maxHighlights = 10
         end: h.end
       }))
       .sort((a, b) => {
-        // Sort by importance level
         const importanceOrder = { high: 0, medium: 1, low: 2 };
         const aPriority = importanceOrder[a.importance] || 2;
         const bPriority = importanceOrder[b.importance] || 2;
@@ -262,8 +233,6 @@ function parseHighlightsFromResponse(response, fullText = '', maxHighlights = 10
 }
 
 /**
- * Validate file extension for document analysis
- */
 function isDocumentFile(filename) {
   const documentExtensions = ['.txt', '.md', '.pdf', '.docx', '.doc', '.rtf', '.csv', '.json', '.xml'];
   const ext = filename.toLowerCase().substring(filename.lastIndexOf('.'));
@@ -271,8 +240,6 @@ function isDocumentFile(filename) {
 }
 
 /**
- * Get document type from filename
- */
 function getDocumentType(filename) {
   const ext = filename.toLowerCase().substring(filename.lastIndexOf('.'));
   const typeMap = {

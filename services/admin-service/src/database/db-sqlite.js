@@ -1,12 +1,10 @@
 const sqlite3 = require('sqlite3').verbose();
 const path = require('path');
 const bcrypt = require('bcrypt');
-require('dotenv').config(); // Cargar variables de entorno
+require('dotenv').config();
 
-// Ruta a la base de datos
 const dbPath = process.env.DB_PATH || path.join(__dirname, 'server.db');
 
-// Crear conexión
 const db = new sqlite3.Database(dbPath, (err) => {
   if (err) {
     console.error('Error conectando a la base de datos:', err.message);
@@ -16,10 +14,8 @@ const db = new sqlite3.Database(dbPath, (err) => {
   }
 });
 
-// Inicializar tablas
 function initDatabase() {
   db.serialize(() => {
-    // 1. Tabla de Usuarios (Perfil)
     db.run(`CREATE TABLE IF NOT EXISTS users (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       username TEXT UNIQUE NOT NULL,
@@ -35,7 +31,6 @@ function initDatabase() {
       microsoft_refresh_token TEXT
     )`);
 
-    // 2. Tabla de Credenciales (Separada para seguridad)
     db.run(`CREATE TABLE IF NOT EXISTS user_credentials (
       user_id INTEGER PRIMARY KEY,
       password_hash TEXT NOT NULL,
@@ -49,7 +44,6 @@ function initDatabase() {
       FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
     )`);
 
-    // Migración para añadir columnas de bloqueo temporal y reset
     const credCols = [
       { name: 'lockout_until', type: 'DATETIME' },
       { name: 'reset_token', type: 'TEXT' },
@@ -61,12 +55,10 @@ function initDatabase() {
       });
     });
 
-    // Migración para añadir columna de borrado programado a users
     db.run(`ALTER TABLE users ADD COLUMN deletion_scheduled_at DATETIME`, (err) => {
       if (err && !err.message.includes('duplicate column name')) {}
     });
 
-    // 2.1 Tabla de Configuración de Seguridad (Email de recuperación encriptado)
     db.run(`CREATE TABLE IF NOT EXISTS security_settings (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       user_id INTEGER UNIQUE,
@@ -75,7 +67,6 @@ function initDatabase() {
       FOREIGN KEY(user_id) REFERENCES users(id)
     )`);
 
-    // 2.2 Tabla de Buzón de Admin (Notificaciones)
     db.run(`CREATE TABLE IF NOT EXISTS admin_inbox (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       type TEXT NOT NULL, -- 'LOCKOUT', 'RESET_REQUEST', 'SYSTEM'
@@ -86,7 +77,6 @@ function initDatabase() {
       FOREIGN KEY(user_id) REFERENCES users(id)
     )`);
 
-    // 3. Tabla de Carpetas (Estructura de archivos)
     db.run(`CREATE TABLE IF NOT EXISTS folders (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       parent_id INTEGER,
@@ -97,7 +87,6 @@ function initDatabase() {
       FOREIGN KEY(parent_id) REFERENCES folders(id)
     )`);
 
-    // 4. Tabla de Archivos (Metadatos)
     db.run(`CREATE TABLE IF NOT EXISTS files (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       folder_id INTEGER,
@@ -111,7 +100,6 @@ function initDatabase() {
       FOREIGN KEY(owner_id) REFERENCES users(id)
     )`);
 
-    // 5. Tabla de Grupos (Para compartir)
     db.run(`CREATE TABLE IF NOT EXISTS groups (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       name TEXT NOT NULL,
@@ -120,7 +108,6 @@ function initDatabase() {
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP
     )`);
 
-    // 6. Tabla de Miembros de Grupo
     db.run(`CREATE TABLE IF NOT EXISTS group_members (
       group_id INTEGER,
       user_id INTEGER,
@@ -131,7 +118,6 @@ function initDatabase() {
       FOREIGN KEY(user_id) REFERENCES users(id)
     )`);
 
-    // Migración de columnas antiguas en 'users' si existen (para compatibilidad)
     const columnsToAdd = [
       { name: 'avatar_url', type: 'TEXT' },
       { name: 'theme_preference', type: 'TEXT DEFAULT "light"' },
@@ -146,12 +132,10 @@ function initDatabase() {
     columnsToAdd.forEach(col => {
       db.run(`ALTER TABLE users ADD COLUMN ${col.name} ${col.type}`, (err) => {
         if (err && !err.message.includes('duplicate column name')) {
-          // console.error(`Error añadiendo columna ${col.name}:`, err.message);
         }
       });
     });
 
-    // Tabla de Eventos de Calendario
     db.run(`CREATE TABLE IF NOT EXISTS calendar_events (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       microsoft_id TEXT UNIQUE,
@@ -173,7 +157,6 @@ function initDatabase() {
       if (err && !err.message.includes('duplicate column name')) {}
     });
 
-    // Tabla de Logs de Auditoría
     db.run(`CREATE TABLE IF NOT EXISTS audit_logs (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       user_id INTEGER,
@@ -184,7 +167,6 @@ function initDatabase() {
       timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
     )`);
 
-    // Tabla de Archivos Compartidos (Legacy + New)
     db.run(`CREATE TABLE IF NOT EXISTS shared_files (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       path TEXT NOT NULL,
@@ -194,12 +176,10 @@ function initDatabase() {
       UNIQUE(path, owner_username, shared_with_username)
     )`);
 
-    // --- MIGRACIÓN DE CONTRASEÑAS ---
-    // Si existen usuarios con contraseña en la tabla 'users' pero no en 'user_credentials', migrarlos.
     db.all("SELECT id, password FROM users", (err, rows) => {
       if (!err && rows) {
         rows.forEach(row => {
-          if (row.password) { // Si tiene contraseña en la tabla antigua
+          if (row.password) {
              db.get("SELECT user_id FROM user_credentials WHERE user_id = ?", [row.id], (err, cred) => {
                if (!cred) {
                  console.log(`Migrando credenciales para usuario ID ${row.id}...`);
@@ -211,9 +191,8 @@ function initDatabase() {
       }
     });
 
-    // Crear usuario administrador por defecto si no existe
     const adminUser = 'administrador';
-    const adminPass = process.env.ADMIN_INITIAL_PASSWORD || 'admin123'; // Fallback seguro
+    const adminPass = process.env.ADMIN_INITIAL_PASSWORD || 'admin123';
 
     db.get("SELECT * FROM users WHERE username = ?", [adminUser], async (err, row) => {
       if (err) {
@@ -241,7 +220,6 @@ function initDatabase() {
       }
     });
 
-    // Crear usuario de prueba 'eric' si no existe
     const testUser = 'eric';
     const testPass = process.env.USER_INITIAL_PASSWORD || 'user123';
 
@@ -268,7 +246,6 @@ function initDatabase() {
   });
 }
 
-// Promisify db methods for easier async/await usage
 const dbAsync = {
   get: (sql, params) => new Promise((resolve, reject) => {
     db.get(sql, params, (err, row) => {

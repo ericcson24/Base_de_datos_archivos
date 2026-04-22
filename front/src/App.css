@@ -1,7 +1,4 @@
-/* ==========================================
-   GLOBAL THEME VARIABLES (light / dark)
-   Used by modals and components outside scoped panels.
-   ========================================== */
+
 :root {
   --bg-primary: #ffffff;
   --bg-secondary: #ffffff;

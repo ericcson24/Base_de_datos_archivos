@@ -35,7 +35,6 @@ textarea:focus {
   cursor: not-allowed;
 }
 
-/* ===== Mobile Responsive ===== */
 @media (max-width: 768px) {
   .line-numbers {
     min-width: 36px;

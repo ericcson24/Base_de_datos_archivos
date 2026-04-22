@@ -10,7 +10,7 @@ const MoveModal = ({ isOpen, onClose, itemToMove, onMove }) => {
 
   useEffect(() => {
     if (isOpen) {
-      setCurrentPath([]); // Reset path when opening
+      setCurrentPath([]);
       loadFolders([]);
     }
   }, [isOpen]);
@@ -62,10 +62,10 @@ const MoveModal = ({ isOpen, onClose, itemToMove, onMove }) => {
         className="bg-white dark:bg-slate-800 rounded-xl shadow-2xl border border-gray-200 dark:border-slate-600 w-full max-w-lg mx-4 flex flex-col max-h-[85vh] overflow-hidden" 
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Header */}
+        
         <div className="p-4 border-b border-gray-200 dark:border-slate-700 flex justify-between items-center bg-gray-50 dark:bg-slate-800/50">
           <h3 className="text-lg font-semibold text-gray-900 dark:text-slate-100 flex items-center">
-            <span className="mr-2 text-xl">🚚</span>
+            <span className="mr-2 text-xl">[Move]</span>
             {t('move.title', { name: itemToMove?.name })}
           </h3>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600 dark:hover:text-slate-300">
@@ -75,7 +75,7 @@ const MoveModal = ({ isOpen, onClose, itemToMove, onMove }) => {
           </button>
         </div>
         
-        {/* Breadcrumbs */}
+        
         <div className="px-4 py-3 bg-gray-100 dark:bg-slate-900/50 border-b border-gray-200 dark:border-slate-700 flex items-center overflow-x-auto whitespace-nowrap scrollbar-hide">
           <button 
             onClick={handleRootClick}
@@ -100,7 +100,7 @@ const MoveModal = ({ isOpen, onClose, itemToMove, onMove }) => {
           ))}
         </div>
         
-        {/* Folder List */}
+        
         <div className="flex-1 overflow-y-auto p-2 min-h-[300px] bg-white dark:bg-slate-800">
           {loading ? (
             <div className="flex flex-col items-center justify-center h-full text-gray-500">
@@ -173,7 +173,7 @@ const MoveModal = ({ isOpen, onClose, itemToMove, onMove }) => {
           )}
         </div>
 
-        {/* Footer */}
+        
         <div className="p-4 border-t border-gray-200 dark:border-slate-700 bg-gray-50 dark:bg-slate-800/50 flex justify-between items-center">
           <div className="text-sm text-gray-500 dark:text-slate-400 truncate max-w-[200px]">
             {t('move.destination')} <span className="font-medium text-gray-700 dark:text-slate-300">/{currentPath.join('/')}</span>

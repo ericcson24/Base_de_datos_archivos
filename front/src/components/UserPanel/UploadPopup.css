@@ -1,7 +1,4 @@
-/* ============================================
-   UPLOAD POPUP - Google Drive Style
-   Bottom-right popup with per-file progress
-   ============================================ */
+
 
 .upload-popup {
   position: fixed;
@@ -46,7 +43,6 @@
   }
 }
 
-/* ---- HEADER ---- */
 .upload-popup-header {
   display: flex;
   align-items: center;
@@ -118,7 +114,6 @@
   height: 16px;
 }
 
-/* ---- OVERALL PROGRESS ---- */
 .upload-popup-overall {
   padding: 6px 16px 8px;
   display: flex;
@@ -168,7 +163,6 @@
   color: #aaa;
 }
 
-/* ---- FILE LIST ---- */
 .upload-popup-list {
   overflow-y: auto;
   max-height: 300px;
@@ -188,7 +182,6 @@
   background: #555;
 }
 
-/* ---- ITEM ---- */
 .upload-popup-item {
   display: flex;
   align-items: flex-start;
@@ -214,7 +207,6 @@
   background: rgba(255, 255, 255, 0.03);
 }
 
-/* Item icon */
 .upload-item-icon {
   width: 24px;
   height: 24px;
@@ -264,7 +256,6 @@
   to { transform: rotate(360deg); }
 }
 
-/* Item info */
 .upload-item-info {
   flex: 1;
   min-width: 0;
@@ -321,7 +312,6 @@
   font-style: italic;
 }
 
-/* Per-file progress bar */
 .upload-item-progress {
   height: 3px;
   background: #e8eaed;
@@ -345,7 +335,6 @@
   background: #3a7afe;
 }
 
-/* Cancel button */
 .upload-item-cancel {
   background: none;
   border: none;
@@ -376,7 +365,6 @@
   height: 14px;
 }
 
-/* ---- RESPONSIVE ---- */
 @media (max-width: 480px) {
   .upload-popup {
     left: 10px;

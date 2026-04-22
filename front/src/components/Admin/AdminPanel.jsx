@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import SettingsModal from '../Modals/SettingsModal';
 import DeleteConfirmationModal from '../Modals/DeleteConfirmationModal';
 import GroupManager from './GroupManager';
@@ -13,7 +13,6 @@ const AdminPanel = ({ user, onLogout, onBackToFolders, onThemeToggle, isDarkMode
   const [loading, setLoading] = useState(true);
   const [showSettingsModal, setShowSettingsModal] = useState(false);
 
-  // Data States
   const [systemData, setSystemData] = useState({});
   const [serverInfo, setServerInfo] = useState({});
   const [connections, setConnections] = useState({});
@@ -23,24 +22,20 @@ const AdminPanel = ({ user, onLogout, onBackToFolders, onThemeToggle, isDarkMode
   const [inboxMessages, setInboxMessages] = useState([]);
   const [recoveryEmail, setRecoveryEmail] = useState('');
 
-  // UI States
   const [showAddUserModal, setShowAddUserModal] = useState(false);
   const [newUser, setNewUser] = useState({ username: '', password: '', role: 'user' });
   const [showEditUserModal, setShowEditUserModal] = useState(false);
   const [editingUser, setEditingUser] = useState(null);
   const [alert, setAlert] = useState({ show: false, type: '', message: '' });
   
-  // Delete Modal State
   const [deleteModal, setDeleteModal] = useState({ isOpen: false, user: null });
   const [currentTime, setCurrentTime] = useState(Date.now());
 
-  // Security States
   const [securityData, setSecurityData] = useState(null);
   const [securityLogs, setSecurityLogs] = useState([]);
   const [securityFilter, setSecurityFilter] = useState('security');
   const [securityLoading, setSecurityLoading] = useState(false);
 
-  // Windows Integration States
   const [windowsUsers, setWindowsUsers] = useState([]);
   const [windowsLinks, setWindowsLinks] = useState([]);
   const [windowsLoading, setWindowsLoading] = useState(false);
@@ -56,7 +51,6 @@ const AdminPanel = ({ user, onLogout, onBackToFolders, onThemeToggle, isDarkMode
     return () => clearInterval(timer);
   }, []);
 
-  // Auto-refresh system data every 5 seconds when on system tab
   useEffect(() => {
     if (activeTab === 'system') {
       loadServerInfo();
@@ -101,7 +95,6 @@ const AdminPanel = ({ user, onLogout, onBackToFolders, onThemeToggle, isDarkMode
     }
   };
 
-  // API Calls
   const fetchWithAuth = async (url, options = {}) => {
     const token = localStorage.getItem('auth_token');
     const headers = {
@@ -252,7 +245,6 @@ const AdminPanel = ({ user, onLogout, onBackToFolders, onThemeToggle, isDarkMode
     }
   };
 
-  // ── Windows Integration Functions ──
   const loadWindowsUsers = async () => {
     setWindowsLoading(true);
     try {
@@ -397,7 +389,6 @@ const AdminPanel = ({ user, onLogout, onBackToFolders, onThemeToggle, isDarkMode
   };
 
   const handleDeleteUser = (userId) => {
-    // Deprecated in favor of confirmDeleteUser
     const user = users.find(u => u.id === userId);
     if (user) confirmDeleteUser(user);
   };
@@ -523,7 +514,6 @@ const AdminPanel = ({ user, onLogout, onBackToFolders, onThemeToggle, isDarkMode
     setTimeout(() => setAlert({ show: false, type: '', message: '' }), 3000);
   };
 
-  // Render Helpers
   const renderSidebar = () => (
     <div className="admin-sidebar">
       <div className="admin-logo">
@@ -605,7 +595,6 @@ const AdminPanel = ({ user, onLogout, onBackToFolders, onThemeToggle, isDarkMode
     </div>
   );
 
-  // Auto-refresh dashboard stats every 10 seconds
   useEffect(() => {
     if (activeTab === 'dashboard') {
       const dashTimer = setInterval(() => {
@@ -793,7 +782,7 @@ const AdminPanel = ({ user, onLogout, onBackToFolders, onThemeToggle, isDarkMode
 
     return (
     <div className="admin-grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '16px' }}>
-      {/* CPU Card */}
+      
       <div className="admin-card">
         <div className="admin-card-header">
           <h2 className="admin-card-title">
@@ -809,7 +798,7 @@ const AdminPanel = ({ user, onLogout, onBackToFolders, onThemeToggle, isDarkMode
         </div>
       </div>
 
-      {/* Memory Card */}
+      
       <div className="admin-card">
         <div className="admin-card-header">
           <h2 className="admin-card-title">
@@ -826,7 +815,7 @@ const AdminPanel = ({ user, onLogout, onBackToFolders, onThemeToggle, isDarkMode
         </div>
       </div>
 
-      {/* Disk Card */}
+      
       <div className="admin-card">
         <div className="admin-card-header">
           <h2 className="admin-card-title">
@@ -843,7 +832,7 @@ const AdminPanel = ({ user, onLogout, onBackToFolders, onThemeToggle, isDarkMode
         </div>
       </div>
 
-      {/* Network Card */}
+      
       <div className="admin-card">
         <div className="admin-card-header">
           <h2 className="admin-card-title">
@@ -860,7 +849,7 @@ const AdminPanel = ({ user, onLogout, onBackToFolders, onThemeToggle, isDarkMode
         </div>
       </div>
 
-      {/* Server Info Card */}
+      
       <div className="admin-card">
         <div className="admin-card-header">
           <h2 className="admin-card-title">
@@ -878,7 +867,7 @@ const AdminPanel = ({ user, onLogout, onBackToFolders, onThemeToggle, isDarkMode
         </div>
       </div>
 
-      {/* Diagnostics Card */}
+      
       <div className="admin-card">
         <div className="admin-card-header">
           <h2 className="admin-card-title">
@@ -958,7 +947,7 @@ const AdminPanel = ({ user, onLogout, onBackToFolders, onThemeToggle, isDarkMode
 
     return (
       <div className="security-panel">
-        {/* Stats Cards */}
+        
         <div className="admin-grid security-stats-grid">
           <div className="admin-card security-stat-card">
             <div className="security-stat-icon success">
@@ -998,7 +987,7 @@ const AdminPanel = ({ user, onLogout, onBackToFolders, onThemeToggle, isDarkMode
           </div>
         </div>
 
-        {/* Rate Limited IPs */}
+        
         <div className="admin-card">
           <div className="admin-card-header">
             <h2 className="admin-card-title">
@@ -1047,7 +1036,7 @@ const AdminPanel = ({ user, onLogout, onBackToFolders, onThemeToggle, isDarkMode
           )}
         </div>
 
-        {/* Blocked Accounts */}
+        
         <div className="admin-card">
           <div className="admin-card-header">
             <h2 className="admin-card-title">
@@ -1095,7 +1084,7 @@ const AdminPanel = ({ user, onLogout, onBackToFolders, onThemeToggle, isDarkMode
           )}
         </div>
 
-        {/* Top Failed Usernames */}
+        
         {recentFailures.length > 0 && (
           <div className="admin-card">
             <div className="admin-card-header">
@@ -1125,7 +1114,7 @@ const AdminPanel = ({ user, onLogout, onBackToFolders, onThemeToggle, isDarkMode
           </div>
         )}
 
-        {/* Security Audit Logs */}
+        
         <div className="admin-card">
           <div className="admin-card-header">
             <h2 className="admin-card-title">
@@ -1181,7 +1170,7 @@ const AdminPanel = ({ user, onLogout, onBackToFolders, onThemeToggle, isDarkMode
 
     return (
       <div className="windows-panel">
-        {/* Detected Windows Users */}
+        
         <div className="admin-card">
           <div className="admin-card-header">
             <h2 className="admin-card-title">
@@ -1238,7 +1227,7 @@ const AdminPanel = ({ user, onLogout, onBackToFolders, onThemeToggle, isDarkMode
           )}
         </div>
 
-        {/* Linked Accounts */}
+        
         <div className="admin-card">
           <div className="admin-card-header">
             <h2 className="admin-card-title">
@@ -1315,7 +1304,7 @@ const AdminPanel = ({ user, onLogout, onBackToFolders, onThemeToggle, isDarkMode
           )}
         </div>
 
-        {/* How it works */}
+        
         <div className="admin-card">
           <div className="admin-card-header">
             <h2 className="admin-card-title">
@@ -1324,10 +1313,10 @@ const AdminPanel = ({ user, onLogout, onBackToFolders, onThemeToggle, isDarkMode
             </h2>
           </div>
           <div className="admin-info-list" style={{ padding: '8px 12px' }}>
-            <p>• {t('admin.windows.help1')}</p>
-            <p>• {t('admin.windows.help2')}</p>
-            <p>• {t('admin.windows.help3')}</p>
-            <p>• {t('admin.windows.help4')}</p>
+            <p>* {t('admin.windows.help1')}</p>
+            <p>* {t('admin.windows.help2')}</p>
+            <p>* {t('admin.windows.help3')}</p>
+            <p>* {t('admin.windows.help4')}</p>
           </div>
         </div>
       </div>
@@ -1478,7 +1467,7 @@ const AdminPanel = ({ user, onLogout, onBackToFolders, onThemeToggle, isDarkMode
         </div>
       )}
 
-      {/* Link Windows User Modal */}
+      
       {showLinkModal && (
         <div className="admin-modal" onClick={() => setShowLinkModal(false)}>
           <div className="admin-modal-content" onClick={e => e.stopPropagation()}>
@@ -1530,7 +1519,7 @@ const AdminPanel = ({ user, onLogout, onBackToFolders, onThemeToggle, isDarkMode
         </div>
       )}
 
-      {/* Auto-Create Users Modal */}
+      
       {showAutoCreateModal && (
         <div className="admin-modal" onClick={() => setShowAutoCreateModal(false)}>
           <div className="admin-modal-content" onClick={e => e.stopPropagation()} style={{ maxWidth: '550px' }}>

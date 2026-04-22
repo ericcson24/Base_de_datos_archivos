@@ -8,7 +8,6 @@ const jwt = require('jsonwebtoken');
 const cors = require('cors');
 const crypto = require('crypto');
 
-// Auto-detect the host machine's LAN IP (for display purposes)
 function getServerLanIP() {
     const interfaces = os.networkInterfaces();
     for (const name of Object.keys(interfaces)) {
@@ -29,7 +28,6 @@ const JWT_SECRET = process.env.JWT_SECRET || 'secret';
 const RDP_SERVER_HOST = process.env.RDP_SERVER_HOST || 'host.docker.internal';
 const RDP_SERVER_PORT = parseInt(process.env.RDP_SERVER_PORT, 10) || 3389;
 
-// Encryption key for connection tokens (derived from JWT_SECRET)
 const ENCRYPTION_KEY = crypto.createHash('sha256').update(JWT_SECRET).digest();
 const IV_LENGTH = 16;
 
@@ -56,7 +54,6 @@ const server = http.createServer(app);
 
 const { dbAsync, initDb } = require('./database/db');
 
-// Initialize DB and start server
 (async () => {
     try {
         await initDb();
@@ -71,21 +68,16 @@ const { dbAsync, initDb } = require('./database/db');
     }
 })();
 
-// Helper to verify token (JWT primary, Base64 legacy fallback)
 const verifyToken = (token) => {
     if (!token) throw new Error('No token provided');
     try {
-        // Try JWT first (secure auth system)
         return jwt.verify(token, JWT_SECRET);
     } catch (e) {
-        // No fallback - reject invalid tokens
         throw new Error('Token inválido o expirado');
     }
 };
 
-// Helper to check if IP is private
 const isPrivateIP = (ip) => {
-    // Handle IPv6 mapped IPv4
     if (ip.startsWith('::ffff:')) {
         ip = ip.substring(7);
     }
@@ -105,21 +97,16 @@ const isPrivateIP = (ip) => {
     return false;
 };
 
-// API Routes for managing connections
 app.get('/settings', async (req, res) => {
     try {
         const authHeader = req.headers.authorization;
-        console.log('RDP /settings Auth Header:', authHeader); // Debug log
+        console.log('RDP /settings Auth Header:', authHeader);
 
         if (!authHeader) return res.status(401).json({ error: 'No token provided' });
         
         const token = authHeader.split(' ')[1];
         const decoded = verifyToken(token);
         
-        // Allow all users to read settings
-        // if (decoded.role !== 'admin') {
-        //     return res.status(403).json({ error: 'Admin access required' });
-        // }
 
         const settings = await dbAsync.all('SELECT setting_key, setting_value FROM rdp_settings');
         const settingsMap = settings.reduce((acc, curr) => {
@@ -127,7 +114,6 @@ app.get('/settings', async (req, res) => {
             return acc;
         }, {});
 
-        // Generate server_id if not exists
         if (!settingsMap.server_id) {
             const newId = Math.floor(100000 + Math.random() * 900000).toString();
             await dbAsync.run('INSERT INTO rdp_settings (setting_key, setting_value) VALUES (?, ?) ON CONFLICT(setting_key) DO UPDATE SET setting_value = ?', ['server_id', newId, newId]);
@@ -170,7 +156,6 @@ app.post('/settings', async (req, res) => {
     }
 });
 
-// Server info endpoint — returns the detected server IP for frontend display
 app.get('/server-info', async (req, res) => {
     try {
         const authHeader = req.headers.authorization;
@@ -191,7 +176,6 @@ app.post('/initialize-default', async (req, res) => {
         const authHeader = req.headers.authorization;
         if (!authHeader) return res.status(401).json({ error: 'No token provided' });
         
-        // Ensure only one connection exists - the System Default
         const existing = await dbAsync.get('SELECT * FROM rdp_connections LIMIT 1');
         
         if (existing) {
@@ -199,9 +183,8 @@ app.post('/initialize-default', async (req, res) => {
         }
 
         const token = authHeader.split(' ')[1];
-        const decoded = verifyToken(token); // To get user ID
+        const decoded = verifyToken(token);
 
-        // Create Default — always points to the host machine (this server)
         const defaultConn = {
             name: 'Este Servidor',
             hostname: 'host.docker.internal',
@@ -241,22 +224,10 @@ app.post('/connections/stop-all', async (req, res) => {
             return res.status(403).json({ error: 'Admin access required' });
         }
 
-        // Enable maintenance mode to prevent new connections
         await dbAsync.run('INSERT INTO rdp_settings (setting_key, setting_value) VALUES (?, ?) ON CONFLICT(setting_key) DO UPDATE SET setting_value = ?', ['maintenance_mode', 'true', 'true']);
         
-        // In a real scenario with GuacamoleLite, we might need to restart the process 
-        // or track sockets to close them. For now, we just set maintenance mode.
-        // If we had access to the websocket server, we could iterate clients and close them.
-        // Since GuacamoleLite attaches to 'server', we can try to close all clients on the wss if accessible,
-        // but GuacamoleLite encapsulates it.
         
-        // However, we can force a process exit to kill all connections (Docker will restart it)
-        // This is a crude but effective "Stop All" for this architecture.
-        // setTimeout(() => process.exit(0), 100); 
         
-        // Better: Just return success and let the maintenance mode block new ones. 
-        // The user can manually restart if they really need to kill *current* ones immediately,
-        // or we can implement a socket tracker.
         
         res.json({ success: true, message: 'Maintenance mode enabled. New connections blocked.' });
     } catch (error) {
@@ -267,7 +238,6 @@ app.post('/connections/stop-all', async (req, res) => {
 
 app.get('/connections', async (req, res) => {
     try {
-        // Verify token
         const authHeader = req.headers.authorization;
         if (!authHeader) return res.status(401).json({ error: 'No token provided' });
         
@@ -282,7 +252,6 @@ app.get('/connections', async (req, res) => {
     }
 });
 
-// NEW: Generate encrypted token for a connection
 app.get('/connections/:id/token', async (req, res) => {
     try {
         const authHeader = req.headers.authorization;
@@ -298,7 +267,6 @@ app.get('/connections/:id/token', async (req, res) => {
             return res.status(404).json({ error: 'Connection not found' });
         }
 
-        // Create the full connection payload with all settings
         const payload = {
             connection: {
                 type: connection.protocol || 'rdp',
@@ -316,7 +284,6 @@ app.get('/connections/:id/token', async (req, res) => {
             }
         };
 
-        // Encrypt the token with full connection details
         const encryptedToken = encryptToken(JSON.stringify(payload));
         
         res.json({ token: encryptedToken, connectionId });
@@ -344,8 +311,6 @@ app.post('/connections', async (req, res) => {
             return res.status(400).json({ error: 'Hostname/IP is required' });
         }
 
-        // Auto-assign Virtual IP (Mock logic: 10.10.10.x)
-        // Find the highest IP currently assigned
         const lastIpRow = await dbAsync.get('SELECT virtual_ip FROM rdp_connections WHERE virtual_ip LIKE \'10.10.10.%\' ORDER BY CAST(SPLIT_PART(virtual_ip, \'.\', 4) AS INTEGER) DESC LIMIT 1');
         let nextOctet = 2;
         if (lastIpRow && lastIpRow.virtual_ip) {
@@ -355,7 +320,6 @@ app.post('/connections', async (req, res) => {
         const virtual_ip = `10.10.10.${nextOctet}`;
         const randomServerId = Math.floor(100000 + Math.random() * 900000).toString();
 
-        // We store the REAL hostname for connection, but assign a virtual_ip for display
         await dbAsync.run(
             'INSERT INTO rdp_connections (user_id, server_id, name, hostname, port, username, password, protocol, security, virtual_ip) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
             [decoded.id || 1, randomServerId, name, hostname, port || 3389, username, password, protocol || 'rdp', security || 'nla', virtual_ip]
@@ -380,7 +344,6 @@ app.delete('/connections/:id', async (req, res) => {
             return res.status(403).json({ error: 'Admin access required' });
         }
 
-        // Prevent deleting the default server connection
         const conn = await dbAsync.get('SELECT id, hostname FROM rdp_connections WHERE id = ?', [req.params.id]);
         if (conn && conn.hostname === 'host.docker.internal') {
             return res.status(403).json({ error: 'Cannot delete the default server connection' });
@@ -393,7 +356,6 @@ app.delete('/connections/:id', async (req, res) => {
     }
 });
 
-// Helper to format Guacamole protocol instruction (top-level)
 const formatGuacInstruction = (opcode, args) => {
     let output = `${opcode.length}.${opcode}`;
     args.forEach(arg => {
@@ -404,13 +366,11 @@ const formatGuacInstruction = (opcode, args) => {
     return output;
 };
 
-// Initialize WebSocket server for Guacamole connections
 const wss = new WebSocket.Server({ 
     server, 
     path: '/api/rdp',
     verifyClient: (info, cb) => {
         try {
-            // Extract token from URL params - reject early if missing/invalid
             const urlString = info.req.headers['x-original-uri'] || info.req.url || '';
             const url = new URL(urlString, `http://${info.req.headers.host || 'localhost'}`);
             const token = url.searchParams.get('token');
@@ -429,11 +389,9 @@ const wss = new WebSocket.Server({
     },
     handleProtocols: (protocols, req) => {
         console.log('WS Protocol Negotiation:', protocols);
-        // ws@8.x passes protocols as a Set, use .has() instead of .includes()
         if (protocols.has('guacamole')) {
             return 'guacamole';
         }
-        // Fallback: pick first available protocol
         const first = protocols.values().next().value;
         return first || 'guacamole';
     }
@@ -443,20 +401,13 @@ wss.on('connection', async (ws, request) => {
     console.log('===== WebSocket Connection Established =====');
     console.log('Selected Protocol:', ws.protocol);
     
-    // CRITICAL: Send tunnel UUID as the very first message.
-    // guacamole-common-js WebSocketTunnel expects the first instruction to be
-    // an internal data opcode (empty string '') with a UUID. Without this,
-    // the tunnel never transitions from CONNECTING to OPEN state.
     const tunnelUUID = crypto.randomUUID();
-    // Format: 0. (empty opcode, length=0) , (separator) 36.UUID (element) ; (terminator)
     const uuidInstruction = `0.,${tunnelUUID.length}.${tunnelUUID};`;
     console.log('Sending tunnel UUID:', tunnelUUID, '| instruction:', uuidInstruction);
     ws.send(uuidInstruction);
     
-    // Debug validation
     if (!request) {
         console.error('CRITICAL: WebSocket connection request object is undefined/null');
-        // Try to access upgradeReq if it exists (legacy ws)
         if (ws.upgradeReq) {
             console.log('Using legacy ws.upgradeReq');
             request = ws.upgradeReq;
@@ -470,12 +421,8 @@ wss.on('connection', async (ws, request) => {
     try {
         console.log('Request Headers available:', request.headers ? Object.keys(request.headers) : 'none');
         
-        // Parse query parameters - handle nginx proxy
-        // nginx may not pass request.url, so try to get it from headers
         let urlString = request.url || '';
         
-        // If request.url is missing or root, try X-Original-URI header
-        // This is critical when behind Nginx with proxy_pass
         if (request.headers) {
             const originalUri = request.headers['x-original-uri'] || request.headers['X-Original-URI'];
             if (originalUri) {
@@ -486,15 +433,12 @@ wss.on('connection', async (ws, request) => {
         
         console.log('Final Request URL to parse:', urlString);
         
-        // Construct full URL for parsing params 
-        // We use a dummy base if host header is missing
         const hostHeader = request.headers ? request.headers.host : 'localhost';
         const url = new URL(urlString, `http://${hostHeader}`);
         
         const token = url.searchParams.get('token');
         let connectionIdRaw = url.searchParams.get('id');
         
-        // Sanitize connection ID (remove trailing ?undefined or garbage)
         let connectionId = null;
         if (connectionIdRaw) {
             connectionId = parseInt(connectionIdRaw, 10);
@@ -510,11 +454,9 @@ wss.on('connection', async (ws, request) => {
             return;
         }
         
-        // Verify token
         const decoded = verifyToken(token);
         console.log(`User ${decoded.username} connecting to RDP...`);
         
-        // Check settings
         const settingsRows = await dbAsync.all('SELECT setting_key, setting_value FROM rdp_settings');
         const settings = settingsRows.reduce((acc, curr) => { 
             acc[curr.setting_key] = curr.setting_value; 
@@ -527,7 +469,6 @@ wss.on('connection', async (ws, request) => {
             return;
         }
 
-        // Enforce LAN-only mode
         if (settings.lan_only === 'true') {
             const clientIp = request.headers['x-real-ip'] || request.headers['x-forwarded-for'] || request.socket.remoteAddress;
             if (!isPrivateIP(clientIp)) {
@@ -537,7 +478,6 @@ wss.on('connection', async (ws, request) => {
             }
         }
         
-        // Get connection details
         const connection = await dbAsync.get('SELECT * FROM rdp_connections WHERE id = ?', [connectionId]);
         
         if (!connection) {
@@ -546,7 +486,6 @@ wss.on('connection', async (ws, request) => {
             return;
         }
 
-        // Override credentials from query params if provided by the frontend modal
         const rdpUser = url.searchParams.get('rdpUser');
         const rdpPass = url.searchParams.get('rdpPass');
         if (rdpUser !== null && rdpUser !== '') {
@@ -558,7 +497,6 @@ wss.on('connection', async (ws, request) => {
             console.log('Using password from frontend modal (provided)');
         }
 
-        // Read client screen resolution from query params
         const clientWidth = parseInt(url.searchParams.get('width'), 10) || 1920;
         const clientHeight = parseInt(url.searchParams.get('height'), 10) || 1080;
         const clientDpi = parseInt(url.searchParams.get('dpi'), 10) || 96;
@@ -566,10 +504,6 @@ wss.on('connection', async (ws, request) => {
         
         console.log('Connecting to:', connection.hostname, ':', connection.port, '| user:', connection.username || '(empty)');
         
-        // Pre-check: verify the RDP target is reachable before engaging guacd.
-        // This gives users a clear error instead of the cryptic "wrong security type".
-        // COMMENTED OUT: Skip pre-check to allow guacd to handle connection errors directly
-        /*
         await new Promise((resolve, reject) => {
             const probe = new net.Socket();
             probe.setTimeout(5000);
@@ -587,18 +521,15 @@ wss.on('connection', async (ws, request) => {
             });
         });
         console.log('Pre-check: RDP target is reachable');
-        */
         
-        // Connect to guacd
         const guacdSocket = new net.Socket();
-        guacdSocket.setTimeout(15000); // 15s timeout for unresponsive guacd
+        guacdSocket.setTimeout(15000);
         guacdSocket.connect(GUACD_PORT, GUACD_HOST);
         
         let guacdBuffer = '';
         let handshakeComplete = false;
-        let nextStreamIndex = 0; // Counter for argv stream indices
+        let nextStreamIndex = 0;
         
-        // Parse all elements from a Guacamole instruction string
         const parseGuacElements = (instruction) => {
             const elements = [];
             let buf = instruction;
@@ -616,7 +547,6 @@ wss.on('connection', async (ws, request) => {
             return elements;
         };
 
-        // Helper to format Guacamole protocol instruction
         const formatGuac = (opcode, args) => {
             let output = `${opcode.length}.${opcode}`;
             args.forEach(arg => {
@@ -627,11 +557,9 @@ wss.on('connection', async (ws, request) => {
             return output;
         };
         
-        // Handle guacd connection
         guacdSocket.on('connect', () => {
             console.log('Connected to guacd');
             
-            // Step 1: Send handshake - select protocol
             const protocol = connection.protocol || 'rdp';
             const handshake = formatGuac('select', [protocol]);
             console.log('Sending select:', handshake);
@@ -641,7 +569,6 @@ wss.on('connection', async (ws, request) => {
         guacdSocket.on('data', (data) => {
             guacdBuffer += data.toString('latin1');
             
-            // Guard against unbounded buffer growth
             if (guacdBuffer.length > 10 * 1024 * 1024) {
                 console.error('Guacd buffer exceeded 10MB, closing connection');
                 guacdSocket.destroy();
@@ -649,7 +576,6 @@ wss.on('connection', async (ws, request) => {
                 return;
             }
             
-            // Process complete Guacamole instructions
             while (guacdBuffer.length > 0) {
                 let instructionStr = null;
                 let isInstructionComplete = false;
@@ -686,32 +612,26 @@ wss.on('connection', async (ws, request) => {
                 
                 if (!isInstructionComplete) break;
                 
-                // Parse opcode
                 const elements = parseGuacElements(instructionStr);
                 const opcode = elements[0] || '';
                 
-                // Only log important opcodes, skip high-frequency ones (img, blob, end, sync, cursor, mouse)
                 const silentOpcodes = ['img', 'blob', 'end', 'sync', 'cursor', 'mouse', 'nop', 'rect', 'copy', 'cfill', 'size', 'move', 'shade', 'dispose', 'png', 'audio'];
                 if (!silentOpcodes.includes(opcode)) {
                     console.log('Guacd opcode:', opcode, '| elements count:', elements.length);
                 }
 
-                // Log error details from guacd
                 if (opcode === 'error') {
                     const errMsg = elements[1] || 'Unknown guacd error';
                     const errCode = elements[2] || '';
                     console.error('*** GUACD ERROR:', errMsg, '| code:', errCode);
                     
-                    // Detect auth failures and send a clearer error code to the browser
                     const errLower = errMsg.toLowerCase();
                     const isAuthFailure = errLower.includes('authentication') || errLower.includes('credentials') || errLower.includes('logon') || errLower.includes('login') || errCode === '769' || errCode === '0x0301';
                     if (isAuthFailure) {
-                        // Replace with code 515 (CLIENT_UNAUTHORIZED) so the frontend shows auth error
                         const authErrInstr = formatGuac('error', ['Authentication failure (invalid credentials?)', '515']);
                         if (ws.readyState === WebSocket.OPEN) {
                             ws.send(authErrInstr);
                         }
-                        // Skip forwarding the original error since we sent our own
                         continue;
                     }
                 }
@@ -719,16 +639,12 @@ wss.on('connection', async (ws, request) => {
                 if (opcode === 'args' && !handshakeComplete) {
                     handshakeComplete = true;
                     
-                    // elements[0] = 'args'
-                    // elements[1] = version (e.g. 'VERSION_1_5_0')
-                    // elements[2..] = arg names for the selected protocol
                     const version = elements[1] || '';
                     const argNames = elements.slice(2);
                     
                     console.log('Guacd version:', version);
                     console.log('Guacd wants args:', argNames.length, 'names:', argNames.slice(0, 10), '...');
                     
-                    // Build config map for all known RDP args
                     const config = {
                         'hostname': connection.hostname || RDP_SERVER_HOST,
                         'port': String(connection.port || RDP_SERVER_PORT),
@@ -797,18 +713,13 @@ wss.on('connection', async (ws, request) => {
                         'disable-paste': '',
                     };
                     
-                    // Map values in the EXACT order guacd requested
                     const values = argNames.map(name => config[name] || '');
                     
                     console.log(`Responding with ${values.length} values for ${argNames.length} args`);
-                    // Debug: log key credential values being sent
                     const usernameIdx = argNames.indexOf('username');
                     const passwordIdx = argNames.indexOf('password');
                     console.log(`Credentials in handshake -> username[${usernameIdx}]: "${values[usernameIdx] || '(empty)'}" | password[${passwordIdx}]: ${values[passwordIdx] ? '(set, ' + values[passwordIdx].length + ' chars)' : '(empty)'}`);
                     
-                    // Send: size, audio, video, image, timezone, then connect
-                    // Per Guacamole protocol spec: connect's first arg is the version,
-                    // followed by one value per arg name from the 'args' instruction
                     const sizeInstr = formatGuac('size', [String(clientWidth), String(clientHeight), String(clientDpi)]);
                     const audioInstr = formatGuac('audio', ['audio/L8', 'audio/L16']);
                     const videoInstr = formatGuac('video', []);
@@ -822,9 +733,6 @@ wss.on('connection', async (ws, request) => {
                     console.log('First 200 chars of handshake:', fullHandshake.substring(0, 200));
                     guacdSocket.write(fullHandshake);
                 } else if (opcode === 'required') {
-                    // guacd is asking for additional credentials (e.g. password for NLA).
-                    // If we have the value stored, respond with an argv stream automatically.
-                    // Otherwise, forward to the browser for interactive input.
                     const requiredParams = elements.slice(1);
                     console.log('Guacd requires:', requiredParams);
                     
@@ -836,10 +744,8 @@ wss.on('connection', async (ws, request) => {
                                     : null;
                         
                         if (value !== null && value !== '') {
-                            // Respond with argv stream: open stream, send blob, end stream
                             const streamIdx = String(nextStreamIndex++);
                             const argvInstr = formatGuac('argv', [streamIdx, 'text/plain', param]);
-                            // Base64-encode the value for the blob instruction
                             const b64Value = Buffer.from(value).toString('base64');
                             const blobInstr = formatGuac('blob', [streamIdx, b64Value]);
                             const endInstr = formatGuac('end', [streamIdx]);
@@ -850,14 +756,12 @@ wss.on('connection', async (ws, request) => {
                     }
                     
                     if (!handled) {
-                        // Forward to browser — it needs to prompt the user
                         console.log('Forwarding required instruction to browser (no stored credentials)');
                         if (ws.readyState === WebSocket.OPEN) {
                             ws.send(instructionStr);
                         }
                     }
                 } else {
-                    // Forward all other instructions to WebSocket client
                     if (ws.readyState === WebSocket.OPEN) {
                         ws.send(instructionStr);
                     }
@@ -887,32 +791,23 @@ wss.on('connection', async (ws, request) => {
             }
         });
         
-        // Handle WebSocket messages (from browser)
         ws.on('message', (message) => {
             const msgStr = message.toString('utf8');
             
-            // Check for internal tunnel messages (opcode = empty string '')
-            // Format: "0.,...;" where first element length is 0 (empty opcode)
             if (msgStr.startsWith('0.')) {
-                // Parse the internal message to check if it's a ping
-                // Format: 0.,4.ping,13.1234567890123;
                 const parts = msgStr.match(/^0\.,4\.ping,(.+);$/);
                 if (parts) {
-                    // Respond with the same ping back to keep the tunnel alive
                     console.log('Tunnel ping received, responding');
                     if (ws.readyState === WebSocket.OPEN) {
                         ws.send(msgStr);
                     }
-                    return; // Don't forward internal messages to guacd
+                    return;
                 }
-                // Other internal messages (like nop) - don't forward
                 console.log('Internal tunnel message (not forwarded):', msgStr.substring(0, 50));
                 return;
             }
             
-            // Forward real Guacamole instructions to guacd
             if (guacdSocket.writable) {
-                // Log key and mouse events (first 5 of each) for debugging
                 if (!ws._inputLogCount) ws._inputLogCount = { key: 0, mouse: 0 };
                 const opMatch = msgStr.match(/^\d+\.(\w+),/);
                 const op = opMatch ? opMatch[1] : '';
@@ -939,8 +834,6 @@ wss.on('connection', async (ws, request) => {
         
     } catch (error) {
         console.error('Error setting up connection:', error);
-        // Send a Guacamole error instruction so the frontend can show a clear message
-        // Format: error opcode with message and status code 519 (UPSTREAM_ERROR)
         if (ws.readyState === WebSocket.OPEN) {
             const errMsg = error.message || 'Connection failed';
             const errInstruction = `5.error,${errMsg.length}.${errMsg},3.519;`;
@@ -956,7 +849,3 @@ app.get('/', (req, res) => {
     res.send('RDP Service Running');
 });
 
-// Remove the old server.listen at the bottom since we moved it inside the async function
-// server.listen(PORT, () => {
-//     console.log(`RDP Service listening on port ${PORT}`);
-// });

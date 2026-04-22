@@ -3,16 +3,10 @@ const path = require('path');
 const { dbAsync } = require('../database/db');
 
 /**
- * Synchronizes the physical disk content to the database.
- * This effectively makes the system act like a "server" where files added directly
- * to the folder structure are discovered and indexed.
- * @param {string} rootDir - The root directory of uploads (e.g. /app/uploads)
- */
 async function syncDiskToDb(rootDir) {
     console.log(' Starting Disk-to-DB Synchronization Scanner...');
     
     try {
-        // Ensur root dir exists
         try {
             await fs.access(rootDir);
         } catch {
@@ -23,11 +17,9 @@ async function syncDiskToDb(rootDir) {
         const entries = await fs.readdir(rootDir, { withFileTypes: true });
         
         for (const entry of entries) {
-            // First level are Usernames
             if (entry.isDirectory()) {
                 const username = entry.name;
                 
-                // Find user in DB
                 const user = await dbAsync.get('SELECT id FROM users WHERE username = $1', [username]);
                 
                 if (user) {
@@ -51,20 +43,16 @@ async function processDirectory(currentPath, userId, parentId) {
         const fullPath = path.join(currentPath, entry.name);
 
         if (entry.isDirectory()) {
-            // 1. Get or Create Folder in DB
             const folderId = await getOrCreateFolder(entry.name, userId, parentId);
             
-            // 2. Recurse
             await processDirectory(fullPath, userId, folderId);
         } else {
-            // 1. Get or Create File in DB
             await getOrCreateFile(entry.name, fullPath, userId, parentId);
         }
     }
 }
 
 async function getOrCreateFolder(name, userId, parentId) {
-    // Check if exists
     let sql = 'SELECT id FROM folders WHERE name = $1 AND owner_id = $2';
     let params = [name, userId];
     
@@ -78,7 +66,6 @@ async function getOrCreateFolder(name, userId, parentId) {
     const row = await dbAsync.get(sql, params);
     if (row) return row.id;
 
-    // Create
     const res = await dbAsync.run(
         'INSERT INTO folders (name, owner_id, parent_id) VALUES ($1, $2, $3)',
         [name, userId, parentId]
@@ -97,11 +84,9 @@ async function getOrCreateFile(name, fullPath, userId, folderId) {
         sql += ' AND folder_id IS NULL';
     }
     
-    // Check DB first
     const row = await dbAsync.get(sql, params);
     if (row) return row.id;
 
-    // Insert
     try {
         const stats = await fs.stat(fullPath);
         const mimeType = getMimeType(name);
@@ -110,7 +95,6 @@ async function getOrCreateFile(name, fullPath, userId, folderId) {
             'INSERT INTO files (folder_id, name, physical_path, size, mime_type, owner_id) VALUES ($1, $2, $3, $4, $5, $6)',
             [folderId, name, fullPath, stats.size, mimeType, userId]
         );
-        // console.log(`   + Synced file: ${name}`);
     } catch (e) {
         console.error(`Error syncing file ${name}:`, e.message);
     }

@@ -20,7 +20,6 @@ const PDFEditor = ({ fileUrl, file, onFileSaved }) => {
   const [hasChanges, setHasChanges] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
 
-  // Annotations state
   const [annotations, setAnnotations] = useState([]);
   const [selectedTool, setSelectedTool] = useState('none');
   const [drawColor, setDrawColor] = useState('#ff0000');
@@ -29,19 +28,16 @@ const PDFEditor = ({ fileUrl, file, onFileSaved }) => {
   const [textInput, setTextInput] = useState('');
   const [textPosition, setTextPosition] = useState(null);
 
-  // Drawing state
   const [isDrawing, setIsDrawing] = useState(false);
   const [currentPath, setCurrentPath] = useState([]);
   const [drawPaths, setDrawPaths] = useState([]);
 
-  // Highlight state
   const [highlightStart, setHighlightStart] = useState(null);
   const [highlights, setHighlights] = useState([]);
 
   const containerRef = useRef(null);
   const overlayRef = useRef(null);
 
-  // Load PDF
   const loadPDF = useCallback(async () => {
     try {
       setLoading(true);
@@ -74,7 +70,6 @@ const PDFEditor = ({ fileUrl, file, onFileSaved }) => {
     loadPDF();
   }, [loadPDF]);
 
-  // Fullscreen
   const toggleFullscreen = () => {
     if (!document.fullscreenElement) {
       containerRef.current?.requestFullscreen();
@@ -89,7 +84,6 @@ const PDFEditor = ({ fileUrl, file, onFileSaved }) => {
     return () => document.removeEventListener('fullscreenchange', handler);
   }, []);
 
-  // Generate blob URL for the PDF (for iframe display)
   const [displayUrl, setDisplayUrl] = useState(null);
   useEffect(() => {
     if (pdfBytes) {
@@ -100,18 +94,15 @@ const PDFEditor = ({ fileUrl, file, onFileSaved }) => {
     }
   }, [pdfBytes]);
 
-  // Navigation
   const goToPage = (page) => {
     const p = Math.max(1, Math.min(page, totalPages));
     setCurrentPage(p);
   };
 
-  // Zoom
   const handleZoomIn = () => setScale(s => Math.min(s + 0.25, 3));
   const handleZoomOut = () => setScale(s => Math.max(s - 0.25, 0.5));
   const handleZoomReset = () => setScale(1);
 
-  // Overlay click for adding text
   const handleOverlayClick = (e) => {
     if (selectedTool === 'text' && isEditing) {
       const rect = e.currentTarget.getBoundingClientRect();
@@ -123,7 +114,6 @@ const PDFEditor = ({ fileUrl, file, onFileSaved }) => {
     }
   };
 
-  // Confirm text annotation
   const confirmTextAnnotation = () => {
     if (textInput.trim() && textPosition) {
       const newAnnotation = {
@@ -143,7 +133,6 @@ const PDFEditor = ({ fileUrl, file, onFileSaved }) => {
     setTextPosition(null);
   };
 
-  // Drawing handlers
   const handleDrawStart = (e) => {
     if (selectedTool !== 'draw' || !isEditing) return;
     const rect = e.currentTarget.getBoundingClientRect();
@@ -177,7 +166,6 @@ const PDFEditor = ({ fileUrl, file, onFileSaved }) => {
     setCurrentPath([]);
   };
 
-  // Highlight handlers
   const handleHighlightStart = (e) => {
     if (selectedTool !== 'highlight' || !isEditing) return;
     const rect = e.currentTarget.getBoundingClientRect();
@@ -208,7 +196,6 @@ const PDFEditor = ({ fileUrl, file, onFileSaved }) => {
     setHighlightStart(null);
   };
 
-  // Mouse handlers dispatcher
   const handleMouseDown = (e) => {
     if (selectedTool === 'draw') handleDrawStart(e);
     else if (selectedTool === 'highlight') handleHighlightStart(e);
@@ -223,7 +210,6 @@ const PDFEditor = ({ fileUrl, file, onFileSaved }) => {
     else if (selectedTool === 'highlight') handleHighlightEnd(e);
   };
 
-  // Delete annotation
   const deleteAnnotation = (index, type) => {
     if (type === 'text') {
       setAnnotations(prev => prev.filter((_, i) => i !== index));
@@ -235,7 +221,6 @@ const PDFEditor = ({ fileUrl, file, onFileSaved }) => {
     setHasChanges(true);
   };
 
-  // Page operations
   const deletePage = async () => {
     if (!pdfDoc || totalPages <= 1) {
       addToast(t('pdfEditor.cannotDeleteLastPage') || 'Cannot delete the only page', 'warning');
@@ -294,13 +279,11 @@ const PDFEditor = ({ fileUrl, file, onFileSaved }) => {
     }
   };
 
-  // Apply all annotations to PDF and save
   const applyAnnotationsAndSave = async () => {
     if (!pdfDoc) return null;
     try {
       const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
       
-      // Apply text annotations
       for (const ann of annotations) {
         if (ann.page <= totalPages) {
           const page = pdfDoc.getPage(ann.page - 1);
@@ -316,7 +299,6 @@ const PDFEditor = ({ fileUrl, file, onFileSaved }) => {
         }
       }
 
-      // Apply highlights
       for (const hl of highlights) {
         if (hl.page <= totalPages) {
           const page = pdfDoc.getPage(hl.page - 1);
@@ -333,7 +315,6 @@ const PDFEditor = ({ fileUrl, file, onFileSaved }) => {
         }
       }
 
-      // Apply draw paths
       for (const path of drawPaths) {
         if (path.page <= totalPages && path.points.length >= 2) {
           const page = pdfDoc.getPage(path.page - 1);
@@ -357,7 +338,6 @@ const PDFEditor = ({ fileUrl, file, onFileSaved }) => {
     }
   };
 
-  // Save to server
   const handleSave = async () => {
     if (!pdfDoc) return;
     setIsSaving(true);
@@ -378,13 +358,11 @@ const PDFEditor = ({ fileUrl, file, onFileSaved }) => {
 
       if (!resp.ok) throw new Error('Upload failed');
 
-      // Reload the saved version
       const newDoc = await PDFDocument.load(savedBytes);
       setPdfDoc(newDoc);
       setPdfBytes(new Uint8Array(savedBytes));
       setTotalPages(newDoc.getPageCount());
       
-      // Clear applied annotations
       setAnnotations([]);
       setDrawPaths([]);
       setHighlights([]);
@@ -400,7 +378,6 @@ const PDFEditor = ({ fileUrl, file, onFileSaved }) => {
     }
   };
 
-  // Download
   const handleDownload = async () => {
     try {
       let bytes;
@@ -421,7 +398,6 @@ const PDFEditor = ({ fileUrl, file, onFileSaved }) => {
     }
   };
 
-  // Clear annotations for current page
   const clearAnnotations = () => {
     setAnnotations(prev => prev.filter(a => a.page !== currentPage));
     setDrawPaths(prev => prev.filter(p => p.page !== currentPage));
@@ -429,7 +405,6 @@ const PDFEditor = ({ fileUrl, file, onFileSaved }) => {
     setHasChanges(true);
   };
 
-  // Hex to RGB helper
   const hexToRgb = (hex) => {
     const h = hex.replace('#', '');
     return {
@@ -439,7 +414,6 @@ const PDFEditor = ({ fileUrl, file, onFileSaved }) => {
     };
   };
 
-  // Render SVG overlay for current page annotations
   const renderAnnotationOverlay = () => {
     const pageAnnotations = annotations.filter(a => a.page === currentPage);
     const pagePaths = drawPaths.filter(p => p.page === currentPage);
@@ -455,9 +429,9 @@ const PDFEditor = ({ fileUrl, file, onFileSaved }) => {
         onMouseUp={handleMouseUp}
         style={{ cursor: selectedTool === 'text' ? 'text' : selectedTool === 'draw' ? 'crosshair' : selectedTool === 'highlight' ? 'crosshair' : 'default' }}
       >
-        {/* SVG for drawings and highlights */}
+        
         <svg className="pdf-annotation-svg" width="100%" height="100%">
-          {/* Highlights */}
+          
           {pageHighlights.map((hl, i) => (
             <g key={`hl-${i}`}>
               <rect
@@ -468,13 +442,13 @@ const PDFEditor = ({ fileUrl, file, onFileSaved }) => {
               />
               {isEditing && (
                 <foreignObject x={hl.x + hl.width - 18} y={hl.y - 2} width="20" height="20">
-                  <button className="pdf-ann-delete-btn" onClick={(e) => { e.stopPropagation(); deleteAnnotation(i, 'highlight'); }}>✕</button>
+                  <button className="pdf-ann-delete-btn" onClick={(e) => { e.stopPropagation(); deleteAnnotation(i, 'highlight'); }}>x</button>
                 </foreignObject>
               )}
             </g>
           ))}
 
-          {/* Draw paths */}
+          
           {pagePaths.map((path, i) => (
             <g key={`path-${i}`}>
               <polyline
@@ -488,13 +462,13 @@ const PDFEditor = ({ fileUrl, file, onFileSaved }) => {
               />
               {isEditing && path.points.length > 0 && (
                 <foreignObject x={path.points[0].x} y={path.points[0].y - 20} width="20" height="20">
-                  <button className="pdf-ann-delete-btn" onClick={(e) => { e.stopPropagation(); deleteAnnotation(i, 'draw'); }}>✕</button>
+                  <button className="pdf-ann-delete-btn" onClick={(e) => { e.stopPropagation(); deleteAnnotation(i, 'draw'); }}>x</button>
                 </foreignObject>
               )}
             </g>
           ))}
 
-          {/* Current drawing path */}
+          
           {isDrawing && currentPath.length > 1 && (
             <polyline
               points={currentPath.map(p => `${p.x},${p.y}`).join(' ')}
@@ -508,7 +482,7 @@ const PDFEditor = ({ fileUrl, file, onFileSaved }) => {
           )}
         </svg>
 
-        {/* Text annotations */}
+        
         {pageAnnotations.map((ann, i) => (
           <div
             key={`text-${i}`}
@@ -522,12 +496,12 @@ const PDFEditor = ({ fileUrl, file, onFileSaved }) => {
           >
             {ann.text}
             {isEditing && (
-              <button className="pdf-ann-delete-btn inline" onClick={(e) => { e.stopPropagation(); deleteAnnotation(i, 'text'); }}>✕</button>
+              <button className="pdf-ann-delete-btn inline" onClick={(e) => { e.stopPropagation(); deleteAnnotation(i, 'text'); }}>x</button>
             )}
           </div>
         ))}
 
-        {/* Text input popup */}
+        
         {isAddingText && textPosition && (
           <div className="pdf-text-input-popup" style={{ left: textPosition.x + 'px', top: textPosition.y + 'px' }}>
             <input
@@ -545,7 +519,7 @@ const PDFEditor = ({ fileUrl, file, onFileSaved }) => {
             />
             <div className="pdf-text-input-actions">
               <button onClick={confirmTextAnnotation} className="pdf-text-confirm">✓</button>
-              <button onClick={() => { setIsAddingText(false); setTextInput(''); setTextPosition(null); }} className="pdf-text-cancel">✕</button>
+              <button onClick={() => { setIsAddingText(false); setTextInput(''); setTextPosition(null); }} className="pdf-text-cancel">x</button>
             </div>
           </div>
         )}
@@ -566,7 +540,7 @@ const PDFEditor = ({ fileUrl, file, onFileSaved }) => {
 
   return (
     <div className={`pdf-editor-container ${isFullscreen ? 'fullscreen' : ''}`} ref={containerRef}>
-      {/* Toolbar */}
+      
       <div className="pdf-toolbar">
         <div className="pdf-toolbar-section">
           {!isEditing ? (
@@ -585,26 +559,26 @@ const PDFEditor = ({ fileUrl, file, onFileSaved }) => {
           )}
         </div>
 
-        {/* Navigation */}
+        
         <div className="pdf-toolbar-section">
           <button className="pdf-btn-icon" onClick={() => goToPage(currentPage - 1)} disabled={currentPage <= 1}>←</button>
           <span className="pdf-page-info">{currentPage} / {totalPages}</span>
           <button className="pdf-btn-icon" onClick={() => goToPage(currentPage + 1)} disabled={currentPage >= totalPages}>→</button>
         </div>
 
-        {/* Zoom */}
+        
         <div className="pdf-toolbar-section">
-          <button className="pdf-btn-icon" onClick={handleZoomOut} title={t('pdfEditor.zoomOut')}>🔍−</button>
+          <button className="pdf-btn-icon" onClick={handleZoomOut} title={t('pdfEditor.zoomOut')}>[Search]−</button>
           <span className="pdf-zoom-info" onClick={handleZoomReset}>{Math.round(scale * 100)}%</span>
-          <button className="pdf-btn-icon" onClick={handleZoomIn} title={t('pdfEditor.zoomIn')}>🔍+</button>
+          <button className="pdf-btn-icon" onClick={handleZoomIn} title={t('pdfEditor.zoomIn')}>[Search]+</button>
         </div>
 
-        {/* Edit tools */}
+        
         {isEditing && (
           <div className="pdf-toolbar-section pdf-tools">
             <button className={`pdf-btn-tool ${selectedTool === 'text' ? 'active' : ''}`}
               onClick={() => setSelectedTool(selectedTool === 'text' ? 'none' : 'text')}>
-              📝 {t('pdfEditor.text')}
+              [Text] {t('pdfEditor.text')}
             </button>
             <button className={`pdf-btn-tool ${selectedTool === 'draw' ? 'active' : ''}`}
               onClick={() => setSelectedTool(selectedTool === 'draw' ? 'none' : 'draw')}>
@@ -626,16 +600,16 @@ const PDFEditor = ({ fileUrl, file, onFileSaved }) => {
           </div>
         )}
 
-        {/* Page operations */}
+        
         {isEditing && (
           <div className="pdf-toolbar-section">
             <button className="pdf-btn-icon" onClick={addBlankPage} title={t('pdfEditor.addPage') || 'Add page'}>📄+</button>
             <button className="pdf-btn-icon" onClick={rotatePage} title={t('pdfEditor.rotatePage') || 'Rotate'}>🔄</button>
-            <button className="pdf-btn-icon pdf-btn-danger-icon" onClick={deletePage} title={t('pdfEditor.deletePage') || 'Delete page'}>🗑️</button>
+            <button className="pdf-btn-icon pdf-btn-danger-icon" onClick={deletePage} title={t('pdfEditor.deletePage') || 'Delete page'}>[Delete]</button>
           </div>
         )}
 
-        {/* Actions */}
+        
         <div className="pdf-toolbar-section pdf-toolbar-right">
           {isEditing && (annotations.length > 0 || drawPaths.length > 0 || highlights.length > 0) && (
             <button className="pdf-btn-icon" onClick={clearAnnotations} title={t('pdfEditor.clearPage') || 'Clear page'}>🧹</button>
@@ -645,7 +619,7 @@ const PDFEditor = ({ fileUrl, file, onFileSaved }) => {
         </div>
       </div>
 
-      {/* PDF Viewer Area */}
+      
       <div className="pdf-viewer-area">
         <div className="pdf-page-wrapper" style={{ transform: `scale(${scale})`, transformOrigin: 'top center' }}>
           <div className="pdf-page-container">
@@ -661,7 +635,7 @@ const PDFEditor = ({ fileUrl, file, onFileSaved }) => {
         </div>
       </div>
 
-      {/* Status bar */}
+      
       <div className="pdf-status-bar">
         <span>{file.name}</span>
         <span>{t('pdfEditor.page')} {currentPage} / {totalPages}</span>

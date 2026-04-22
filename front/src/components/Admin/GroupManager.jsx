@@ -9,14 +9,11 @@ const GroupManager = () => {
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [newGroup, setNewGroup] = useState({ name: '', description: '' });
-  const [selectedUsers, setSelectedUsers] = useState({}); // { groupId: userId }
-  const [expandedGroups, setExpandedGroups] = useState({}); // { groupId: boolean } to load members on demand if needed, but I'll load them with the group or separately.
+  const [selectedUsers, setSelectedUsers] = useState({});
+  const [expandedGroups, setExpandedGroups] = useState({});
   const [errorMsg, setErrorMsg] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
 
-  // Actually, the list groups endpoint returns member count. 
-  // I should probably fetch members when a group is expanded or just fetch all for now if not too many.
-  // Let's fetch members for a group when we want to see them.
 
   useEffect(() => {
     loadData();
@@ -45,15 +42,12 @@ const GroupManager = () => {
   const loadData = async () => {
     setLoading(true);
     try {
-      // Load users first to ensure we have them for the select
       const usersRes = await fetchWithAuth('/api/users/users');
       if (usersRes.success) setUsers(usersRes.users);
 
       const groupsRes = await fetchWithAuth('/api/users/groups');
       if (groupsRes.success) {
         setGroups(groupsRes.groups);
-        // Pre-load members for all groups
-        // Use Promise.allSettled to avoid one failure blocking others
         await Promise.allSettled(groupsRes.groups.map(g => loadGroupMembers(g.id)));
       }
     } catch (error) {
@@ -96,7 +90,6 @@ const GroupManager = () => {
         setNewGroup({ name: '', description: '' });
         setSuccessMsg(t('admin.groupCreated') || 'Grupo creado correctamente');
         setTimeout(() => setSuccessMsg(''), 3000);
-        // Reload groups + members
         await loadData();
       } else {
         setErrorMsg(res.message || t('admin.errorCreatingGroup') || 'Error creating group');

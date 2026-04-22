@@ -53,7 +53,7 @@ const Input = ({
         className={inputClasses}
         {...props}
       />
-      {error && <span className="input-error-icon">⚠️</span>}
+      {error && <span className="input-error-icon">[Warning]</span>}
     </div>
   );
 

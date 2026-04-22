@@ -35,19 +35,19 @@ const FolderCustomizeModal = ({ isOpen, onClose, folder, onSave }) => {
     <div className="fixed inset-0 bg-black/50 dark:bg-black/70 flex items-center justify-center z-50 folder-customize-backdrop" onClick={onClose}>
       <div className="folder-customize-modal" onClick={(e) => e.stopPropagation()}>
         
-        {/* Header */}
+        
         <div className="fc-header">
           <h3>{t('contextMenu.customizeFolder') || 'Personalizar carpeta'}</h3>
           <button className="fc-close" onClick={onClose}>&times;</button>
         </div>
 
-        {/* Preview */}
+        
         <div className="fc-preview">
           <FolderIcon color={selectedColor} icon={selectedIcon} size={72} />
           <span className="fc-preview-name">{folder.name}</span>
         </div>
 
-        {/* Color Picker */}
+        
         <div className="fc-section">
           <label className="fc-label">{t('contextMenu.folderColor') || 'Color'}</label>
           <div className="fc-color-grid">
@@ -69,7 +69,7 @@ const FolderCustomizeModal = ({ isOpen, onClose, folder, onSave }) => {
           </div>
         </div>
 
-        {/* Icon Picker */}
+        
         <div className="fc-section">
           <label className="fc-label">{t('contextMenu.folderIcon') || 'Icono'}</label>
           <div className="fc-icon-grid">
@@ -87,7 +87,7 @@ const FolderCustomizeModal = ({ isOpen, onClose, folder, onSave }) => {
           </div>
         </div>
 
-        {/* Footer */}
+        
         <div className="fc-footer">
           <button className="fc-btn fc-btn-cancel" onClick={onClose} disabled={isSaving}>
             {t('common.cancel') || 'Cancelar'}

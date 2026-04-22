@@ -1,6 +1,4 @@
-/* ═══════════════════════════════════════════════════════════════
-   AI TASK MODAL — Dark Metal Glass / Frosted Liquid Glass
-   ═══════════════════════════════════════════════════════════════ */
+
 
 .ai-task-modal {
   width: 520px;
@@ -61,7 +59,6 @@
   margin-bottom: 18px;
 }
 
-/* ── Textarea — liquid glass input ── */
 .ai-prompt-textarea {
   width: 100%;
   padding: 14px 16px;
@@ -118,7 +115,6 @@
   color: rgba(100, 116, 139, 0.5);
 }
 
-/* ── Options ── */
 .ai-task-options {
   display: flex;
   flex-direction: column;
@@ -137,7 +133,6 @@
   color: #64748b;
 }
 
-/* ── Selector — glass dropdown ── */
 .ai-assign-selector select {
   width: 100%;
   padding: 10px 14px;
@@ -174,7 +169,6 @@
   color: #1e293b;
 }
 
-/* ── Loading — metallic spinner ── */
 .ai-loading-indicator {
   display: flex;
   flex-direction: column;
@@ -205,7 +199,6 @@
   to { opacity: 1; transform: translateY(0) scale(1); }
 }
 
-/* ── Close button ── */
 .ai-task-modal .close-button {
   background: rgba(148, 163, 184, 0.1);
   border: 1px solid rgba(148, 163, 184, 0.15);
@@ -226,7 +219,6 @@
   transform: scale(1.1) rotate(90deg);
 }
 
-/* ── Header ── */
 .ai-task-modal .modal-header {
   display: flex;
   justify-content: space-between;
@@ -240,7 +232,6 @@
   border-bottom-color: rgba(148, 163, 184, 0.2);
 }
 
-/* ── Footer ── */
 .ai-task-modal .modal-footer {
   display: flex;
   justify-content: flex-end;
@@ -254,7 +245,6 @@
   border-top-color: rgba(148, 163, 184, 0.18);
 }
 
-/* ── Helper text ── */
 .ai-task-modal .modal-body p {
   color: #94a3b8;
   font-size: 0.88rem;

@@ -11,9 +11,9 @@ const config = {
 let msalClient;
 try {
   msalClient = new msal.ConfidentialClientApplication(config);
-  console.log('🟢 MSAL Client inicializado correctamente');
+  console.log('[Green] MSAL Client inicializado correctamente');
 } catch (error) {
-  console.error('🔴 Error inicializando MSAL Client:', error);
+  console.error('[Red] Error inicializando MSAL Client:', error);
 }
 
 const scopes = [

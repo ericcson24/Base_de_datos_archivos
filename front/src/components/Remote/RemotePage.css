@@ -1,6 +1,4 @@
-/* =========================================
-   REMOTE PAGE - BASE STYLES
-   ========================================= */
+
 
 .remote-page {
     display: flex;
@@ -12,9 +10,7 @@
     position: relative;
 }
 
-/* =========================================
-   SIDEBAR STYLES
-   ========================================= */
+
 
 .remote-sidebar {
     width: var(--sidebar-width, 280px);
@@ -93,9 +89,7 @@
     margin: 0;
 }
 
-/* =========================================
-   MAIN CONTENT AREA
-   ========================================= */
+
 
 .remote-main {
     flex: 1;
@@ -131,9 +125,7 @@
     padding: 32px;
 }
 
-/* =========================================
-   LOADING STATE
-   ========================================= */
+
 
 .remote-loading {
     display: flex;
@@ -162,9 +154,7 @@
     font-size: 1rem;
 }
 
-/* =========================================
-   STATUS BAR
-   ========================================= */
+
 
 .remote-status-bar {
     display: flex;
@@ -218,9 +208,7 @@
     border: 1px solid rgba(156, 39, 176, 0.3);
 }
 
-/* =========================================
-   CONNECTIONS GRID
-   ========================================= */
+
 
 .remote-connections-grid {
     display: grid;
@@ -293,9 +281,7 @@
     transform: scale(1.02);
 }
 
-/* =========================================
-   EMPTY STATE
-   ========================================= */
+
 
 .remote-empty-state {
     display: flex;
@@ -345,9 +331,7 @@
     transform: scale(1.05);
 }
 
-/* =========================================
-   VIEWER FULLSCREEN MODE
-   ========================================= */
+
 
 .remote-viewer-fullscreen {
     position: fixed;

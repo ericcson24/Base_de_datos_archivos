@@ -20,7 +20,6 @@ const Login = ({ onLogin, onSwitchToRegister, onThemeToggle, isDarkMode }) => {
       ...prev,
       [name]: value
     }));
-    // Clear error when user starts typing
     if (errors[name]) {
       setErrors(prev => ({
         ...prev,
@@ -51,21 +50,17 @@ const Login = ({ onLogin, onSwitchToRegister, onThemeToggle, isDarkMode }) => {
 
     setIsLoading(true);
     try {
-      await onLogin(formData); // Pasar las credenciales a App.js
+      await onLogin(formData);
     } catch (error) {
-      // Usar traducción si hay código de error, sino usar mensaje del servidor o genérico
       let errorMessage = t('common.error');
       
       if (error.code) {
-        // Mapear códigos de error a claves de traducción
         const errorKey = `auth.errors.${error.code}`;
         const translatedError = t(errorKey);
         
-        // Si la traducción existe (no devuelve la clave), usarla
         if (translatedError !== errorKey) {
           errorMessage = translatedError;
         } else {
-           // Fallback para códigos no traducidos
            errorMessage = error.message;
         }
       } else {
@@ -80,7 +75,7 @@ const Login = ({ onLogin, onSwitchToRegister, onThemeToggle, isDarkMode }) => {
 
   return (
     <div className="login-container">
-      {/* Theme & Language Controls */}
+      
       <div className="login-controls">
         <select 
           value={language} 
@@ -97,7 +92,7 @@ const Login = ({ onLogin, onSwitchToRegister, onThemeToggle, isDarkMode }) => {
           onClick={onThemeToggle}
           title={isDarkMode ? t('common.theme.light') : t('common.theme.dark')}
         >
-          {isDarkMode ? '☀️' : '🌙'}
+          {isDarkMode ? '[Light]' : '[Dark]'}
         </button>
       </div>
 

@@ -16,7 +16,6 @@ const PORT = process.env.PORT || 5002;
 app.use(cors());
 app.use(express.json());
 
-// Initialize Database Table
 const initDb = async () => {
     try {
         await db.query(`
@@ -32,7 +31,6 @@ const initDb = async () => {
                 metadata JSONB
             );
         `);
-        // Ensure metadata column exists (migration for existing tables)
         await db.query(`
             ALTER TABLE notifications ADD COLUMN IF NOT EXISTS metadata JSONB;
         `);
@@ -44,7 +42,6 @@ const initDb = async () => {
 
 initDb();
 
-// Authentication Middleware
 const authenticate = (req, res, next) => {
     const authHeader = req.headers.authorization;
     let token = null;
@@ -70,7 +67,6 @@ const authenticate = (req, res, next) => {
     }
 };
 
-// Redis Client
 const redisClient = createClient({ url: process.env.REDIS_HOST ? `redis://${process.env.REDIS_HOST}:6379` : 'redis://redis:6379' });
 redisClient.on('error', (err) => console.log('Redis Client Error', err));
 
@@ -78,7 +74,6 @@ redisClient.on('error', (err) => console.log('Redis Client Error', err));
     await redisClient.connect();
 })();
 
-// Socket.io Setup
 const io = new Server(server, {
     path: '/socket.io',
     cors: {
@@ -87,7 +82,6 @@ const io = new Server(server, {
     }
 });
 
-// Socket.io auth middleware: verify JWT at handshake so clients can only join their own room.
 io.use((socket, next) => {
   try {
     const token = socket.handshake?.auth?.token
@@ -103,11 +97,9 @@ io.use((socket, next) => {
 });
 
 io.on('connection', (socket) => {
-  // Auto-join the authenticated user's own room.
   if (socket.user && socket.user.id) {
     socket.join(`user:${socket.user.id}`);
   }
-  // Legacy join event: only allow joining your own room.
   socket.on('join', (userId) => {
     if (socket.user && String(socket.user.id) === String(userId)) {
       socket.join(`user:${userId}`);
@@ -117,7 +109,6 @@ io.on('connection', (socket) => {
   });
 });
 
-// Subscribe to Redis events
 const subscriber = redisClient.duplicate();
 subscriber.connect().then(() => {
     subscriber.subscribe('notifications', async (message) => {
@@ -125,14 +116,12 @@ subscriber.connect().then(() => {
             const data = JSON.parse(message);
             console.log('📨 Notification Received (Redis):', data.title, '| userId:', data.userId);
             
-            // Validate userId is a proper integer
             const userId = parseInt(data.userId, 10);
             if (isNaN(userId)) {
                 console.error('❌ Invalid userId in Redis notification:', data.userId);
                 return;
             }
 
-            // 1. Save to Database
             let savedNotification = data;
             try {
                 const result = await db.query(
@@ -146,9 +135,8 @@ subscriber.connect().then(() => {
                 console.error('Error saving notification to DB:', dbErr);
             }
 
-            // 2. Emit to Socket - targeted to user room + broadcast
             io.to(`user:${userId}`).emit('notification', savedNotification);
-            console.log(`📤 Notification emitted to user:${userId}`);
+            console.log(`[Export] Notification emitted to user:${userId}`);
 
         } catch (err) {
             console.error('Error processing redis message:', err);
@@ -156,9 +144,7 @@ subscriber.connect().then(() => {
     });
 });
 
-// REST API Routes
 
-// Internal-only token so services can create notifications, but external clients can't.
 const INTERNAL_API_TOKEN = process.env.INTERNAL_API_TOKEN || JWT_SECRET;
 const requireInternal = (req, res, next) => {
     const token = req.headers['x-internal-token'] || '';
@@ -166,7 +152,6 @@ const requireInternal = (req, res, next) => {
     return res.status(403).json({ success: false, message: 'Forbidden (internal endpoint)' });
 };
 
-// POST /create - Create a notification (internal service-to-service only)
 app.post('/create', requireInternal, async (req, res) => {
     try {
         const { userId, title, message, type, link, metadata } = req.body;
@@ -183,7 +168,6 @@ app.post('/create', requireInternal, async (req, res) => {
 
         const savedNotification = result.rows[0];
 
-        // Emit via socket to the specific user room and broadcast
         io.to(`user:${userId}`).emit('notification', savedNotification);
 
         res.json({ success: true, notification: savedNotification });
@@ -193,7 +177,6 @@ app.post('/create', requireInternal, async (req, res) => {
     }
 });
 
-// GET / - Get notifications for current user
 app.get('/', authenticate, async (req, res) => {
     try {
         const userId = req.user.id;
@@ -214,7 +197,6 @@ app.get('/', authenticate, async (req, res) => {
     }
 });
 
-// PUT /:id/read - Mark as read
 app.put('/:id/read', authenticate, async (req, res) => {
     try {
         const userId = req.user.id;
@@ -234,7 +216,6 @@ app.put('/:id/read', authenticate, async (req, res) => {
     }
 });
 
-// Mark all as read
 app.put('/read-all', authenticate, async (req, res) => {
     try {
         const userId = req.user.id;
