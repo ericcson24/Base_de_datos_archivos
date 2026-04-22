@@ -261,9 +261,7 @@ const FileViewerModal = ({ file, onClose, user }) => {
               file={file}
               fileUrl={`/api/files/preview/${file.id}?token=${encodeURIComponent(getAuthToken())}`}
               onClose={() => {}} 
-              onFileSaved={() => {
-                addToast(t('fileViewer.fileSaved'), 'success');
-              }}
+              onFileSaved={() => {}}
             />
           </div>
         );
@@ -275,9 +273,7 @@ const FileViewerModal = ({ file, onClose, user }) => {
               file={file}
               fileUrl={`/api/files/preview/${file.id}?token=${encodeURIComponent(getAuthToken())}`}
               onClose={() => {}}
-              onFileSaved={() => {
-                addToast(t('fileViewer.fileSaved'), 'success');
-              }}
+              onFileSaved={() => {}}
             />
           </div>
         );
@@ -289,9 +285,7 @@ const FileViewerModal = ({ file, onClose, user }) => {
               file={file}
               fileUrl={`/api/files/preview/${file.id}?token=${encodeURIComponent(getAuthToken())}`}
               onClose={() => {}}
-              onFileSaved={() => {
-                addToast(t('fileViewer.fileSaved'), 'success');
-              }}
+              onFileSaved={() => {}}
             />
           </div>
         );

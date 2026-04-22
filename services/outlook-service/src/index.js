@@ -1,4 +1,4 @@
-require('dotenv').config();
+﻿require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const jwt = require('jsonwebtoken');
@@ -523,7 +523,8 @@ app.post('/sync', authenticate, async (req, res) => {
     const user = await dbAsync.get('SELECT id, microsoft_access_token, microsoft_refresh_token FROM users WHERE username = ?', [username]);
 
     if (!user || !user.microsoft_access_token) {
-      return sendResponse(res, 400, { error: 'No vinculado' });
+      // Graceful: user simply has no Microsoft link; that's fine, nothing to sync.
+      return res.json({ success: true, message: 'No Microsoft account linked; using local events only', synced: 0 });
     }
 
     const now = new Date();
@@ -552,11 +553,56 @@ app.post('/', authenticate, async (req, res) => {
     const username = req.user.username;
     const user = await dbAsync.get('SELECT id, microsoft_access_token, microsoft_refresh_token FROM users WHERE username = ?', [username]);
 
-    if (!user || !user.microsoft_access_token) return res.status(401).json({ error: 'No vinculado', message: 'Conecta tu cuenta de Microsoft para crear eventos' });
+    if (!user) return res.status(404).json({ error: 'Usuario no encontrado' });
 
     const { title, start, end, allDay, location, description, attendees, categories } = req.body;
+
+    // LOCAL-ONLY path: user has no Microsoft link -> save directly to DB with a local_* id
+    if (!user.microsoft_access_token) {
+      const localId = `local_${Date.now()}_${Math.random().toString(36).substr(2,9)}`;
+      const catsJson = JSON.stringify(Array.isArray(categories) ? categories : (categories ? [categories] : []));
+      let dbStart = start;
+      let dbEnd = end;
+      if (allDay) {
+        dbStart = (start || '').split('T')[0];
+        dbEnd = (end || '').split('T')[0];
+        // Normalize inclusive end -> already handled by caller; keep as-is
+      }
+      await dbAsync.run(`
+          INSERT INTO calendar_events (microsoft_id, user_id, subject, body_preview, start_time, end_time, is_all_day, location, web_link, categories, last_synced, created_at)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+      `, [
+          localId, user.id, title, description || '',
+          dbStart, dbEnd, allDay ? 1 : 0,
+          location || null, null, catsJson
+      ]);
+      return res.status(201).json({
+        id: localId,
+        title,
+        start: dbStart,
+        end: dbEnd,
+        allDay: !!allDay,
+        extendedProps: { location: location || null, description: description || '', categories: Array.isArray(categories) ? categories : [] }
+      });
+    }
+
     const validToken = await getValidAccessToken(user);
-    if (!validToken) return res.status(401).json({ error: 'Token expirado', message: 'Token expirado, reconecta tu cuenta de Microsoft' });
+    if (!validToken) {
+      // Token refresh failed -> still allow local-only creation so calendar never blocks
+      const localId = `local_${Date.now()}_${Math.random().toString(36).substr(2,9)}`;
+      const catsJson = JSON.stringify(Array.isArray(categories) ? categories : (categories ? [categories] : []));
+      const dbStart = allDay ? (start || '').split('T')[0] : start;
+      const dbEnd = allDay ? (end || '').split('T')[0] : end;
+      await dbAsync.run(`
+          INSERT INTO calendar_events (microsoft_id, user_id, subject, body_preview, start_time, end_time, is_all_day, location, web_link, categories, last_synced, created_at)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+      `, [ localId, user.id, title, description || '', dbStart, dbEnd, allDay ? 1 : 0, location || null, null, catsJson ]);
+      return res.status(201).json({
+        id: localId, title, start: dbStart, end: dbEnd, allDay: !!allDay,
+        extendedProps: { location: location || null, description: description || '', categories: Array.isArray(categories) ? categories : [] },
+        syncError: 'Token Microsoft expirado, guardado solo en local'
+      });
+    }
     const client = getAuthenticatedClient(validToken);
 
     const newEvent = {
@@ -695,6 +741,12 @@ app.delete('/:id', authenticate, async (req, res) => {
 
     // Delete from local DB
     await dbAsync.run('DELETE FROM calendar_events WHERE id = ?', [dbEvent.id]);
+
+    // Cascade: remove attached files metadata (does NOT delete actual files)
+    try {
+      const attachEventKey = dbEvent.microsoft_id || dbEvent.id.toString();
+      await dbAsync.run('DELETE FROM event_attachments WHERE event_id = ?', [attachEventKey]);
+    } catch (eAtt) { console.warn('Cascade attachments cleanup failed:', eAtt.message); }
 
     res.json({ success: true, message: 'Evento eliminado', id });
   } catch (error) {
@@ -940,7 +992,7 @@ app.post('/group', authenticate, async (req, res) => {
         try {
           const notifRes = await fetch('http://notification-service:5002/create', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 'Content-Type': 'application/json', 'X-Internal-Token': process.env.INTERNAL_API_TOKEN || process.env.JWT_SECRET || '' },
             body: JSON.stringify({
               userId: member.id,
               title: 'calendar_event_assigned',
@@ -1068,7 +1120,7 @@ app.post('/assign-user', authenticate, async (req, res) => {
     try {
       const notifRes = await fetch('http://notification-service:5002/create', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', 'X-Internal-Token': process.env.INTERNAL_API_TOKEN || process.env.JWT_SECRET || '' },
         body: JSON.stringify({
           userId: targetUser.id,
           title: 'calendar_event_assigned',
@@ -1397,6 +1449,35 @@ app.post('/attachments', authenticate, async (req, res) => {
       return res.status(400).json({ error: 'Missing required fields (eventId, fileName, filePath)' });
     }
 
+    // --- Authorization: requester must own the target event or be admin/boss ---
+    const requester = await dbAsync.get('SELECT id, role FROM users WHERE username = ?', [username]);
+    if (!requester) return res.status(401).json({ error: 'Unauthorized' });
+    const isAdminOrBoss = requester.role === 'admin' || requester.role === 'boss';
+    let targetEvent = await dbAsync.get('SELECT user_id FROM calendar_events WHERE microsoft_id = ?', [eventId]);
+    if (!targetEvent && !isNaN(eventId)) {
+      targetEvent = await dbAsync.get('SELECT user_id FROM calendar_events WHERE id = ?', [parseInt(eventId)]);
+    }
+    if (!targetEvent) {
+      return res.status(404).json({ error: 'Evento no encontrado' });
+    }
+    if (targetEvent.user_id !== requester.id && !isAdminOrBoss) {
+      return res.status(403).json({ error: 'No tienes permiso para adjuntar a este evento' });
+    }
+
+    // --- Authorization: requester must own `fileOwner` or have the file shared with them ---
+    // Without this, a user could specify any fileOwner and download other users' private files
+    // via the internal-admin JWT minted below.
+    const resolvedFileOwner = fileOwner || username;
+    if (resolvedFileOwner !== username && !isAdminOrBoss) {
+      const shareRow = await dbAsync.get(
+        'SELECT id FROM shared_files WHERE path = ? AND owner_username = ? AND shared_with_username = ?',
+        [filePath, resolvedFileOwner, username]
+      );
+      if (!shareRow) {
+        return res.status(403).json({ error: 'No tienes acceso a este archivo' });
+      }
+    }
+
     // Save to local DB first
     const result = await dbAsync.run(
       `INSERT INTO event_attachments (event_id, file_name, file_path, file_owner, attached_by, file_size)
@@ -1488,7 +1569,23 @@ app.post('/attachments', authenticate, async (req, res) => {
 app.get('/:eventId/attachments', authenticate, async (req, res) => {
   try {
     const { eventId } = req.params;
-    
+    const username = req.user.username;
+
+    // Authorization: only event owner or admin/boss can list attachments
+    const requester = await dbAsync.get('SELECT id, role FROM users WHERE username = ?', [username]);
+    if (!requester) return res.status(401).json({ error: 'Unauthorized' });
+    const isAdminOrBoss = requester.role === 'admin' || requester.role === 'boss';
+    let targetEvent = await dbAsync.get('SELECT user_id FROM calendar_events WHERE microsoft_id = ?', [eventId]);
+    if (!targetEvent && !isNaN(eventId)) {
+      targetEvent = await dbAsync.get('SELECT user_id FROM calendar_events WHERE id = ?', [parseInt(eventId)]);
+    }
+    if (!targetEvent) {
+      return res.json({ success: true, attachments: [] });
+    }
+    if (targetEvent.user_id !== requester.id && !isAdminOrBoss) {
+      return res.status(403).json({ error: 'No autorizado' });
+    }
+
     const attachments = await dbAsync.all(
       'SELECT * FROM event_attachments WHERE event_id = ? ORDER BY created_at DESC',
       [eventId]

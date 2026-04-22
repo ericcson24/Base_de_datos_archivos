@@ -48,7 +48,17 @@
     "processing": "Przetwarzanie...",
     "networkError": "Błąd połączenia sieciowego",
     "selectUser": "Wybierz użytkownika",
-    "selectGroup": "Wybierz grupę"
+    "selectGroup": "Wybierz grupę",
+    "done": "Gotowe",
+    "apply": "Zastosuj",
+    "download": "Pobierz",
+    "downloading": "Pobieranie…",
+    "exitFullscreen": "Wyjdź z pełnego ekranu",
+    "fullscreen": "Pełny ekran",
+    "print": "Drukuj",
+    "resetZoom": "Zresetuj powiększenie",
+    "zoomIn": "Przybliż",
+    "zoomOut": "Oddal"
   },
   "folders": {
     "title": "Wybierz folder",
@@ -170,7 +180,11 @@
     "removedFromShared": "Usunięto z udostępnionych plików",
     "savedToMyFiles": "\"{{name}}\" zapisano w twoich plikach",
     "movedToPanel": "\"{{name}}\" przeniesiono do twojego panelu",
-    "unpinnedFromPanel": "Usunięto z twojego panelu"
+    "unpinnedFromPanel": "Usunięto z twojego panelu",
+    "remoteDesktop": "Pulpit zdalny",
+    "file": "plik",
+    "folder": "folder",
+    "pinnedToPanel": "Przypięte do panelu"
   },
   "settings": {
     "title": "Ustawienia",
@@ -238,7 +252,22 @@
     "peopleWithAccess": "Osoby z dostępem",
     "noShares": "Jeszcze nie udostępniłeś tego pliku",
     "removeAccess": "Usuń dostęp",
-    "sharedOn": "Udostępniono {{date}}"
+    "sharedOn": "Udostępniono {{date}}",
+    "permission": "Uprawnienie",
+    "permEdit": "Edytor",
+    "permRead": "Tylko do odczytu",
+    "tabUsers": "Użytkownicy",
+    "tabGroup": "Grupa",
+    "selectGroup": "Wybierz grupę",
+    "chooseGroup": "— Wybierz grupę —",
+    "loadingGroups": "Ładowanie grup...",
+    "noGroups": "Brak dostępnych grup",
+    "shareGroupBtn": "Udostępnij grupie",
+    "groupShared": "Grupa: +{{added}} nowych / {{updated}} zaktualizowanych",
+    "revokeAll": "Usuń wszystkich",
+    "confirmRevokeAll": "Usunąć dostęp wszystkim użytkownikom?",
+    "revokedAll": "{{count}} dostępów usuniętych",
+    "changePermission": "Zmień uprawnienie"
   },
   "move": {
     "title": "Przenieś \"{{name}}\"",
@@ -325,17 +354,14 @@
     "teamCalendars": "Zespoły",
     "viewAllSchedules": "Zobacz wszystkie harmonogramy",
     "noMembers": "Brak członków",
-    "noGroups": "Brak dostępnych grup",
+    "noGroups": "Brak utworzonych grup",
     "noMembersInGroup": "Grupa nie ma członków",
     "taskCreatedBy": "Zadanie utworzone przez",
     "confirmDeleteGroup": "Czy na pewno chcesz usunąć ten grupę?",
     "groupManagement": "Zarządzanie grupami",
     "groupName": "Nazwa grupy",
-    "description": "Opis",
     "createGroup": "Utwórz grupę",
-    "noGroups": "Brak utworzonych grup",
     "members": "Członkowie",
-    "noMembers": "Brak członków",
     "selectUser": "Wybierz użytkownika...",
     "aiAssistant": "Asystent AI",
     "aiTaskBuilder": "Asystent AI Zadań",
@@ -360,7 +386,9 @@
     "analyzingFiles": "Analizowanie Twoich plików...",
     "attach": "Załącz",
     "saveFirstToAttach": "Najpierw zapisz wydarzenie, aby załączyć",
-    "dismiss": "Odrzuć"
+    "dismiss": "Odrzuć",
+    "openAttachment": "Otwórz załącznik",
+    "saveToAttach": "Zapisz wydarzenie, aby dołączyć pliki"
   },
   "sidebar": {
     "errorLoadingFile": "Błąd podczas ładowania pliku",
@@ -391,41 +419,41 @@
     "openNewWindow": "Otwórz w nowym oknie",
     "closePanel": "Zamknij panel",
     "errorSaving": "Błąd podczas zapisywania",
-    "save": "Zapisz",
-    "cancel": "Anuluj",
-    "cannotEdit": "Tego typu pliku nie można edytować",
-    "download": "Pobierz",
     "close": "Zamknij"
   },
   "fileEditor": {
-    "errorLoading": "Błąd podczas ładowania pliku: {{error}}",
-    "emptyFile": "Pobrany plik jest pusty",
-    "serverError": "Błąd serwera podczas pobierania pliku",
-    "loading": "Ładowanie...",
-    "retry": "Ponów",
-    "download": "Pobierz",
+    "emptyFile": "Plik jest pusty",
+    "serverError": "Błąd serwera podczas przetwarzania pliku",
+    "errorLoading": "Błąd ładowania pliku: {{error}}",
+    "presentation": "Prezentacja PowerPoint",
+    "presentationDesc": "Prezentacji PowerPoint nie można edytować bezpośrednio w przeglądarce.",
+    "downloadToEdit": "Pobierz, aby edytować",
+    "cannotEdit": "Nie można edytować tego pliku",
+    "type": "Typ: {{type}}",
+    "cannotPreview": "Nie można wyświetlić podglądu tego typu pliku",
+    "characters": "znaki",
     "close": "Zamknij",
-    "done": "Gotowe",
-    "minimize": "Minimalizuj",
-    "maximize": "Maksymalizuj",
-    "restore": "Przywróć",
-    "unsupported": "Nieobsługiwany plik",
-    "cannotPreview": "Nie można podglądnąć tego typu pliku",
+    "download": "Pobierz",
     "fontSize": "Rozmiar",
+    "genericSaveError": "Błąd zapisu pliku",
     "lineHeight": "Wysokość linii",
-    "showLineNumbers": "Pokaż numery linii",
-    "wordWrap": "Zawijanie wierszy",
-    "save": "Zapisz",
-    "saveSuccess": "Plik zapisany pomyślnie",
-    "saveError": "Błąd podczas zapisywania: {{error}}",
-    "genericSaveError": "Błąd podczas zapisywania pliku",
-    "noSession": "Brak aktywnej sesji. Odśwież stronę i zaloguj się ponownie.",
     "lineNumbersShort": "Numery",
-    "wordWrapShort": "Zawijaj",
-    "lines": "linii",
-    "characters": "znaków",
+    "lines": "linie",
+    "loading": "Ładowanie...",
+    "maximize": "Maksymalizuj",
+    "minimize": "Minimalizuj",
+    "noSession": "Brak aktywnej sesji. Odśwież stronę i zaloguj się ponownie.",
+    "restore": "Przywróć",
+    "retry": "Ponów",
+    "save": "Zapisz",
+    "saveError": "Błąd zapisu: {{error}}",
+    "saveSuccess": "Plik zapisany pomyślnie",
+    "showLineNumbers": "Pokaż numery linii",
+    "undo": "Cofnij",
     "unsaved": "Niezapisane",
-    "undo": "Cofnij"
+    "unsupported": "Nieobsługiwany plik",
+    "wordWrap": "Zawijanie wierszy",
+    "wordWrapShort": "Zawiń"
   },
   "zipViewer": {
     "errorLoading": "Błąd podczas ładowania pliku ZIP: {{error}}",
@@ -469,7 +497,15 @@
     "saveSuccess": "Obraz zapisany pomyślnie na serwerze",
     "saveError": "Błąd zapisu: ",
     "saveErrorGeneric": "Błąd zapisu obrazu",
-    "noSession": "Brak aktywnej sesji"
+    "noSession": "Brak aktywnej sesji",
+    "adjust": "Dostosuj",
+    "crop": "Przytnij",
+    "overwrite": "Nadpisz",
+    "overwriteDesc": "Zastępuje oryginalny plik",
+    "rotate": "Obróć",
+    "saveAsCopy": "Zapisz jako kopię",
+    "saveAsCopyDesc": "Tworzy nowy plik z prefiksem copy_",
+    "saveOptions": "Opcje zapisu"
   },
   "pdfEditor": {
     "enterAnnotation": "Wprowadź tekst adnotacji:",
@@ -566,7 +602,9 @@
     "deleteSheet": "Usuń arkusz",
     "renameSheet": "Zmień nazwę arkusza",
     "selectAll": "Zaznacz wszystko",
-    "clearContents": "Wyczyść zawartość"
+    "clearContents": "Wyczyść zawartość",
+    "cannotDeleteLastSheet": "Nie możesz usunąć ostatniego arkusza",
+    "enterSheetName": "Nazwa arkusza:"
   },
   "wordEditor": {
     "docNotSupported": "Format .doc (Word 97-2003) nie jest obsługiwany. Proszę przekonwertować plik na .docx lub pobrać go, aby wyświetlić.",
@@ -598,7 +636,8 @@
     "emptyDocumentMessage": "Pusty dokument - Zacznij pisać tutaj...",
     "emptyDocumentWarning": "Ten dokument jest pusty. Możesz zacząć pisać bezpośrednio.",
     "corruptedFile": "Plik może być uszkodzony. Włączono tryb edycji, aby utworzyć nową zawartość.",
-    "loadErrorFallback": "Nie można załadować pliku. Włączono tryb edycji, aby zacząć od nowa."
+    "loadErrorFallback": "Nie można załadować pliku. Włączono tryb edycji, aby zacząć od nowa.",
+    "docxReadError": "Błąd odczytu pliku .docx"
   },
   "videoPlayer": {
     "play": "Odtwórz",
@@ -611,17 +650,12 @@
     "download": "Pobierz",
     "speed": "Prędkość",
     "normal": "Normalna",
-    "pip": "Obraz w obrazie"
-  },
-  "fileEditor": {
-    "emptyFile": "Plik jest pusty",
-    "serverError": "Błąd serwera podczas przetwarzania pliku",
-    "errorLoading": "Błąd ładowania pliku: {{error}}",
-    "presentation": "Prezentacja PowerPoint",
-    "presentationDesc": "Prezentacji PowerPoint nie można edytować bezpośrednio w przeglądarce.",
-    "downloadToEdit": "Pobierz, aby edytować",
-    "cannotEdit": "Nie można edytować tego pliku",
-    "type": "Typ: {{type}}"
+    "pip": "Obraz w obrazie",
+    "edit": "Edytuj",
+    "saveError": "Błąd przetwarzania wideo",
+    "saveErrorGeneric": "Wystąpił nieoczekiwany błąd podczas zapisu",
+    "saveSuccess": "Wideo przetworzone pomyślnie",
+    "trim": "Przytnij / Filtry"
   },
   "fileViewer": {
     "errorLoading": "Błąd podczas ładowania pliku",
@@ -647,7 +681,10 @@
     "downloadFile": "Pobierz plik",
     "clickToEditExcel": "Kliknij przycisk, aby otworzyć edytor arkuszy kalkulacyjnych.",
     "clickToEditPowerPoint": "Kliknij przycisk, aby otworzyć edytor prezentacji.",
-    "enableEditing": "Otwórz Edytor"
+    "enableEditing": "Otwórz Edytor",
+    "excelEditMessage": "Kliknij 'Otwórz edytor', aby wyświetlić i edytować ten plik Excel",
+    "fileSaved": "Plik zapisany pomyślnie",
+    "powerpointEditMessage": "Kliknij 'Otwórz edytor', aby wyświetlić i edytować tę prezentację"
   },
   "admin": {
     "loading": "Ładowanie panelu administratora...",
@@ -839,7 +876,11 @@
       "ipUnblocked": "IP odblokowane pomyślnie",
       "allRateLimitsCleared": "Wszystkie limity wyczyszczone",
       "accountUnlocked": "Konto odblokowane pomyślnie"
-    }
+    },
+    "errorAddingMember": "Błąd dodawania członka",
+    "errorCreatingGroup": "Błąd podczas tworzenia grupy",
+    "groupCreated": "Grupa utworzona pomyślnie",
+    "groupNameRequired": "Nazwa grupy jest wymagana"
   },
   "contextMenu": {
     "open": "Otwórz",
@@ -856,6 +897,9 @@
     "shared": "Udostępnione",
     "by": "przez {{owner}}",
     "saveToMyFiles": "Zapisz w moich plikach",
+    "pinToPanel": "Przypnij do panelu",
+    "unpinFromPanel": "Odepnij od panelu",
+    "copyPath": "Kopiuj ścieżkę",
     "removeFromShared": "Usuń z udostępnionych",
     "moveToPanel": "Zapisz w moich plikach",
     "removeFromPanel": "Usuń z panelu",
@@ -866,7 +910,8 @@
     "excludeFromAI": "Wyklucz z AI",
     "includeInAI": "Uwzględnij w AI",
     "excludedFromAIMsg": "\"{{name}}\" wykluczone z AI",
-    "includedInAIMsg": "\"{{name}}\" uwzględnione w AI"
+    "includedInAIMsg": "\"{{name}}\" uwzględnione w AI",
+    "unshare": "Anuluj udostępnianie"
   },
   "aiResults": {
     "title": "Wyniki Wyszukiwania AI",
@@ -940,10 +985,10 @@
     "passwordRequired": "Wymagane Hasło",
     "serverRequestsPassword": "Serwer zdalny wymaga podania hasła",
     "authenticate": "Uwierzytelnij",
-    "authFailed": "Uwierzytelnienie nie powiod\u0142o si\u0119 \u2014 sprawd\u017a nazw\u0119 u\u017cytkownika i has\u0142o",
-    "serverError": "B\u0142\u0105d serwera \u2014 nie mo\u017cna po\u0142\u0105czy\u0107 si\u0119 z pulpitem zdalnym",
-    "upstreamError": "Serwer pulpitu zdalnego niedost\u0119pny",
-    "connectionFailed": "Po\u0142\u0105czenie nie powiod\u0142o si\u0119 \u2014 nie mo\u017cna ustanowi\u0107 sesji pulpitu zdalnego",
+    "authFailed": "Uwierzytelnienie nie powiodło się — sprawdź nazwę użytkownika i hasło",
+    "serverError": "Błąd serwera — nie można połączyć się z pulpitem zdalnym",
+    "upstreamError": "Serwer pulpitu zdalnego niedostępny",
+    "connectionFailed": "Połączenie nie powiodło się — nie można ustanowić sesji pulpitu zdalnego",
     "remoteDesktop": "Pulpit Zdalny",
     "description": "Połącz się z prywatnym wirtualnym pulpitem z dowolnego miejsca",
     "selectConnection": "Wybierz Połączenie",
@@ -1041,7 +1086,8 @@
     "thisWeek": "Ten tydzień",
     "thisMonth": "Ten miesiąc",
     "nextMonth": "Następny miesiąc",
-    "last30Days": "Ostatnie 30 dni"
+    "last30Days": "Ostatnie 30 dni",
+    "popupBlocked": "Przeglądarka zablokowała okno. Zezwól na wyskakujące okna, aby wyeksportować."
   },
   "duplicateModal": {
     "titleSingle": "Zduplikowany plik",

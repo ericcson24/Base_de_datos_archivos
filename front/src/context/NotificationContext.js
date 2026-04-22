@@ -1,6 +1,7 @@
 import React, { createContext, useEffect, useRef, useState, useCallback } from 'react';
 import io from 'socket.io-client';
 import { useToast } from './ToastContext';
+import { getAuthToken } from '../utils/fileUtils';
 
 const NotificationContext = createContext();
 
@@ -107,9 +108,11 @@ export const NotificationProvider = ({ children, user, onNavigate }) => {
 
     // Connect to socket
     // The path must match the nginx location for notifications
+    const token = getAuthToken();
     const newSocket = io('/', {
       path: '/api/notifications/socket.io',
-      transports: ['websocket', 'polling']
+      transports: ['websocket', 'polling'],
+      auth: { token }
     });
 
     newSocket.on('connect', () => {
@@ -152,6 +155,22 @@ export const NotificationProvider = ({ children, user, onNavigate }) => {
           toastTitle = '📁 Archivo compartido';
           toastMessage = meta.from && meta.fileName 
             ? `${meta.from} compartió "${meta.fileName}" contigo`
+            : toastMessage;
+        } else if (meta.notifType === 'file_unshared') {
+          toastTitle = '🚫 Acceso revocado';
+          toastMessage = meta.from && meta.fileName
+            ? `${meta.from} dejó de compartir "${meta.fileName}" contigo`
+            : toastMessage;
+        } else if (meta.notifType === 'file_shared_deleted') {
+          toastTitle = '🗑️ Archivo eliminado';
+          toastMessage = meta.from && meta.fileName
+            ? `${meta.from} eliminó "${meta.fileName}" (compartido contigo)`
+            : toastMessage;
+        } else if (meta.notifType === 'file_permission_changed') {
+          toastTitle = '🔑 Permiso actualizado';
+          const permLabel = meta.permission === 'read' ? 'solo lectura' : 'edición';
+          toastMessage = meta.from && meta.fileName
+            ? `${meta.from} cambió el permiso de "${meta.fileName}" a ${permLabel}`
             : toastMessage;
         } else if (meta.notifType === 'calendar_assign' || meta.notifType === 'calendar_group') {
           toastTitle = '📅 Evento asignado';

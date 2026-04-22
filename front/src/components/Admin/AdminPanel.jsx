@@ -409,13 +409,13 @@ const AdminPanel = ({ user, onLogout, onBackToFolders, onThemeToggle, isDarkMode
   const handleScheduleDelete = async () => {
     if (!deleteModal.user) return;
     try {
-      const res = await fetchWithAuth(`/admin/api/users/${deleteModal.user.id}`, { method: 'DELETE' });
+      const res = await fetchWithAuth(`/admin/api/users/${deleteModal.user.id}/schedule-deletion`, { method: 'POST' });
       const data = await res.json();
       if (data.success) {
-        showAlert('success', t('admin.userDeleted') || 'Usuario eliminado correctamente');
+        showAlert('success', t('admin.deletionScheduled') || 'Eliminación programada. Puedes cancelarla durante los próximos 5 minutos.');
         loadUsers();
       } else {
-        showAlert('error', data.message);
+        showAlert('error', data.message || t('common.error'));
       }
     } catch (e) {
       showAlert('error', t('common.networkError'));

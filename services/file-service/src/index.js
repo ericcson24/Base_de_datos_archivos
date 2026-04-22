@@ -1,4 +1,4 @@
-require('dotenv').config();
+﻿require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const multer = require('multer');
@@ -92,13 +92,40 @@ async function logAction(username, action, details) {
 }
 
 // Configurar multer
+// Helper: reject any path/filename containing traversal or absolute-root segments.
+const isUnsafePathSegment = (p) => {
+  if (p === undefined || p === null) return false;
+  const s = String(p).replace(/\\/g, '/');
+  if (s.includes('..')) return true;
+  if (path.isAbsolute(s)) return true;
+  if (/^[a-zA-Z]:[\\/]/.test(s)) return true; // Windows drive-letter
+  return false;
+};
+
+// Helper: strip traversal from an original filename (never allow it to escape its target dir).
+const sanitizeFilename = (name) => {
+  if (!name) return `file_${Date.now()}`;
+  // Keep only the basename, strip null bytes and leading dots.
+  const base = path.basename(String(name)).replace(/\0/g, '').replace(/^\.+/, '');
+  // Fall back if completely empty after sanitization.
+  return base || `file_${Date.now()}`;
+};
+
 const storage = multer.diskStorage({
   destination: async (req, file, cb) => {
     try {
       const username = req.user.username;
       const uploadPath = req.body.path || '';
-      const fullPath = path.join(UPLOAD_DIR, username, uploadPath);
-      
+      if (isUnsafePathSegment(uploadPath)) {
+        return cb(new Error('Ruta de subida inválida'));
+      }
+      const userRoot = path.resolve(UPLOAD_DIR, username);
+      const fullPath = path.resolve(userRoot, uploadPath);
+      // Ensure the resolved path is still within the user's own folder.
+      if (fullPath !== userRoot && !fullPath.startsWith(userRoot + path.sep)) {
+        return cb(new Error('Ruta fuera del ámbito del usuario'));
+      }
+
       await fs.mkdir(fullPath, { recursive: true });
       cb(null, fullPath);
     } catch (error) {
@@ -106,15 +133,20 @@ const storage = multer.diskStorage({
     }
   },
   filename: (req, file, cb) => {
+    const safeOriginal = sanitizeFilename(file.originalname);
     // Si se solicita renombrar duplicados, generar un nombre único
     if (req.body.duplicateAction === 'rename') {
       const username = req.user ? req.user.username : 'unknown';
       const uploadPath = req.body.path || '';
-      const dir = path.join(UPLOAD_DIR, username, uploadPath);
-      const ext = path.extname(file.originalname);
-      const base = path.basename(file.originalname, ext);
+      const userRoot = path.resolve(UPLOAD_DIR, username);
+      const dir = path.resolve(userRoot, uploadPath);
+      if (dir !== userRoot && !dir.startsWith(userRoot + path.sep)) {
+        return cb(new Error('Ruta fuera del ámbito del usuario'));
+      }
+      const ext = path.extname(safeOriginal);
+      const base = path.basename(safeOriginal, ext);
 
-      let candidate = file.originalname;
+      let candidate = safeOriginal;
       let counter = 1;
       while (fsSync.existsSync(path.join(dir, candidate))) {
         candidate = `${base} (${counter})${ext}`;
@@ -122,18 +154,26 @@ const storage = multer.diskStorage({
       }
       cb(null, candidate);
     } else {
-      cb(null, file.originalname);
+      cb(null, safeOriginal);
     }
   }
 });
 
-const upload = multer({ 
-  storage: storage
+const upload = multer({
+  storage: storage,
+  limits: {
+    // Per-file cap (2 GB) to prevent runaway uploads; adjust via env if needed.
+    fileSize: parseInt(process.env.MAX_UPLOAD_BYTES || String(2 * 1024 * 1024 * 1024), 10),
+    files: 200
+  }
 });
 
 // Configuración de multer para actualización de archivos (usa carpeta temporal)
-const uploadTemp = multer({ 
-  dest: '/tmp/uploads'
+const uploadTemp = multer({
+  dest: '/tmp/uploads',
+  limits: {
+    fileSize: parseInt(process.env.MAX_UPLOAD_BYTES || String(2 * 1024 * 1024 * 1024), 10)
+  }
 });
 
 // --- Rutas ---
@@ -156,6 +196,25 @@ app.get('/list', authenticate, async (req, res) => {
 
     let targetDir;
     if (owner && owner !== username) {
+       // Authorization: the requested path must match a share with us (exact or ancestor)
+       const normReq = (requestedPath || '').replace(/\\/g, '/');
+       let allowed = false;
+       try {
+          const shares = await dbAsync.all(
+             'SELECT path FROM shared_files WHERE owner_username = ? AND shared_with_username = ?',
+             [owner, username]
+          );
+          for (const s of (shares || [])) {
+             const sp = (s.path || '').replace(/\\/g, '/');
+             if (sp === normReq || normReq === sp || normReq.startsWith(sp + '/') || sp.startsWith(normReq + '/') || normReq === '') {
+                // Only allow: exact match, inside shared folder, OR listing the ancestor path (shared folder itself at its parent)
+                if (sp === normReq || normReq.startsWith(sp + '/')) { allowed = true; break; }
+             }
+          }
+       } catch (e) { /* ignore */ }
+       if (!allowed) {
+          return res.status(403).json({ success: false, message: 'No tienes acceso a esta carpeta' });
+       }
        targetDir = path.join(UPLOAD_DIR, owner, requestedPath);
     } else {
        targetDir = path.join(UPLOAD_DIR, username, requestedPath);
@@ -181,6 +240,15 @@ app.get('/list', authenticate, async (req, res) => {
     }
 
     const items = await fs.readdir(targetDir, { withFileTypes: true });
+
+    // If viewing a shared user's folder, fetch their avatar once
+    let viewingOwnerAvatarUrl = null;
+    if (owner && owner !== username) {
+      try {
+        const ownerRow = await dbAsync.get('SELECT avatar_url FROM users WHERE username = ?', [owner]);
+        viewingOwnerAvatarUrl = (ownerRow && ownerRow.avatar_url) || null;
+      } catch (e) { /* ignore */ }
+    }
     
     // FETCH SHARED STATUS
     let sharedPaths = new Set();
@@ -260,6 +328,7 @@ app.get('/list', authenticate, async (req, res) => {
           shared: isShared,
           sharedWith: isShared ? sharedWith : undefined,
           owner: owner || username,
+          ownerAvatarUrl: viewingOwnerAvatarUrl,
           folder_color: meta.color || null,
           folder_icon: meta.icon || null,
           ai_excluded: isAIExcluded(normalizedPath)
@@ -277,6 +346,7 @@ app.get('/list', authenticate, async (req, res) => {
           shared: isShared,
           sharedWith: isShared ? sharedWith : undefined,
           owner: owner || username,
+          ownerAvatarUrl: viewingOwnerAvatarUrl,
           ai_excluded: isAIExcluded(normalizedPath)
         });
       }
@@ -296,6 +366,18 @@ app.get('/list', authenticate, async (req, res) => {
           [username]
         );
         if (pinnedShares && pinnedShares.length > 0) {
+          // Build avatar map for all distinct owners in pinned shares
+          const pinnedOwners = [...new Set(pinnedShares.map(s => s.owner_username))];
+          const pinnedAvatarMap = {};
+          if (pinnedOwners.length) {
+            try {
+              const rows = await dbAsync.all(
+                `SELECT username, avatar_url FROM users WHERE username IN (${pinnedOwners.map(() => '?').join(',')})`,
+                pinnedOwners
+              );
+              for (const r of rows || []) pinnedAvatarMap[r.username] = r.avatar_url || null;
+            } catch (e) { /* ignore */ }
+          }
           for (const share of pinnedShares) {
             const fullPath = path.join(UPLOAD_DIR, share.owner_username, share.path);
             try {
@@ -310,7 +392,10 @@ app.get('/list', authenticate, async (req, res) => {
                 path: share.path,
                 extension: path.extname(share.path).toLowerCase(),
                 owner: share.owner_username,
+                ownerAvatarUrl: pinnedAvatarMap[share.owner_username] || null,
                 shared: true,
+                permission: share.permission || 'edit',
+                pinned_to_panel: true,
                 pinnedFromShared: true
               };
               // Apply ignored extensions + search filter
@@ -377,11 +462,23 @@ async function resolveFilePath(fileId, username) {
         const ownerUsername = parts[1];
         const filePath = parts.slice(2).join(':'); // path may contain colons
 
-        // Verify the share exists in DB
-        const share = await dbAsync.get(
+        // Verify the share exists in DB (exact path OR a parent folder shared with us)
+        let share = await dbAsync.get(
             'SELECT * FROM shared_files WHERE owner_username = ? AND shared_with_username = ? AND path = ?',
             [ownerUsername, username, filePath]
         );
+        if (!share) {
+            // Walk up ancestors: folder/sub/file.txt -> folder/sub -> folder
+            const segments = filePath.split('/').filter(Boolean);
+            for (let i = segments.length - 1; i > 0; i--) {
+                const ancestor = segments.slice(0, i).join('/');
+                const s = await dbAsync.get(
+                    'SELECT * FROM shared_files WHERE owner_username = ? AND shared_with_username = ? AND path = ?',
+                    [ownerUsername, username, ancestor]
+                );
+                if (s) { share = s; break; }
+            }
+        }
         if (!share) {
             return { error: 'No tienes acceso a este archivo compartido', status: 403 };
         }
@@ -391,7 +488,13 @@ async function resolveFilePath(fileId, username) {
             return { error: 'Acceso denegado', status: 403 };
         }
 
-        return { fullPath, filePath, ownerUsername, isShared: true };
+        return {
+            fullPath,
+            filePath,
+            ownerUsername,
+            isShared: true,
+            permission: share.permission || 'edit'
+        };
     }
 
     // Own file
@@ -400,7 +503,7 @@ async function resolveFilePath(fileId, username) {
         return { error: 'Acceso denegado', status: 403 };
     }
 
-    return { fullPath, filePath: decoded, ownerUsername: username, isShared: false };
+    return { fullPath, filePath: decoded, ownerUsername: username, isShared: false, permission: 'owner' };
 }
 
 // Descargar archivo
@@ -658,24 +761,104 @@ app.post('/ai-exclude/toggle', authenticate, async (req, res) => {
 app.delete('/:fileId', authenticate, async (req, res) => {
   try {
     const { fileId } = req.params;
-    const filePath = Buffer.from(fileId, 'base64').toString();
-    const fullPath = path.join(UPLOAD_DIR, req.user.username, filePath);
+    const username = req.user.username;
+    const decoded = Buffer.from(fileId, 'base64').toString();
 
-    if (!fullPath.startsWith(path.join(UPLOAD_DIR, req.user.username))) {
+    // Case A: recipient deleting a file that was shared with them -> just remove the share row
+    if (decoded.startsWith('shared:')) {
+        const parts = decoded.split(':');
+        if (parts.length < 3) {
+            return res.status(400).json({ success: false, message: 'ID compartido inválido' });
+        }
+        const ownerUsername = parts[1];
+        const filePath = parts.slice(2).join(':');
+        await dbAsync.run(
+            'DELETE FROM shared_files WHERE path = ? AND owner_username = ? AND shared_with_username = ?',
+            [filePath, ownerUsername, username]
+        );
+        // Remove it from this user's recent/audit logs so it disappears from "recientes"
+        await dbAsync.run(
+            `DELETE FROM audit_logs
+             WHERE username = ?
+               AND action = 'FILE_OPEN'
+               AND details LIKE ?`,
+            [username, `%${filePath} (compartido por ${ownerUsername})%`]
+        );
+        await logAction(username, 'REMOVE_SHARED', `Quitado de panel ${filePath} (de ${ownerUsername})`);
+        return res.json({ success: true, message: 'Quitado de tus archivos' });
+    }
+
+    // Case B: owner deleting their own file/folder
+    const filePath = decoded;
+    const fullPath = path.join(UPLOAD_DIR, username, filePath);
+
+    if (!fullPath.startsWith(path.join(UPLOAD_DIR, username))) {
         return res.status(403).json({ success: false, message: 'Acceso denegado' });
     }
 
     const stats = await fs.stat(fullPath);
     if (stats.isDirectory()) {
         await fs.rm(fullPath, { recursive: true, force: true });
-        await logAction(req.user.username, 'FOLDER_DELETE', `Eliminada carpeta: ${filePath}`);
+        await logAction(username, 'FOLDER_DELETE', `Eliminada carpeta: ${filePath}`);
     } else {
         await fs.unlink(fullPath);
-        await logAction(req.user.username, 'FILE_DELETE', `Eliminado archivo: ${filePath}`);
+        await logAction(username, 'FILE_DELETE', `Eliminado archivo: ${filePath}`);
     }
+
+    // Cascade: notify recipients then remove any shares pointing at this path (or children for folders)
+    try {
+        const affectedShares = await dbAsync.all(
+            `SELECT DISTINCT shared_with_username, path FROM shared_files
+             WHERE owner_username = ? AND (path = ? OR path LIKE ?)`,
+            [username, filePath, `${filePath}/%`]
+        );
+        for (const s of (affectedShares || [])) {
+            try {
+                const target = await dbAsync.get('SELECT id FROM users WHERE username = ?', [s.shared_with_username]);
+                if (target) {
+                    const fName = (s.path || '').split('/').pop() || s.path;
+                    await fetch('http://notification-service:5002/create', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json', 'X-Internal-Token': process.env.INTERNAL_API_TOKEN || process.env.JWT_SECRET || '' },
+                        body: JSON.stringify({
+                            userId: target.id,
+                            title: 'file_shared_deleted',
+                            message: `${username}|${fName}`,
+                            type: 'warning',
+                            metadata: { notifType: 'file_shared_deleted', from: username, fileName: fName, path: s.path }
+                        })
+                    });
+                }
+            } catch (e) { /* best effort */ }
+        }
+        await dbAsync.run(
+            `DELETE FROM shared_files
+             WHERE owner_username = ? AND (path = ? OR path LIKE ?)`,
+            [username, filePath, `${filePath}/%`]
+        );
+    } catch (e) { console.warn('Cascade share cleanup failed:', e.message); }
+
+    // Cascade: remove folder_metadata rows
+    try {
+        await dbAsync.run(
+            `DELETE FROM folder_metadata
+             WHERE username = ? AND (folder_path = ? OR folder_path LIKE ?)`,
+            [username, filePath, `${filePath}/%`]
+        );
+    } catch (e) { /* table may not exist */ }
+
+    // Cascade: remove ai_exclusions rows
+    try {
+        await dbAsync.run(
+            `DELETE FROM ai_exclusions
+             WHERE username = ? AND (path = ? OR path LIKE ?)`,
+            [username, filePath, `${filePath}/%`]
+        );
+    } catch (e) { /* table may not exist */ }
 
     res.json({ success: true, message: 'Eliminado exitosamente' });
   } catch (error) {
+    console.error('Error deleting:', error);
     res.status(500).json({ success: false, message: error.message });
   }
 });
@@ -685,15 +868,70 @@ app.put('/:fileId/rename', authenticate, async (req, res) => {
   try {
     const { fileId } = req.params;
     const { newName } = req.body;
+    const username = req.user.username;
     const filePath = Buffer.from(fileId, 'base64').toString();
-    const fullPath = path.join(UPLOAD_DIR, req.user.username, filePath);
-    const newPath = path.join(path.dirname(fullPath), newName);
+
+    if (filePath.startsWith('shared:')) {
+        return res.status(403).json({ success: false, message: 'No puedes renombrar un archivo compartido por otro usuario' });
+    }
+    if (!newName || /[\\/]/.test(newName)) {
+        return res.status(400).json({ success: false, message: 'Nombre inválido' });
+    }
+
+    const fullPath = path.join(UPLOAD_DIR, username, filePath);
+    const parentDir = path.dirname(filePath);
+    const newRelPath = parentDir === '.' || parentDir === '' ? newName : path.join(parentDir, newName).replace(/\\/g, '/');
+    const newPath = path.join(UPLOAD_DIR, username, newRelPath);
+
+    if (!newPath.startsWith(path.join(UPLOAD_DIR, username))) {
+        return res.status(403).json({ success: false, message: 'Acceso denegado' });
+    }
 
     await fs.rename(fullPath, newPath);
-    await logAction(req.user.username, 'FILE_RENAME', `Renombrado: ${filePath} -> ${newName}`);
+
+    // Cascade: update shares / metadata / ai_exclusions to point at the new path
+    try {
+        await dbAsync.run(
+            `UPDATE shared_files SET path = ? WHERE owner_username = ? AND path = ?`,
+            [newRelPath, username, filePath]
+        );
+        await dbAsync.run(
+            `UPDATE shared_files
+             SET path = ? || SUBSTR(path, ?)
+             WHERE owner_username = ? AND path LIKE ?`,
+            [newRelPath, filePath.length + 1, username, `${filePath}/%`]
+        );
+    } catch (e) { console.warn('Cascade share rename failed:', e.message); }
+    try {
+        await dbAsync.run(
+            `UPDATE folder_metadata SET folder_path = ? WHERE username = ? AND folder_path = ?`,
+            [newRelPath, username, filePath]
+        );
+        await dbAsync.run(
+            `UPDATE folder_metadata
+             SET folder_path = ? || SUBSTR(folder_path, ?)
+             WHERE username = ? AND folder_path LIKE ?`,
+            [newRelPath, filePath.length + 1, username, `${filePath}/%`]
+        );
+    } catch (e) { /* table may not exist */ }
+    try {
+        await dbAsync.run(
+            `UPDATE ai_exclusions SET path = ? WHERE username = ? AND path = ?`,
+            [newRelPath, username, filePath]
+        );
+        await dbAsync.run(
+            `UPDATE ai_exclusions
+             SET path = ? || SUBSTR(path, ?)
+             WHERE username = ? AND path LIKE ?`,
+            [newRelPath, filePath.length + 1, username, `${filePath}/%`]
+        );
+    } catch (e) { /* table may not exist */ }
+
+    await logAction(username, 'FILE_RENAME', `Renombrado: ${filePath} -> ${newRelPath}`);
 
     res.json({ success: true, message: 'Renombrado exitosamente' });
   } catch (error) {
+    console.error('Error renaming:', error);
     res.status(500).json({ success: false, message: error.message });
   }
 });
@@ -703,16 +941,67 @@ app.post('/:fileId/move', authenticate, async (req, res) => {
   try {
     const { fileId } = req.params;
     const { destinationPath } = req.body;
+    const username = req.user.username;
     const filePath = Buffer.from(fileId, 'base64').toString();
-    const fullPath = path.join(UPLOAD_DIR, req.user.username, filePath);
+
+    if (filePath.startsWith('shared:')) {
+        return res.status(403).json({ success: false, message: 'No puedes mover un archivo compartido por otro usuario' });
+    }
+
+    const fullPath = path.join(UPLOAD_DIR, username, filePath);
     const fileName = path.basename(fullPath);
-    const fullDest = path.join(UPLOAD_DIR, req.user.username, destinationPath, fileName);
+    const newRelPath = path.join(destinationPath || '', fileName).replace(/\\/g, '/');
+    const fullDest = path.join(UPLOAD_DIR, username, newRelPath);
+
+    if (!fullDest.startsWith(path.join(UPLOAD_DIR, username))) {
+        return res.status(403).json({ success: false, message: 'Acceso denegado' });
+    }
 
     await fs.rename(fullPath, fullDest);
-    await logAction(req.user.username, 'FILE_MOVE', `Movido: ${filePath} -> ${destinationPath}`);
+
+    // Cascade the path change in shares / metadata / ai_exclusions
+    try {
+        await dbAsync.run(
+            `UPDATE shared_files SET path = ? WHERE owner_username = ? AND path = ?`,
+            [newRelPath, username, filePath]
+        );
+        await dbAsync.run(
+            `UPDATE shared_files
+             SET path = ? || SUBSTR(path, ?)
+             WHERE owner_username = ? AND path LIKE ?`,
+            [newRelPath, filePath.length + 1, username, `${filePath}/%`]
+        );
+    } catch (e) { console.warn('Cascade share move failed:', e.message); }
+    try {
+        await dbAsync.run(
+            `UPDATE folder_metadata SET folder_path = ? WHERE username = ? AND folder_path = ?`,
+            [newRelPath, username, filePath]
+        );
+        await dbAsync.run(
+            `UPDATE folder_metadata
+             SET folder_path = ? || SUBSTR(folder_path, ?)
+             WHERE username = ? AND folder_path LIKE ?`,
+            [newRelPath, filePath.length + 1, username, `${filePath}/%`]
+        );
+    } catch (e) { /* table may not exist */ }
+    try {
+        await dbAsync.run(
+            `UPDATE ai_exclusions SET path = ? WHERE username = ? AND path = ?`,
+            [newRelPath, username, filePath]
+        );
+        await dbAsync.run(
+            `UPDATE ai_exclusions
+             SET path = ? || SUBSTR(path, ?)
+             WHERE username = ? AND path LIKE ?`,
+            [newRelPath, filePath.length + 1, username, `${filePath}/%`]
+        );
+    } catch (e) { /* table may not exist */ }
+
+    await logAction(username, 'FILE_MOVE', `Movido: ${filePath} -> ${newRelPath}`);
 
     res.json({ success: true, message: 'Movido exitosamente' });
   } catch (error) {
+    console.error('Error moving:', error);
     res.status(500).json({ success: false, message: error.message });
   }
 });
@@ -726,6 +1015,9 @@ app.put('/:fileId/content', authenticate, async (req, res) => {
     const resolved = await resolveFilePath(fileId, req.user.username);
     if (resolved.error) {
       return res.status(resolved.status).json({ success: false, message: resolved.error });
+    }
+    if (resolved.isShared && resolved.permission === 'read') {
+      return res.status(403).json({ success: false, message: 'Tienes permiso de solo lectura sobre este archivo' });
     }
     
     const fullPath = resolved.fullPath;
@@ -762,6 +1054,10 @@ app.put('/:fileId', authenticate, uploadTemp.single('file'), async (req, res) =>
       // Clean up temp file
       try { await fs.unlink(req.file.path); } catch(e) {}
       return res.status(resolved.status).json({ success: false, message: resolved.error });
+    }
+    if (resolved.isShared && resolved.permission === 'read') {
+      try { await fs.unlink(req.file.path); } catch(e) {}
+      return res.status(403).json({ success: false, message: 'Tienes permiso de solo lectura sobre este archivo' });
     }
     
     const fullPath = resolved.fullPath;
@@ -957,7 +1253,18 @@ app.get('/shared-with-me', authenticate, async (req, res) => {
             'SELECT * FROM shared_files WHERE shared_with_username = ?',
             [username]
         );
-        
+
+        // Build a map of owner -> avatar_url to avoid N+1 queries
+        const ownerSet = [...new Set((sharedFiles || []).map(s => s.owner_username))];
+        const avatarMap = {};
+        if (ownerSet.length) {
+            const rows = await dbAsync.all(
+                `SELECT username, avatar_url FROM users WHERE username IN (${ownerSet.map(() => '?').join(',')})`,
+                ownerSet
+            );
+            for (const r of rows || []) avatarMap[r.username] = r.avatar_url || null;
+        }
+
         const files = [];
         for (const share of sharedFiles) {
              const fullPath = path.join(UPLOAD_DIR, share.owner_username, share.path);
@@ -974,7 +1281,10 @@ app.get('/shared-with-me', authenticate, async (req, res) => {
                     modified: stats.mtime,
                     path: share.path,
                     owner: share.owner_username,
+                    ownerAvatarUrl: avatarMap[share.owner_username] || null,
                     shared: true,
+                    permission: share.permission || 'edit',
+                    pinned_to_panel: !!share.pinned_to_panel,
                     extension: path.extname(share.path).toLowerCase()
                  });
              } catch (e) {
@@ -993,7 +1303,10 @@ app.get('/shared-folders', authenticate, async (req, res) => {
     try {
         const username = req.user.username;
         const owners = await dbAsync.all(
-            'SELECT DISTINCT owner_username FROM shared_files WHERE shared_with_username = ?',
+            `SELECT DISTINCT sf.owner_username, u.avatar_url
+             FROM shared_files sf
+             LEFT JOIN users u ON u.username = sf.owner_username
+             WHERE sf.shared_with_username = ?`,
             [username]
         );
         
@@ -1002,6 +1315,7 @@ app.get('/shared-folders', authenticate, async (req, res) => {
             name: o.owner_username,
             type: 'folder',
             owner: o.owner_username,
+            ownerAvatarUrl: o.avatar_url || null,
             shared: true
         }));
         
@@ -1015,8 +1329,9 @@ app.get('/shared-folders', authenticate, async (req, res) => {
 // Share
 app.post('/share', authenticate, async (req, res) => {
   try {
-    const { path: filePath, username: targetUsername } = req.body;
+    const { path: filePath, username: targetUsername, permission: rawPermission } = req.body;
     const ownerUsername = req.user.username;
+    const permission = rawPermission === 'read' ? 'read' : 'edit';
 
     if (!filePath || !targetUsername) {
       return res.status(400).json({ success: false, message: 'Faltan datos' });
@@ -1039,45 +1354,182 @@ app.post('/share', authenticate, async (req, res) => {
         return res.status(404).json({ success: false, message: 'Archivo no encontrado' });
     }
 
-    // Insert into DB
-    await dbAsync.run(
-        'INSERT INTO shared_files (path, owner_username, shared_with_username) VALUES (?, ?, ?) ON CONFLICT DO NOTHING',
+    // Insert or update permission if already shared
+    const existing = await dbAsync.get(
+        'SELECT id FROM shared_files WHERE path = ? AND owner_username = ? AND shared_with_username = ?',
         [filePath, ownerUsername, targetUsername]
     );
+    if (existing) {
+        await dbAsync.run(
+            'UPDATE shared_files SET permission = ? WHERE id = ?',
+            [permission, existing.id]
+        );
+    } else {
+        await dbAsync.run(
+            'INSERT INTO shared_files (path, owner_username, shared_with_username, permission) VALUES (?, ?, ?, ?)',
+            [filePath, ownerUsername, targetUsername, permission]
+        );
+    }
 
-    // Send notification to the target user
+    // Send notification to the target user (only on new share, not permission update)
     const fileName = filePath.split('/').pop() || filePath;
-    try {
+    if (!existing) {
+      try {
         const notifRes = await fetch('http://notification-service:5002/create', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 'Content-Type': 'application/json', 'X-Internal-Token': process.env.INTERNAL_API_TOKEN || process.env.JWT_SECRET || '' },
             body: JSON.stringify({
                 userId: user.id,
                 title: 'file_shared',
                 message: `${ownerUsername}|${fileName}`,
                 type: 'info',
                 link: '/shared',
-                metadata: { 
+                metadata: {
                     notifType: 'file_share',
-                    from: ownerUsername, 
+                    from: ownerUsername,
                     fileName: fileName,
-                    path: filePath 
+                    path: filePath,
+                    permission
                 }
             })
         });
         if (!notifRes.ok) {
             console.warn('⚠️ Notification service returned error:', notifRes.status);
         }
-    } catch (notifErr) {
-        console.warn('⚠️ Could not send share notification:', notifErr.message);
+      } catch (notifErr) {
+          console.warn('⚠️ Could not send share notification:', notifErr.message);
+      }
     }
 
     // Also Log
-    await logAction(ownerUsername, 'FILE_SHARE', `Compartido ${filePath} con ${targetUsername}`);
+    await logAction(ownerUsername, 'FILE_SHARE', `Compartido ${filePath} con ${targetUsername} (${permission})`);
 
-    res.json({ success: true, message: `Compartido con ${targetUsername}` });
+    res.json({ success: true, message: `Compartido con ${targetUsername}`, permission });
   } catch (error) {
     console.error('Error sharing:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// Share with an entire group (expands to members)
+app.post('/share-with-group', authenticate, async (req, res) => {
+  try {
+    const { path: filePath, groupId, permission: rawPermission } = req.body;
+    const ownerUsername = req.user.username;
+    const permission = rawPermission === 'read' ? 'read' : 'edit';
+
+    if (!filePath || !groupId) {
+      return res.status(400).json({ success: false, message: 'Faltan datos' });
+    }
+
+    // Verify file exists
+    try {
+        await fs.access(path.join(UPLOAD_DIR, ownerUsername, filePath));
+    } catch {
+        return res.status(404).json({ success: false, message: 'Archivo no encontrado' });
+    }
+
+    // Fetch group members via user-service
+    let members = [];
+    try {
+        const token = req.headers.authorization;
+        const r = await fetch(`http://user-service:5005/groups/${groupId}/members`, {
+            headers: { Authorization: token }
+        });
+        if (!r.ok) {
+            return res.status(r.status).json({ success: false, message: 'No se pudieron obtener los miembros del grupo' });
+        }
+        const data = await r.json();
+        members = data.members || [];
+    } catch (e) {
+        return res.status(500).json({ success: false, message: 'Error contactando user-service: ' + e.message });
+    }
+
+    const fileName = filePath.split('/').pop() || filePath;
+    let added = 0, updated = 0, skipped = 0;
+
+    for (const member of members) {
+        if (!member.username || member.username === ownerUsername) { skipped++; continue; }
+
+        const existing = await dbAsync.get(
+            'SELECT id FROM shared_files WHERE path = ? AND owner_username = ? AND shared_with_username = ?',
+            [filePath, ownerUsername, member.username]
+        );
+        if (existing) {
+            await dbAsync.run('UPDATE shared_files SET permission = ? WHERE id = ?', [permission, existing.id]);
+            updated++;
+        } else {
+            await dbAsync.run(
+                'INSERT INTO shared_files (path, owner_username, shared_with_username, permission) VALUES (?, ?, ?, ?)',
+                [filePath, ownerUsername, member.username, permission]
+            );
+            added++;
+            // Notify
+            try {
+                await fetch('http://notification-service:5002/create', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'X-Internal-Token': process.env.INTERNAL_API_TOKEN || process.env.JWT_SECRET || '' },
+                    body: JSON.stringify({
+                        userId: member.id,
+                        title: 'file_shared',
+                        message: `${ownerUsername}|${fileName}`,
+                        type: 'info',
+                        link: '/shared',
+                        metadata: { notifType: 'file_share', from: ownerUsername, fileName, path: filePath, permission, viaGroup: true }
+                    })
+                });
+            } catch (e) { /* best effort */ }
+        }
+    }
+
+    await logAction(ownerUsername, 'FILE_SHARE_GROUP', `Compartido ${filePath} con grupo ${groupId} (+${added} / ~${updated})`);
+    res.json({ success: true, added, updated, skipped, total: members.length });
+  } catch (error) {
+    console.error('Error share-with-group:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// Update permission on an existing share
+app.put('/share/permission', authenticate, async (req, res) => {
+  try {
+    const { path: filePath, username: targetUsername, permission: rawPermission } = req.body;
+    const ownerUsername = req.user.username;
+    const permission = rawPermission === 'read' ? 'read' : 'edit';
+
+    if (!filePath || !targetUsername) {
+      return res.status(400).json({ success: false, message: 'Faltan datos' });
+    }
+
+    const result = await dbAsync.run(
+      'UPDATE shared_files SET permission = ? WHERE path = ? AND owner_username = ? AND shared_with_username = ?',
+      [permission, filePath, ownerUsername, targetUsername]
+    );
+    if (result.changes === 0) {
+      return res.status(404).json({ success: false, message: 'Compartición no encontrada' });
+    }
+    // Notify target of the permission change
+    try {
+        const target = await dbAsync.get('SELECT id FROM users WHERE username = ?', [targetUsername]);
+        if (target) {
+            const fileName = filePath.split('/').pop() || filePath;
+            await fetch('http://notification-service:5002/create', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-Internal-Token': process.env.INTERNAL_API_TOKEN || process.env.JWT_SECRET || '' },
+                body: JSON.stringify({
+                    userId: target.id,
+                    title: 'file_permission_changed',
+                    message: `${ownerUsername}|${fileName}|${permission}`,
+                    type: 'info',
+                    metadata: { notifType: 'file_permission_changed', from: ownerUsername, fileName, path: filePath, permission }
+                })
+            });
+        }
+    } catch (e) { /* best effort */ }
+    await logAction(ownerUsername, 'FILE_SHARE_PERM', `Permiso de ${filePath} con ${targetUsername} -> ${permission}`);
+    res.json({ success: true, permission });
+  } catch (error) {
+    console.error('Error updating share permission:', error);
     res.status(500).json({ success: false, message: error.message });
   }
 });
@@ -1101,10 +1553,93 @@ app.post('/unshare', authenticate, async (req, res) => {
       return res.status(404).json({ success: false, message: 'Compartición no encontrada' });
     }
 
+    // Remove the file from the target user's recent/audit logs so it disappears from their recientes
+    try {
+        await dbAsync.run(
+            `DELETE FROM audit_logs
+             WHERE username = ?
+               AND action = 'FILE_OPEN'
+               AND details LIKE ?`,
+            [targetUsername, `%${filePath} (compartido por ${ownerUsername})%`]
+        );
+    } catch (e) { console.warn('Could not clean recent logs on unshare:', e.message); }
+
+    // Notify target user that access was revoked
+    try {
+        const target = await dbAsync.get('SELECT id FROM users WHERE username = ?', [targetUsername]);
+        if (target) {
+            const fileName = filePath.split('/').pop() || filePath;
+            await fetch('http://notification-service:5002/create', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-Internal-Token': process.env.INTERNAL_API_TOKEN || process.env.JWT_SECRET || '' },
+                body: JSON.stringify({
+                    userId: target.id,
+                    title: 'file_unshared',
+                    message: `${ownerUsername}|${fileName}`,
+                    type: 'warning',
+                    metadata: { notifType: 'file_unshared', from: ownerUsername, fileName, path: filePath }
+                })
+            });
+        }
+    } catch (e) { /* best effort */ }
+
     await logAction(ownerUsername, 'FILE_UNSHARE', `Dejado de compartir ${filePath} con ${targetUsername}`);
     res.json({ success: true, message: `Dejado de compartir con ${targetUsername}` });
   } catch (error) {
     console.error('Error unsharing:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// Unshare with everyone for this file
+app.post('/unshare-all', authenticate, async (req, res) => {
+  try {
+    const { path: filePath } = req.body;
+    const ownerUsername = req.user.username;
+    if (!filePath) return res.status(400).json({ success: false, message: 'Falta path' });
+
+    const shares = await dbAsync.all(
+      'SELECT shared_with_username FROM shared_files WHERE path = ? AND owner_username = ?',
+      [filePath, ownerUsername]
+    );
+
+    if (!shares || shares.length === 0) {
+      return res.json({ success: true, removed: 0 });
+    }
+
+    await dbAsync.run('DELETE FROM shared_files WHERE path = ? AND owner_username = ?', [filePath, ownerUsername]);
+
+    // Clean up recents + notify
+    for (const s of shares) {
+      try {
+        await dbAsync.run(
+          `DELETE FROM audit_logs WHERE username = ? AND action = 'FILE_OPEN' AND details LIKE ?`,
+          [s.shared_with_username, `%${filePath} (compartido por ${ownerUsername})%`]
+        );
+      } catch (e) { /* ignore */ }
+      try {
+        const target = await dbAsync.get('SELECT id FROM users WHERE username = ?', [s.shared_with_username]);
+        if (target) {
+          const fileName = filePath.split('/').pop() || filePath;
+          await fetch('http://notification-service:5002/create', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-Internal-Token': process.env.INTERNAL_API_TOKEN || process.env.JWT_SECRET || '' },
+            body: JSON.stringify({
+              userId: target.id,
+              title: 'file_unshared',
+              message: `${ownerUsername}|${fileName}`,
+              type: 'warning',
+              metadata: { notifType: 'file_unshared', from: ownerUsername, fileName, path: filePath }
+            })
+          });
+        }
+      } catch (e) { /* best effort */ }
+    }
+
+    await logAction(ownerUsername, 'FILE_UNSHARE_ALL', `Dejado de compartir ${filePath} con todos (${shares.length})`);
+    res.json({ success: true, removed: shares.length });
+  } catch (error) {
+    console.error('Error unshare-all:', error);
     res.status(500).json({ success: false, message: error.message });
   }
 });
@@ -1127,6 +1662,17 @@ app.post('/remove-shared', authenticate, async (req, res) => {
     if (result.changes === 0) {
       return res.status(404).json({ success: false, message: 'Share not found' });
     }
+
+    // Also scrub recent-files entries for this user pointing at the removed share
+    try {
+        await dbAsync.run(
+            `DELETE FROM audit_logs
+             WHERE username = ?
+               AND action = 'FILE_OPEN'
+               AND details LIKE ?`,
+            [username, `%${filePath} (compartido por ${ownerUsername})%`]
+        );
+    } catch (e) { console.warn('Could not clean recent logs on remove-shared:', e.message); }
 
     await logAction(username, 'REMOVE_SHARED', `Removed shared file ${filePath} from ${ownerUsername}`);
     res.json({ success: true, message: 'Removed from shared' });
@@ -1241,6 +1787,30 @@ app.post('/unpin-from-panel', authenticate, async (req, res) => {
   }
 });
 
+// Pin shared file to panel
+app.post('/pin-to-panel', authenticate, async (req, res) => {
+  try {
+    const { path: filePath, ownerUsername } = req.body;
+    const username = req.user.username;
+
+    if (!filePath || !ownerUsername) {
+      return res.status(400).json({ success: false, message: 'Missing path or ownerUsername' });
+    }
+
+    const result = await dbAsync.run(
+      'UPDATE shared_files SET pinned_to_panel = TRUE WHERE path = ? AND owner_username = ? AND shared_with_username = ?',
+      [filePath, ownerUsername, username]
+    );
+    if (result.changes === 0) {
+      return res.status(404).json({ success: false, message: 'Compartición no encontrada' });
+    }
+    res.json({ success: true, message: 'Pinned to panel' });
+  } catch (error) {
+    console.error('Error pinning to panel:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
 // Helper to recursively copy directory
 async function copyDir(src, dest) {
   await fs.mkdir(dest, { recursive: true });
@@ -1267,7 +1837,10 @@ app.get('/shares', authenticate, async (req, res) => {
     }
 
     const shares = await dbAsync.all(
-      'SELECT shared_with_username, created_at FROM shared_files WHERE path = ? AND owner_username = ?',
+      `SELECT sf.shared_with_username, sf.created_at, sf.permission, u.avatar_url AS "avatarUrl"
+       FROM shared_files sf
+       LEFT JOIN users u ON u.username = sf.shared_with_username
+       WHERE sf.path = ? AND sf.owner_username = ?`,
       [filePath, ownerUsername]
     );
 
@@ -1284,6 +1857,7 @@ app.get('/user-files', authenticate, async (req, res) => {
     const username = req.user.username;
     const requestedPath = req.query.path || '';
     const searchQuery = req.query.search || '';
+    const includeShared = req.query.includeShared !== 'false'; // default true
 
     if (requestedPath.includes('..')) {
       return res.status(400).json({ success: false, message: 'Ruta inválida' });
@@ -1291,28 +1865,56 @@ app.get('/user-files', authenticate, async (req, res) => {
 
     const targetDir = path.join(UPLOAD_DIR, username, requestedPath);
 
-    try {
-      await fs.access(targetDir);
-    } catch (e) {
-      return res.json({ success: true, files: [] });
-    }
-
-    const items = await fs.readdir(targetDir, { withFileTypes: true });
     let files = [];
 
-    for (const item of items) {
-      const relativePath = path.join(requestedPath, item.name);
-      if (item.isDirectory()) continue; // Only return files for attachment selection
+    try {
+      await fs.access(targetDir);
+      const items = await fs.readdir(targetDir, { withFileTypes: true });
+      for (const item of items) {
+        const relativePath = path.join(requestedPath, item.name).replace(/\\/g, '/');
+        if (item.isDirectory()) continue; // Only return files for attachment selection
 
-      const stats = await fs.stat(path.join(targetDir, item.name));
-      files.push({
-        id: Buffer.from(relativePath).toString('base64'),
-        name: item.name,
-        path: relativePath,
-        size: stats.size,
-        modified: stats.mtime,
-        extension: path.extname(item.name).toLowerCase()
-      });
+        const stats = await fs.stat(path.join(targetDir, item.name));
+        files.push({
+          id: Buffer.from(relativePath).toString('base64'),
+          name: item.name,
+          path: relativePath,
+          size: stats.size,
+          modified: stats.mtime,
+          extension: path.extname(item.name).toLowerCase(),
+          owner: username
+        });
+      }
+    } catch (e) {
+      // own folder may not exist yet - that's fine, continue to shared
+    }
+
+    // Also include files shared with the user so they can attach them too
+    if (includeShared && !requestedPath) {
+      try {
+        const shared = await dbAsync.all(
+          'SELECT path, owner_username FROM shared_files WHERE shared_with_username = ?',
+          [username]
+        );
+        for (const s of (shared || [])) {
+          try {
+            const full = path.join(UPLOAD_DIR, s.owner_username, s.path);
+            const st = await fs.stat(full);
+            if (st.isDirectory()) continue;
+            const name = path.basename(s.path);
+            files.push({
+              id: Buffer.from(`shared:${s.owner_username}:${s.path}`).toString('base64'),
+              name,
+              path: s.path,
+              size: st.size,
+              modified: st.mtime,
+              extension: path.extname(name).toLowerCase(),
+              owner: s.owner_username,
+              shared: true
+            });
+          } catch (e) { /* file moved/deleted */ }
+        }
+      } catch (e) { /* no shares */ }
     }
 
     // Search filter
@@ -1331,19 +1933,52 @@ app.get('/user-files', authenticate, async (req, res) => {
 app.post('/:fileId/duplicate', authenticate, async (req, res) => {
   try {
     const { fileId } = req.params;
-    const filePath = Buffer.from(fileId, 'base64').toString();
-    const fullPath = path.join(UPLOAD_DIR, req.user.username, filePath);
-    
-    const ext = path.extname(fullPath);
-    const name = path.basename(fullPath, ext);
-    const newName = `${name} - Copy${ext}`;
-    const newPath = path.join(path.dirname(fullPath), newName);
+    const username = req.user.username;
+    const resolved = await resolveFilePath(fileId, username);
+    if (resolved.error) {
+      return res.status(resolved.status).json({ success: false, message: resolved.error });
+    }
 
-    await fs.copyFile(fullPath, newPath);
-    await logAction(req.user.username, 'FILE_DUPLICATE', `Duplicado: ${filePath} -> ${newName}`);
+    const ext = path.extname(resolved.fullPath);
+    const baseName = path.basename(resolved.fullPath, ext);
 
-    res.json({ success: true, message: 'Duplicado exitosamente' });
+    // For shared files, the duplicate goes to the recipient's own home (at root).
+    // For owned files, the duplicate stays in the same folder.
+    let newPath;
+    let destRelPath;
+    if (resolved.isShared) {
+      let candidate = `${baseName} - Copy${ext}`;
+      let userHome = path.join(UPLOAD_DIR, username);
+      let i = 1;
+      while (true) {
+        const tryPath = path.join(userHome, candidate);
+        try {
+          await fs.access(tryPath);
+          i++;
+          candidate = `${baseName} - Copy (${i})${ext}`;
+        } catch {
+          newPath = tryPath;
+          destRelPath = candidate;
+          break;
+        }
+      }
+    } else {
+      const newName = `${baseName} - Copy${ext}`;
+      newPath = path.join(path.dirname(resolved.fullPath), newName);
+      destRelPath = path.join(path.dirname(resolved.filePath), newName).replace(/\\/g, '/');
+    }
+
+    const stat = await fs.stat(resolved.fullPath);
+    if (stat.isDirectory()) {
+      await copyDir(resolved.fullPath, newPath);
+    } else {
+      await fs.copyFile(resolved.fullPath, newPath);
+    }
+    await logAction(username, 'FILE_DUPLICATE', `Duplicado: ${resolved.filePath} -> ${destRelPath}`);
+
+    res.json({ success: true, message: 'Duplicado exitosamente', path: destRelPath });
   } catch (error) {
+    console.error('Error duplicating:', error);
     res.status(500).json({ success: false, message: error.message });
   }
 });

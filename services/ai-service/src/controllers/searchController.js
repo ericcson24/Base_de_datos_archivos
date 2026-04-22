@@ -260,7 +260,15 @@ const searchFiles = async (req, res) => {
 
     // Exclude file types the AI should ignore entirely
     {
-      const ignoredExtensions = ['.ini', '.lnk'];
+      const ignoredExtensions = [
+        '.ini', '.lnk',
+        // Installers / executables
+        '.exe', '.msi', '.msix', '.msixbundle', '.appx', '.dmg', '.pkg', '.deb', '.rpm',
+        // Archives (content not indexed)
+        '.zip', '.rar', '.7z', '.tar', '.gz', '.bz2', '.xz',
+        // Binary blobs / dumps
+        '.iso', '.img', '.bin', '.dat', '.dll', '.so', '.dylib',
+      ];
       const beforeCount = relevantFiles.length;
       relevantFiles = relevantFiles.filter(file => {
         const lowerName = (file.name || '').toLowerCase();
@@ -462,12 +470,83 @@ Si no encuentras nada relevante, devuelve "highlights": [] y una respuesta expli
     // Parse JSON response
     let finalResponse = { answer: aiResponseText, highlights: [] };
     try {
-        // Cleanup potential markdown
-        aiResponseText = aiResponseText.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
-        finalResponse = JSON.parse(aiResponseText);
+        // Cleanup potential markdown fences and leading prose before the JSON body
+        let cleaned = aiResponseText.replace(/```json\s*/gi, '').replace(/```\s*/g, '').trim();
+        // If the model prepended text, grab the first {...} block
+        const firstBrace = cleaned.indexOf('{');
+        const lastBrace = cleaned.lastIndexOf('}');
+        if (firstBrace > 0 && lastBrace > firstBrace) {
+            cleaned = cleaned.slice(firstBrace, lastBrace + 1);
+        }
+        finalResponse = JSON.parse(cleaned);
+
+        // Sometimes the model double-wraps: { answer: "{ \"answer\": ..., \"highlights\": [...] }", highlights: [] }
+        if (typeof finalResponse.answer === 'string') {
+            const inner = finalResponse.answer.trim();
+            if (inner.startsWith('{') && inner.endsWith('}')) {
+                try {
+                    const innerParsed = JSON.parse(inner);
+                    if (innerParsed && typeof innerParsed.answer === 'string') {
+                        finalResponse = {
+                            answer: innerParsed.answer,
+                            highlights: innerParsed.highlights || finalResponse.highlights || []
+                        };
+                    }
+                } catch (_) { /* keep outer */ }
+            }
+        }
     } catch (e) {
         // Fallback for non-JSON response
+        console.warn('[AI SEARCH] Failed to parse AI JSON response, using raw text:', e.message);
         finalResponse.answer = aiResponseText;
+    }
+
+    // Final safety: answer must be a plain string, never an object or JSON dump
+    if (typeof finalResponse.answer !== 'string') {
+        try { finalResponse.answer = JSON.stringify(finalResponse.answer); } catch (_) { finalResponse.answer = String(finalResponse.answer); }
+    }
+    if (!Array.isArray(finalResponse.highlights)) {
+        finalResponse.highlights = [];
+    }
+
+    // Narrow down the "relevant files" list to those actually cited by the AI (highlights)
+    // or whose name appears in the AI answer. This avoids returning unrelated "filler"
+    // files that were only added as recent-file context.
+    {
+      const highlights = finalResponse.highlights || [];
+      const citedIds = new Set(highlights.map(h => h.fileId).filter(id => id != null));
+      const answerText = (finalResponse.answer || '').toLowerCase();
+
+      const nameMatches = (file) => {
+        const name = (file.name || '').toLowerCase();
+        if (!name) return false;
+        if (answerText.includes(name)) return true;
+        // Also try matching by base name (without extension) when it's long enough
+        const base = name.replace(/\.[^.]+$/, '');
+        return base.length >= 4 && answerText.includes(base);
+      };
+
+      const queryLower = query.toLowerCase();
+      const queryWords = queryLower.split(/\s+/).filter(w => w.length >= 3);
+      const queryMatchesName = (file) => {
+        const name = (file.name || '').toLowerCase();
+        return queryWords.some(w => name.includes(w));
+      };
+
+      if (citedIds.size > 0 || highlights.length > 0) {
+        const filtered = relevantFiles.filter(f => citedIds.has(f.id) || nameMatches(f) || queryMatchesName(f));
+        if (filtered.length > 0) {
+          console.log(`[AI SEARCH] Narrowed relevant files ${relevantFiles.length} -> ${filtered.length} based on AI citations`);
+          relevantFiles = filtered;
+        }
+      } else {
+        // No highlights: keep only files whose name matches the query or that the AI mentioned
+        const filtered = relevantFiles.filter(f => nameMatches(f) || queryMatchesName(f));
+        if (filtered.length > 0 && filtered.length < relevantFiles.length) {
+          console.log(`[AI SEARCH] Narrowed relevant files ${relevantFiles.length} -> ${filtered.length} based on name/query match`);
+          relevantFiles = filtered;
+        }
+      }
     }
 
     // Guardar en cache

@@ -273,7 +273,9 @@ const ExcelEditor = ({ fileUrl, fileBlob, file, onClose, onFileSaved }) => {
         const response = await fetch(fileUrl, {
           headers: token ? { Authorization: `Bearer ${token}` } : {}
         });
-        if (!response.ok) throw new Error(t('excelEditor.loadError'));
+        if (!response.ok) {
+          throw new Error(`${t('excelEditor.loadError')} (HTTP ${response.status})`);
+        }
         const blob = await response.blob();
         if (blob.size === 0) isEmpty = true;
         else arrayBuffer = await blob.arrayBuffer();

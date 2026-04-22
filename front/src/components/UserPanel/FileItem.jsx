@@ -191,7 +191,38 @@ const OfficePreview = React.memo(({ fileId, fileType, fileName }) => {
   );
 });
 
-const FileItem = ({ item, onFolderClick, onDelete, onRename, onMove, onView, onOpenSidebar, onEdit, onDuplicate, onShare, onUnshare, onDragStart, onDragEnd, onDropToFolder, viewMode = 'list', isSharedView = false, onSaveToMyFiles, onRemoveShared, onCustomizeFolder, onToggleAIExclude }) => {
+// Small owner avatar. Shows image when url provided, else colored initial circle.
+const OwnerAvatar = ({ username, url, size = 20, title }) => {
+  const [errored, setErrored] = useState(false);
+  const initial = (username || '?').trim().charAt(0).toUpperCase();
+  // Deterministic color from username
+  let hash = 0;
+  for (let i = 0; i < (username || '').length; i++) hash = (hash * 31 + username.charCodeAt(i)) | 0;
+  const hue = Math.abs(hash) % 360;
+  const bg = `hsl(${hue}, 55%, 55%)`;
+  const style = {
+    width: size, height: size, borderRadius: '50%',
+    display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+    background: bg, color: '#fff', fontSize: Math.max(10, Math.floor(size * 0.45)),
+    fontWeight: 700, flexShrink: 0, overflow: 'hidden',
+    border: '1px solid rgba(255,255,255,0.7)', boxShadow: '0 1px 2px rgba(0,0,0,0.15)'
+  };
+  if (url && !errored) {
+    return (
+      <img
+        src={url}
+        alt={username || ''}
+        title={title || username}
+        style={{ ...style, background: '#eee', objectFit: 'cover' }}
+        onError={() => setErrored(true)}
+        loading="lazy"
+      />
+    );
+  }
+  return <span style={style} title={title || username}>{initial}</span>;
+};
+
+const FileItem = ({ item, onFolderClick, onDelete, onRename, onMove, onView, onOpenSidebar, onEdit, onDuplicate, onShare, onUnshare, onDragStart, onDragEnd, onDropToFolder, viewMode = 'list', isSharedView = false, onSaveToMyFiles, onRemoveShared, onCustomizeFolder, onToggleAIExclude, onPinToPanel, onUnpinFromPanel }) => {
   const [menuOpen, setMenuOpen] = useState(false);
   const [menuPosition, setMenuPosition] = useState({ top: 0, left: 0 });
   const [previewUrl, setPreviewUrl] = useState(null);
@@ -356,71 +387,10 @@ const FileItem = ({ item, onFolderClick, onDelete, onRename, onMove, onView, onO
     const canShowPreview = canPreview(item.name);
     const isShared = isSharedView || item.shared;
     
-    // Shared files from another user: expanded context menu
-    if (isShared && item.owner && item.owner !== 'me') {
-      return (
-        <>
-          <button className="context-menu-item" onClick={(e) => { e.stopPropagation(); setMenuOpen(false); handleClick(); }}>
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-            </svg>
-            <span>{t('contextMenu.open')}</span>
-          </button>
-          {onEdit && (
-            <button className="context-menu-item" onClick={(e) => { e.stopPropagation(); setMenuOpen(false); onEdit(item); }}>
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-              </svg>
-              <span>{t('contextMenu.editInPanel')}</span>
-            </button>
-          )}
-          <button className="context-menu-item" onClick={(e) => { e.stopPropagation(); setMenuOpen(false); onOpenSidebar(item, 'info'); }}>
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
-            <span>{t('contextMenu.info')}</span>
-          </button>
-          {canShowPreview ? (
-            <button className="context-menu-item" onClick={(e) => { e.stopPropagation(); setMenuOpen(false); onView(item); }}>
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-              </svg>
-              <span>{t('contextMenu.preview')}</span>
-            </button>
-          ) : null}
-          <button className="context-menu-item" onClick={(e) => { e.stopPropagation(); setMenuOpen(false); downloadFile(item.id, item.name, t); }}>
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-            </svg>
-            <span>{t('contextMenu.download')}</span>
-          </button>
-          <button className="context-menu-item" onClick={(e) => { e.stopPropagation(); setMenuOpen(false); onDuplicate(item); }}>
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
-            </svg>
-            <span>{t('contextMenu.duplicate')}</span>
-          </button>
-          <div className="border-t border-gray-200 dark:border-slate-600 my-1"></div>
-          {onSaveToMyFiles && (
-            <button className="context-menu-item" onClick={(e) => { e.stopPropagation(); setMenuOpen(false); onSaveToMyFiles(item); }}>
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" />
-              </svg>
-              <span>{t('contextMenu.saveToMyFiles') || 'Guardar en mis archivos'}</span>
-            </button>
-          )}
-          {onRemoveShared && (
-            <button className="context-menu-danger" onClick={(e) => { e.stopPropagation(); setMenuOpen(false); onRemoveShared(item); }}>
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-              </svg>
-              <span>{t('contextMenu.removeFromShared')}</span>
-            </button>
-          )}
-        </>
-      );
-    }
+    // Shared files from another user (recipient view): same menu as normal file,
+    // but "Delete" only removes the share from the recipient (not from owner).
+    const isRecipient = isShared && item.owner && item.owner !== 'me' && !item.sharedWith;
+    const isReadOnly = isRecipient && item.permission === 'read';
     
     return (
       <>
@@ -431,12 +401,14 @@ const FileItem = ({ item, onFolderClick, onDelete, onRename, onMove, onView, onO
           </svg>
           <span>{t('contextMenu.open')}</span>
         </button>
-        <button className="context-menu-item" onClick={(e) => { e.stopPropagation(); setMenuOpen(false); onEdit ? onEdit(item) : onOpenSidebar(item, 'edit'); }}>
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-          </svg>
-          <span>{t('contextMenu.editInPanel')}</span>
-        </button>
+        {!isReadOnly && (
+          <button className="context-menu-item" onClick={(e) => { e.stopPropagation(); setMenuOpen(false); onEdit ? onEdit(item) : onOpenSidebar(item, 'edit'); }}>
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+            </svg>
+            <span>{t('contextMenu.editInPanel')}</span>
+          </button>
+        )}
         <button className="context-menu-item" onClick={(e) => { e.stopPropagation(); setMenuOpen(false); onOpenSidebar(item, 'info'); }}>
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
@@ -469,12 +441,51 @@ const FileItem = ({ item, onFolderClick, onDelete, onRename, onMove, onView, onO
           </svg>
           <span>{t('contextMenu.move')}</span>
         </button>
-        <button className="context-menu-item" onClick={(e) => { e.stopPropagation(); setMenuOpen(false); onShare(item); }}>
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
-          </svg>
-          <span>{t('contextMenu.share')}</span>
-        </button>
+        {!isRecipient && (
+          <button className="context-menu-item" onClick={(e) => { e.stopPropagation(); setMenuOpen(false); onShare(item); }}>
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
+            </svg>
+            <span>{t('contextMenu.share')}</span>
+          </button>
+        )}
+        {isRecipient && onPinToPanel && (
+          <button className="context-menu-item" onClick={(e) => { e.stopPropagation(); setMenuOpen(false); onPinToPanel(item); }}>
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 5a2 2 0 012-2h6l5 5v11a2 2 0 01-2 2H7a2 2 0 01-2-2V5z M12 11v6 M9 14h6" />
+            </svg>
+            <span>{t('contextMenu.pinToPanel') || 'Anclar al panel'}</span>
+          </button>
+        )}
+        {isRecipient && onUnpinFromPanel && (
+          <button className="context-menu-item" onClick={(e) => { e.stopPropagation(); setMenuOpen(false); onUnpinFromPanel(item); }}>
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+            <span>{t('contextMenu.unpinFromPanel') || 'Quitar del panel'}</span>
+          </button>
+        )}
+        {isRecipient && (
+          <button className="context-menu-item" onClick={(e) => { e.stopPropagation(); setMenuOpen(false); navigator.clipboard.writeText(item.path); }}>
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+            </svg>
+            <span>{t('contextMenu.copyPath') || 'Copiar ruta'}</span>
+          </button>
+        )}
+        {isRecipient && onSaveToMyFiles && (
+          <button className="context-menu-item" onClick={(e) => { e.stopPropagation(); setMenuOpen(false); onSaveToMyFiles(item); }}>
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" />
+            </svg>
+            <span>{t('contextMenu.saveToMyFiles') || 'Guardar en mis archivos'}</span>
+          </button>
+        )}
+        {isReadOnly && (
+          <div style={{ padding: '6px 12px', fontSize: 11, color: '#f59e0b', fontStyle: 'italic' }}>
+            {t('share.permRead') || 'Solo lectura'}
+          </div>
+        )}
         {item.shared && item.sharedWith && item.sharedWith.length > 0 && onUnshare && (
           <button className="context-menu-item" onClick={(e) => { e.stopPropagation(); setMenuOpen(false); onUnshare(item); }}>
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -501,17 +512,20 @@ const FileItem = ({ item, onFolderClick, onDelete, onRename, onMove, onView, onO
             <span>{item.ai_excluded ? t('contextMenu.includeInAI') || 'Incluir en IA' : t('contextMenu.excludeFromAI') || 'Excluir de IA'}</span>
           </button>
         )}
-        <button className="context-menu-danger" onClick={(e) => { e.stopPropagation(); setMenuOpen(false); onDelete(item); }}>
+        <button className="context-menu-danger" onClick={(e) => { e.stopPropagation(); setMenuOpen(false); if (isRecipient && onRemoveShared) { onRemoveShared(item); } else { onDelete(item); } }}>
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
           </svg>
-          <span>{t('contextMenu.delete')}</span>
+          <span>{isRecipient ? (t('contextMenu.removeFromShared') || t('contextMenu.delete')) : t('contextMenu.delete')}</span>
         </button>
       </>
     );
   };
 
-  const renderFolderMenuItems = () => (
+  const renderFolderMenuItems = () => {
+    const isShared = isSharedView || item.shared;
+    const isRecipient = isShared && item.owner && item.owner !== 'me' && !item.sharedWith;
+    return (
     <>
       <button className="context-menu-item" onClick={(e) => { e.stopPropagation(); onFolderClick(item); }}>
         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -538,12 +552,14 @@ const FileItem = ({ item, onFolderClick, onDelete, onRename, onMove, onView, onO
         </svg>
         <span>{t('contextMenu.move')}</span>
       </button>
-      <button className="context-menu-item" onClick={(e) => { e.stopPropagation(); setMenuOpen(false); onShare(item); }}>
-        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
-        </svg>
-        <span>{t('contextMenu.share')}</span>
-      </button>
+      {!isRecipient && (
+        <button className="context-menu-item" onClick={(e) => { e.stopPropagation(); setMenuOpen(false); onShare(item); }}>
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
+          </svg>
+          <span>{t('contextMenu.share')}</span>
+        </button>
+      )}
       <div className="border-t border-gray-200 dark:border-slate-600 my-1"></div>
       <button className="context-menu-item" onClick={(e) => { e.stopPropagation(); setMenuOpen(false); onRename(item); }}>
         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -570,14 +586,15 @@ const FileItem = ({ item, onFolderClick, onDelete, onRename, onMove, onView, onO
           <span>{item.ai_excluded ? t('contextMenu.includeInAI') || 'Incluir en IA' : t('contextMenu.excludeFromAI') || 'Excluir de IA'}</span>
         </button>
       )}
-      <button className="context-menu-danger" onClick={(e) => { e.stopPropagation(); setMenuOpen(false); onDelete(item); }}>
+      <button className="context-menu-danger" onClick={(e) => { e.stopPropagation(); setMenuOpen(false); if (isRecipient && onRemoveShared) { onRemoveShared(item); } else { onDelete(item); } }}>
         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
         </svg>
-        <span>{t('contextMenu.delete')}</span>
+        <span>{isRecipient ? (t('contextMenu.removeFromShared') || t('contextMenu.delete')) : t('contextMenu.delete')}</span>
       </button>
     </>
-  );
+    );
+  };
 
   // Render file preview thumbnail or fallback icon
   const renderFilePreview = (size = 'grid') => {
@@ -701,6 +718,9 @@ const FileItem = ({ item, onFolderClick, onDelete, onRename, onMove, onView, onO
             </h3>
             {item.shared && (
               <div className="flex items-center text-xs text-gray-500 mt-1">
+                {item.owner && item.owner !== 'me' && !item.sharedWith && (
+                  <span className="mr-1"><OwnerAvatar username={item.owner} url={item.ownerAvatarUrl} size={16} /></span>
+                )}
                 <svg className="shared-icon-svg mr-1" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#4caf50" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>
                 {item.owner && item.owner !== 'me' && !item.sharedWith ? (
                   <span className="text-[10px] text-blue-500 truncate">{t('contextMenu.from', { owner: item.owner })}</span>
@@ -708,6 +728,9 @@ const FileItem = ({ item, onFolderClick, onDelete, onRename, onMove, onView, onO
                   <span className="text-[10px] text-blue-500 truncate" title={item.sharedWith.join(', ')}>{t('contextMenu.sharedWithUsers', { users: item.sharedWith.join(', ') })}</span>
                 ) : (
                   <span className="text-[10px] text-green-600">{t('contextMenu.shared')}</span>
+                )}
+                {item.permission === 'read' && !item.sharedWith && (
+                  <span className="ml-1 px-1 rounded" style={{ fontSize: 9, background: 'rgba(245,158,11,0.18)', color: '#f59e0b', fontWeight: 600 }}>{t('share.permRead') || 'Solo lectura'}</span>
                 )}
               </div>
             )}
@@ -758,6 +781,9 @@ const FileItem = ({ item, onFolderClick, onDelete, onRename, onMove, onView, onO
             {item.name}
             {item.shared && (
               <span className="shared-label ml-2 text-xs text-gray-500 flex items-center">
+                {item.owner && item.owner !== 'me' && !item.sharedWith && (
+                  <span className="mr-1"><OwnerAvatar username={item.owner} url={item.ownerAvatarUrl} size={16} /></span>
+                )}
                 <svg className="shared-icon-svg mr-1" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#4caf50" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>
                 {item.owner && item.owner !== 'me' && !item.sharedWith ? (
                   <span className="text-[10px] text-blue-500">{t('contextMenu.from', { owner: item.owner })}</span>
@@ -765,6 +791,9 @@ const FileItem = ({ item, onFolderClick, onDelete, onRename, onMove, onView, onO
                   <span className="text-[10px] text-blue-500" title={item.sharedWith.join(', ')}>{t('contextMenu.sharedWithUsers', { users: item.sharedWith.join(', ') })}</span>
                 ) : (
                   <span className="text-[10px] text-green-600">{t('contextMenu.shared')}</span>
+                )}
+                {item.permission === 'read' && !item.sharedWith && (
+                  <span className="ml-1 px-1 rounded" style={{ fontSize: 9, background: 'rgba(245,158,11,0.18)', color: '#f59e0b', fontWeight: 600 }}>{t('share.permRead') || 'Solo lectura'}</span>
                 )}
               </span>
             )}
@@ -802,8 +831,13 @@ const FileItem = ({ item, onFolderClick, onDelete, onRename, onMove, onView, onO
         onDragLeave={handleFolderDragLeave}
         onDrop={handleFolderDrop}
       >
-        <div className="aspect-square p-2 flex items-center justify-center grid-folder-thumbnail">
+        <div className="aspect-square p-2 flex items-center justify-center grid-folder-thumbnail" style={{ position: 'relative' }}>
           <FolderIcon color={item.folder_color} icon={item.folder_icon} size={56} />
+          {item.shared && item.owner && item.owner !== 'me' && !item.sharedWith && (
+            <div style={{ position: 'absolute', bottom: 6, right: 6 }}>
+              <OwnerAvatar username={item.owner} url={item.ownerAvatarUrl} size={26} title={item.owner} />
+            </div>
+          )}
         </div>
 
         <div className="p-1 grid-folder-info">
@@ -859,7 +893,14 @@ const FileItem = ({ item, onFolderClick, onDelete, onRename, onMove, onView, onO
         onDragLeave={handleFolderDragLeave}
         onDrop={handleFolderDrop}
       >
-        <span className="folder-icon"><FolderIcon color={item.folder_color} icon={item.folder_icon} size={22} /></span>
+        <span className="folder-icon" style={{ position: 'relative', display: 'inline-flex' }}>
+          <FolderIcon color={item.folder_color} icon={item.folder_icon} size={22} />
+          {item.shared && item.owner && item.owner !== 'me' && !item.sharedWith && (
+            <span style={{ position: 'absolute', bottom: -4, right: -4 }}>
+              <OwnerAvatar username={item.owner} url={item.ownerAvatarUrl} size={14} title={item.owner} />
+            </span>
+          )}
+        </span>
         <span className="folder-name" title={item.name}>
           {item.name}
           {item.shared && (

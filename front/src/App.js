@@ -45,9 +45,11 @@ function App() {
     const root = document.documentElement;
     if (isDarkMode) {
       root.setAttribute('data-theme', 'dark');
+      root.classList.add('dark');
       setCookie('theme', 'dark');
     } else {
       root.setAttribute('data-theme', 'light');
+      root.classList.remove('dark');
       setCookie('theme', 'light');
     }
   }, [isDarkMode]);

@@ -995,6 +995,33 @@ useEffect(() => {
     }
   };
 
+  // Pin a shared file to own panel (show it in main listing)
+  const handlePinToPanel = async (item) => {
+    try {
+      const response = await fetch('/api/files/pin-to-panel', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${getAuthToken()}`
+        },
+        body: JSON.stringify({
+          path: item.path,
+          ownerUsername: item.owner
+        })
+      });
+      const result = await response.json();
+      if (result.success) {
+        addToast(t('userPanel.pinnedToPanel') || 'Anclado al panel', 'success');
+        loadFiles();
+      } else {
+        addToast(result.message || t('common.error'), 'error');
+      }
+    } catch (error) {
+      console.error('Error pinning to panel:', error);
+      addToast(t('common.error'), 'error');
+    }
+  };
+
   const handleMoveItem = async (item, destinationPath) => {
     try {
       const response = await fetch(`/api/files/${encodeURIComponent(item.id)}/move`, {
@@ -1024,7 +1051,7 @@ useEffect(() => {
     }
   };
 
-  const handleShareItem = async (item, targetUsername) => {
+  const handleShareItem = async (item, targetUsername, permission = 'edit') => {
     try {
       const response = await fetchWithNotify('/api/files/share', {
         method: 'POST',
@@ -1034,7 +1061,8 @@ useEffect(() => {
         },
         body: JSON.stringify({
           path: item.path,
-          username: targetUsername
+          username: targetUsername,
+          permission
         })
       });
 
@@ -1904,7 +1932,9 @@ useEffect(() => {
                     viewMode={viewMode}
                     isSharedView={currentView === 'shared' || item.pinnedFromShared}
                     onSaveToMyFiles={currentView === 'shared' ? handleSaveToMyFiles : (item.pinnedFromShared ? handleUnpinFromPanel : undefined)}
-                    onRemoveShared={currentView === 'shared' ? handleRemoveShared : undefined}
+                    onRemoveShared={handleRemoveShared}
+                    onPinToPanel={currentView === 'shared' && !item.pinned_to_panel ? handlePinToPanel : undefined}
+                    onUnpinFromPanel={(currentView === 'shared' && item.pinned_to_panel) || item.pinnedFromShared ? handleUnpinFromPanel : undefined}
                     onCustomizeFolder={openCustomizeFolder}
                     onToggleAIExclude={currentView !== 'shared' ? handleToggleAIExclude : undefined}
                   />

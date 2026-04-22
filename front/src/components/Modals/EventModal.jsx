@@ -174,6 +174,25 @@ const EventModal = ({
     }
   };
 
+  // Open attachment in new tab (preview); auth token sent via query for images, etc.
+  const openAttachment = (att) => {
+    try {
+      // file-service download endpoint accepts ?token= for inline browser previews
+      const owner = att.fileOwner || '';
+      const path = att.filePath || '';
+      // shared IDs: shared:<owner>:<path>  ; owned IDs: <path>
+      const idRaw = owner && owner !== '' && att.attachedBy && owner !== att.attachedBy
+        ? `shared:${owner}:${path}`
+        : path;
+      const fileId = btoa(unescape(encodeURIComponent(idRaw)));
+      const token = getAuthToken();
+      const url = `/api/files/preview/${encodeURIComponent(fileId)}?token=${encodeURIComponent(token)}`;
+      window.open(url, '_blank', 'noopener');
+    } catch (e) {
+      console.error('Error opening attachment:', e);
+    }
+  };
+
   // Update state when props change
   useEffect(() => {
     setAssignMode(initialAssignMode);
@@ -623,7 +642,7 @@ const EventModal = ({
                     {attachments.length > 0 ? (
                       <div className="attachments-list">
                         {attachments.map(att => (
-                          <div key={att.id} className="attachment-item">
+                          <div key={att.id} className="attachment-item" onClick={() => openAttachment(att)} style={{ cursor: 'pointer' }} title={t('calendar.openAttachment') || 'Abrir adjunto'}>
                             <span className="attachment-icon"><FileTypeIcon type={getFileType(att.fileName)} size={20} /></span>
                             <div className="attachment-info">
                               <span className="attachment-name">{att.fileName}</span>
@@ -631,7 +650,7 @@ const EventModal = ({
                             </div>
                             <button 
                               className="attachment-remove-btn"
-                              onClick={() => removeAttachment(att.id)}
+                              onClick={(e) => { e.stopPropagation(); removeAttachment(att.id); }}
                               title={t('calendar.removeAttachment') || 'Quitar adjunto'}
                             >
                               ✕
@@ -916,7 +935,7 @@ const EventModal = ({
                     <label className="form-label">📎 {t('calendar.attachments') || 'Adjuntos'}</label>
                     <div className="attachments-list">
                       {attachments.map(att => (
-                        <div key={att.id} className="attachment-item">
+                        <div key={att.id} className="attachment-item" onClick={() => openAttachment(att)} style={{ cursor: 'pointer' }} title={t('calendar.openAttachment') || 'Abrir adjunto'}>
                           <span className="attachment-icon"><FileTypeIcon type={getFileType(att.fileName)} size={20} /></span>
                           <div className="attachment-info">
                             <span className="attachment-name">{att.fileName}</span>
@@ -924,7 +943,7 @@ const EventModal = ({
                           </div>
                           <button 
                             className="attachment-remove-btn"
-                            onClick={() => removeAttachment(att.id)}
+                            onClick={(e) => { e.stopPropagation(); removeAttachment(att.id); }}
                             title={t('calendar.removeAttachment') || 'Quitar'}
                           >
                             ✕
@@ -949,6 +968,16 @@ const EventModal = ({
                     >
                       ✨ {t('calendar.suggestFiles') || 'Sugerir archivos'}
                     </button>
+                  </div>
+                )}
+
+                {/* Create mode: hint to save first before attaching */}
+                {currentMode === 'create' && (
+                  <div className="form-group">
+                    <label className="form-label" style={{ opacity: 0.7 }}>📎 {t('calendar.attachments') || 'Adjuntos'}</label>
+                    <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', fontStyle: 'italic', padding: '6px 10px', background: 'var(--bg-secondary)', borderRadius: '6px' }}>
+                      💡 {t('calendar.saveToAttach') || 'Guarda el evento primero y luego ábrelo para adjuntar archivos.'}
+                    </div>
                   </div>
                 )}
               </form>
@@ -1071,7 +1100,14 @@ const EventModal = ({
                     >
                       <span className="attachment-icon"><FileTypeIcon type={getFileType(file.name)} size={20} /></span>
                       <div className="attachment-info">
-                        <span className="attachment-name">{file.name}</span>
+                        <span className="attachment-name">
+                          {file.name}
+                          {file.shared && (
+                            <span style={{ marginLeft: '6px', fontSize: '0.7rem', padding: '1px 6px', borderRadius: '4px', background: 'rgba(59,130,246,0.15)', color: '#3b82f6' }}>
+                              🔗 {file.owner}
+                            </span>
+                          )}
+                        </span>
                         <span className="attachment-meta">{formatFileSize(file.size)}</span>
                       </div>
                     </div>

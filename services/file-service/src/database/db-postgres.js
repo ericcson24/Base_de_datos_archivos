@@ -244,6 +244,7 @@ const initDatabase = async () => {
             owner_username TEXT NOT NULL,
             shared_with_username TEXT NOT NULL,
             pinned_to_panel BOOLEAN DEFAULT FALSE,
+            permission TEXT DEFAULT 'edit',
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             UNIQUE(path, owner_username, shared_with_username)
         )`);
@@ -251,6 +252,11 @@ const initDatabase = async () => {
         // Migration: add pinned_to_panel column if it doesn't exist
         await client.query(`DO $$ BEGIN
           ALTER TABLE shared_files ADD COLUMN pinned_to_panel BOOLEAN DEFAULT FALSE;
+        EXCEPTION WHEN duplicate_column THEN END $$;`);
+
+        // Migration: add permission column if it doesn't exist
+        await client.query(`DO $$ BEGIN
+          ALTER TABLE shared_files ADD COLUMN permission TEXT DEFAULT 'edit';
         EXCEPTION WHEN duplicate_column THEN END $$;`);
 
         // Folder Metadata (color/icon customization)

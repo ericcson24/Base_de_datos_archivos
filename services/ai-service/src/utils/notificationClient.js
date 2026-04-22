@@ -21,7 +21,7 @@ const sendNotification = async (data) => {
             const payload = typeof data === 'object' ? data : { userId: arguments[0], title: arguments[1], message: arguments[2], type: arguments[3] || 'info' };
             const res = await fetch('http://notification-service:5002/create', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: { 'Content-Type': 'application/json', 'X-Internal-Token': process.env.INTERNAL_API_TOKEN || process.env.JWT_SECRET || '' },
                 body: JSON.stringify(payload)
             });
             if (res.ok) console.log('[NOTIFICATION] Sent via HTTP fallback');

@@ -87,10 +87,33 @@ const io = new Server(server, {
     }
 });
 
+// Socket.io auth middleware: verify JWT at handshake so clients can only join their own room.
+io.use((socket, next) => {
+  try {
+    const token = socket.handshake?.auth?.token
+      || (socket.handshake?.headers?.authorization || '').replace(/^Bearer\s+/i, '')
+      || socket.handshake?.query?.token;
+    if (!token) return next(new Error('No auth token'));
+    const userData = jwt.verify(token, JWT_SECRET);
+    socket.user = userData;
+    next();
+  } catch (e) {
+    next(new Error('Invalid auth token'));
+  }
+});
+
 io.on('connection', (socket) => {
-  // Join user room for targeted notifications if client sends event
+  // Auto-join the authenticated user's own room.
+  if (socket.user && socket.user.id) {
+    socket.join(`user:${socket.user.id}`);
+  }
+  // Legacy join event: only allow joining your own room.
   socket.on('join', (userId) => {
-    socket.join(`user:${userId}`);
+    if (socket.user && String(socket.user.id) === String(userId)) {
+      socket.join(`user:${userId}`);
+    } else {
+      console.warn(`[SOCKET] Blocked join attempt: user ${socket.user?.id} tried to join user:${userId}`);
+    }
   });
 });
 
@@ -135,8 +158,16 @@ subscriber.connect().then(() => {
 
 // REST API Routes
 
-// POST /create - Create a notification (internal service-to-service)
-app.post('/create', async (req, res) => {
+// Internal-only token so services can create notifications, but external clients can't.
+const INTERNAL_API_TOKEN = process.env.INTERNAL_API_TOKEN || JWT_SECRET;
+const requireInternal = (req, res, next) => {
+    const token = req.headers['x-internal-token'] || '';
+    if (token && token === INTERNAL_API_TOKEN) return next();
+    return res.status(403).json({ success: false, message: 'Forbidden (internal endpoint)' });
+};
+
+// POST /create - Create a notification (internal service-to-service only)
+app.post('/create', requireInternal, async (req, res) => {
     try {
         const { userId, title, message, type, link, metadata } = req.body;
         if (!userId || !title) {

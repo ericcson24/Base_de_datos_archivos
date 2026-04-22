@@ -532,7 +532,7 @@ Responde SOLO el JSON.`;
                     eventId: targetEvent.id,
                     fileName: matchedFile.name,
                     filePath: matchedFile.path || matchedFile.id || '',
-                    fileOwner: attachUsername,
+                    fileOwner: matchedFile.owner || attachUsername,
                     fileSize: matchedFile.size || 0
                 })
             });

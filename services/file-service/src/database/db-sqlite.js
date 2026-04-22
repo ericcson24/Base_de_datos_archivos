@@ -197,12 +197,20 @@ function initDatabase() {
       owner_username TEXT NOT NULL,
       shared_with_username TEXT NOT NULL,
       pinned_to_panel INTEGER DEFAULT 0,
+      permission TEXT DEFAULT 'edit',
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       UNIQUE(path, owner_username, shared_with_username)
     )`);
 
     // Migration: add pinned_to_panel column if it doesn't exist
     db.run(`ALTER TABLE shared_files ADD COLUMN pinned_to_panel INTEGER DEFAULT 0`, (err) => {
+      if (err && !err.message.includes('duplicate column')) {
+        // Column already exists or other non-critical error
+      }
+    });
+
+    // Migration: add permission column if it doesn't exist
+    db.run(`ALTER TABLE shared_files ADD COLUMN permission TEXT DEFAULT 'edit'`, (err) => {
       if (err && !err.message.includes('duplicate column')) {
         // Column already exists or other non-critical error
       }

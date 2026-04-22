@@ -175,12 +175,73 @@ const LocationPickerModal = ({ isOpen, onClose, onSelect, initialLocation }) => 
     if (!query || query.length < 3) return;
     setIsSearching(true);
     try {
-      const response = await fetch(
-        `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&limit=8&addressdetails=1&accept-language=es,en`
-      );
-      const data = await response.json();
-      setSearchResults(data);
-      setShowResults(data.length > 0);
+      // Bias the search around the current map center if we have one, so that
+      // small POIs close to the user appear higher up in the results.
+      let viewbox = '';
+      let bounded = '';
+      if (position && typeof position.lat === 'number' && typeof position.lng === 'number') {
+        const dLat = 0.7;  // ~70 km radius bias, but NOT bounded so we still get far results
+        const dLng = 1.0;
+        const left = position.lng - dLng;
+        const right = position.lng + dLng;
+        const top = position.lat + dLat;
+        const bottom = position.lat - dLat;
+        viewbox = `&viewbox=${left},${top},${right},${bottom}`;
+        bounded = ''; // keep results global, only bias
+      }
+      const lang = (navigator.language || 'es,en').split(',')[0] + ',es,en';
+      // First pass: rich search with bias and more results
+      const primary = fetch(
+        `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&limit=20&addressdetails=1&namedetails=1&extratags=1&accept-language=${encodeURIComponent(lang)}${viewbox}${bounded}`,
+        { headers: { 'Accept': 'application/json' } }
+      ).then(r => r.ok ? r.json() : []);
+      // Second pass (Photon by Komoot): much better for POIs/businesses. Soft fallback.
+      const photon = fetch(
+        `https://photon.komoot.io/api/?q=${encodeURIComponent(query)}&limit=12&lang=${encodeURIComponent((navigator.language || 'es').split('-')[0])}${position ? `&lat=${position.lat}&lon=${position.lng}&location_bias_scale=0.3` : ''}`
+      ).then(r => r.ok ? r.json() : null).then(gj => {
+        if (!gj || !Array.isArray(gj.features)) return [];
+        return gj.features.map(f => {
+          const p = f.properties || {};
+          const [lon, lat] = f.geometry?.coordinates || [];
+          return {
+            place_id: `ph_${p.osm_type || ''}_${p.osm_id || ''}`,
+            lat: String(lat),
+            lon: String(lon),
+            type: p.osm_value || p.type || '',
+            class: p.osm_key || '',
+            name: p.name || '',
+            display_name: [p.name, p.street, p.city || p.town || p.village, p.state, p.country].filter(Boolean).join(', '),
+            address: {
+              road: p.street,
+              house_number: p.housenumber,
+              neighbourhood: p.district,
+              city: p.city || p.town || p.village,
+              state: p.state,
+              country: p.country
+            }
+          };
+        });
+      }).catch(() => []);
+
+      const [primaryRes, photonRes] = await Promise.all([primary, photon]);
+
+      // Merge, de-dupe by name+lat/lng rounded; prefer Nominatim order, then fill with Photon
+      const seen = new Set();
+      const merged = [];
+      const key = (r) => {
+        const lat = Number(r.lat).toFixed(3);
+        const lon = Number(r.lon).toFixed(3);
+        return `${(r.name || r.display_name || '').toLowerCase().slice(0, 40)}|${lat}|${lon}`;
+      };
+      for (const r of [...(primaryRes || []), ...(photonRes || [])]) {
+        const k = key(r);
+        if (seen.has(k)) continue;
+        seen.add(k);
+        merged.push(r);
+        if (merged.length >= 15) break;
+      }
+      setSearchResults(merged);
+      setShowResults(merged.length > 0);
     } catch (error) {
       console.error("Error searching location:", error);
     } finally {

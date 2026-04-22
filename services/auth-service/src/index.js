@@ -17,6 +17,9 @@ const app = express();
 const PORT = process.env.PORT || 5001;
 const EMAIL_SERVICE_URL = process.env.EMAIL_SERVICE_URL || 'http://email-service:5007';
 
+// We run behind the nginx gateway; trust its X-Forwarded-For so req.ip reflects the real client IP.
+app.set('trust proxy', 1);
+
 // --- Rate Limiter (brute-force protection for /login) ---
 const loginAttempts = new Map(); // IP -> { count, resetTime }
 const RATE_LIMIT_WINDOW = 15 * 60 * 1000; // 15 minutos
@@ -24,13 +27,16 @@ const RATE_LIMIT_MAX = 10; // max 10 intentos por ventana
 
 const loginRateLimiter = (req, res, next) => {
   const ip = req.ip || req.headers['x-forwarded-for'] || req.connection.remoteAddress || 'unknown';
+  // Include username (if provided) in the key so one abuser can't lock out everyone sharing an IP/NAT.
+  const user = (req.body && req.body.username ? String(req.body.username).toLowerCase().trim() : '').slice(0, 64);
+  const key = `${ip}|${user}`;
   const now = Date.now();
-  const record = loginAttempts.get(ip);
+  const record = loginAttempts.get(key);
 
   if (record && now < record.resetTime) {
     if (record.count >= RATE_LIMIT_MAX) {
       const retryAfter = Math.ceil((record.resetTime - now) / 1000);
-      console.log(`🚫 Rate limit exceeded for IP: ${ip} (${record.count} attempts)`);
+      console.log(`🚫 Rate limit exceeded for ${key} (${record.count} attempts)`);
       return res.status(429).json({
         success: false,
         message: 'Demasiados intentos de login. Intente de nuevo más tarde.',
@@ -39,7 +45,7 @@ const loginRateLimiter = (req, res, next) => {
     }
     record.count++;
   } else {
-    loginAttempts.set(ip, { count: 1, resetTime: now + RATE_LIMIT_WINDOW });
+    loginAttempts.set(key, { count: 1, resetTime: now + RATE_LIMIT_WINDOW });
   }
 
   next();
@@ -48,8 +54,8 @@ const loginRateLimiter = (req, res, next) => {
 // Cleanup expired rate limit entries every 30 min
 setInterval(() => {
   const now = Date.now();
-  for (const [ip, record] of loginAttempts) {
-    if (now >= record.resetTime) loginAttempts.delete(ip);
+  for (const [key, record] of loginAttempts) {
+    if (now >= record.resetTime) loginAttempts.delete(key);
   }
 }, 30 * 60 * 1000);
 
@@ -369,7 +375,7 @@ app.get('/settings', authenticate, async (req, res) => {
 
 app.put('/settings', authenticate, async (req, res) => {
   try {
-    const { theme, avatarUrl, language, notifications, newPassword } = req.body;
+    const { theme, avatarUrl, language, notifications, newPassword, currentPassword } = req.body;
     const username = req.user.username;
 
     if (theme) await dbAsync.run('UPDATE users SET theme_preference = ? WHERE username = ?', [theme, username]);
@@ -377,13 +383,21 @@ app.put('/settings', authenticate, async (req, res) => {
     if (language) await dbAsync.run('UPDATE users SET language = ? WHERE username = ?', [language, username]);
     if (notifications !== undefined) await dbAsync.run('UPDATE users SET notifications = ? WHERE username = ?', [notifications ? 1 : 0, username]);
     if (newPassword) {
-      const hash = await bcrypt.hash(newPassword, 10);
-      // Note: This updates the legacy password field. Should also update user_credentials if possible.
-      // For now, we update the legacy field as per original code, but let's try to update credentials too.
-      const user = await dbAsync.get('SELECT id FROM users WHERE username = ?', [username]);
-      if (user) {
-          await dbAsync.run('UPDATE user_credentials SET password_hash = ? WHERE user_id = ?', [hash, user.id]);
+      // Minimum strength + require current password to mitigate session-hijack takeover
+      if (typeof newPassword !== 'string' || newPassword.length < 8) {
+        return res.status(400).json({ success: false, message: 'La nueva contraseña debe tener al menos 8 caracteres' });
       }
+      if (!currentPassword || typeof currentPassword !== 'string') {
+        return res.status(400).json({ success: false, message: 'Debes introducir tu contraseña actual' });
+      }
+      const user = await dbAsync.get('SELECT id FROM users WHERE username = ?', [username]);
+      if (!user) return res.status(404).json({ success: false, message: 'Usuario no encontrado' });
+      const creds = await dbAsync.get('SELECT password_hash FROM user_credentials WHERE user_id = ?', [user.id]);
+      if (!creds) return res.status(400).json({ success: false, message: 'Credenciales no encontradas' });
+      const ok = await bcrypt.compare(currentPassword, creds.password_hash);
+      if (!ok) return res.status(401).json({ success: false, message: 'Contraseña actual incorrecta' });
+      const hash = await bcrypt.hash(newPassword, 10);
+      await dbAsync.run('UPDATE user_credentials SET password_hash = ? WHERE user_id = ?', [hash, user.id]);
     }
 
     res.json({ success: true, message: 'Configuración actualizada' });

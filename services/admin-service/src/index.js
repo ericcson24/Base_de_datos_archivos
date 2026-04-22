@@ -283,6 +283,13 @@ app.delete('/api/users/:id', requireAdmin, async (req, res) => {
     await dbAsync.run("DELETE FROM files WHERE owner_id = ?", [id]);
     await dbAsync.run("DELETE FROM folders WHERE owner_id = ?", [id]);
     await dbAsync.run("DELETE FROM group_members WHERE user_id = ?", [id]);
+    // Remove attachments tied to this user's events before deleting the events themselves
+    try {
+      await dbAsync.run(
+        "DELETE FROM event_attachments WHERE event_id IN (SELECT COALESCE(microsoft_id, CAST(id AS TEXT)) FROM calendar_events WHERE user_id = ?) OR attached_by = ? OR file_owner = ?",
+        [id, user.username, user.username]
+      );
+    } catch (eAtt) { /* table may not exist yet */ }
     await dbAsync.run("DELETE FROM calendar_events WHERE user_id = ?", [id]);
     await dbAsync.run("DELETE FROM notifications WHERE user_id = ?", [id]);
     await dbAsync.run("DELETE FROM admin_inbox WHERE user_id = ?", [id]);
@@ -725,6 +732,12 @@ setInterval(async () => {
         await dbAsync.run("DELETE FROM files WHERE owner_id = ?", [user.id]);
         await dbAsync.run("DELETE FROM folders WHERE owner_id = ?", [user.id]);
         await dbAsync.run("DELETE FROM group_members WHERE user_id = ?", [user.id]);
+        try {
+          await dbAsync.run(
+            "DELETE FROM event_attachments WHERE event_id IN (SELECT COALESCE(microsoft_id, CAST(id AS TEXT)) FROM calendar_events WHERE user_id = ?) OR attached_by = ? OR file_owner = ?",
+            [user.id, user.username, user.username]
+          );
+        } catch (eAtt) { /* table may not exist yet */ }
         await dbAsync.run("DELETE FROM calendar_events WHERE user_id = ?", [user.id]);
         await dbAsync.run("DELETE FROM notifications WHERE user_id = ?", [user.id]);
         await dbAsync.run("DELETE FROM admin_inbox WHERE user_id = ?", [user.id]);

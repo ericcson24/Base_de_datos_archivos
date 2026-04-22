@@ -41,6 +41,14 @@ const authenticate = (req, res, next) => {
   }
 };
 
+// Only admin or boss may manage groups (create/delete/add-remove members)
+const requireAdminOrBoss = (req, res, next) => {
+  if (!req.user || (req.user.role !== 'admin' && req.user.role !== 'boss')) {
+    return res.status(403).json({ success: false, message: 'Permiso denegado: se requiere rol admin o boss' });
+  }
+  next();
+};
+
 app.get('/', (req, res) => {
   res.send('User Service is running');
 });
@@ -81,8 +89,8 @@ app.get('/notifications', authenticate, async (req, res) => {
   }
 });
 
-// 2. Create notification (Internal/Admin)
-app.post('/notifications', authenticate, async (req, res) => {
+// 2. Create notification (Internal/Admin only — prevents arbitrary cross-user spam)
+app.post('/notifications', authenticate, requireAdminOrBoss, async (req, res) => {
   try {
     const { userId, title, message, type, link } = req.body;
     
@@ -152,7 +160,7 @@ app.get('/groups', authenticate, async (req, res) => {
 });
 
 // 2. Create a new group
-app.post('/groups', authenticate, async (req, res) => {
+app.post('/groups', authenticate, requireAdminOrBoss, async (req, res) => {
   try {
     const { name, description } = req.body;
     
@@ -179,7 +187,7 @@ app.post('/groups', authenticate, async (req, res) => {
 });
 
 // 3. Delete a group
-app.delete('/groups/:id', authenticate, async (req, res) => {
+app.delete('/groups/:id', authenticate, requireAdminOrBoss, async (req, res) => {
   try {
     const groupId = req.params.id;
     // First remove members
@@ -213,7 +221,7 @@ app.get('/groups/:id/members', authenticate, async (req, res) => {
 });
 
 // 5. Add member to group
-app.post('/groups/:id/members', authenticate, async (req, res) => {
+app.post('/groups/:id/members', authenticate, requireAdminOrBoss, async (req, res) => {
   try {
     const groupId = req.params.id;
     const { userId } = req.body;
@@ -249,7 +257,7 @@ app.post('/groups/:id/members', authenticate, async (req, res) => {
 });
 
 // 6. Remove member from group
-app.delete('/groups/:id/members/:userId', authenticate, async (req, res) => {
+app.delete('/groups/:id/members/:userId', authenticate, requireAdminOrBoss, async (req, res) => {
   try {
     const { id: groupId, userId } = req.params;
     await dbAsync.run(
