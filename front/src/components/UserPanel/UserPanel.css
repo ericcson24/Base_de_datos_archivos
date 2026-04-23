@@ -8,10 +8,9 @@
   --shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
   --shadow-hover: 0 8px 32px rgba(0, 0, 0, 0.12);
 
-  /* Light theme colors */
   --bg-gradient: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
   --text-color: #333;
-  --sidebar-bg: rgba(255, 255, 255, 0.9); /* Match panel-bg for consistency */
+  --sidebar-bg: rgba(255, 255, 255, 0.9); 
   --sidebar-border: rgba(0, 0, 0, 0.1);
   --sidebar-text: #333;
   --sidebar-btn-bg: rgba(0, 0, 0, 0.08);
@@ -58,7 +57,6 @@
   --hover-preview-border: rgba(0, 0, 0, 0.1);
   --hover-preview-text: #333;
   --hover-preview-secondary-text: #666;
-  /* Controls (search, sort, filter) */
   --control-bg: rgba(255, 255, 255, 0.9);
   --control-border: rgba(0, 0, 0, 0.1);
   --control-text: #333;
@@ -97,13 +95,11 @@
   display: none;
 }
 
-/* Fix for fallback icon showing on top of previews */
 .file-icon.fallback-icon-hidden,
 .file-fallback-icon.fallback-icon-hidden {
   display: none;
 }
 
-/* Dark theme */
 [data-theme="dark"] {
   --bg-gradient: linear-gradient(135deg, #0a0a0a 0%, #1a1a1a 100%);
   --text-color: #ffffff;
@@ -154,7 +150,6 @@
   --hover-preview-border: rgba(255, 255, 255, 0.1);
   --hover-preview-text: #ffffff;
   --hover-preview-secondary-text: #cccccc;
-  /* Controls (search, sort, filter) - Dark Mode */
   --control-bg: rgba(40, 40, 40, 0.9);
   --control-border: rgba(255, 255, 255, 0.1);
   --control-text: #ffffff;
@@ -193,7 +188,8 @@ body {
   color: var(--text-color);
   font-size: var(--font-main);
   min-height: 100vh;
-  width: 100vw;
+  min-height: 100dvh;
+  width: 100%;
   overflow-x: hidden;
   background: transparent;
 }
@@ -201,12 +197,12 @@ body {
 .user-panel {
   display: flex;
   height: 100vh;
+  height: 100dvh;
   overflow: hidden;
   position: relative;
   background: var(--bg-gradient);
 }
 
-/* Modal styles */
 .modal-overlay {
   position: fixed;
   top: 0;
@@ -230,6 +226,7 @@ body {
   border: 1px solid var(--sidebar-border);
   min-width: 300px;
   max-width: 500px;
+  box-sizing: border-box;
 }
 
 .modal-content h3 {
@@ -279,7 +276,6 @@ body {
   opacity: 0.9;
 }
 
-/* SIDEBAR */
 .sidebar {
   width: var(--sidebar-width);
   background: var(--sidebar-bg);
@@ -290,7 +286,6 @@ body {
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
   z-index: 20;
-  /* Reset floating styles */
   position: relative;
   left: auto;
   top: auto;
@@ -300,11 +295,11 @@ body {
   border-top: none;
   border-bottom: none;
   border-left: none;
-  padding: 0; /* Reset padding to match Calendar */
+  padding: 0; 
 }
 
 .sidebar-header {
-  height: 70px; /* Match Calendar header height */
+  height: 70px; 
   padding: 0 1.5rem;
   display: flex;
   align-items: center;
@@ -442,18 +437,14 @@ body {
   opacity: 0.9;
 }
 
-/* UPLOAD BUTTON SEPARADO - REMOVED (Replaced by create-event-btn) */
 .upload-btn-container {
   position: relative;
   width: 100%;
   margin-bottom: 0.5rem;
 }
 
-/* SIDEBAR NAVIGATION - REMOVED (Replaced by sidebar-section) */
 
-/* SIDEBAR ACTIONS - REMOVED (Replaced by sidebar-footer) */
 
-/* Context Menu Styles */
 .context-menu {
   position: fixed;
   background: rgba(255, 255, 255, 0.95);
@@ -592,7 +583,6 @@ body {
   color: #d32f2f;
 }
 
-/* SIDEBAR ACTIONS */
 .sidebar-actions {
   margin-top: auto;
   display: flex;
@@ -651,18 +641,21 @@ body {
   transform: none;
 }
 
-/* Si tienes listas/carpetas dentro de la sidebar */
 
 .main-panel {
   flex: 1;
   margin-left: 0;
-  padding: 0; /* Removed padding to match Calendar */
+  padding: var(--main-padding);
+  padding-top: 0.5rem;
   display: flex;
   flex-direction: column;
   min-width: 0;
   height: 100vh;
+  height: 100dvh;
   overflow-y: auto;
   background: transparent;
+  position: relative;
+  box-sizing: border-box;
 }
 
 .panel-header {
@@ -774,7 +767,6 @@ body {
   align-content: start;
 }
 
-/* Grid items - Responsive */
 @media (max-width: 1400px) {
   .files-container.grid-view {
     grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
@@ -845,11 +837,11 @@ body {
   -webkit-user-select: none;
   -moz-user-select: none;
   -ms-user-select: none;
-  gap: 12px; /* Espaciado entre elementos */
+  gap: 12px; 
 }
 
 .drive-file-row:active {
-  transform: scale(0.98); /* Efecto sutil al hacer clic */
+  transform: scale(0.98); 
   transition: transform 0.1s;
 }
 
@@ -960,7 +952,6 @@ input[type="text"]:focus {
   border-color: var(--input-focus-border);
 }
 
-/* Excluir inputs dentro de search/AI del borde azul global */
 .search-container input[type="text"]:focus,
 .ai-container input[type="text"]:focus {
   border-color: transparent;
@@ -994,19 +985,7 @@ input[type="text"]:focus {
     -webkit-backdrop-filter: url(#frosted);
 }
 
-/* MAIN PANEL */
-.main-panel {
-  flex: 1;
-  /* margin-left removed as requested */
-  padding: var(--main-padding);
-  padding-top: 0.5rem;
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
-  position: relative;
-}
 
-/* Panel header styles moved above to avoid duplicate definitions */
 
 .file-grid::-webkit-scrollbar {
   width: 6px;
@@ -1021,7 +1000,6 @@ input[type="text"]:focus {
   background: transparent;
 }
 
-/* FILE ITEMS - TRADITIONAL ROWS - Actualizado */
 .drive-file-row,
 .folder-chip {
   display: flex;
@@ -1055,7 +1033,6 @@ input[type="text"]:focus {
   background: rgba(255, 255, 255, 0.1);
 }
 
-/* Estilos específicos para folder-chip */
 .folder-chip {
   background: var(--folder-bg);
   border-color: var(--folder-border);
@@ -1065,7 +1042,6 @@ input[type="text"]:focus {
   background: var(--file-row-hover);
 }
 
-/* Estilos específicos para folder e íconos */
 .folder-chip .folder-icon {
   font-size: 24px;
   color: var(--folder-icon);
@@ -1096,7 +1072,6 @@ input[type="text"]:focus {
   box-shadow: 0 4px 12px rgba(76, 175, 80, 0.2);
 }
 
-/* THUMBNAIL - ROW STYLE */
 .thumbnail {
   width: var(--thumbnail-size);
   height: var(--thumbnail-size);
@@ -1127,10 +1102,7 @@ input[type="text"]:focus {
   transition: all 0.3s ease;
 }
 
-/* ZOOM THUMBNAIL ADJUSTMENTS - REMOVED */
-/* Files now display as traditional rows */
 
-/* FILE TYPE ICONS */
 .file-icon {
   font-size: 2.5rem;
   display: flex;
@@ -1141,7 +1113,6 @@ input[type="text"]:focus {
   transition: all 0.3s ease;
 }
 
-/* FILE NAME */
 .file-name {
   flex: 1;
   font-size: 0.9rem;
@@ -1161,7 +1132,6 @@ input[type="text"]:focus {
   background-color: rgba(66, 133, 244, 0.1);
 }
 
-/* FILE SIZE */
 .file-size {
   font-size: 0.8rem;
   background: var(--file-size-bg);
@@ -1175,7 +1145,6 @@ input[type="text"]:focus {
 
 
 
-/* MENU BUTTON */
 .menu-container {
   position: relative;
   display: flex;
@@ -1208,10 +1177,7 @@ input[type="text"]:focus {
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
 }
 
-/* MENU POPUP - REMOVED OLD STYLES */
-/* Using mini-menu-frosted instead */
 
-/* BACK BUTTON */
 .back-btn {
   align-self: flex-start;
   padding: 0.75rem 1.5rem;
@@ -1241,7 +1207,6 @@ input[type="text"]:focus {
   box-shadow: 0 0 15px rgba(66, 133, 244, 0.4);
 }
 
-/* EMPTY STATE */
 .empty-state {
   display: flex;
   flex-direction: column;
@@ -1258,7 +1223,6 @@ input[type="text"]:focus {
   opacity: 0.5;
 }
 
-/* MODALS */
 .modal-overlay {
   position: fixed;
   top: 0;
@@ -1339,7 +1303,6 @@ input[type="text"]:focus {
   opacity: 0.9;
 }
 
-/* GLASSMORPHISM EFFECTS */
 .glassmorphism {
   background: rgba(255, 255, 255, 0.6);
   backdrop-filter: blur(20px);
@@ -1414,7 +1377,6 @@ input[type="text"]:focus {
   border: 1px solid rgba(255, 255, 255, 0.2);
 }
 
-/* Dark mode glassmorphism variants */
 [data-theme="dark"] .glassmorphism {
   background: rgba(30, 30, 30, 0.9);
   border: 1px solid rgba(255, 255, 255, 0.1);
@@ -1465,37 +1427,38 @@ input[type="text"]:focus {
   border: 1px solid rgba(255, 255, 255, 0.1);
 }
 
-/* RESPONSIVE */
 @media (max-width: 768px) {
-  .sidebar {
-    position: fixed;
-    left: -100%;
-    width: 280px;
-    z-index: 1000;
-    top: 1rem;
-    height: calc(100vh - 2rem);
-  }
-
-  .sidebar.show {
-    left: 0;
-  }
 
   .main-panel {
     margin-left: 0;
-    padding: 1rem;
-    padding-top: 1rem;
+    height: auto;
+    min-height: 100vh;
+    min-height: 100dvh;
   }
 
   .panel-title {
-    font-size: 1.5rem;
+    font-size: 1.3rem;
+  }
+
+  .panel-header {
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+
+  .main-panel > .panel-header {
+    padding: 10px 12px;
+    border-radius: 12px;
   }
 
   .file-grid {
-    max-height: 90vh; /* Aumentado de 60vh a 90vh también para móviles */
+    max-height: none;
+    min-height: 300px;
   }
 
   .main-content-container {
     flex-direction: column;
+    overflow: visible;
+    min-height: 0;
   }
 
   .editor-panels-container {
@@ -1504,7 +1467,6 @@ input[type="text"]:focus {
   }
 }
 
-/* SEARCH CONTROLS BAR (outer toolbar wrapper) */
 .search-controls-bar {
   background: var(--control-bg);
   border: 1px solid var(--control-border);
@@ -1522,7 +1484,6 @@ input[type="text"]:focus {
   box-shadow: 0 20px 55px rgba(0, 0, 0, 0.35);
 }
 
-/* SEARCH AND SORT CONTROLS */
 .search-container {
   border: 1px solid var(--control-border);
   color: var(--control-text);
@@ -1557,7 +1518,6 @@ input[type="text"]:focus {
   color: #9ca3af;
 }
 
-/* Dark mode search */
 [data-theme="dark"] .search-container {
   background: rgba(255, 255, 255, 0.06);
   border-color: rgba(255, 255, 255, 0.1);
@@ -1631,7 +1591,6 @@ input[type="text"]:focus {
   color: var(--control-btn-active-text);
 }
 
-/* UTILITIES */
 .loading {
   text-align: center;
   padding: 2rem;
@@ -1639,13 +1598,8 @@ input[type="text"]:focus {
   font-size: 1rem;
 }
 
-/* ZOOM CONTROLS - REMOVED */
-/* Zoom functionality has been removed */
 
-/* RESIZE HANDLE - REMOVED */
-/* MOVE HANDLE - REMOVED */
 
-/* SIDEBAR PANEL - FOR FILE DETAILS/VIEWER */
 .sidebar-panel {
   position: absolute;
   top: 0;
@@ -1740,7 +1694,6 @@ input[type="text"]:focus {
   visibility: visible;
 }
 
-/* SIDEBAR PANEL CONTENT TYPES */
 .panel-file-info {
   background: var(--panel-bg);
   border-radius: 8px;
@@ -1805,7 +1758,6 @@ input[type="text"]:focus {
   color: #d32f2f;
 }
 
-/* FILE ICON IN THUMBNAIL */
 .file-icon {
   font-size: 1.5rem;
   display: flex;
@@ -1815,7 +1767,6 @@ input[type="text"]:focus {
   height: 100%;
 }
 
-/* FILE VIEWER MODAL */
 .file-viewer-overlay {
   z-index: 3000;
 }
@@ -1944,7 +1895,6 @@ input[type="text"]:focus {
   background: #1565c0;
 }
 
-/* TEXT VIEWER */
 .text-viewer {
   padding: 1rem;
   background: var(--text-viewer-bg);
@@ -1963,7 +1913,6 @@ input[type="text"]:focus {
   color: var(--text-viewer-text);
 }
 
-/* UNSUPPORTED FILE VIEWER */
 .unsupported-content {
   text-align: center;
   padding: 2rem;
@@ -1980,7 +1929,6 @@ input[type="text"]:focus {
   color: var(--panel-secondary-text);
 }
 
-/* HOVER PREVIEW */
 .hover-preview {
   position: fixed;
   background: var(--hover-preview-bg);
@@ -2036,10 +1984,7 @@ input[type="text"]:focus {
   color: var(--hover-preview-secondary-text);
 }
 
-/* SEARCH AND SORT CONTROLS - UPDATED MODERN DESIGN */
-/* Old styles removed - now using Tailwind classes in JSX */
 
-/* EDITOR PANELS STYLES */
 .cursor-grab {
   cursor: grab;
 }
@@ -2101,7 +2046,6 @@ input[type="text"]:focus {
   color: #60a5fa;
 }
 
-/* Glassmorphism effects */
 .glassmorphism {
   background: rgba(255, 255, 255, 0.7);
   backdrop-filter: blur(20px) saturate(180%);
@@ -2138,7 +2082,6 @@ input[type="text"]:focus {
   border: 1px solid rgba(255, 255, 255, 0.2);
 }
 
-/* Animations */
 @keyframes fade-in {
   from {
     opacity: 0;
@@ -2167,7 +2110,6 @@ input[type="text"]:focus {
   animation: pulse-scale 2s ease-in-out infinite;
 }
 
-/* Drag and drop visual feedback */
 .drive-file-row .thumbnail[draggable="true"],
 .group .aspect-square[draggable="true"] {
   transition: all 0.2s ease;
@@ -2186,9 +2128,7 @@ input[type="text"]:focus {
   cursor: grabbing !important;
 }
 
-/* New Layout: Main Content Container - Merged with above */
 
-/* .file-grid removed - merged with above */
 
 .editor-panels-container {
   flex: 1.2 1 0;
@@ -2219,7 +2159,6 @@ input[type="text"]:focus {
   }
 }
 
-/* File Editor Panel Inline Styles */
 .file-editor-panel-inline {
   border-radius: 16px;
   overflow: hidden;
@@ -2233,7 +2172,6 @@ input[type="text"]:focus {
   background: linear-gradient(135deg, rgba(30, 30, 40, 0.9), rgba(20, 20, 30, 0.7));
 }
 
-/* Estilos para archivos recientes */
 .scrollbar-thin {
   scrollbar-width: thin;
 }
@@ -2263,7 +2201,6 @@ input[type="text"]:focus {
   background-color: rgba(71, 85, 105, 0.8);
 }
 
-/* Animaciones para archivos recientes */
 .animate-fade-in {
   animation: fadeIn 0.3s ease-in-out;
 }
@@ -2279,7 +2216,6 @@ input[type="text"]:focus {
   }
 }
 
-/* Glassmorphism mejorado para archivos recientes */
 .glassmorphism {
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
@@ -2293,37 +2229,61 @@ input[type="text"]:focus {
   z-index: 9999 !important;
 }
 
-/* Estilos para el botón IA — misma estructura cuadrada que search-container con tinte púrpura */
 .ai-container {
-  border: 1px solid rgba(139, 92, 246, 0.18);
+  border: 1px solid rgba(129, 140, 248, 0.18);
   color: var(--control-text);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  background: rgba(139, 92, 246, 0.06);
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  backdrop-filter: blur(20px) saturate(160%);
+  -webkit-backdrop-filter: blur(20px) saturate(160%);
+  background: linear-gradient(
+    135deg,
+    rgba(129, 140, 248, 0.06),
+    rgba(56, 189, 248, 0.04),
+    rgba(192, 132, 252, 0.05)
+  );
+  transition: all 0.35s cubic-bezier(0.4, 0, 0.2, 1);
   overflow: hidden;
+  box-shadow:
+    0 0 0 1px rgba(255, 255, 255, 0.03) inset,
+    0 1px 0 rgba(255, 255, 255, 0.04) inset;
 }
 
 .ai-container.collapsed {
-  border-radius: 10px;
+  border-radius: 12px;
 }
 
 .ai-container.collapsed:hover {
-  background: rgba(139, 92, 246, 0.12);
-  border-color: rgba(139, 92, 246, 0.3);
+  background: linear-gradient(
+    135deg,
+    rgba(129, 140, 248, 0.12),
+    rgba(56, 189, 248, 0.08),
+    rgba(192, 132, 252, 0.1)
+  );
+  border-color: rgba(129, 140, 248, 0.3);
+  box-shadow:
+    0 0 0 1px rgba(255, 255, 255, 0.05) inset,
+    0 1px 0 rgba(255, 255, 255, 0.06) inset,
+    0 0 20px -4px rgba(129, 140, 248, 0.15);
 }
 
 .ai-container.expanded {
-  border-radius: 10px;
-  background: rgba(139, 92, 246, 0.06);
-  border-color: rgba(139, 92, 246, 0.25);
-  box-shadow: 0 1px 4px rgba(139, 92, 246, 0.1);
+  border-radius: 12px;
+  background: linear-gradient(
+    135deg,
+    rgba(129, 140, 248, 0.08),
+    rgba(56, 189, 248, 0.06),
+    rgba(192, 132, 252, 0.07)
+  );
+  border-color: rgba(129, 140, 248, 0.25);
+  box-shadow:
+    0 0 0 1px rgba(255, 255, 255, 0.04) inset,
+    0 4px 16px -2px rgba(129, 140, 248, 0.12);
 }
 
 .ai-container .ai-input {
   color: var(--control-text);
   height: 100%;
   line-height: normal;
+  background: transparent;
 }
 
 .ai-container .ai-input:focus {
@@ -2333,33 +2293,55 @@ input[type="text"]:focus {
 }
 
 .ai-container .ai-input::placeholder {
-  color: rgba(139, 92, 246, 0.45);
+  color: rgba(129, 140, 248, 0.45);
   font-size: 13px;
   line-height: normal;
 }
 
-/* Dark mode AI */
 [data-theme="dark"] .ai-container {
-  background: rgba(139, 92, 246, 0.08);
-  border-color: rgba(139, 92, 246, 0.15);
+  background: linear-gradient(
+    135deg,
+    rgba(129, 140, 248, 0.1),
+    rgba(56, 189, 248, 0.06),
+    rgba(192, 132, 252, 0.08)
+  );
+  border-color: rgba(129, 140, 248, 0.15);
+  box-shadow:
+    0 0 0 1px rgba(255, 255, 255, 0.04) inset,
+    0 1px 0 rgba(255, 255, 255, 0.05) inset;
 }
 
 [data-theme="dark"] .ai-container.collapsed:hover {
-  background: rgba(139, 92, 246, 0.15);
-  border-color: rgba(139, 92, 246, 0.3);
+  background: linear-gradient(
+    135deg,
+    rgba(129, 140, 248, 0.16),
+    rgba(56, 189, 248, 0.1),
+    rgba(192, 132, 252, 0.12)
+  );
+  border-color: rgba(129, 140, 248, 0.35);
+  box-shadow:
+    0 0 0 1px rgba(255, 255, 255, 0.06) inset,
+    0 0 24px -4px rgba(129, 140, 248, 0.2);
 }
 
 [data-theme="dark"] .ai-container.expanded {
-  background: rgba(139, 92, 246, 0.1);
-  border-color: rgba(139, 92, 246, 0.25);
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.2);
+  background: linear-gradient(
+    135deg,
+    rgba(129, 140, 248, 0.12),
+    rgba(56, 189, 248, 0.08),
+    rgba(192, 132, 252, 0.1)
+  );
+  border-color: rgba(129, 140, 248, 0.28);
+  box-shadow:
+    0 0 0 1px rgba(255, 255, 255, 0.05) inset,
+    0 4px 20px -2px rgba(0, 0, 0, 0.25),
+    0 0 30px -6px rgba(129, 140, 248, 0.15);
 }
 
 [data-theme="dark"] .ai-container .ai-input::placeholder {
-  color: rgba(167, 139, 250, 0.5);
+  color: rgba(192, 132, 252, 0.45);
 }
 
-/* Estilos para archivos recientes - Rediseño elegante */
 .recent-files-section {
   margin: 0 0 16px 0;
   background: var(--panel-bg);
@@ -2460,13 +2442,11 @@ input[type="text"]:focus {
   background-color: var(--control-btn-hover-bg);
 }
 
-/* Quitar gradientes de fade - interferían con scroll */
 .recent-files-grid::before,
 .recent-files-grid::after {
   display: none;
 }
 
-/* Estilo de cada archivo reciente - Rediseñado */
 .recent-file-item {
   min-width: 120px;
   max-width: 140px;
@@ -2499,7 +2479,6 @@ input[type="text"]:focus {
   justify-content: center;
 }
 
-/* Previews específicos por tipo - Mejorados */
 .file-preview-container {
   width: 100%;
   height: 100%;
@@ -2568,7 +2547,6 @@ input[type="text"]:focus {
   50% { opacity: 0.8; }
 }
 
-/* Indicador de tipo de archivo - Rediseñado */
 .file-type-indicator {
   position: absolute;
   top: 8px;
@@ -2585,7 +2563,6 @@ input[type="text"]:focus {
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
 }
 
-/* Información del archivo - Rediseñada */
 .recent-file-info {
   padding: 12px 12px 16px 12px;
   text-align: left;
@@ -2623,7 +2600,6 @@ input[type="text"]:focus {
   text-overflow: ellipsis;
 }
 
-/* Botón Ver todos - Rediseñado */
 .recent-view-all {
   min-width: 140px;
   max-width: 160px;
@@ -2695,7 +2671,6 @@ input[type="text"]:focus {
   color: var(--text-color);
 }
 
-/* Botón para mostrar archivos recientes cuando está oculto */
 .show-recent-files-btn {
   width: 100%;
   padding: 12px 16px;
@@ -2737,7 +2712,6 @@ input[type="text"]:focus {
   z-index: 1;
 }
 
-/* Responsive - Mejorado */
 @media (max-width: 768px) {
   .recent-files-section {
     margin: 0 16px 20px 16px;
@@ -2767,9 +2741,7 @@ input[type="text"]:focus {
   }
 }
 
-/* ===== GRID VIEW STYLES ===== */
 
-/* Grid item base styles - Archivos */
 .files-container.grid-view .group {
   background: var(--file-grid-bg);
   border: 1px solid var(--sidebar-border);
@@ -2791,7 +2763,6 @@ input[type="text"]:focus {
   box-shadow: 0 8px 25px rgba(66, 133, 244, 0.15);
 }
 
-/* Aspect ratio container for thumbnails */
 .files-container.grid-view .aspect-square {
   aspect-ratio: 1;
   background: var(--back-btn-bg);
@@ -2803,7 +2774,6 @@ input[type="text"]:focus {
   justify-content: center;
 }
 
-/* File info section en grid */
 .files-container.grid-view .group .p-3 {
   padding: 12px;
   background: var(--file-grid-bg);
@@ -2834,7 +2804,6 @@ input[type="text"]:focus {
   opacity: 0.8;
 }
 
-/* File icons en grid */
 .files-container.grid-view .file-icon {
   font-size: 48px;
   color: var(--text-color);
@@ -2842,7 +2811,6 @@ input[type="text"]:focus {
   text-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
 
-/* Folder styles en grid */
 .files-container.grid-view .glassmorphism-light {
   background: var(--folder-bg) !important;
   border: 1px solid var(--folder-border) !important;
@@ -2858,7 +2826,6 @@ input[type="text"]:focus {
   border-bottom: 1px solid var(--sidebar-border);
 }
 
-/* Menu buttons en grid */
 .files-container.grid-view .glassmorphism-button {
   background: var(--modal-bg) !important;
   border: 1px solid var(--sidebar-border) !important;
@@ -2869,7 +2836,6 @@ input[type="text"]:focus {
   background: var(--file-row-hover) !important;
 }
 
-/* Menu popup en grid */
 .files-container.grid-view .glassmorphism-strong {
   background: var(--modal-bg) !important;
   border: 1px solid var(--sidebar-border) !important;
@@ -2888,14 +2854,12 @@ input[type="text"]:focus {
   background: var(--file-row-hover) !important;
 }
 
-/* Badges/tags en grid */
 .files-container.grid-view .bg-blue-100 {
   background: var(--input-focus-border) !important;
   color: var(--text-color) !important;
   opacity: 0.9;
 }
 
-/* Image previews en grid */
 .files-container.grid-view img,
 .files-container.grid-view video,
 .files-container.grid-view iframe {
@@ -2908,7 +2872,6 @@ input[type="text"]:focus {
   transform: scale(1.05);
 }
 
-/* Text colors forced override para modo claro/oscuro */
 [data-theme="light"] .files-container.grid-view .group h3,
 [data-theme="light"] .files-container.grid-view .group span {
   color: #1f2937 !important;
@@ -2927,7 +2890,6 @@ input[type="text"]:focus {
   color: #94a3b8 !important;
 }
 
-/* Grid responsive adjustments */
 @media (max-width: 1400px) {
   .files-container.grid-view .group {
     min-height: 160px;
@@ -2968,9 +2930,7 @@ input[type="text"]:focus {
   }
 }
 
-/* ===== NUEVAS CLASES ESPECÍFICAS PARA GRID ===== */
 
-/* File grid items */
 .file-grid-item,
 .folder-grid-item {
   background: rgba(0, 0, 0, 0.03);
@@ -3012,7 +2972,6 @@ input[type="text"]:focus {
   border-color: var(--input-focus-border);
 }
 
-/* Thumbnails */
 .grid-thumbnail,
 .grid-folder-thumbnail {
   background: var(--back-btn-bg);
@@ -3028,7 +2987,6 @@ input[type="text"]:focus {
   background: var(--folder-bg);
 }
 
-/* Info sections */
 .grid-file-info,
 .grid-folder-info {
   background: var(--file-grid-bg);
@@ -3039,7 +2997,6 @@ input[type="text"]:focus {
   background: var(--folder-bg);
 }
 
-/* Names and text */
 .file-grid-name,
 .folder-grid-name {
   color: var(--text-color);
@@ -3062,7 +3019,6 @@ input[type="text"]:focus {
   opacity: 0.8;
 }
 
-/* Shared badge */
 .folder-shared-badge {
   display: inline-flex;
   align-items: center;
@@ -3076,7 +3032,6 @@ input[type="text"]:focus {
   margin-top: 4px;
 }
 
-/* Menu button */
 .grid-menu-button {
   padding: 6px;
   background: var(--modal-bg);
@@ -3097,7 +3052,6 @@ input[type="text"]:focus {
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
 }
 
-/* Menu popup */
 .grid-menu-popup {
   position: fixed;
   z-index: 999999;
@@ -3123,7 +3077,6 @@ input[type="text"]:focus {
   }
 }
 
-/* Menu items */
 .grid-menu-item {
   width: 100%;
   display: flex;
@@ -3154,7 +3107,6 @@ input[type="text"]:focus {
   margin: 4px 0;
 }
 
-/* File icons en grid */
 .file-grid-item .file-icon {
   font-size: 48px;
   color: var(--text-color);
@@ -3162,7 +3114,6 @@ input[type="text"]:focus {
   text-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
 
-/* Responsive para grid específico */
 @media (max-width: 768px) {
   .file-grid-item .file-icon {
     font-size: 36px;
@@ -3188,7 +3139,6 @@ input[type="text"]:focus {
   }
 }
 
-/* Custom Scrollbar */
 ::-webkit-scrollbar {
   width: 8px;
   height: 8px;
@@ -3214,7 +3164,6 @@ input[type="text"]:focus {
 [data-theme="dark"] ::-webkit-scrollbar-thumb:hover {
   background: rgba(255, 255, 255, 0.3);
 }
-/* Shared Item Indicator */
 .shared-item {
   border-bottom: 3px solid #4caf50 !important;
   box-shadow: 0 4px 6px rgba(76, 175, 80, 0.15);
@@ -3235,7 +3184,6 @@ input[type="text"]:focus {
   flex-shrink: 0;
 }
 
-/* Avatar Selector in Settings */
 .avatar-selector {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(60px, 1fr));
@@ -3272,7 +3220,6 @@ input[type="text"]:focus {
   object-fit: cover;
 }
 
-/* Share Modal Suggestions */
 .suggestions-list {
   position: absolute;
   top: 100%;
@@ -3323,7 +3270,6 @@ input[type="text"]:focus {
   color: var(--text-secondary);
 }
 
-/* Microsoft Integration Status */
 .microsoft-status {
   display: flex;
   align-items: center;
@@ -3360,9 +3306,7 @@ input[type="text"]:focus {
   color: #4caf50;
 }
 
-/* ===== FILE PREVIEW THUMBNAILS ===== */
 
-/* Grid preview container */
 .grid-preview-container {
   width: 100%;
   height: 100%;
@@ -3374,7 +3318,6 @@ input[type="text"]:focus {
   border-radius: 8px;
 }
 
-/* List preview container */
 .list-preview-container {
   width: 36px;
   height: 36px;
@@ -3387,7 +3330,6 @@ input[type="text"]:focus {
   flex-shrink: 0;
 }
 
-/* Preview images */
 .item-preview-image {
   width: 100%;
   height: 100%;
@@ -3400,7 +3342,6 @@ input[type="text"]:focus {
   transform: scale(1.05);
 }
 
-/* Preview PDF as iframe (grid fallback) */
 .item-preview-pdf-iframe {
   width: 140%;
   height: 140%;
@@ -3413,14 +3354,12 @@ input[type="text"]:focus {
   left: 0;
 }
 
-/* Preview PDF as image attempt */
 .item-preview-pdf {
   width: 100%;
   height: 100%;
   object-fit: contain;
 }
 
-/* Preview video */
 .item-preview-video {
   width: 100%;
   height: 100%;
@@ -3432,7 +3371,6 @@ input[type="text"]:focus {
   transform: scale(1.05);
 }
 
-/* Preview text (iframe) */
 .item-preview-text {
   width: 140%;
   height: 140%;
@@ -3446,7 +3384,6 @@ input[type="text"]:focus {
   background: white;
 }
 
-/* Loading spinner */
 .preview-loading {
   background: var(--back-btn-bg);
 }
@@ -3464,7 +3401,6 @@ input[type="text"]:focus {
   to { transform: rotate(360deg); }
 }
 
-/* Extension badge on preview */
 .preview-ext-badge {
   position: absolute;
   bottom: 4px;
@@ -3482,7 +3418,6 @@ input[type="text"]:focus {
   backdrop-filter: blur(4px);
 }
 
-/* List view: make thumbnail overflow visible for preview */
 .drive-file-row .thumbnail .list-preview-container {
   width: 32px;
   height: 32px;
@@ -3496,13 +3431,11 @@ input[type="text"]:focus {
   display: none;
 }
 
-/* Dark mode adjustments */
 [data-theme="dark"] .item-preview-text {
   background: #1e293b;
   filter: invert(1) hue-rotate(180deg);
 }
 
-/* ===== FOLDER DROP TARGET ===== */
 .folder-drop-target {
   outline: 2.5px dashed #4285f4 !important;
   outline-offset: -2px;
@@ -3517,7 +3450,6 @@ input[type="text"]:focus {
   transform: scale(1.03) !important;
 }
 
-/* Drag-over visual on main file-grid area */
 .file-grid.drag-over {
   outline: 2.5px dashed #4285f4;
   outline-offset: -4px;
@@ -3525,7 +3457,6 @@ input[type="text"]:focus {
   border-radius: 16px;
 }
 
-/* ===== FILES LOADING INDICATOR ===== */
 
 .files-loading-container {
   display: flex;
@@ -3565,7 +3496,6 @@ input[type="text"]:focus {
   color: #aaa;
 }
 
-/* ===== OFFICE DOCUMENT PREVIEWS ===== */
 
 .office-preview-fallback {
   width: 100%;
@@ -3648,7 +3578,48 @@ input[type="text"]:focus {
   background: #f9fafb;
 }
 
-/* Dark mode for office previews */
+
+.office-preview-html.powerpoint-preview {
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  background: #f1f1f1;
+}
+
+.office-preview-html.powerpoint-preview .pptx-slide {
+  background: white;
+  border: 1px solid #d1d5db;
+  border-radius: 3px;
+  padding: 10px 14px;
+  min-height: 60px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+}
+
+.office-preview-html.powerpoint-preview .pptx-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: #1e293b;
+  margin-bottom: 6px;
+  line-height: 1.3;
+}
+
+.office-preview-html.powerpoint-preview .pptx-content {
+  font-size: 10px;
+  color: #475569;
+  line-height: 1.4;
+  margin: 2px 0;
+  padding-left: 8px;
+  border-left: 2px solid #e2e8f0;
+}
+
+.office-preview-html.powerpoint-preview .pptx-empty-placeholder {
+  font-size: 32px;
+  text-align: center;
+  padding: 16px 0 8px;
+  opacity: 0.5;
+}
+
 [data-theme="dark"] .office-preview-content {
   background: #1e293b;
 }
@@ -3668,4 +3639,22 @@ input[type="text"]:focus {
 
 [data-theme="dark"] .office-preview-html.excel-preview tr:nth-child(even) {
   background: #1e293b;
+}
+
+[data-theme="dark"] .office-preview-html.powerpoint-preview {
+  background: #0f172a;
+}
+
+[data-theme="dark"] .office-preview-html.powerpoint-preview .pptx-slide {
+  background: #1e293b;
+  border-color: #334155;
+}
+
+[data-theme="dark"] .office-preview-html.powerpoint-preview .pptx-title {
+  color: #e2e8f0;
+}
+
+[data-theme="dark"] .office-preview-html.powerpoint-preview .pptx-content {
+  color: #94a3b8;
+  border-left-color: #334155;
 }

@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { FiAlertTriangle, FiCheckCircle, FiXCircle, FiInfo } from 'react-icons/fi';
 import './Toast.css';
 
 const Toast = ({ id, title, message, type = 'info', duration = 3000, onClose }) => {
@@ -16,15 +17,15 @@ const Toast = ({ id, title, message, type = 'info', duration = 3000, onClose }) 
     setIsExiting(true);
     setTimeout(() => {
       onClose(id);
-    }, 300); // Match animation duration
+    }, 300);
   };
 
   const getIcon = () => {
     switch (type) {
-      case 'success': return '✅';
-      case 'error': return '❌';
-      case 'warning': return '⚠️';
-      default: return 'ℹ️';
+      case 'success': return <FiCheckCircle />;
+      case 'error': return <FiXCircle />;
+      case 'warning': return <FiAlertTriangle />;
+      default: return <FiInfo />;
     }
   };
 
@@ -38,7 +39,7 @@ const Toast = ({ id, title, message, type = 'info', duration = 3000, onClose }) 
         </div>
       </div>
       <button className="toast-close" onClick={handleClose}>
-        ✕
+        x
       </button>
     </div>
   );

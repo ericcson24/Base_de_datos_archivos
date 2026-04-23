@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import SettingsModal from '../Modals/SettingsModal';
 import DeleteConfirmationModal from '../Modals/DeleteConfirmationModal';
 import GroupManager from './GroupManager';
@@ -13,7 +13,6 @@ const AdminPanel = ({ user, onLogout, onBackToFolders, onThemeToggle, isDarkMode
   const [loading, setLoading] = useState(true);
   const [showSettingsModal, setShowSettingsModal] = useState(false);
 
-  // Data States
   const [systemData, setSystemData] = useState({});
   const [serverInfo, setServerInfo] = useState({});
   const [connections, setConnections] = useState({});
@@ -23,18 +22,15 @@ const AdminPanel = ({ user, onLogout, onBackToFolders, onThemeToggle, isDarkMode
   const [inboxMessages, setInboxMessages] = useState([]);
   const [recoveryEmail, setRecoveryEmail] = useState('');
 
-  // UI States
   const [showAddUserModal, setShowAddUserModal] = useState(false);
   const [newUser, setNewUser] = useState({ username: '', password: '', role: 'user' });
   const [showEditUserModal, setShowEditUserModal] = useState(false);
   const [editingUser, setEditingUser] = useState(null);
   const [alert, setAlert] = useState({ show: false, type: '', message: '' });
   
-  // Delete Modal State
   const [deleteModal, setDeleteModal] = useState({ isOpen: false, user: null });
   const [currentTime, setCurrentTime] = useState(Date.now());
 
-  // Security States
   const [securityData, setSecurityData] = useState(null);
   const [securityLogs, setSecurityLogs] = useState([]);
   const [securityFilter, setSecurityFilter] = useState('security');
@@ -43,6 +39,14 @@ const AdminPanel = ({ user, onLogout, onBackToFolders, onThemeToggle, isDarkMode
   // Roadmap Access States
   const [roadmapAccessUsers, setRoadmapAccessUsers] = useState([]);
   const [roadmapAccessLoading, setRoadmapAccessLoading] = useState(false);
+  const [windowsUsers, setWindowsUsers] = useState([]);
+  const [windowsLinks, setWindowsLinks] = useState([]);
+  const [windowsLoading, setWindowsLoading] = useState(false);
+  const [showLinkModal, setShowLinkModal] = useState(false);
+  const [linkData, setLinkData] = useState({ cloud_username: '', windows_username: '', sync_desktop: true, sync_documents: true, sync_downloads: true });
+  const [showAutoCreateModal, setShowAutoCreateModal] = useState(false);
+  const [autoCreateData, setAutoCreateData] = useState({ selectedUsers: [], defaultPassword: '', defaultRole: 'user', autoLink: true });
+  const [syncingId, setSyncingId] = useState(null);
 
   useEffect(() => {
     loadInitialData();
@@ -51,12 +55,31 @@ const AdminPanel = ({ user, onLogout, onBackToFolders, onThemeToggle, isDarkMode
   }, []);
 
   useEffect(() => {
+    if (activeTab === 'system') {
+      loadServerInfo();
+      loadSystemStatus();
+      const sysTimer = setInterval(() => {
+        loadServerInfo();
+        loadSystemStatus();
+      }, 5000);
+      return () => clearInterval(sysTimer);
+    }
+  }, [activeTab]);
+
+  useEffect(() => {
     if (activeTab === 'security') {
       loadSecurityOverview();
       loadSecurityLogs();
     }
     if (activeTab === 'roadmap') {
       loadRoadmapAccess();
+    }
+  }, [activeTab]);
+
+  useEffect(() => {
+    if (activeTab === 'windows' || activeTab === 'users') {
+      loadWindowsUsers();
+      loadWindowsLinks();
     }
   }, [activeTab]);
 
@@ -78,7 +101,6 @@ const AdminPanel = ({ user, onLogout, onBackToFolders, onThemeToggle, isDarkMode
     }
   };
 
-  // API Calls
   const fetchWithAuth = async (url, options = {}) => {
     const token = localStorage.getItem('auth_token');
     const headers = {
@@ -229,8 +251,150 @@ const AdminPanel = ({ user, onLogout, onBackToFolders, onThemeToggle, isDarkMode
     }
   };
 
+  const loadWindowsUsers = async () => {
+    setWindowsLoading(true);
+    try {
+      const res = await fetchWithAuth('/api/windows/users');
+      const data = await res.json();
+      if (data.success) setWindowsUsers(data.users || []);
+    } catch (e) { console.error('Error loading Windows users:', e); }
+    setWindowsLoading(false);
+  };
+
+  const loadWindowsLinks = async () => {
+    try {
+      const res = await fetchWithAuth('/api/windows/links');
+      const data = await res.json();
+      if (data.success) setWindowsLinks(data.links || []);
+    } catch (e) { console.error('Error loading Windows links:', e); }
+  };
+
+  const handleLinkUsers = async (e) => {
+    e.preventDefault();
+    try {
+      const res = await fetchWithAuth('/api/windows/link', {
+        method: 'POST',
+        body: JSON.stringify(linkData)
+      });
+      const data = await res.json();
+      if (data.success) {
+        setShowLinkModal(false);
+        setLinkData({ cloud_username: '', windows_username: '', sync_desktop: true, sync_documents: true, sync_downloads: true });
+        loadWindowsLinks();
+        loadWindowsUsers();
+        showAlert('success', t('admin.windows.linked_msg'));
+      } else {
+        showAlert('error', data.message);
+      }
+    } catch (e) { showAlert('error', t('common.networkError')); }
+  };
+
+  const handleUnlink = async (id) => {
+    try {
+      const res = await fetchWithAuth(`/api/windows/link/${id}`, { method: 'DELETE' });
+      const data = await res.json();
+      if (data.success) {
+        loadWindowsLinks();
+        loadWindowsUsers();
+        loadUsers();
+        showAlert('success', t('admin.windows.unlinked'));
+      }
+    } catch (e) { showAlert('error', t('common.networkError')); }
+  };
+
+  const handleQuickLink = async (cloudUsername, windowsUsername) => {
+    try {
+      const res = await fetchWithAuth('/api/windows/link', {
+        method: 'POST',
+        body: JSON.stringify({ cloud_username: cloudUsername, windows_username: windowsUsername, sync_desktop: true, sync_documents: true, sync_downloads: true })
+      });
+      const data = await res.json();
+      if (data.success) {
+        loadWindowsLinks();
+        loadWindowsUsers();
+        loadUsers();
+        showAlert('success', `${cloudUsername} vinculado a Windows (${windowsUsername})`);
+      } else {
+        showAlert('error', data.message);
+      }
+    } catch (e) { showAlert('error', t('common.networkError')); }
+  };
+
+  const handleSyncUser = async (id) => {
+    setSyncingId(id);
+    try {
+      const res = await fetchWithAuth(`/api/windows/sync/${id}`, { method: 'POST' });
+      const data = await res.json();
+      if (data.success) {
+        loadWindowsLinks();
+        showAlert('success', data.message);
+      } else {
+        showAlert('error', data.message);
+      }
+    } catch (e) { showAlert('error', t('common.networkError')); }
+    setSyncingId(null);
+  };
+
+  const handleSyncAll = async () => {
+    setSyncingId('all');
+    try {
+      const res = await fetchWithAuth('/api/windows/sync-all', { method: 'POST' });
+      const data = await res.json();
+      if (data.success) {
+        loadWindowsLinks();
+        showAlert('success', data.message);
+      }
+    } catch (e) { showAlert('error', t('common.networkError')); }
+    setSyncingId(null);
+  };
+
+  const handleAutoCreate = async (e) => {
+    e.preventDefault();
+    try {
+      const res = await fetchWithAuth('/api/windows/auto-create', {
+        method: 'POST',
+        body: JSON.stringify({
+          users: autoCreateData.selectedUsers,
+          defaultPassword: autoCreateData.defaultPassword,
+          defaultRole: autoCreateData.defaultRole,
+          autoLink: autoCreateData.autoLink
+        })
+      });
+      const data = await res.json();
+      if (data.success) {
+        setShowAutoCreateModal(false);
+        setAutoCreateData({ selectedUsers: [], defaultPassword: '', defaultRole: 'user', autoLink: true });
+        loadWindowsUsers();
+        loadWindowsLinks();
+        loadUsers();
+        showAlert('success', data.message);
+      } else {
+        showAlert('error', data.message);
+      }
+    } catch (e) { showAlert('error', t('common.networkError')); }
+  };
+
+  const handleToggleSyncSetting = async (linkId, field, value) => {
+    try {
+      const res = await fetchWithAuth(`/api/windows/link/${linkId}`, {
+        method: 'PUT',
+        body: JSON.stringify({ [field]: value })
+      });
+      const data = await res.json();
+      if (data.success) loadWindowsLinks();
+    } catch (e) { console.error(e); }
+  };
+
+  const toggleAutoCreateUser = (username) => {
+    setAutoCreateData(prev => ({
+      ...prev,
+      selectedUsers: prev.selectedUsers.includes(username)
+        ? prev.selectedUsers.filter(u => u !== username)
+        : [...prev.selectedUsers, username]
+    }));
+  };
+
   const handleDeleteUser = (userId) => {
-    // Deprecated in favor of confirmDeleteUser
     const user = users.find(u => u.id === userId);
     if (user) confirmDeleteUser(user);
   };
@@ -245,10 +409,10 @@ const AdminPanel = ({ user, onLogout, onBackToFolders, onThemeToggle, isDarkMode
       const res = await fetchWithAuth(`/admin/api/users/${deleteModal.user.id}/schedule-deletion`, { method: 'POST' });
       const data = await res.json();
       if (data.success) {
-        showAlert('success', t('admin.deletionScheduled'));
+        showAlert('success', t('admin.deletionScheduled') || 'Eliminación programada. Puedes cancelarla durante los próximos 5 minutos.');
         loadUsers();
       } else {
-        showAlert('error', data.message);
+        showAlert('error', data.message || t('common.error'));
       }
     } catch (e) {
       showAlert('error', t('common.networkError'));
@@ -592,6 +756,11 @@ const AdminPanel = ({ user, onLogout, onBackToFolders, onThemeToggle, isDarkMode
         >
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6"/><line x1="8" y1="2" x2="8" y2="18"/><line x1="16" y1="6" x2="16" y2="22"/></svg>
           <span>Roadmap</span>
+          className={`admin-nav-item ${activeTab === 'windows' ? 'active' : ''}`}
+          onClick={() => setActiveTab('windows')}
+        >
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="3" width="20" height="18" rx="2"/><path d="M2 7h20"/><path d="M9 21V7"/></svg>
+          <span>{t('admin.windows.title')}</span>
         </button>
       </nav>
       <div className="admin-sidebar-footer">
@@ -610,6 +779,16 @@ const AdminPanel = ({ user, onLogout, onBackToFolders, onThemeToggle, isDarkMode
       </div>
     </div>
   );
+
+  useEffect(() => {
+    if (activeTab === 'dashboard') {
+      const dashTimer = setInterval(() => {
+        loadSystemStatus();
+        loadConnections();
+      }, 10000);
+      return () => clearInterval(dashTimer);
+    }
+  }, [activeTab]);
 
   const renderDashboard = () => (
     <div className="admin-grid">
@@ -641,14 +820,26 @@ const AdminPanel = ({ user, onLogout, onBackToFolders, onThemeToggle, isDarkMode
   const renderUsers = () => {
     const activeUsers = users.filter(u => !u.deletion_scheduled_at);
     const pendingUsers = users.filter(u => u.deletion_scheduled_at);
+    const linkedWinUsernames = new Set(windowsLinks.map(l => l.windows_username));
 
     return (
     <div className="admin-card">
       <div className="admin-card-header">
         <h2 className="admin-card-title">{t('admin.userManagement')}</h2>
-        <button className="admin-btn admin-btn-primary" onClick={() => setShowAddUserModal(true)}>
-          + {t('admin.addUser')}
-        </button>
+        <div style={{ display: 'flex', gap: '8px' }}>
+          {windowsUsers.filter(wu => !linkedWinUsernames.has(wu.username)).length > 0 && (
+            <button className="admin-btn admin-btn-secondary" onClick={() => {
+              setAutoCreateData({ selectedUsers: [], defaultPassword: '', defaultRole: 'user', autoLink: true });
+              setShowAutoCreateModal(true);
+            }}>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ verticalAlign: 'middle', marginRight: '4px' }}><rect x="2" y="3" width="20" height="18" rx="2"/><path d="M2 7h20"/><path d="M9 21V7"/></svg>
+              {t('admin.windows.autoCreate') || 'Auto-crear desde Windows'}
+            </button>
+          )}
+          <button className="admin-btn admin-btn-primary" onClick={() => setShowAddUserModal(true)}>
+            + {t('admin.addUser')}
+          </button>
+        </div>
       </div>
 
       {pendingUsers.length > 0 && (
@@ -691,11 +882,15 @@ const AdminPanel = ({ user, onLogout, onBackToFolders, onThemeToggle, isDarkMode
             <th>{t('admin.user')}</th>
             <th>{t('admin.role')}</th>
             <th>{t('admin.status')}</th>
+            <th>Windows</th>
             <th>{t('admin.actions')}</th>
           </tr>
         </thead>
         <tbody>
-          {activeUsers.map(u => (
+          {activeUsers.map(u => {
+            const winLink = windowsLinks.find(l => l.cloud_username === u.username);
+            const matchingWinUser = windowsUsers.find(wu => wu.username.toLowerCase() === u.username.toLowerCase());
+            return (
             <tr key={u.id}>
               <td>{u.username}</td>
               <td><span className="status-badge">{u.role}</span></td>
@@ -703,6 +898,22 @@ const AdminPanel = ({ user, onLogout, onBackToFolders, onThemeToggle, isDarkMode
                 <span className={`status-badge ${u.is_locked ? 'error' : 'success'}`}>
                   {u.is_locked ? t('admin.locked') : t('admin.active')}
                 </span>
+              </td>
+              <td>
+                {winLink ? (
+                  <span className="status-badge success" title={`Vinculado a ${winLink.windows_username}`} style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', cursor: 'pointer' }}
+                    onClick={() => handleSyncUser(winLink.id)}>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
+                    {winLink.windows_username}
+                  </span>
+                ) : matchingWinUser ? (
+                  <button className="admin-btn admin-btn-secondary admin-btn-small" onClick={() => handleQuickLink(u.username, matchingWinUser.username)} title="Vincular automáticamente">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
+                    {t('admin.windows.linkAccount') || 'Vincular'}
+                  </button>
+                ) : (
+                  <span style={{ opacity: 0.4, fontSize: '0.85rem' }}>—</span>
+                )}
               </td>
               <td>
                 <button className="admin-btn admin-btn-secondary admin-btn-small" onClick={() => openEditModal(u)} style={{ marginRight: '5px' }}>
@@ -716,39 +927,152 @@ const AdminPanel = ({ user, onLogout, onBackToFolders, onThemeToggle, isDarkMode
                 </button>
               </td>
             </tr>
-          ))}
+            );
+          })}
         </tbody>
       </table>
     </div>
   );
   };
 
-  const renderSystem = () => (
-    <div className="admin-grid">
+  const formatBytes = (bytes) => {
+    if (!bytes || bytes === 0) return '0 B';
+    const k = 1024;
+    const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
+  };
+
+  const formatUptime = (seconds) => {
+    if (!seconds) return '—';
+    const d = Math.floor(seconds / 86400);
+    const h = Math.floor((seconds % 86400) / 3600);
+    const m = Math.floor((seconds % 3600) / 60);
+    if (d > 0) return `${d}d ${h}h ${m}m`;
+    if (h > 0) return `${h}h ${m}m`;
+    return `${m}m`;
+  };
+
+  const ProgressBar = ({ percent, color = '#4caf50' }) => (
+    <div style={{ width: '100%', height: '8px', background: 'var(--bg-secondary, #e0e0e0)', borderRadius: '4px', overflow: 'hidden', marginTop: '6px' }}>
+      <div style={{ width: `${Math.min(percent || 0, 100)}%`, height: '100%', background: (percent || 0) > 90 ? '#ff3b30' : (percent || 0) > 70 ? '#ff9500' : color, borderRadius: '4px', transition: 'width 0.5s ease' }} />
+    </div>
+  );
+
+  const renderSystem = () => {
+    const info = serverInfo || {};
+    const stats = systemData?.server_stats || {};
+    const net = info.network || stats.network || {};
+    const lastUpdated = info.last_updated || stats.last_updated;
+
+    return (
+    <div className="admin-grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '16px' }}>
+      
       <div className="admin-card">
         <div className="admin-card-header">
-          <h2 className="admin-card-title">{t('admin.serverInfo')}</h2>
+          <h2 className="admin-card-title">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ verticalAlign: 'middle', marginRight: '8px' }}><rect x="4" y="4" width="16" height="16" rx="2"/><rect x="9" y="9" width="6" height="6"/><line x1="9" y1="1" x2="9" y2="4"/><line x1="15" y1="1" x2="15" y2="4"/><line x1="9" y1="20" x2="9" y2="23"/><line x1="15" y1="20" x2="15" y2="23"/><line x1="20" y1="9" x2="23" y2="9"/><line x1="20" y1="14" x2="23" y2="14"/><line x1="1" y1="9" x2="4" y2="9"/><line x1="1" y1="14" x2="4" y2="14"/></svg>
+            CPU
+          </h2>
+          <span style={{ fontSize: '1.4rem', fontWeight: 700 }}>{info.cpu_percent ?? stats.cpu_percent ?? '—'}%</span>
         </div>
-        <div className="admin-info-list">
-          <p><strong>{t('admin.hostname')}:</strong> {serverInfo.hostname}</p>
-          <p><strong>{t('admin.platform')}:</strong> {serverInfo.platform}</p>
-          <p><strong>{t('admin.nodeVersion')}:</strong> {serverInfo.node_version}</p>
-          <p><strong>{t('admin.memory')}:</strong> {systemData.server_stats?.memory_usage}</p>
-          <p><strong>{t('admin.cpuUsage')}:</strong> {systemData.server_stats?.cpu_usage}</p>
+        <ProgressBar percent={info.cpu_percent ?? stats.cpu_percent} color="#007aff" />
+        <div className="admin-info-list" style={{ marginTop: '12px' }}>
+          <p><strong>{t('admin.cpuUsage')}:</strong> {info.cpu_model || stats.cpu_model || '—'}</p>
+          <p><strong>Cores:</strong> {info.cpu_count || stats.cpu_count || '—'}</p>
         </div>
       </div>
+
+      
       <div className="admin-card">
         <div className="admin-card-header">
-          <h2 className="admin-card-title">{t('admin.systemDiagnostics')}</h2>
+          <h2 className="admin-card-title">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ verticalAlign: 'middle', marginRight: '8px' }}><rect x="2" y="6" width="20" height="12" rx="2"/><line x1="6" y1="10" x2="6" y2="14"/><line x1="10" y1="10" x2="10" y2="14"/><line x1="14" y1="10" x2="14" y2="14"/><line x1="18" y1="10" x2="18" y2="14"/></svg>
+            {t('admin.memory')}
+          </h2>
+          <span style={{ fontSize: '1.4rem', fontWeight: 700 }}>{info.memory_percent ?? stats.memory_percent ?? '—'}%</span>
         </div>
-        <button className="admin-btn admin-btn-primary" onClick={runDiagnostics}>
+        <ProgressBar percent={info.memory_percent ?? stats.memory_percent} color="#34c759" />
+        <div className="admin-info-list" style={{ marginTop: '12px' }}>
+          <p><strong>Total:</strong> {info.memory_total_gb ?? stats.memory_total_gb ?? '—'} GB</p>
+          <p><strong>En uso:</strong> {info.memory_used_gb ?? stats.memory_used_gb ?? '—'} GB</p>
+          <p><strong>{t('admin.free')}:</strong> {info.memory_free_gb ?? stats.memory_free_gb ?? '—'} GB</p>
+        </div>
+      </div>
+
+      
+      <div className="admin-card">
+        <div className="admin-card-header">
+          <h2 className="admin-card-title">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ verticalAlign: 'middle', marginRight: '8px' }}><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>
+            {t('admin.disk')}
+          </h2>
+          <span style={{ fontSize: '1.4rem', fontWeight: 700 }}>{info.disk_percent ?? stats.disk_percent ?? '—'}%</span>
+        </div>
+        <ProgressBar percent={info.disk_percent ?? stats.disk_percent} color="#ff9500" />
+        <div className="admin-info-list" style={{ marginTop: '12px' }}>
+          <p><strong>Total:</strong> {info.disk_total_gb ?? stats.disk_total_gb ?? '—'} GB</p>
+          <p><strong>En uso:</strong> {info.disk_used_gb ?? stats.disk_used_gb ?? '—'} GB</p>
+          <p><strong>{t('admin.free')}:</strong> {info.disk_free_gb ?? stats.disk_free_gb ?? '—'} GB</p>
+        </div>
+      </div>
+
+      
+      <div className="admin-card">
+        <div className="admin-card-header">
+          <h2 className="admin-card-title">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ verticalAlign: 'middle', marginRight: '8px' }}><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+            {t('admin.network')}
+          </h2>
+        </div>
+        <div className="admin-info-list">
+          <p><strong>↓ Descarga:</strong> {formatBytes(net.rx_sec || 0)}/s</p>
+          <p><strong>↑ Subida:</strong> {formatBytes(net.tx_sec || 0)}/s</p>
+          <p><strong>↓ Total RX:</strong> {formatBytes(net.rx_total || 0)}</p>
+          <p><strong>↑ Total TX:</strong> {formatBytes(net.tx_total || 0)}</p>
+          {net.iface && <p><strong>Interfaz:</strong> {net.iface}</p>}
+        </div>
+      </div>
+
+      
+      <div className="admin-card">
+        <div className="admin-card-header">
+          <h2 className="admin-card-title">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ verticalAlign: 'middle', marginRight: '8px' }}><rect x="2" y="2" width="20" height="8" rx="2" ry="2"/><rect x="2" y="14" width="20" height="8" rx="2" ry="2"/><line x1="6" y1="6" x2="6.01" y2="6"/><line x1="6" y1="18" x2="6.01" y2="18"/></svg>
+            {t('admin.serverInfo')}
+          </h2>
+        </div>
+        <div className="admin-info-list">
+          <p><strong>{t('admin.hostname')}:</strong> {info.hostname || stats.hostname || '—'}</p>
+          <p><strong>{t('admin.platform')}:</strong> {info.platform || stats.platform || '—'} ({info.arch || stats.arch || '—'})</p>
+          <p><strong>{t('admin.nodeVersion')}:</strong> {info.node_version || '—'}</p>
+          <p><strong>{t('admin.pid')}:</strong> {info.pid || '—'}</p>
+          <p><strong>Uptime (Sistema):</strong> {formatUptime(info.uptime_seconds ?? stats.uptime_seconds)}</p>
+          <p><strong>Uptime (Proceso):</strong> {formatUptime(info.process_uptime_seconds)}</p>
+        </div>
+      </div>
+
+      
+      <div className="admin-card">
+        <div className="admin-card-header">
+          <h2 className="admin-card-title">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ verticalAlign: 'middle', marginRight: '8px' }}><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+            {t('admin.systemDiagnostics')}
+          </h2>
+          {lastUpdated && (
+            <span style={{ fontSize: '0.75rem', opacity: 0.5 }}>
+              {new Date(lastUpdated).toLocaleTimeString()}
+            </span>
+          )}
+        </div>
+        <button className="admin-btn admin-btn-primary" onClick={runDiagnostics} style={{ marginBottom: '12px' }}>
           {t('admin.runDiagnostics')}
         </button>
         {diagnostics.length > 0 && (
-          <div className="admin-diagnostics-results" style={{ marginTop: '16px' }}>
+          <div className="admin-diagnostics-results">
             {diagnostics.map((d, i) => (
               <div key={i} className="admin-log-entry">
-                <span className={`status-badge ${d.status === 'ok' ? 'success' : 'error'}`}>{d.status}</span>
+                <span className={`status-badge ${d.status === 'ok' ? 'success' : d.status === 'warning' ? 'warning' : 'error'}`}>{d.status}</span>
                 <span style={{ marginLeft: '8px' }}>{d.name}: {d.message}</span>
               </div>
             ))}
@@ -757,6 +1081,7 @@ const AdminPanel = ({ user, onLogout, onBackToFolders, onThemeToggle, isDarkMode
       </div>
     </div>
   );
+  };
 
   const renderLogs = () => (
     <div className="admin-card">
@@ -807,7 +1132,7 @@ const AdminPanel = ({ user, onLogout, onBackToFolders, onThemeToggle, isDarkMode
 
     return (
       <div className="security-panel">
-        {/* Stats Cards */}
+        
         <div className="admin-grid security-stats-grid">
           <div className="admin-card security-stat-card">
             <div className="security-stat-icon success">
@@ -847,7 +1172,7 @@ const AdminPanel = ({ user, onLogout, onBackToFolders, onThemeToggle, isDarkMode
           </div>
         </div>
 
-        {/* Rate Limited IPs */}
+        
         <div className="admin-card">
           <div className="admin-card-header">
             <h2 className="admin-card-title">
@@ -896,7 +1221,7 @@ const AdminPanel = ({ user, onLogout, onBackToFolders, onThemeToggle, isDarkMode
           )}
         </div>
 
-        {/* Blocked Accounts */}
+        
         <div className="admin-card">
           <div className="admin-card-header">
             <h2 className="admin-card-title">
@@ -944,7 +1269,7 @@ const AdminPanel = ({ user, onLogout, onBackToFolders, onThemeToggle, isDarkMode
           )}
         </div>
 
-        {/* Top Failed Usernames */}
+        
         {recentFailures.length > 0 && (
           <div className="admin-card">
             <div className="admin-card-header">
@@ -974,7 +1299,7 @@ const AdminPanel = ({ user, onLogout, onBackToFolders, onThemeToggle, isDarkMode
           </div>
         )}
 
-        {/* Security Audit Logs */}
+        
         <div className="admin-card">
           <div className="admin-card-header">
             <h2 className="admin-card-title">
@@ -1022,6 +1347,167 @@ const AdminPanel = ({ user, onLogout, onBackToFolders, onThemeToggle, isDarkMode
     );
   };
 
+  const renderWindows = () => {
+    const linkedWinUsernames = new Set(windowsLinks.map(l => l.windows_username));
+    const linkedCloudUsernames = new Set(windowsLinks.map(l => l.cloud_username));
+    const unlinkedWinUsers = windowsUsers.filter(u => !linkedWinUsernames.has(u.username));
+    const availableCloudUsers = users.filter(u => !linkedCloudUsernames.has(u.username));
+
+    return (
+      <div className="windows-panel">
+        
+        <div className="admin-card">
+          <div className="admin-card-header">
+            <h2 className="admin-card-title">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ verticalAlign: 'middle', marginRight: '8px' }}><rect x="2" y="3" width="20" height="18" rx="2"/><path d="M2 7h20"/><path d="M9 21V7"/></svg>
+              {t('admin.windows.detectedUsers')}
+            </h2>
+            <div style={{ display: 'flex', gap: '8px' }}>
+              <button className="admin-btn admin-btn-secondary admin-btn-small" onClick={loadWindowsUsers}>
+                {t('admin.refresh')}
+              </button>
+              {unlinkedWinUsers.length > 0 && (
+                <button className="admin-btn admin-btn-primary admin-btn-small" onClick={() => {
+                  setAutoCreateData({ selectedUsers: [], defaultPassword: '', defaultRole: 'user', autoLink: true });
+                  setShowAutoCreateModal(true);
+                }}>
+                  {t('admin.windows.autoCreate')}
+                </button>
+              )}
+            </div>
+          </div>
+          {windowsLoading ? (
+            <p style={{ opacity: 0.6, padding: '12px' }}>{t('common.loading')}</p>
+          ) : windowsUsers.length > 0 ? (
+            <table className="admin-table">
+              <thead>
+                <tr>
+                  <th>{t('admin.windows.windowsUser')}</th>
+                  <th>{t('admin.windows.desktop')}</th>
+                  <th>{t('admin.windows.documents')}</th>
+                  <th>{t('admin.windows.downloads')}</th>
+                  <th>{t('admin.status')}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {windowsUsers.map(wu => (
+                  <tr key={wu.username}>
+                    <td><strong>{wu.username}</strong></td>
+                    <td>{wu.hasDesktop ? `✓ (${wu.folders.find(f => f.type === 'desktop')?.count || 0})` : '—'}</td>
+                    <td>{wu.hasDocuments ? `✓ (${wu.folders.find(f => f.type === 'documents')?.count || 0})` : '—'}</td>
+                    <td>{wu.hasDownloads ? `✓ (${wu.folders.find(f => f.type === 'downloads')?.count || 0})` : '—'}</td>
+                    <td>
+                      {linkedWinUsernames.has(wu.username) ? (
+                        <span className="status-badge success">{t('admin.windows.linked')}</span>
+                      ) : (
+                        <span className="status-badge warning">{t('admin.windows.notLinked')}</span>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          ) : (
+            <p style={{ opacity: 0.6, padding: '12px', fontStyle: 'italic' }}>{t('admin.windows.noUsersDetected')}</p>
+          )}
+        </div>
+
+        
+        <div className="admin-card">
+          <div className="admin-card-header">
+            <h2 className="admin-card-title">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ verticalAlign: 'middle', marginRight: '8px' }}><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
+              {t('admin.windows.linkedAccounts')}
+            </h2>
+            <div style={{ display: 'flex', gap: '8px' }}>
+              <button className="admin-btn admin-btn-primary admin-btn-small" onClick={() => {
+                setLinkData({ cloud_username: '', windows_username: '', sync_desktop: true, sync_documents: true, sync_downloads: true });
+                setShowLinkModal(true);
+              }}>
+                + {t('admin.windows.linkAccount')}
+              </button>
+              {windowsLinks.length > 0 && (
+                <button className="admin-btn admin-btn-secondary admin-btn-small" onClick={handleSyncAll} disabled={syncingId === 'all'}>
+                  {syncingId === 'all' ? t('admin.windows.syncing') : t('admin.windows.syncAll')}
+                </button>
+              )}
+            </div>
+          </div>
+          {windowsLinks.length > 0 ? (
+            <table className="admin-table">
+              <thead>
+                <tr>
+                  <th>{t('admin.windows.cloudUser')}</th>
+                  <th>{t('admin.windows.windowsUser')}</th>
+                  <th>{t('admin.windows.desktop')}</th>
+                  <th>{t('admin.windows.documents')}</th>
+                  <th>{t('admin.windows.downloads')}</th>
+                  <th>{t('admin.windows.lastSync')}</th>
+                  <th>{t('admin.actions')}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {windowsLinks.map(link => (
+                  <tr key={link.id}>
+                    <td><strong>{link.cloud_username}</strong></td>
+                    <td>{link.windows_username}</td>
+                    <td>
+                      <label className="win-toggle">
+                        <input type="checkbox" checked={link.sync_desktop} onChange={e => handleToggleSyncSetting(link.id, 'sync_desktop', e.target.checked)} />
+                        <span className="win-toggle-slider"></span>
+                      </label>
+                    </td>
+                    <td>
+                      <label className="win-toggle">
+                        <input type="checkbox" checked={link.sync_documents} onChange={e => handleToggleSyncSetting(link.id, 'sync_documents', e.target.checked)} />
+                        <span className="win-toggle-slider"></span>
+                      </label>
+                    </td>
+                    <td>
+                      <label className="win-toggle">
+                        <input type="checkbox" checked={link.sync_downloads} onChange={e => handleToggleSyncSetting(link.id, 'sync_downloads', e.target.checked)} />
+                        <span className="win-toggle-slider"></span>
+                      </label>
+                    </td>
+                    <td style={{ fontSize: '0.85rem', opacity: 0.7 }}>
+                      {link.last_sync ? new Date(link.last_sync).toLocaleString() : '—'}
+                    </td>
+                    <td>
+                      <button className="admin-btn admin-btn-secondary admin-btn-small" onClick={() => handleSyncUser(link.id)} disabled={syncingId === link.id} style={{ marginRight: '5px' }}>
+                        {syncingId === link.id ? '...' : t('admin.windows.sync')}
+                      </button>
+                      <button className="admin-btn admin-btn-secondary admin-btn-small" onClick={() => handleUnlink(link.id)}>
+                        {t('admin.windows.unlink')}
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          ) : (
+            <p style={{ opacity: 0.6, padding: '12px', fontStyle: 'italic' }}>{t('admin.windows.noLinks')}</p>
+          )}
+        </div>
+
+        
+        <div className="admin-card">
+          <div className="admin-card-header">
+            <h2 className="admin-card-title">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ verticalAlign: 'middle', marginRight: '8px' }}><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+              {t('admin.windows.howItWorks')}
+            </h2>
+          </div>
+          <div className="admin-info-list" style={{ padding: '8px 12px' }}>
+            <p>* {t('admin.windows.help1')}</p>
+            <p>* {t('admin.windows.help2')}</p>
+            <p>* {t('admin.windows.help3')}</p>
+            <p>* {t('admin.windows.help4')}</p>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   return (
     <div className="admin-panel">
       {renderSidebar()}
@@ -1036,6 +1522,7 @@ const AdminPanel = ({ user, onLogout, onBackToFolders, onThemeToggle, isDarkMode
             {activeTab === 'security' && t('admin.security.title')}
             {activeTab === 'rdp' && t('admin.rdpAdmin')}
             {activeTab === 'roadmap' && 'Roadmap'}
+            {activeTab === 'windows' && t('admin.windows.title')}
           </h1>
           <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
             <NotificationCenter />
@@ -1059,6 +1546,7 @@ const AdminPanel = ({ user, onLogout, onBackToFolders, onThemeToggle, isDarkMode
         {activeTab === 'security' && renderSecurity()}
         {activeTab === 'rdp' && <RDPManager />}
         {activeTab === 'roadmap' && renderRoadmapAccess()}
+        {activeTab === 'windows' && renderWindows()}
       </main>
 
       {showSettingsModal && (
@@ -1160,6 +1648,118 @@ const AdminPanel = ({ user, onLogout, onBackToFolders, onThemeToggle, isDarkMode
                   </select>
                 </div>
                 <button type="submit" className="admin-btn admin-btn-primary">{t('common.save')}</button>
+              </form>
+            </div>
+          </div>
+        </div>
+      )}
+
+      
+      {showLinkModal && (
+        <div className="admin-modal" onClick={() => setShowLinkModal(false)}>
+          <div className="admin-modal-content" onClick={e => e.stopPropagation()}>
+            <div className="admin-modal-header">
+              <h3>{t('admin.windows.linkAccount')}</h3>
+              <button className="admin-modal-close" onClick={() => setShowLinkModal(false)}>&times;</button>
+            </div>
+            <div className="admin-modal-body">
+              <form onSubmit={handleLinkUsers}>
+                <div className="admin-form-group">
+                  <label className="admin-form-label">{t('admin.windows.cloudUser')}</label>
+                  <select className="admin-input" value={linkData.cloud_username} onChange={e => setLinkData({...linkData, cloud_username: e.target.value})} required>
+                    <option value="">{t('admin.windows.selectUser')}</option>
+                    {users.filter(u => !windowsLinks.some(l => l.cloud_username === u.username)).map(u => (
+                      <option key={u.id} value={u.username}>{u.username} ({u.role})</option>
+                    ))}
+                  </select>
+                </div>
+                <div className="admin-form-group">
+                  <label className="admin-form-label">{t('admin.windows.windowsUser')}</label>
+                  <select className="admin-input" value={linkData.windows_username} onChange={e => setLinkData({...linkData, windows_username: e.target.value})} required>
+                    <option value="">{t('admin.windows.selectUser')}</option>
+                    {windowsUsers.filter(u => !windowsLinks.some(l => l.windows_username === u.username)).map(u => (
+                      <option key={u.username} value={u.username}>{u.username}</option>
+                    ))}
+                  </select>
+                </div>
+                <div className="admin-form-group">
+                  <label className="admin-form-label">{t('admin.windows.syncFolders')}</label>
+                  <div style={{ display: 'flex', gap: '16px', marginTop: '6px' }}>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer' }}>
+                      <input type="checkbox" checked={linkData.sync_desktop} onChange={e => setLinkData({...linkData, sync_desktop: e.target.checked})} />
+                      {t('admin.windows.desktop')}
+                    </label>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer' }}>
+                      <input type="checkbox" checked={linkData.sync_documents} onChange={e => setLinkData({...linkData, sync_documents: e.target.checked})} />
+                      {t('admin.windows.documents')}
+                    </label>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer' }}>
+                      <input type="checkbox" checked={linkData.sync_downloads} onChange={e => setLinkData({...linkData, sync_downloads: e.target.checked})} />
+                      {t('admin.windows.downloads')}
+                    </label>
+                  </div>
+                </div>
+                <button type="submit" className="admin-btn admin-btn-primary">{t('admin.windows.linkAccount')}</button>
+              </form>
+            </div>
+          </div>
+        </div>
+      )}
+
+      
+      {showAutoCreateModal && (
+        <div className="admin-modal" onClick={() => setShowAutoCreateModal(false)}>
+          <div className="admin-modal-content" onClick={e => e.stopPropagation()} style={{ maxWidth: '550px' }}>
+            <div className="admin-modal-header">
+              <h3>{t('admin.windows.autoCreate')}</h3>
+              <button className="admin-modal-close" onClick={() => setShowAutoCreateModal(false)}>&times;</button>
+            </div>
+            <div className="admin-modal-body">
+              <form onSubmit={handleAutoCreate}>
+                <div className="admin-form-group">
+                  <label className="admin-form-label">{t('admin.windows.selectUsersToCreate')}</label>
+                  <div style={{ maxHeight: '200px', overflowY: 'auto', border: '1px solid var(--border-color, #ddd)', borderRadius: '8px', padding: '8px' }}>
+                    {windowsUsers.filter(u => !windowsLinks.some(l => l.windows_username === u.username)).map(wu => {
+                      const cloudExists = users.some(u => u.username === wu.username);
+                      return (
+                        <label key={wu.username} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '6px 4px', cursor: 'pointer', opacity: cloudExists ? 0.5 : 1 }}>
+                          <input 
+                            type="checkbox" 
+                            checked={autoCreateData.selectedUsers.includes(wu.username)}
+                            onChange={() => toggleAutoCreateUser(wu.username)}
+                            disabled={cloudExists}
+                          />
+                          <span style={{ fontWeight: 500 }}>{wu.username}</span>
+                          {cloudExists && <span className="status-badge" style={{ fontSize: '0.7rem' }}>{t('admin.windows.alreadyExists')}</span>}
+                          <span style={{ fontSize: '0.8rem', opacity: 0.6, marginLeft: 'auto' }}>
+                            {wu.folders.reduce((s, f) => s + f.count, 0)} {t('admin.windows.files')}
+                          </span>
+                        </label>
+                      );
+                    })}
+                  </div>
+                </div>
+                <div className="admin-form-group">
+                  <label className="admin-form-label">{t('admin.windows.defaultPassword')}</label>
+                  <input className="admin-input" type="password" value={autoCreateData.defaultPassword} onChange={e => setAutoCreateData({...autoCreateData, defaultPassword: e.target.value})} required />
+                </div>
+                <div className="admin-form-group">
+                  <label className="admin-form-label">{t('admin.role')}</label>
+                  <select className="admin-input" value={autoCreateData.defaultRole} onChange={e => setAutoCreateData({...autoCreateData, defaultRole: e.target.value})}>
+                    <option value="user">{t('admin.roleUser')}</option>
+                    <option value="boss">{t('admin.roleBoss')}</option>
+                    <option value="admin">{t('admin.roleAdmin')}</option>
+                  </select>
+                </div>
+                <div className="admin-form-group">
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
+                    <input type="checkbox" checked={autoCreateData.autoLink} onChange={e => setAutoCreateData({...autoCreateData, autoLink: e.target.checked})} />
+                    {t('admin.windows.autoLinkAfterCreate')}
+                  </label>
+                </div>
+                <button type="submit" className="admin-btn admin-btn-primary" disabled={autoCreateData.selectedUsers.length === 0}>
+                  {t('admin.windows.createSelected')} ({autoCreateData.selectedUsers.length})
+                </button>
               </form>
             </div>
           </div>

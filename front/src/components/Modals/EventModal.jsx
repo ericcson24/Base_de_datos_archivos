@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { FiAlertTriangle, FiUser } from 'react-icons/fi';
 import './EventModal.css';
 import LocationPickerModal from './LocationPickerModal';
 import { useLanguage } from '../../context/LanguageContext';
@@ -10,13 +11,13 @@ const EventModal = ({
   isOpen,
   onClose,
   event,
-  mode, // 'view', 'edit', 'create'
+  mode,
   onSave,
   onDelete,
   categories = [],
   isLoading = false,
-  selectedDates = null, // Para modo create
-  user, // Add user prop
+  selectedDates = null,
+  user,
   initialAssignMode = 'me',
   initialTargetUserId = '',
   initialGroupId = '',
@@ -28,10 +29,9 @@ const EventModal = ({
   const [currentMode, setCurrentMode] = useState(mode);
   const [showLocationPicker, setShowLocationPicker] = useState(false);
   
-  // Group Assignment State
   const [groups, setGroups] = useState([]);
   const [users, setUsers] = useState([]);
-  const [assignMode, setAssignMode] = useState(initialAssignMode); // 'me', 'group', 'user'
+  const [assignMode, setAssignMode] = useState(initialAssignMode);
   const [selectedGroupId, setSelectedGroupId] = useState(initialGroupId);
   const [selectedUserId, setSelectedUserId] = useState(initialTargetUserId);
 
@@ -49,14 +49,12 @@ const EventModal = ({
   const [errors, setErrors] = useState({});
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
-  // Attachment State
   const [attachments, setAttachments] = useState([]);
   const [showFilePicker, setShowFilePicker] = useState(false);
   const [userFiles, setUserFiles] = useState([]);
   const [filesLoading, setFilesLoading] = useState(false);
   const [fileSearch, setFileSearch] = useState('');
 
-  // AI File Suggestions State
   const [suggestedFiles, setSuggestedFiles] = useState([]);
   const [suggestionsLoading, setSuggestionsLoading] = useState(false);
   const [suggestionsShown, setSuggestionsShown] = useState(false);
@@ -121,7 +119,6 @@ const EventModal = ({
     }
   }, []);
 
-  // Load user files for the file picker
   const loadUserFiles = useCallback(async (search = '') => {
     setFilesLoading(true);
     try {
@@ -141,7 +138,6 @@ const EventModal = ({
     }
   }, []);
 
-  // Fetch AI-suggested files for the current event
   const fetchSuggestions = useCallback(async (eventTitle, eventDescription, eventLocation, eventCategories) => {
     if (!eventTitle || eventTitle.trim().length < 3) {
       setSuggestedFiles([]);
@@ -178,7 +174,6 @@ const EventModal = ({
     }
   }, []);
 
-  // Attach file to event
   const attachFile = async (file, eventId) => {
     try {
       const response = await fetch('/api/events/attachments', {
@@ -205,7 +200,6 @@ const EventModal = ({
     }
   };
 
-  // Remove attachment
   const removeAttachment = async (attachmentId) => {
     try {
       const response = await fetch(`/api/events/attachments/${attachmentId}`, {
@@ -281,6 +275,22 @@ const EventModal = ({
   };
 
   // Update state when props change
+  const openAttachment = (att) => {
+    try {
+      const owner = att.fileOwner || '';
+      const path = att.filePath || '';
+      const idRaw = owner && owner !== '' && att.attachedBy && owner !== att.attachedBy
+        ? `shared:${owner}:${path}`
+        : path;
+      const fileId = btoa(unescape(encodeURIComponent(idRaw)));
+      const token = getAuthToken();
+      const url = `/api/files/preview/${encodeURIComponent(fileId)}?token=${encodeURIComponent(token)}`;
+      window.open(url, '_blank', 'noopener');
+    } catch (e) {
+      console.error('Error opening attachment:', e);
+    }
+  };
+
   useEffect(() => {
     setAssignMode(initialAssignMode);
   }, [initialAssignMode]);
@@ -293,12 +303,10 @@ const EventModal = ({
     setSelectedGroupId(initialGroupId);
   }, [initialGroupId]);
 
-  // Load groups and users for admin/boss
   useEffect(() => {
     if (user && (user.role === 'admin' || user.role === 'boss')) {
       const token = localStorage.getItem('auth_token');
       
-      // Fetch Groups
       fetch('/api/users/groups', {
         headers: { 'Authorization': `Bearer ${token}` }
       })
@@ -308,7 +316,6 @@ const EventModal = ({
       })
       .catch(err => console.error('Error loading groups:', err));
 
-      // Fetch Users
       fetch('/api/users/users', {
         headers: { 'Authorization': `Bearer ${token}` }
       })
@@ -320,16 +327,13 @@ const EventModal = ({
     }
   }, [user]);
 
-  // Helper to format date for datetime-local input (YYYY-MM-DDTHH:mm)
   const formatDateForInput = (date) => {
     if (!date) return '';
     const d = new Date(date);
-    // Adjust for timezone to keep local time in ISO string
     const offset = d.getTimezoneOffset() * 60000;
     return (new Date(d - offset)).toISOString().slice(0, 16);
   };
 
-  // Helper for date input (YYYY-MM-DD)
   const formatDateForDateInput = (date) => {
     if (!date) return '';
     const d = new Date(date);
@@ -337,14 +341,11 @@ const EventModal = ({
     return (new Date(d - offset)).toISOString().split('T')[0];
   };
 
-  // Initialize form data when modal opens or event/mode changes
   useEffect(() => {
     if (isOpen && event && (mode === 'view' || mode === 'edit')) {
       const startDate = event.start;
       let displayEndDate = event.end;
 
-      // FullCalendar uses exclusive end for allDay events;
-      // subtract 1 day to show the inclusive end date to the user
       if (event.allDay && displayEndDate) {
         const d = new Date(displayEndDate);
         d.setDate(d.getDate() - 1);
@@ -363,15 +364,12 @@ const EventModal = ({
       });
       setCurrentMode(mode);
     } else if (isOpen && mode === 'create') {
-      // Initialize with default values for create mode
       if (selectedDates) {
-        // Use selected dates from calendar
         const startDate = selectedDates.allDay
           ? formatDateForDateInput(selectedDates.start)
           : formatDateForInput(selectedDates.start);
         let endDate;
         if (selectedDates.allDay) {
-          // FullCalendar uses exclusive end for allDay; subtract 1 day for inclusive display
           const inclusiveEnd = new Date(selectedDates.end);
           inclusiveEnd.setDate(inclusiveEnd.getDate() - 1);
           endDate = formatDateForDateInput(inclusiveEnd);
@@ -390,7 +388,6 @@ const EventModal = ({
           categories: []
         });
       } else {
-        // Fallback to current time
         const now = new Date();
         const tomorrow = new Date(now);
         tomorrow.setDate(tomorrow.getDate() + 1);
@@ -407,7 +404,6 @@ const EventModal = ({
         });
       }
       setCurrentMode(mode);
-      // Reset assignment state for create mode
       setAssignMode(initialAssignMode);
       setSelectedUserId(initialTargetUserId);
       setSelectedGroupId('');
@@ -420,19 +416,16 @@ const EventModal = ({
     setSuggestionsShown(false);
     setDismissedSuggestions(new Set());
     
-    // Load attachments for existing events
     if (isOpen && event && (mode === 'view' || mode === 'edit')) {
       loadAttachments(event.id);
     }
   }, [isOpen, event, mode, selectedDates, initialAssignMode, initialTargetUserId, loadAttachments]);
 
   const handleInputChange = (field, value) => {
-    // Lógica especial para el cambio de "Todo el día"
     if (field === 'allDay') {
       const isAllDay = value;
       const now = new Date();
       
-      // Si activamos "Todo el día", solo guardamos la fecha (YYYY-MM-DD)
       if (isAllDay) {
         setFormData(prev => ({
           ...prev,
@@ -441,13 +434,10 @@ const EventModal = ({
           end: prev.end ? prev.end.split('T')[0] : formatDateForDateInput(now)
         }));
       } else {
-        // Si desactivamos "Todo el día", añadimos hora por defecto (ej: hora actual o 09:00)
-        // Intentamos preservar la fecha que ya estaba seleccionada
         const currentStartDate = formData.start || formatDateForDateInput(now);
         const currentEndDate = formData.end || formatDateForDateInput(now);
         
-        // Añadimos hora actual para inicio y +1 hora para fin
-        const startTime = now.toTimeString().slice(0, 5); // HH:mm
+        const startTime = now.toTimeString().slice(0, 5);
         const endTime = new Date(now.getTime() + 60*60*1000).toTimeString().slice(0, 5);
 
         setFormData(prev => ({
@@ -464,7 +454,6 @@ const EventModal = ({
       }));
     }
 
-    // Clear error for this field
     if (errors[field]) {
       setErrors(prev => ({
         ...prev,
@@ -472,7 +461,6 @@ const EventModal = ({
       }));
     }
 
-    // Debounced AI suggestions when title or description changes
     if (field === 'title' || field === 'description') {
       if (suggestionsTimerRef.current) clearTimeout(suggestionsTimerRef.current);
       suggestionsTimerRef.current = setTimeout(() => {
@@ -535,12 +523,10 @@ const EventModal = ({
       let finalEnd = formData.end;
 
       if (formData.allDay) {
-          // Convert inclusive end date back to exclusive for backend/Graph API (add 1 day)
           const [y, m, d] = formData.end.split('-').map(Number);
           const nextDay = new Date(y, m - 1, d + 1);
           finalEnd = `${nextDay.getFullYear()}-${String(nextDay.getMonth() + 1).padStart(2, '0')}-${String(nextDay.getDate()).padStart(2, '0')}`;
       } else {
-          // Fix timezone issue: Convert local input time to ISO UTC
           if (formData.start && formData.start.includes('T')) {
               finalStart = new Date(formData.start).toISOString();
           }
@@ -622,12 +608,11 @@ const EventModal = ({
           <div className="modal-body">
             {errors.general && (
               <div className="message error">
-                ⚠️ {errors.general}
+                <FiAlertTriangle style={{ verticalAlign: 'middle', marginRight: 6 }} /> {errors.general}
               </div>
             )}
 
             {currentMode === 'view' ? (
-              // VIEW MODE
               <div className="event-details">
                 <div className="detail-group">
                   <label className="detail-label">{t('calendar.eventTitle')}</label>
@@ -669,7 +654,7 @@ const EventModal = ({
                         rel="noopener noreferrer"
                         className="location-link"
                       >
-                        <span className="location-link-icon">📍</span>
+                        <span className="location-link-icon">[Location]</span>
                         <span className="location-link-text">{event.extendedProps.location}</span>
                         <span className="location-link-arrow">↗</span>
                       </a>
@@ -681,7 +666,7 @@ const EventModal = ({
                   <div className="detail-group">
                     <label className="detail-label">{t('calendar.assignedBy') || 'Asignado por'}</label>
                     <div className="detail-value" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                      <span style={{ fontSize: '1.1rem' }}>👤</span>
+                      <span style={{ fontSize: '1.1rem' }}><FiUser /></span>
                       <span style={{ fontWeight: 500, color: '#3b82f6' }}>{event.extendedProps.assignedBy}</span>
                     </div>
                   </div>
@@ -722,25 +707,25 @@ const EventModal = ({
                   </div>
                 )}
 
-                {/* Attachments Section - View Mode */}
+                
                 <div className="detail-group">
                   <label className="detail-label">{t('calendar.attachments') || 'Adjuntos'}</label>
                   <div className="detail-value">
                     {attachments.length > 0 ? (
                       <div className="attachments-list">
                         {attachments.map(att => (
-                          <div key={att.id} className="attachment-item">
+                          <div key={att.id} className="attachment-item" onClick={() => openAttachment(att)} style={{ cursor: 'pointer' }} title={t('calendar.openAttachment') || 'Abrir adjunto'}>
                             <span className="attachment-icon"><FileTypeIcon type={getFileType(att.fileName)} size={20} /></span>
                             <div className="attachment-info">
                               <span className="attachment-name">{att.fileName}</span>
-                              <span className="attachment-meta">{formatFileSize(att.fileSize)} • {att.attachedBy}</span>
+                              <span className="attachment-meta">{formatFileSize(att.fileSize)} * {att.attachedBy}</span>
                             </div>
                             <button 
                               className="attachment-remove-btn"
-                              onClick={() => removeAttachment(att.id)}
+                              onClick={(e) => { e.stopPropagation(); removeAttachment(att.id); }}
                               title={t('calendar.removeAttachment') || 'Quitar adjunto'}
                             >
-                              ✕
+                              x
                             </button>
                           </div>
                         ))}
@@ -759,7 +744,6 @@ const EventModal = ({
                 </div>
               </div>
             ) : (
-              // EDIT/CREATE MODE
               <form className="event-form">
                 <div className="form-group">
                   <label className="form-label required">{t('calendar.eventTitle')}</label>
@@ -829,12 +813,12 @@ const EventModal = ({
                       onClick={() => setShowLocationPicker(true)}
                       title={t('calendar.searchMap')}
                     >
-                      📍
+                      [Location]
                     </button>
                   </div>
                 </div>
 
-                {/* Assignment Section */}
+                
                 {currentMode === 'create' && (user?.role === 'admin' || user?.role === 'boss') && (
                   <div className="form-group" style={{ marginTop: '15px', borderTop: '1px solid var(--border-color)', paddingTop: '15px' }}>
                     <label className="form-label" style={{ fontWeight: '600', color: 'var(--primary-color)' }}>
@@ -1023,6 +1007,7 @@ const EventModal = ({
                 )}
 
                 {/* AI File Suggestions */}
+                
                 {(currentMode === 'create' || currentMode === 'edit') && (suggestionsLoading || (suggestedFiles.length > 0 && suggestionsShown)) && (
                   <div className="form-group ai-suggestions-section">
                     <label className="form-label ai-suggestions-label">
@@ -1033,7 +1018,7 @@ const EventModal = ({
                           className="ai-suggestions-dismiss"
                           onClick={() => setSuggestionsShown(false)}
                           title={t('common.close') || 'Cerrar'}
-                        >✕</button>
+                        >x</button>
                       )}
                     </label>
                     {suggestionsLoading ? (
@@ -1073,7 +1058,7 @@ const EventModal = ({
                               <button
                                 className="ai-suggestion-dismiss-btn"
                                 onClick={() => setDismissedSuggestions(prev => new Set([...prev, file.id]))}
-                              >✕</button>
+                              >x</button>
                             </div>
                           </div>
                         ))}
@@ -1082,13 +1067,13 @@ const EventModal = ({
                   </div>
                 )}
 
-                {/* Attachments Section - Edit/Create Mode */}
+                
                 {currentMode === 'edit' && event?.id && (
                   <div className="form-group">
                     <label className="form-label">📎 {t('calendar.attachments') || 'Adjuntos'}</label>
                     <div className="attachments-list">
                       {attachments.map(att => (
-                        <div key={att.id} className="attachment-item">
+                        <div key={att.id} className="attachment-item" onClick={() => openAttachment(att)} style={{ cursor: 'pointer' }} title={t('calendar.openAttachment') || 'Abrir adjunto'}>
                           <span className="attachment-icon"><FileTypeIcon type={getFileType(att.fileName)} size={20} /></span>
                           <div className="attachment-info">
                             <span className="attachment-name">{att.fileName}</span>
@@ -1096,10 +1081,10 @@ const EventModal = ({
                           </div>
                           <button 
                             className="attachment-remove-btn"
-                            onClick={() => removeAttachment(att.id)}
+                            onClick={(e) => { e.stopPropagation(); removeAttachment(att.id); }}
                             title={t('calendar.removeAttachment') || 'Quitar'}
                           >
-                            ✕
+                            x
                           </button>
                         </div>
                       ))}
@@ -1121,6 +1106,16 @@ const EventModal = ({
                     >
                       ✨ {t('calendar.suggestFiles') || 'Sugerir archivos'}
                     </button>
+                  </div>
+                )}
+
+                
+                {currentMode === 'create' && (
+                  <div className="form-group">
+                    <label className="form-label" style={{ opacity: 0.7 }}>📎 {t('calendar.attachments') || 'Adjuntos'}</label>
+                    <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', fontStyle: 'italic', padding: '6px 10px', background: 'var(--bg-secondary)', borderRadius: '6px' }}>
+                      💡 {t('calendar.saveToAttach') || 'Guarda el evento primero y luego ábrelo para adjuntar archivos.'}
+                    </div>
                   </div>
                 )}
               </form>
@@ -1173,7 +1168,7 @@ const EventModal = ({
         </div>
       </div>
 
-      {/* Delete Confirmation Modal */}
+      
       {showDeleteConfirm && (
         <div className="modal-backdrop show" onClick={() => setShowDeleteConfirm(false)}>
           <div className="confirm-modal" onClick={e => e.stopPropagation()}>
@@ -1210,7 +1205,7 @@ const EventModal = ({
         </div>
       )}
 
-      {/* File Picker Modal for Attachments */}
+      
       {showFilePicker && (
         <div className="modal-backdrop show" style={{ zIndex: 1100 }} onClick={() => setShowFilePicker(false)}>
           <div className="event-modal file-picker-modal" onClick={e => e.stopPropagation()} style={{ maxWidth: '500px' }}>
@@ -1243,7 +1238,14 @@ const EventModal = ({
                     >
                       <span className="attachment-icon"><FileTypeIcon type={getFileType(file.name)} size={20} /></span>
                       <div className="attachment-info">
-                        <span className="attachment-name">{file.name}</span>
+                        <span className="attachment-name">
+                          {file.name}
+                          {file.shared && (
+                            <span style={{ marginLeft: '6px', fontSize: '0.7rem', padding: '1px 6px', borderRadius: '4px', background: 'rgba(59,130,246,0.15)', color: '#3b82f6' }}>
+                              🔗 {file.owner}
+                            </span>
+                          )}
+                        </span>
                         <span className="attachment-meta">{formatFileSize(file.size)}</span>
                       </div>
                     </div>
@@ -1255,7 +1257,7 @@ const EventModal = ({
         </div>
       )}
 
-      {/* Location Picker Modal */}
+      
       <LocationPickerModal
         isOpen={showLocationPicker}
         onClose={() => setShowLocationPicker(false)}

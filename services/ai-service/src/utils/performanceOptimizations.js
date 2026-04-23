@@ -1,8 +1,4 @@
-/**
- * Sistema de batch processing paralelo para análisis de documentos
- * Permite procesar múltiples análisis de forma paralela y eficiente
- */
-
+﻿
 class ParallelAnalysisBatcher {
   constructor(maxConcurrent = 3) {
     this.maxConcurrent = maxConcurrent;
@@ -11,9 +7,6 @@ class ParallelAnalysisBatcher {
     this.results = new Map();
   }
 
-  /**
-   * Agrega una tarea de análisis a la cola
-   */
   async add(taskId, analysisFunction) {
     return new Promise((resolve, reject) => {
       this.queue.push({
@@ -27,9 +20,6 @@ class ParallelAnalysisBatcher {
     });
   }
 
-  /**
-   * Procesa tareas de la cola en paralelo
-   */
   async process() {
     while (this.active < this.maxConcurrent && this.queue.length > 0) {
       this.active++;
@@ -57,16 +47,10 @@ class ParallelAnalysisBatcher {
     }
   }
 
-  /**
-   * Obtiene resultados de análisis completados
-   */
   getResult(taskId) {
     return this.results.get(taskId);
   }
 
-  /**
-   * Limpia resultados antiguos
-   */
   clearOldResults(maxAge = 60 * 60 * 1000) {
     const now = Date.now();
     for (const [taskId, result] of this.results) {
@@ -76,9 +60,6 @@ class ParallelAnalysisBatcher {
     }
   }
 
-  /**
-   * Obtiene estadísticas del batcher
-   */
   getStats() {
     return {
       queueLength: this.queue.length,
@@ -91,9 +72,6 @@ class ParallelAnalysisBatcher {
     };
   }
 
-  /**
-   * Calcula tiempo promedio de procesamiento
-   */
   getAverageProcessingTime() {
     if (this.results.size === 0) return 0;
     const times = Array.from(this.results.values()).map(r => r.processingTime);
@@ -101,10 +79,6 @@ class ParallelAnalysisBatcher {
   }
 }
 
-/**
- * Gestor de pool de conexiones para base de datos
- * Optimiza queries frecuentes
- */
 class QueryOptimizer {
   constructor(db, maxPoolConnections = 10) {
     this.db = db;
@@ -113,24 +87,18 @@ class QueryOptimizer {
     this.activeQueries = 0;
   }
 
-  /**
-   * Ejecuta query con caching automático
-   */
   async execute(query, params, cacheKey = null, cacheDuration = 300000) {
     const fullCacheKey = cacheKey || this.generateCacheKey(query, params);
 
-    // Intentar obtener del cache
     const cached = this.queryCache.get(fullCacheKey);
     if (cached && Date.now() - cached.timestamp < cacheDuration) {
       return cached.result;
     }
 
-    // Ejecutar query
     try {
       this.activeQueries++;
       const result = await this.db.query(query, params);
       
-      // Guardar en cache
       this.queryCache.set(fullCacheKey, {
         result,
         timestamp: Date.now()
@@ -142,27 +110,18 @@ class QueryOptimizer {
     }
   }
 
-  /**
-   * Ejecuta múltiples queries en paralelo
-   */
   async executeBatch(queries) {
     return Promise.all(
       queries.map(q => this.execute(q.query, q.params, q.cacheKey, q.cacheDuration))
     );
   }
 
-  /**
-   * Genera clave para cachear query
-   */
   generateCacheKey(query, params) {
     const normalizedQuery = query.replace(/\s+/g, ' ').trim();
     const paramString = JSON.stringify(params || []);
     return `query_${normalizedQuery}_${paramString}`.substring(0, 100);
   }
 
-  /**
-   * Invalida cache
-   */
   invalidateCache(pattern) {
     for (const key of this.queryCache.keys()) {
       if (key.includes(pattern)) {
@@ -171,9 +130,6 @@ class QueryOptimizer {
     }
   }
 
-  /**
-   * Obtiene estadísticas
-   */
   getStats() {
     return {
       cacheSize: this.queryCache.size,
@@ -183,9 +139,6 @@ class QueryOptimizer {
     };
   }
 
-  /**
-   * Limpia cache antiguo
-   */
   cleanup(maxAge = 60 * 60 * 1000) {
     const now = Date.now();
     for (const [key, entry] of this.queryCache) {
@@ -196,18 +149,12 @@ class QueryOptimizer {
   }
 }
 
-/**
- * Sistema de rate limiting para APIs
- */
 class RateLimiter {
   constructor(maxRequestsPerMinute = 60) {
     this.maxRequestsPerMinute = maxRequestsPerMinute;
     this.userRequests = new Map();
   }
 
-  /**
-   * Verifica si usuario puede hacer request
-   */
   canMakeRequest(userId) {
     const now = Date.now();
     const userKey = `user_${userId}`;
@@ -217,7 +164,7 @@ class RateLimiter {
     }
 
     const requests = this.userRequests.get(userKey);
-    const recentRequests = requests.filter(t => now - t < 60000); // Último minuto
+    const recentRequests = requests.filter(t => now - t < 60000);
 
     if (recentRequests.length >= this.maxRequestsPerMinute) {
       return {
@@ -237,9 +184,6 @@ class RateLimiter {
     };
   }
 
-  /**
-   * Obtiene estadísticas de rate limiting
-   */
   getStats() {
     return {
       activeUsers: this.userRequests.size,
@@ -248,9 +192,6 @@ class RateLimiter {
     };
   }
 
-  /**
-   * Limpia datos antiguos
-   */
   cleanup() {
     const now = Date.now();
     for (const [key, requests] of this.userRequests) {
@@ -264,9 +205,6 @@ class RateLimiter {
   }
 }
 
-/**
- * Monitor de performance del sistema
- */
 class PerformanceMonitor {
   constructor() {
     this.metrics = {
@@ -279,9 +217,6 @@ class PerformanceMonitor {
     };
   }
 
-  /**
-   * Registra una llamada API
-   */
   recordApiCall(responseTime, cacheHit = false, error = false) {
     this.metrics.apiCalls++;
     if (cacheHit) {
@@ -301,9 +236,6 @@ class PerformanceMonitor {
     this.updateAverageResponseTime();
   }
 
-  /**
-   * Actualiza tiempo promedio de respuesta
-   */
   updateAverageResponseTime() {
     if (this.metrics.responseTimes.length === 0) {
       this.metrics.averageResponseTime = 0;
@@ -314,9 +246,6 @@ class PerformanceMonitor {
     this.metrics.averageResponseTime = (sum / this.metrics.responseTimes.length).toFixed(2);
   }
 
-  /**
-   * Obtiene reporte de performance
-   */
   getReport() {
     const hitRate = this.metrics.apiCalls > 0
       ? ((this.metrics.cacheHits / this.metrics.apiCalls) * 100).toFixed(2)
@@ -338,9 +267,6 @@ class PerformanceMonitor {
     };
   }
 
-  /**
-   * Calcula calidad del uptime (0-100)
-   */
   calculateQuality() {
     const errorRate = this.metrics.apiCalls > 0
       ? (this.metrics.errors / this.metrics.apiCalls)
@@ -349,9 +275,6 @@ class PerformanceMonitor {
     return Math.max(0, 100 - (errorRate * 100)).toFixed(2);
   }
 
-  /**
-   * Resetea métricas
-   */
   reset() {
     this.metrics = {
       apiCalls: 0,

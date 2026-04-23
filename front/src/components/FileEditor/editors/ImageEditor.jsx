@@ -6,8 +6,7 @@ import './ImageEditor.css';
 const ImageEditor = ({ fileUrl, file }) => {
   const { t } = useLanguage();
   
-  // State
-  const [activeTab, setActiveTab] = useState('adjust'); // adjust, crop, rotate
+  const [activeTab, setActiveTab] = useState('adjust');
   const [params, setParams] = useState({
     brightness: 100,
     contrast: 100,
@@ -19,21 +18,20 @@ const ImageEditor = ({ fileUrl, file }) => {
   });
 
   const [cropMode, setCropMode] = useState(false);
-  const [cropRect, setCropRect] = useState(null); // { x, y, w, h } relative to canvas displayed size
+  const [cropRect, setCropRect] = useState(null);
   const [isDragging, setIsDragging] = useState(false);
-  const [dragHandle, setDragHandle] = useState(null); // 'tl', 'tr', 'bl', 'br', 'move'
+  const [dragHandle, setDragHandle] = useState(null);
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
   
   const [loading, setLoading] = useState(true);
   const [showSaveModal, setShowSaveModal] = useState(false);
-  const [history, setHistory] = useState([]); // Array of params/imageSrc states? Too complex for now.
+  const [history, setHistory] = useState([]);
   
   const canvasRef = useRef(null);
   const containerRef = useRef(null);
-  const imageRef = useRef(null); // The source image (can be updated after crop)
+  const imageRef = useRef(null);
   const originalUrlRef = useRef(fileUrl);
 
-  // Load image
   useEffect(() => {
     if (fileUrl) {
       setLoading(true);
@@ -53,7 +51,6 @@ const ImageEditor = ({ fileUrl, file }) => {
     }
   }, [fileUrl]);
 
-  // Render function (apply filters, rotation)
   const renderImage = useCallback(() => {
     const canvas = canvasRef.current;
     const img = imageRef.current;
@@ -61,18 +58,14 @@ const ImageEditor = ({ fileUrl, file }) => {
 
     const ctx = canvas.getContext('2d');
     
-    // Handle Rotation dimensions
     const rot = params.rotation % 360;
     const isVertical = rot === 90 || rot === 270 || rot === -90 || rot === -270;
     
     canvas.width = isVertical ? img.height : img.width;
     canvas.height = isVertical ? img.width : img.height;
 
-    // Clear
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     
-    // Filters logic
-    // We apply filters before drawing? No, context.filter is best
     const filterString = `
       brightness(${params.brightness}%) 
       contrast(${params.contrast}%) 
@@ -83,7 +76,6 @@ const ImageEditor = ({ fileUrl, file }) => {
     `;
     ctx.filter = filterString;
 
-    // Transform logic
     ctx.save();
     ctx.translate(canvas.width / 2, canvas.height / 2);
     ctx.rotate((params.rotation * Math.PI) / 180);
@@ -96,7 +88,6 @@ const ImageEditor = ({ fileUrl, file }) => {
     renderImage();
   }, [renderImage]);
 
-  // Reset
   const handleReset = () => {
     setParams({
       brightness: 100,
@@ -107,17 +98,12 @@ const ImageEditor = ({ fileUrl, file }) => {
       blur: 0,
       rotation: 0
     });
-    // Reload original if cropped? 
-    // Ideally we keep original source separate. 
-    // For now, reset just resets params.
   };
 
-  // Crop Logic
   const initCrop = () => {
     if (!canvasRef.current) return;
     const cw = canvasRef.current.clientWidth;
     const ch = canvasRef.current.clientHeight;
-    // Default 80% center crop
     setCropRect({
       x: cw * 0.1,
       y: ch * 0.1,
@@ -132,7 +118,6 @@ const ImageEditor = ({ fileUrl, file }) => {
     if (!cropRect || !canvasRef.current || !imageRef.current) return;
     
     const canvas = canvasRef.current;
-    // Calculate ratio between displayed canvas size and actual resolution
     const scaleX = canvas.width / canvas.clientWidth;
     const scaleY = canvas.height / canvas.clientHeight;
     
@@ -141,29 +126,21 @@ const ImageEditor = ({ fileUrl, file }) => {
     const cropW = cropRect.w * scaleX;
     const cropH = cropRect.h * scaleY;
 
-    // Create temp canvas for the cropped part
     const tempCanvas = document.createElement('canvas');
     tempCanvas.width = cropW;
     tempCanvas.height = cropH;
     const tCtx = tempCanvas.getContext('2d');
 
-    // Draw the current state (with filters) to temp canvas, clipped
     tCtx.drawImage(canvas, cropX, cropY, cropW, cropH, 0, 0, cropW, cropH);
 
-    // Apply as new image source
     const newImg = new Image();
     newImg.onload = () => {
         imageRef.current = newImg;
-        // Reset params as they are "baked in" now? 
-        // Yes, for simple implementation. 
-        // Or we keep params and apply them ON TOP? 
-        // Best UX: bake in rotation/crop, but maybe keep filters?
-        // Let's bake in everything to simplify "Apply".
         handleReset(); 
         setCropMode(false);
         setActiveTab('adjust');
     };
-    newImg.src = tempCanvas.toDataURL(); // DataURL is easiest way to "copy" canvas to image
+    newImg.src = tempCanvas.toDataURL();
   };
 
   const cancelCrop = () => {
@@ -172,7 +149,6 @@ const ImageEditor = ({ fileUrl, file }) => {
     setActiveTab('adjust');
   };
 
-  // Crop Interaction
   const handleMouseDown = (e, handle) => {
     e.preventDefault();
     e.stopPropagation();
@@ -189,9 +165,9 @@ const ImageEditor = ({ fileUrl, file }) => {
     
     let newRect = { ...cropRect };
     
-    /* 
+     /*
        Handles: tl, tc, tr, cl, cr, bl, bc, br, move
-    */
+     */
     
     if (dragHandle === 'move') {
         newRect.x += dx;
@@ -203,10 +179,8 @@ const ImageEditor = ({ fileUrl, file }) => {
         if (dragHandle.includes('b')) { newRect.h += dy; }
     }
 
-    // Constraints check (simplified)
     if (newRect.w < 50) newRect.w = 50;
     if (newRect.h < 50) newRect.h = 50;
-    // Don't go out of bounds (omitted for brevity, but should be added for robustness)
 
     setCropRect(newRect);
     setDragStart({ x: e.clientX, y: e.clientY });
@@ -217,18 +191,16 @@ const ImageEditor = ({ fileUrl, file }) => {
     setDragHandle(null);
   };
 
-  // Saving
   const handleSave = async (saveAsCopy) => {
     setShowSaveModal(false);
     setLoading(true);
     try {
         const canvas = canvasRef.current;
-        // Convert canvas to blob
         const blob = await new Promise(resolve => canvas.toBlob(resolve, file.type || 'image/png', 0.95));
         
         const formData = new FormData();
-        formData.append('file', blob, file.name); // Same name, logic handles rename if copy
-        formData.append('originalPath', file.path); // Need path
+        formData.append('file', blob, file.name);
+        formData.append('originalPath', file.path);
         formData.append('saveAsCopy', saveAsCopy);
 
         const token = localStorage.getItem('auth_token');
@@ -242,11 +214,8 @@ const ImageEditor = ({ fileUrl, file }) => {
 
         const data = await res.json();
         if (data.success) {
-            // alert(t('saveSuccess'));
-             // Maybe close or refresh?
         } else {
             console.error(data.message);
-            // alert(t('error'));
         }
 
     } catch (err) {
@@ -259,7 +228,7 @@ const ImageEditor = ({ fileUrl, file }) => {
   return (
     <div className="ie-container" onMouseMove={handleMouseMove} onMouseUp={handleMouseUp} onMouseLeave={handleMouseUp}>
       
-      {/* Viewport */}
+      
       <div className="ie-viewport" ref={containerRef}>
         {loading && (
             <div className="ie-loading-overlay">
@@ -271,7 +240,7 @@ const ImageEditor = ({ fileUrl, file }) => {
         <div className="ie-canvas-wrap">
             <canvas ref={canvasRef} className="ie-canvas" />
             
-            {/* Crop Overlay */}
+            
             {cropMode && cropRect && (
                 <div 
                     className="ie-crop-overlay"
@@ -295,7 +264,7 @@ const ImageEditor = ({ fileUrl, file }) => {
         </div>
       </div>
 
-      {/* Toolbar */}
+      
       <div className="ie-toolbar">
          <button className={`ie-btn ${activeTab === 'adjust' ? 'active' : ''}`} onClick={() => { setActiveTab('adjust'); setCropMode(false); }}>
             <BiAdjust />
@@ -323,7 +292,7 @@ const ImageEditor = ({ fileUrl, file }) => {
          </button>
       </div>
 
-      {/* Controls Panel */}
+      
       {activeTab === 'adjust' && !cropMode && (
           <div className="ie-controls-panel">
                <SliderControl label={t('imageEditor.brightness')} val={params.brightness} min={0} max={200} onChange={v => setParams({...params, brightness: v})} suffix="%" />
@@ -362,7 +331,7 @@ const ImageEditor = ({ fileUrl, file }) => {
           </div>
       )}
       
-      {/* Save Modal */}
+      
       {showSaveModal && (
           <div className="ie-save-modal">
               <h3>{t('imageEditor.saveOptions')}</h3>

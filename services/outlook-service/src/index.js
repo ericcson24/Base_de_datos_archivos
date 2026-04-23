@@ -17,7 +17,6 @@ app.use(cors({
 }));
 app.use(express.json());
 
-// Middleware de autenticación
 const authenticate = (req, res, next) => {
   const authHeader = req.headers.authorization;
   let token = null;
@@ -49,8 +48,20 @@ function getAuthenticatedClient(accessToken) {
   });
 }
 
-// --- Auto-refresh Microsoft tokens ---
-// Refreshes an expired access_token using the stored refresh_token
+const tokenRefreshLocks = new Map();
+
+async function withTokenRefreshLock(userId, fn) {
+  const existing = tokenRefreshLocks.get(userId);
+  if (existing) {
+    return existing;
+  }
+  const promise = fn().finally(() => {
+    tokenRefreshLocks.delete(userId);
+  });
+  tokenRefreshLocks.set(userId, promise);
+  return promise;
+}
+
 async function refreshAccessToken(userId, refreshToken) {
   const clientId = process.env.MS_CLIENT_ID || process.env.MICROSOFT_CLIENT_ID;
   const clientSecret = process.env.MS_CLIENT_SECRET || process.env.MICROSOFT_CLIENT_SECRET;
@@ -77,16 +88,14 @@ async function refreshAccessToken(userId, refreshToken) {
 
     if (data.error) {
       console.error('[TOKEN] Refresh failed:', data.error, data.error_description);
-      // If refresh token is also invalid, clear everything
       if (data.error === 'invalid_grant') {
         await dbAsync.run('UPDATE users SET microsoft_access_token = NULL, microsoft_refresh_token = NULL WHERE id = ?', [userId]);
       }
       return null;
     }
 
-    // Save new tokens to DB
     const newAccessToken = data.access_token;
-    const newRefreshToken = data.refresh_token || refreshToken; // MS may or may not return a new refresh token
+    const newRefreshToken = data.refresh_token || refreshToken;
     
     await dbAsync.run(
       'UPDATE users SET microsoft_access_token = ?, microsoft_refresh_token = ? WHERE id = ?',
@@ -101,32 +110,25 @@ async function refreshAccessToken(userId, refreshToken) {
   }
 }
 
-// Gets a valid access token for a user - refreshes automatically if expired
-// user object must have: id, microsoft_access_token, microsoft_refresh_token
 async function getValidAccessToken(user) {
   if (!user.microsoft_access_token) return null;
 
-  // First try with existing token (fast path - no extra API call)
   try {
     const client = getAuthenticatedClient(user.microsoft_access_token);
-    // Quick validation - use a lightweight endpoint
     await client.api('/me').select('id').get();
-    return user.microsoft_access_token; // Token is valid
+    return user.microsoft_access_token;
   } catch (err) {
-    // Token expired or invalid - try refresh
     if (err.statusCode === 401 || err.code === 'InvalidAuthenticationToken' || 
         (err.message && (err.message.includes('JWT is not well formed') || err.message.includes('Access token has expired') || err.message.includes('Lifetime validation failed')))) {
       console.log(`[TOKEN] Access token expired for user ID ${user.id}, attempting refresh...`);
-      const newToken = await refreshAccessToken(user.id, user.microsoft_refresh_token);
-      return newToken; // null if refresh failed
+      const newToken = await withTokenRefreshLock(user.id, () => refreshAccessToken(user.id, user.microsoft_refresh_token));
+      return newToken;
     }
-    // Some other error (network, etc.) - return existing token and let caller handle
     console.warn('[TOKEN] Validation check failed with non-auth error:', err.message);
     return user.microsoft_access_token;
   }
 }
 
-// Helper Response Handler
 const sendResponse = (res, status, data, notification = null) => {
   const response = { ...data };
   if (notification) {
@@ -135,513 +137,585 @@ const sendResponse = (res, status, data, notification = null) => {
   res.status(status).json(response);
 };
 
-// Función CORREGIDA - Usar UTC
 function convertToSpainTime(dateStr, isAllDay = false) {
   if (!dateStr) return null;
   if (isAllDay) return dateStr.includes('T') ? dateStr.split('T')[0] : dateStr;
 
-  // Si no tiene Z y no tiene offset, asumir que es UTC y añadir Z
   if (!dateStr.endsWith('Z') && !/[+-]\d{2}:\d{2}$/.test(dateStr)) {
       return dateStr + 'Z';
   }
   return dateStr;
 }
 
-/**
- * Convert a UTC dateTime string from Graph API to the correct date (YYYY-MM-DD) in Europe/Madrid.
- * Graph API with Prefer: outlook.timezone="UTC" shifts all-day event midnight from Madrid to UTC,
- * causing the date to move back one day. This converts it back to the correct Madrid date.
- */
-function utcDateTimeToMadridDate(dateTimeStr) {
-  if (!dateTimeStr) return null;
-  if (!dateTimeStr.includes('T')) return dateTimeStr;
-  const utc = new Date(dateTimeStr.endsWith('Z') ? dateTimeStr : dateTimeStr + 'Z');
-  return utc.toLocaleDateString('en-CA', { timeZone: 'Europe/Madrid' });
-}
-
-/**
- * Ensure a value from DB is a date-only string (YYYY-MM-DD) for all-day events.
- * PostgreSQL TIMESTAMP columns return JS Date objects via the pg driver.
- */
-function toDateOnly(val) {
-  if (!val) return null;
-  if (val instanceof Date) return val.toLocaleDateString('en-CA', { timeZone: 'UTC' });
-  if (typeof val === 'string' && val.includes('T')) return val.split('T')[0];
-  return val;
-}
-
-// Función para convertir colores de Outlook a hexadecimal
-function getOutlookCategoryColor(outlookColor) {
-  // Microsoft Outlook category preset colors (official mapping)
-  const colorMap = {
-    'preset0': '#e74856',   // Red
-    'preset1': '#ff8c00',   // Orange
-    'preset2': '#f7b262',   // Peach / Brown
-    'preset3': '#f8db3e',   // Yellow
-    'preset4': '#3da848',   // Green
-    'preset5': '#47a5a5',   // Teal
-    'preset6': '#9cac36',   // Olive
-    'preset7': '#4585ed',   // Blue
-    'preset8': '#b085dc',   // Purple
-    'preset9': '#c44569',   // Cranberry
-    'preset10': '#647687',  // Steel
-    'preset11': '#4b5d6e',  // DarkSteel
-    'preset12': '#98a8b4',  // Gray
-    'preset13': '#636c73',  // DarkGray
-    'preset14': '#4a4c4f',  // Black
-    'preset15': '#8f3a40',  // DarkRed
-    'preset16': '#c06000',  // DarkOrange
-    'preset17': '#c18c4a',  // DarkPeach
-    'preset18': '#b39e35',  // DarkYellow
-    'preset19': '#2f7635',  // DarkGreen
-    'preset20': '#377b7b',  // DarkTeal
-    'preset21': '#72852b',  // DarkOlive
-    'preset22': '#304da5',  // DarkBlue
-    'preset23': '#8459a5',  // DarkPurple
-    'preset24': '#96314c'   // DarkCranberry
-  };
-
-  return colorMap[outlookColor] || '#4585ed';
-}
-
-// --- Rutas ---
-
-// Background sync tracker: avoid concurrent syncs for same user
-const syncInProgress = new Map();
-
-app.get('/', authenticate, async (req, res) => {
+app.get('/status', authenticate, async (req, res) => {
   try {
-    const username = req.user.username;
-    const { start, end } = req.query;
-
-    // 1. Obtener usuario y token
-    const user = await dbAsync.get('SELECT id, microsoft_access_token, microsoft_refresh_token, role FROM users WHERE username = ?', [username]);
-    
-    if (!user) return res.status(404).json({ error: 'Usuario no encontrado' });
-
-    // 2. Devolver eventos de la DB PRIMERO (rápido)
-    let targetUserIds = [user.id];
-    if ((user.role === 'admin' || user.role === 'boss') && req.query.userId) {
-        targetUserIds = req.query.userId.split(',').map(id => id.trim());
+    const user = await dbAsync.get(
+      'SELECT microsoft_access_token, microsoft_email FROM users WHERE username = ?',
+      [req.user.username]
+    );
+    if (!user) {
+      return res.json({ success: true, linked: false, email: null });
     }
-
-    const placeholders = targetUserIds.map(() => '?').join(',');
-    let query = `SELECT * FROM calendar_events WHERE user_id IN (${placeholders})`;
-    let params = [...targetUserIds];
-
-    // Add date filter to DB query for faster response
-    if (start && end) {
-        query += ` AND start_time <= ? AND end_time >= ?`;
-        params.push(new Date(end).toISOString(), new Date(start).toISOString());
-    }
-
-    const dbEvents = await dbAsync.all(query, params);
-
-    const formattedEvents = dbEvents.map(e => {
-        let categories = [];
-        try {
-            if (typeof e.categories === 'string') {
-                categories = JSON.parse(e.categories);
-            } else if (Array.isArray(e.categories)) {
-                categories = e.categories;
-            }
-        } catch (err) {}
-
-        const isAllDay = e.is_all_day === 1 || e.is_all_day === true;
-        return {
-            id: e.microsoft_id || e.id.toString(),
-            title: e.subject,
-            start: isAllDay ? toDateOnly(e.start_time) : e.start_time,
-            end: isAllDay ? toDateOnly(e.end_time) : e.end_time,
-            allDay: isAllDay,
-            location: e.location,
-            description: e.body_preview,
-            url: e.web_link,
-            categories: categories,
-            assignedBy: e.assigned_by || null,
-            source: 'database'
-        };
-    });
-
-    // Send response immediately (fast!)
-    res.json(formattedEvents);
-
-    // 3. Sync with Microsoft in BACKGROUND (non-blocking, after response sent)
-    if (user.microsoft_access_token && !syncInProgress.get(user.id)) {
-        syncInProgress.set(user.id, true);
-        setImmediate(async () => {
-            try {
-                const validToken = await getValidAccessToken(user);
-                if (!validToken) throw new Error('Token refresh failed');
-                const client = getAuthenticatedClient(validToken);
-                
-                let msQuery = client.api('/me/calendar/events')
-                    .header('Prefer', 'outlook.timezone="UTC"')
-                    .select('id,subject,bodyPreview,start,end,location,webLink,isAllDay,categories')
-                    .top(100);
-
-                if (start && end) {
-                    const startISO = new Date(start).toISOString();
-                    const endISO = new Date(end).toISOString();
-                    msQuery = msQuery.filter(`start/dateTime ge '${startISO}' and end/dateTime le '${endISO}'`);
-                }
-                
-                const eventsResponse = await msQuery.get();
-
-                for (const event of eventsResponse.value) {
-                    // For all-day events, convert UTC dateTime back to Madrid date (Prefer UTC header shifts midnight)
-                    let startTime, endTime;
-                    if (event.isAllDay) {
-                        startTime = utcDateTimeToMadridDate(event.start.dateTime);
-                        endTime = utcDateTimeToMadridDate(event.end.dateTime);
-                    } else {
-                        startTime = event.start.dateTime.endsWith('Z') ? event.start.dateTime : event.start.dateTime + 'Z';
-                        endTime = event.end.dateTime.endsWith('Z') ? event.end.dateTime : event.end.dateTime + 'Z';
-                    }
-
-                    await dbAsync.run(`
-                        INSERT INTO calendar_events (microsoft_id, user_id, subject, body_preview, start_time, end_time, is_all_day, location, web_link, categories, last_synced)
-                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
-                        ON CONFLICT(microsoft_id) DO UPDATE SET
-                        subject=excluded.subject,
-                        body_preview=excluded.body_preview,
-                        start_time=excluded.start_time,
-                        end_time=excluded.end_time,
-                        is_all_day=excluded.is_all_day,
-                        location=excluded.location,
-                        web_link=excluded.web_link,
-                        categories=excluded.categories,
-                        last_synced=CURRENT_TIMESTAMP
-                    `, [
-                        event.id, user.id, event.subject, event.bodyPreview,
-                        startTime, endTime, event.isAllDay ? 1 : 0,
-                        event.location?.displayName, event.webLink,
-                        JSON.stringify(event.categories || [])
-                    ]);
-                }
-                console.log(`[SYNC] Background sync completed for user ${username}: ${eventsResponse.value.length} events`);
-            } catch (msError) {
-                console.error('[SYNC] Background Microsoft sync failed:', msError.message || msError);
-            } finally {
-                syncInProgress.delete(user.id);
-            }
-        });
-    }
-
-  } catch (error) {
-    console.error('Error getting events:', error);
-    res.status(500).json({ error: 'Error interno del servidor' });
-  }
-});
-
-app.get('/categories', authenticate, async (req, res) => {
-  try {
-    let targetUsernames = [req.user.username];
-
-    // Allow admin/boss to fetch categories for another user(s)
-    if ((req.user.role === 'admin' || req.user.role === 'boss') && req.query.userId) {
-      const ids = req.query.userId.split(',').map(id => id.trim()).filter(id => id);
-      if (ids.length > 0) {
-        // Create placeholders for SQL IN clause
-        const placeholders = ids.map(() => '?').join(',');
-        const users = await dbAsync.all(`SELECT username FROM users WHERE id IN (${placeholders})`, ids);
-        if (users && users.length > 0) {
-          targetUsernames = users.map(u => u.username);
-        }
-      }
-    }
-
-    // Use a Map to merge categories by name, avoiding duplicates
-    const mergedCategories = new Map();
-
-    for (const username of targetUsernames) {
-      try {
-        const user = await dbAsync.get('SELECT id, microsoft_access_token, microsoft_refresh_token FROM users WHERE username = ?', [username]);
-        
-        if (!user || !user.microsoft_access_token) continue;
-
-        const validToken = await getValidAccessToken(user);
-        if (!validToken) continue;
-
-        const client = getAuthenticatedClient(validToken);
-        const categoriesResponse = await client.api('/me/outlook/masterCategories').get();
-
-        if (categoriesResponse.value) {
-          categoriesResponse.value.forEach(category => {
-            // If category doesn't exist in map, add it. 
-            // If it exists, we keep the first one found (arbitrary priority)
-            if (!mergedCategories.has(category.displayName)) {
-              mergedCategories.set(category.displayName, {
-                id: category.id,
-                name: category.displayName,
-                color: category.color,
-                hexColor: getOutlookCategoryColor(category.color)
-              });
-            }
-          });
-        }
-      } catch (err) {
-        console.error(`Error fetching categories for user ${username}:`, err.message);
-        // Continue to next user even if one fails
-      }
-    }
-
-    res.json(Array.from(mergedCategories.values()));
-  } catch (error) {
-    console.error('Error getting categories:', error);
-    // ... existing error handling ...
-    if (error.code === 'InvalidAuthenticationToken') {
-       // Only invalidate if it's the current user's token that failed
-       if (req.user.username === (await dbAsync.get('SELECT username FROM users WHERE microsoft_access_token IS NOT NULL AND username = ?', [req.user.username]))?.username) {
-          await dbAsync.run('UPDATE users SET microsoft_access_token = NULL WHERE username = ?', [req.user.username]);
-       }
-       return sendResponse(res, 401, { error: 'REAUTH' });
-    }
-    res.status(500).json({ error: 'Error interno' });
-  }
-});
-
-app.post('/categories', authenticate, async (req, res) => {
-  try {
-    const username = req.user.username;
-    const user = await dbAsync.get('SELECT id, microsoft_access_token, microsoft_refresh_token FROM users WHERE username = ?', [username]);
-
-    if (!user || !user.microsoft_access_token) return res.status(401).json({ error: 'No vinculado' });
-
-    const { name, color } = req.body;
-    const validToken = await getValidAccessToken(user);
-    if (!validToken) return res.status(401).json({ error: 'Token expirado, reconecta tu cuenta' });
-    const client = getAuthenticatedClient(validToken);
-
-    const newCategory = { displayName: name, color: color || 'preset0' };
-    const createdCategory = await client.api('/me/outlook/masterCategories').post(newCategory);
-
-    res.status(201).json({
-      id: createdCategory.id,
-      name: createdCategory.displayName,
-      color: createdCategory.color,
-      hexColor: getOutlookCategoryColor(createdCategory.color)
+    res.json({
+      success: true,
+      linked: !!user.microsoft_access_token,
+      email: user.microsoft_email || null
     });
   } catch (error) {
-    res.status(500).json({ error: 'Error interno' });
+    console.error('Error in GET /status:', error);
+    res.status(500).json({ success: false, linked: false, email: null });
   }
 });
 
 app.post('/sync', authenticate, async (req, res) => {
   try {
     const username = req.user.username;
-    const user = await dbAsync.get('SELECT id, microsoft_access_token, microsoft_refresh_token FROM users WHERE username = ?', [username]);
+    const user = await dbAsync.get(
+      'SELECT id, microsoft_access_token, microsoft_refresh_token FROM users WHERE username = ?',
+      [username]
+    );
 
-    if (!user || !user.microsoft_access_token) {
-      return sendResponse(res, 400, { error: 'No vinculado' });
+    if (!user) return res.status(404).json({ success: false, error: 'User not found' });
+    if (!user.microsoft_access_token) {
+      return res.status(400).json({ success: false, error: 'Microsoft account not linked' });
     }
 
     const validToken = await getValidAccessToken(user);
-    if (!validToken) return sendResponse(res, 401, { error: 'Token expirado, reconecta tu cuenta' });
-    const client = getAuthenticatedClient(validToken);
-    const now = new Date();
-    const start = new Date(now); start.setMonth(start.getMonth() - 1);
-    const end = new Date(now); end.setMonth(end.getMonth() + 6);
-
-    const eventsResponse = await client.api('/me/calendar/events')
-        .header('Prefer', 'outlook.timezone="UTC"')
-        .select('id,subject,bodyPreview,start,end,location,webLink,isAllDay,categories')
-        .filter(`start/dateTime ge '${start.toISOString()}' and end/dateTime le '${end.toISOString()}'`)
-        .top(200)
-        .get();
-
-    let syncedCount = 0;
-    for (const event of eventsResponse.value) {
-        // For all-day events, convert UTC dateTime back to Madrid date (Prefer UTC header shifts midnight)
-        let startTime, endTime;
-        if (event.isAllDay) {
-            startTime = utcDateTimeToMadridDate(event.start.dateTime);
-            endTime = utcDateTimeToMadridDate(event.end.dateTime);
-        } else {
-            startTime = event.start.dateTime.endsWith('Z') ? event.start.dateTime : event.start.dateTime + 'Z';
-            endTime = event.end.dateTime.endsWith('Z') ? event.end.dateTime : event.end.dateTime + 'Z';
-        }
-
-        await dbAsync.run(`
-            INSERT INTO calendar_events (microsoft_id, user_id, subject, body_preview, start_time, end_time, is_all_day, location, web_link, categories, last_synced)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
-            ON CONFLICT(microsoft_id) DO UPDATE SET
-            subject=excluded.subject,
-            body_preview=excluded.body_preview,
-            start_time=excluded.start_time,
-            end_time=excluded.end_time,
-            is_all_day=excluded.is_all_day,
-            location=excluded.location,
-            web_link=excluded.web_link,
-            categories=excluded.categories,
-            last_synced=CURRENT_TIMESTAMP
-        `, [
-            event.id, user.id, event.subject, event.bodyPreview, startTime, endTime,
-            event.isAllDay ? 1 : 0, event.location?.displayName, event.webLink, JSON.stringify(event.categories || [])
-        ]);
-        syncedCount++;
+    if (!validToken) {
+      return res.status(401).json({ success: false, error: 'Could not obtain valid access token' });
     }
 
-    sendResponse(res, 200, { success: true, message: `Sincronizados ${syncedCount} eventos` });
+    const client = getAuthenticatedClient(validToken);
+
+    const now = new Date();
+    const startWindow = new Date(now.getFullYear(), now.getMonth() - 3, 1).toISOString();
+    const endWindow = new Date(now.getFullYear(), now.getMonth() + 6, 0, 23, 59, 59).toISOString();
+
+    let imported = 0;
+    let updated = 0;
+
+    const response = await client
+      .api('/me/calendarView')
+      .query({ startDateTime: startWindow, endDateTime: endWindow })
+      .select('id,subject,bodyPreview,start,end,isAllDay,location,webLink,categories')
+      .top(250)
+      .get();
+
+    const events = (response && response.value) || [];
+
+    for (const ev of events) {
+      const startTime = ev.start?.dateTime || null;
+      const endTime = ev.end?.dateTime || null;
+      const locationName = ev.location?.displayName || null;
+      const categoriesJson = ev.categories ? JSON.stringify(ev.categories) : null;
+      const isAllDay = ev.isAllDay ? 1 : 0;
+
+      const existing = await dbAsync.get(
+        'SELECT id FROM calendar_events WHERE microsoft_id = ?',
+        [ev.id]
+      );
+
+      if (existing) {
+        await dbAsync.run(
+          `UPDATE calendar_events SET user_id = ?, subject = ?, body_preview = ?, start_time = ?, end_time = ?, is_all_day = ?, location = ?, web_link = ?, categories = ?, last_synced = CURRENT_TIMESTAMP WHERE id = ?`,
+          [user.id, ev.subject || '', ev.bodyPreview || '', startTime, endTime, isAllDay, locationName, ev.webLink || null, categoriesJson, existing.id]
+        );
+        updated++;
+      } else {
+        await dbAsync.run(
+          `INSERT INTO calendar_events (microsoft_id, user_id, subject, body_preview, start_time, end_time, is_all_day, location, web_link, categories, last_synced) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)`,
+          [ev.id, user.id, ev.subject || '', ev.bodyPreview || '', startTime, endTime, isAllDay, locationName, ev.webLink || null, categoriesJson]
+        );
+        imported++;
+      }
+    }
+
+    console.log(`[SYNC] User ${username}: imported=${imported} updated=${updated} total=${events.length}`);
+    res.json({ success: true, imported, updated, total: events.length });
   } catch (error) {
-    console.error('Error syncing:', error);
-    res.status(500).json({ error: 'Error de sincronización' });
+    console.error('Error in POST /sync:', error.message || error);
+    res.status(500).json({ success: false, error: error.message || 'Error syncing events' });
   }
 });
+
+function rowToEvent(row) {
+  if (!row) return null;
+  const toIso = (v) => {
+    if (!v) return null;
+    if (v instanceof Date) return v.toISOString();
+    return String(v);
+  };
+  let cats = [];
+  if (row.categories) {
+    try { cats = JSON.parse(row.categories); if (!Array.isArray(cats)) cats = []; }
+    catch (e) { cats = []; }
+  }
+  return {
+    id: row.id,
+    microsoftId: row.microsoft_id,
+    userId: row.user_id,
+    ownerUsername: row.owner_username || null,
+    title: row.subject || '',
+    description: row.body_preview || '',
+    start: toIso(row.start_time),
+    end: toIso(row.end_time),
+    allDay: !!row.is_all_day,
+    location: row.location || '',
+    webLink: row.web_link || null,
+    categories: cats,
+    assignedBy: row.assigned_by || null
+  };
+}
+
+async function canViewUser(requester, targetUserId) {
+  if (!targetUserId) return true;
+  if (String(requester.id) === String(targetUserId)) return true;
+  return requester.role === 'admin' || requester.role === 'boss';
+}
+
+app.get('/', authenticate, async (req, res) => {
+  try {
+    const { start, end, userId } = req.query;
+    const username = req.user.username;
+    const requester = await dbAsync.get('SELECT id, role FROM users WHERE username = ?', [username]);
+    if (!requester) return res.status(401).json({ error: 'Unauthorized' });
+
+    let targetUserId = requester.id;
+    if (userId) {
+      if (!(await canViewUser(requester, userId))) {
+        return res.status(403).json({ error: 'Forbidden' });
+      }
+      targetUserId = parseInt(userId);
+    }
+
+    const params = [targetUserId];
+    let sql = `SELECT ce.*, u.username AS owner_username
+               FROM calendar_events ce
+               LEFT JOIN users u ON u.id = ce.user_id
+               WHERE ce.user_id = ?`;
+    if (start) { sql += ' AND (ce.end_time IS NULL OR ce.end_time >= ?)'; params.push(start); }
+    if (end)   { sql += ' AND (ce.start_time IS NULL OR ce.start_time <= ?)'; params.push(end); }
+    sql += ' ORDER BY ce.start_time ASC';
+
+    const rows = await dbAsync.all(sql, params);
+    res.json(rows.map(rowToEvent));
+  } catch (error) {
+    console.error('Error in GET /:', error);
+    res.status(500).json({ error: 'Error loading events' });
+  }
+});
+
+app.get('/categories', authenticate, async (req, res) => {
+  try {
+    const { userId } = req.query;
+    const username = req.user.username;
+    const requester = await dbAsync.get(
+      'SELECT id, role, microsoft_access_token, microsoft_refresh_token FROM users WHERE username = ?',
+      [username]
+    );
+    if (!requester) return res.status(401).json({ error: 'Unauthorized' });
+
+    let target = requester;
+    if (userId) {
+      if (!(await canViewUser(requester, userId))) return res.status(403).json({ error: 'Forbidden' });
+      target = await dbAsync.get(
+        'SELECT id, microsoft_access_token, microsoft_refresh_token FROM users WHERE id = ?',
+        [parseInt(userId)]
+      );
+      if (!target) return res.status(404).json({ error: 'User not found' });
+    }
+
+    const presetColors = {
+      preset0: '#e74c3c', // Red
+      preset1: '#f39c12', // Orange
+      preset2: '#c19a6b', // Brown (Peach)
+      preset3: '#f1c40f', // Yellow
+      preset4: '#2ecc71', // Green
+      preset5: '#1abc9c', // Teal
+      preset6: '#808000', // Olive
+      preset7: '#3498db', // Blue
+      preset8: '#9b59b6', // Purple
+      preset9: '#c0392b', // Cranberry
+      preset10: '#708090', // Steel
+      preset11: '#2f4f4f', // DarkSteel
+      preset12: '#808080', // Gray
+      preset13: '#404040', // DarkGray
+      preset14: '#000000', // Black
+      preset15: '#8b0000', // DarkRed
+      preset16: '#d2691e', // DarkOrange
+      preset17: '#5d4037', // DarkBrown
+      preset18: '#b8860b', // DarkYellow
+      preset19: '#006400', // DarkGreen
+      preset20: '#008080', // DarkTeal
+      preset21: '#556b2f', // DarkOlive
+      preset22: '#00008b', // DarkBlue
+      preset23: '#4b0082', // DarkPurple
+      preset24: '#8b0a50'  // DarkCranberry
+    };
+
+    const graphCategories = new Map();
+    if (target.microsoft_access_token) {
+      try {
+        const validToken = await getValidAccessToken(target);
+        if (validToken) {
+          const client = getAuthenticatedClient(validToken);
+          const response = await client.api('/me/outlook/masterCategories').get();
+          const items = (response && response.value) || [];
+          for (const it of items) {
+            if (it.displayName) {
+              const key = (it.color || '').toLowerCase();
+              graphCategories.set(it.displayName, {
+                id: `cat-${it.displayName}`,
+                name: it.displayName,
+                color: key || 'preset8',
+                hexColor: presetColors[key] || '#2563eb'
+              });
+            }
+          }
+        }
+      } catch (e) {
+        console.warn('[CATEGORIES] Could not fetch masterCategories:', e.message);
+      }
+    }
+
+    const rows = await dbAsync.all(
+      'SELECT categories FROM calendar_events WHERE user_id = ? AND categories IS NOT NULL',
+      [target.id]
+    );
+    for (const r of rows) {
+      try {
+        const arr = JSON.parse(r.categories);
+        if (Array.isArray(arr)) {
+          for (const name of arr) {
+            if (name && !graphCategories.has(name)) {
+              let hash = 0;
+              for (let i = 0; i < name.length; i++) hash = name.charCodeAt(i) + ((hash << 5) - hash);
+              const c = (hash & 0x00ffffff).toString(16).toUpperCase().padStart(6, '0');
+              graphCategories.set(name, {
+                id: `cat-${name}`,
+                name,
+                color: 'preset8',
+                hexColor: '#' + c
+              });
+            }
+          }
+        }
+      } catch (e) {}
+    }
+
+    res.json(Array.from(graphCategories.values()));
+  } catch (error) {
+    console.error('Error in GET /categories:', error);
+    res.status(500).json({ error: 'Error loading categories' });
+  }
+});
+
+function normalizeEventPayload(body) {
+  const p = body || {};
+  return {
+    subject: p.title !== undefined ? p.title : p.subject,
+    bodyPreview: p.description !== undefined ? p.description : p.body,
+    startTime: p.start !== undefined ? p.start : p.startTime,
+    endTime: p.end !== undefined ? p.end : p.endTime,
+    location: p.location,
+    isAllDay: p.allDay !== undefined ? p.allDay : p.isAllDay,
+    categories: p.categories
+  };
+}
+
+async function pushEventToGraph(owner, payload, existingMsId) {
+  try {
+    const validToken = await getValidAccessToken(owner);
+    if (!validToken) return null;
+    const client = getAuthenticatedClient(validToken);
+    const graphEvent = {};
+    if (payload.subject !== undefined) graphEvent.subject = payload.subject || '';
+    if (payload.bodyPreview !== undefined) graphEvent.body = { contentType: 'Text', content: payload.bodyPreview || '' };
+    if (payload.isAllDay !== undefined) graphEvent.isAllDay = !!payload.isAllDay;
+    if (payload.startTime) {
+      graphEvent.start = payload.isAllDay
+        ? { dateTime: `${String(payload.startTime).split('T')[0]}T00:00:00`, timeZone: 'Europe/Madrid' }
+        : { dateTime: payload.startTime, timeZone: 'UTC' };
+    }
+    if (payload.endTime) {
+      graphEvent.end = payload.isAllDay
+        ? { dateTime: `${String(payload.endTime).split('T')[0]}T00:00:00`, timeZone: 'Europe/Madrid' }
+        : { dateTime: payload.endTime, timeZone: 'UTC' };
+    }
+    if (payload.location !== undefined) graphEvent.location = { displayName: payload.location || '' };
+    if (payload.categories !== undefined) graphEvent.categories = Array.isArray(payload.categories) ? payload.categories : [payload.categories];
+
+    if (existingMsId) {
+      await client.api(`/me/events/${existingMsId}`).patch(graphEvent);
+      return existingMsId;
+    }
+    const created = await client.api('/me/events').post(graphEvent);
+    return created && created.id ? created.id : null;
+  } catch (e) {
+    console.error('[OUTLOOK] Graph push failed:', e.message);
+    return null;
+  }
+}
+
+async function insertLocalEvent(targetUserId, payload, assignedBy) {
+  const catsJson = payload.categories
+    ? JSON.stringify(Array.isArray(payload.categories) ? payload.categories : [payload.categories])
+    : null;
+  const localMsId = `local_${Date.now()}_${Math.floor(Math.random() * 1e6)}`;
+  const result = await dbAsync.run(
+    `INSERT INTO calendar_events (microsoft_id, user_id, subject, body_preview, start_time, end_time, is_all_day, location, categories, assigned_by, last_synced)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)`,
+    [
+      localMsId,
+      targetUserId,
+      payload.subject || '',
+      payload.bodyPreview || '',
+      payload.startTime || null,
+      payload.endTime || null,
+      payload.isAllDay ? 1 : 0,
+      payload.location || null,
+      catsJson,
+      assignedBy || null
+    ]
+  );
+  return { id: result.lastID, microsoftId: localMsId };
+}
 
 app.post('/', authenticate, async (req, res) => {
   try {
     const username = req.user.username;
-    const user = await dbAsync.get('SELECT id, microsoft_access_token, microsoft_refresh_token FROM users WHERE username = ?', [username]);
+    const requester = await dbAsync.get(
+      'SELECT id, role, microsoft_access_token, microsoft_refresh_token FROM users WHERE username = ?',
+      [username]
+    );
+    if (!requester) return res.status(401).json({ error: 'Unauthorized' });
 
-    if (!user || !user.microsoft_access_token) return res.status(401).json({ error: 'No vinculado', message: 'Conecta tu cuenta de Microsoft para crear eventos' });
+    const payload = normalizeEventPayload(req.body);
+    if (!payload.subject) return res.status(400).json({ error: 'title required' });
+    if (!payload.startTime) return res.status(400).json({ error: 'start required' });
 
-    const { title, start, end, allDay, location, description, attendees, categories } = req.body;
-    const validToken = await getValidAccessToken(user);
-    if (!validToken) return res.status(401).json({ error: 'Token expirado', message: 'Token expirado, reconecta tu cuenta de Microsoft' });
-    const client = getAuthenticatedClient(validToken);
+    const local = await insertLocalEvent(requester.id, payload, null);
 
-    const newEvent = {
-      subject: title,
-      location: location ? { displayName: location } : null,
-      body: { contentType: 'text', content: description || '' },
-      categories: Array.isArray(categories) ? categories : (categories ? [categories] : [])
-    };
-
-    if (allDay) {
-      newEvent.isAllDay = true;
-      const startDateStr = start.split('T')[0];
-      let endDateStr = end.split('T')[0];
-      // Graph API requires end date to be the day AFTER the last day for all-day events
-      if (endDateStr <= startDateStr) {
-        const d = new Date(startDateStr);
-        d.setDate(d.getDate() + 1);
-        endDateStr = d.toISOString().split('T')[0];
+    let finalMsId = local.microsoftId;
+    if (requester.microsoft_access_token) {
+      const msId = await pushEventToGraph(requester, payload, null);
+      if (msId) {
+        finalMsId = msId;
+        await dbAsync.run('UPDATE calendar_events SET microsoft_id = ? WHERE id = ?', [msId, local.id]);
       }
-      // All-day events: use dateTime with T00:00:00 (Graph API DateTimeTimeZone has no 'date' property)
-      newEvent.start = { dateTime: `${startDateStr}T00:00:00`, timeZone: 'Europe/Madrid' };
-      newEvent.end = { dateTime: `${endDateStr}T00:00:00`, timeZone: 'Europe/Madrid' };
-    } else {
-      newEvent.isAllDay = false;
-      newEvent.start = { dateTime: start, timeZone: 'Europe/Madrid' };
-      newEvent.end = { dateTime: end, timeZone: 'Europe/Madrid' };
     }
 
-    if (attendees && attendees.trim()) {
-      newEvent.attendees = attendees.split(',').map(email => ({
-        emailAddress: { address: email.trim(), name: email.trim() }
-      }));
-    }
-
-    const createdEvent = await client.api('/me/events').post(newEvent);
-
-    let startDate, endDate;
-    if (createdEvent.isAllDay) {
-      // All-day events: extract correct Madrid date from response dateTime
-      startDate = utcDateTimeToMadridDate(createdEvent.start.dateTime) || start.split('T')[0];
-      endDate = utcDateTimeToMadridDate(createdEvent.end.dateTime) || end.split('T')[0];
-    } else {
-      startDate = createdEvent.start.dateTime.endsWith('Z') ? createdEvent.start.dateTime : createdEvent.start.dateTime + 'Z';
-      endDate = createdEvent.end.dateTime.endsWith('Z') ? createdEvent.end.dateTime : createdEvent.end.dateTime + 'Z';
-    }
-
-    const formattedEvent = {
-      id: createdEvent.id,
-      title: createdEvent.subject,
-      start: startDate,
-      end: endDate,
-      allDay: createdEvent.isAllDay,
-      extendedProps: {
-        location: createdEvent.location?.displayName,
-        description: createdEvent.bodyPreview,
-        categories: createdEvent.categories
-      }
-    };
-
-    try {
-      // For all-day events, store the correct Madrid date
-      const dbStartTime = createdEvent.isAllDay
-        ? (utcDateTimeToMadridDate(createdEvent.start.dateTime) || start.split('T')[0])
-        : (createdEvent.start.dateTime || start);
-      const dbEndTime = createdEvent.isAllDay
-        ? (utcDateTimeToMadridDate(createdEvent.end.dateTime) || end.split('T')[0])
-        : (createdEvent.end.dateTime || end);
-      await dbAsync.run(`
-          INSERT INTO calendar_events (microsoft_id, user_id, subject, body_preview, start_time, end_time, is_all_day, location, web_link, categories, last_synced)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
-      `, [
-          createdEvent.id, user.id, createdEvent.subject, createdEvent.bodyPreview,
-          dbStartTime, dbEndTime, createdEvent.isAllDay ? 1 : 0,
-          createdEvent.location?.displayName, createdEvent.webLink,
-          JSON.stringify(createdEvent.categories || [])
-      ]);
-    } catch (e) {}
-
-    res.status(201).json(formattedEvent);
+    const row = await dbAsync.get(
+      `SELECT ce.*, u.username AS owner_username FROM calendar_events ce LEFT JOIN users u ON u.id = ce.user_id WHERE ce.id = ?`,
+      [local.id]
+    );
+    res.status(201).json({ success: true, event: rowToEvent(row) });
   } catch (error) {
-    console.error('Error creating event:', error);
-    res.status(500).json({ error: 'Error creando evento', message: error.message || 'Error creando evento' });
+    console.error('Error in POST /:', error);
+    res.status(500).json({ error: 'Error creating event' });
   }
+});
+
+app.post('/assign-user', authenticate, async (req, res) => {
+  try {
+    const username = req.user.username;
+    const requester = await dbAsync.get('SELECT id, role FROM users WHERE username = ?', [username]);
+    if (!requester) return res.status(401).json({ error: 'Unauthorized' });
+    if (requester.role !== 'admin' && requester.role !== 'boss') {
+      return res.status(403).json({ error: 'Forbidden' });
+    }
+
+    const payload = normalizeEventPayload(req.body);
+    const targetUserId = parseInt(req.body.targetUserId);
+    if (!targetUserId) return res.status(400).json({ error: 'targetUserId required' });
+    if (!payload.subject) return res.status(400).json({ error: 'title required' });
+    if (!payload.startTime) return res.status(400).json({ error: 'start required' });
+
+    const target = await dbAsync.get(
+      'SELECT id, microsoft_access_token, microsoft_refresh_token FROM users WHERE id = ?',
+      [targetUserId]
+    );
+    if (!target) return res.status(404).json({ error: 'Target user not found' });
+
+    const local = await insertLocalEvent(targetUserId, payload, username);
+
+    if (target.microsoft_access_token) {
+      const msId = await pushEventToGraph(target, payload, null);
+      if (msId) {
+        await dbAsync.run('UPDATE calendar_events SET microsoft_id = ? WHERE id = ?', [msId, local.id]);
+      }
+    }
+
+    res.status(201).json({ success: true, eventId: local.id });
+  } catch (error) {
+    console.error('Error in POST /assign-user:', error);
+    res.status(500).json({ error: 'Error assigning event' });
+  }
+});
+
+app.post('/group', authenticate, async (req, res) => {
+  try {
+    const username = req.user.username;
+    const requester = await dbAsync.get('SELECT id, role FROM users WHERE username = ?', [username]);
+    if (!requester) return res.status(401).json({ error: 'Unauthorized' });
+    if (requester.role !== 'admin' && requester.role !== 'boss') {
+      return res.status(403).json({ error: 'Forbidden' });
+    }
+
+    const payload = normalizeEventPayload(req.body);
+    const groupId = parseInt(req.body.groupId);
+    if (!groupId) return res.status(400).json({ error: 'groupId required' });
+    if (!payload.subject) return res.status(400).json({ error: 'title required' });
+    if (!payload.startTime) return res.status(400).json({ error: 'start required' });
+
+    let members = [];
+    try {
+      members = await dbAsync.all(
+        `SELECT u.id, u.microsoft_access_token, u.microsoft_refresh_token
+         FROM group_members gm JOIN users u ON u.id = gm.user_id
+         WHERE gm.group_id = ?`,
+        [groupId]
+      );
+    } catch (e) {
+      console.warn('[GROUP] group_members table missing:', e.message);
+    }
+
+    if (!members.length) return res.status(404).json({ error: 'Group has no members' });
+
+    let success = 0, failed = 0;
+    for (const member of members) {
+      try {
+        const local = await insertLocalEvent(member.id, payload, username);
+        if (member.microsoft_access_token) {
+          const msId = await pushEventToGraph(member, payload, null);
+          if (msId) {
+            await dbAsync.run('UPDATE calendar_events SET microsoft_id = ? WHERE id = ?', [msId, local.id]);
+          }
+        }
+        success++;
+      } catch (err) {
+        console.error('[GROUP] Failed to assign to user', member.id, err.message);
+        failed++;
+      }
+    }
+
+    res.status(201).json({ success: true, results: { success, failed, total: members.length } });
+  } catch (error) {
+    console.error('Error in POST /group:', error);
+    res.status(500).json({ error: 'Error creating group events' });
+  }
+});
+
+async function findOwnedEvent(id, requester) {
+  const isAdminOrBoss = requester.role === 'admin' || requester.role === 'boss';
+  let event = null;
+  if (!isNaN(id)) {
+    try {
+      event = await dbAsync.get('SELECT * FROM calendar_events WHERE id = ? AND user_id = ?', [id, requester.id]);
+    } catch (e) {}
+  }
+  if (!event) {
+    event = await dbAsync.get('SELECT * FROM calendar_events WHERE microsoft_id = ? AND user_id = ?', [id, requester.id]);
+  }
+  if (!event && isAdminOrBoss) {
+    if (!isNaN(id)) {
+      try { event = await dbAsync.get('SELECT * FROM calendar_events WHERE id = ?', [id]); } catch (e) {}
+    }
+    if (!event) event = await dbAsync.get('SELECT * FROM calendar_events WHERE microsoft_id = ?', [id]);
+  }
+  return event;
+}
+
+async function updateEventById(id, body, username, res) {
+  const requester = await dbAsync.get(
+    'SELECT id, role, microsoft_access_token, microsoft_refresh_token FROM users WHERE username = ?',
+    [username]
+  );
+  if (!requester) return res.status(401).json({ error: 'Unauthorized' });
+
+  const event = await findOwnedEvent(id, requester);
+  if (!event) return res.status(404).json({ error: 'Event not found or not owned' });
+
+  const payload = normalizeEventPayload(body);
+  const isLocalOnly = !event.microsoft_id || event.microsoft_id.startsWith('local_');
+  const owner = event.user_id === requester.id
+    ? requester
+    : await dbAsync.get(
+        'SELECT id, microsoft_access_token, microsoft_refresh_token FROM users WHERE id = ?',
+        [event.user_id]
+      );
+
+  if (!isLocalOnly && owner && owner.microsoft_access_token) {
+    await pushEventToGraph(owner, payload, event.microsoft_id);
+  }
+
+  const sets = [];
+  const vals = [];
+  if (payload.subject !== undefined) { sets.push('subject = ?'); vals.push(payload.subject || ''); }
+  if (payload.bodyPreview !== undefined) { sets.push('body_preview = ?'); vals.push(payload.bodyPreview || ''); }
+  if (payload.startTime !== undefined) { sets.push('start_time = ?'); vals.push(payload.startTime || null); }
+  if (payload.endTime !== undefined) { sets.push('end_time = ?'); vals.push(payload.endTime || null); }
+  if (payload.location !== undefined) { sets.push('location = ?'); vals.push(payload.location || null); }
+  if (payload.isAllDay !== undefined) { sets.push('is_all_day = ?'); vals.push(payload.isAllDay ? 1 : 0); }
+  if (payload.categories !== undefined) {
+    const catsJson = JSON.stringify(Array.isArray(payload.categories) ? payload.categories : [payload.categories]);
+    sets.push('categories = ?'); vals.push(catsJson);
+  }
+
+  if (sets.length > 0) {
+    sets.push('last_synced = CURRENT_TIMESTAMP');
+    vals.push(event.id);
+    await dbAsync.run(`UPDATE calendar_events SET ${sets.join(', ')} WHERE id = ?`, vals);
+  }
+
+  res.json({ success: true, message: 'Updated' });
+}
+
+app.put('/:id', authenticate, async (req, res) => {
+  try { await updateEventById(req.params.id, req.body, req.user.username, res); }
+  catch (error) { console.error('Error in PUT /:id:', error); res.status(500).json({ error: 'Error updating' }); }
+});
+
+app.patch('/:id', authenticate, async (req, res) => {
+  try { await updateEventById(req.params.id, req.body, req.user.username, res); }
+  catch (error) { console.error('Error in PATCH /:id:', error); res.status(500).json({ error: 'Error updating' }); }
 });
 
 app.delete('/:id', authenticate, async (req, res) => {
   try {
-    const username = req.user.username;
-    const user = await dbAsync.get('SELECT id, microsoft_access_token, microsoft_refresh_token, role FROM users WHERE username = ?', [username]);
-
-    if (!user) return res.status(404).json({ error: 'Usuario no encontrado' });
-
     const { id } = req.params;
-    const isAdminOrBoss = user.role === 'admin' || user.role === 'boss';
+    const username = req.user.username;
+    const requester = await dbAsync.get('SELECT id, role FROM users WHERE username = ?', [username]);
+    if (!requester) return res.status(401).json({ error: 'Unauthorized' });
 
-    // Find event in local DB - admin/boss can find ANY user's events
-    let dbEvent = await dbAsync.get('SELECT * FROM calendar_events WHERE microsoft_id = ? AND user_id = ?', [id, user.id]);
-    if (!dbEvent && !isNaN(id)) {
-      dbEvent = await dbAsync.get('SELECT * FROM calendar_events WHERE id = ? AND user_id = ?', [parseInt(id), user.id]);
-    }
-    // If not found and user is admin/boss, search without user_id filter (for assigned events)
-    if (!dbEvent && isAdminOrBoss) {
-      dbEvent = await dbAsync.get('SELECT * FROM calendar_events WHERE microsoft_id = ?', [id]);
-      if (!dbEvent && !isNaN(id)) {
-        dbEvent = await dbAsync.get('SELECT * FROM calendar_events WHERE id = ?', [parseInt(id)]);
-      }
-    }
+    const event = await findOwnedEvent(id, requester);
+    if (!event) return res.status(404).json({ error: 'Event not found' });
 
-    if (!dbEvent) {
-      return res.status(404).json({ error: 'Evento no encontrado' });
-    }
-
-    const isLocalOnly = !dbEvent.microsoft_id || dbEvent.microsoft_id.startsWith('local_');
-
-    // Delete from Microsoft if linked
-    // Use the EVENT OWNER's token to delete from their Outlook (not the admin's)
-    if (!isLocalOnly) {
-      const eventOwner = dbEvent.user_id === user.id 
-        ? user 
-        : await dbAsync.get('SELECT id, microsoft_access_token, microsoft_refresh_token FROM users WHERE id = ?', [dbEvent.user_id]);
-      
-      if (eventOwner && eventOwner.microsoft_access_token) {
+    if (event.microsoft_id && !event.microsoft_id.startsWith('local_')) {
+      const owner = event.user_id === requester.id
+        ? requester
+        : await dbAsync.get(
+            'SELECT id, microsoft_access_token, microsoft_refresh_token FROM users WHERE id = ?',
+            [event.user_id]
+          );
+      if (owner && owner.microsoft_access_token) {
         try {
-          const validToken = await getValidAccessToken(eventOwner);
+          const validToken = await getValidAccessToken(owner);
           if (validToken) {
             const client = getAuthenticatedClient(validToken);
-            await client.api(`/me/events/${dbEvent.microsoft_id}`).delete();
-            console.log(`[OUTLOOK] Deleted event ${dbEvent.microsoft_id} from user ${dbEvent.user_id}'s Outlook`);
+            await client.api(`/me/events/${event.microsoft_id}`).delete();
           }
-        } catch (msError) {
-          console.error('[OUTLOOK] Microsoft Graph delete failed:', msError.message);
-          // Continue with local deletion even if MS fails
+        } catch (e) {
+          console.error('[OUTLOOK] Delete failed (maybe already deleted):', e.message);
         }
       }
     }
 
-    // Delete from local DB
-    await dbAsync.run('DELETE FROM calendar_events WHERE id = ?', [dbEvent.id]);
-
-    res.json({ success: true, message: 'Evento eliminado', id });
+    await dbAsync.run('DELETE FROM calendar_events WHERE id = ?', [event.id]);
+    res.json({ success: true, message: 'Deleted' });
   } catch (error) {
-    console.error('Error deleting event:', error);
-    res.status(500).json({ error: 'Error eliminando evento' });
+    console.error('Error in DELETE /:id:', error);
+    res.status(500).json({ error: 'Error deleting' });
   }
 });
 
@@ -1139,33 +1213,28 @@ app.post('/events', authenticate, async (req, res) => {
 // NEW ENDPOINT: Update Event
 app.patch('/events/:id', authenticate, async (req, res) => {
   try {
-    const { id } = req.params; // Can be local ID or Microsoft ID
+    const { id } = req.params;
     const { subject, body, startTime, endTime, location, isAllDay, categories } = req.body;
     const username = req.user.username;
-
     const user = await dbAsync.get('SELECT id, microsoft_access_token, microsoft_refresh_token, role FROM users WHERE username = ?', [username]);
     const isAdminOrBoss = user.role === 'admin' || user.role === 'boss';
-    
-    // Check if event exists
+
     let event = null;
-    
-    // If id is numeric, try searching by local ID first
     if (!isNaN(id)) {
-        try {
-            event = await dbAsync.get('SELECT * FROM calendar_events WHERE id = ? AND user_id = ?', [id, user.id]);
-        } catch (e) { /* Ignore type errors */ }
+      try {
+        event = await dbAsync.get('SELECT * FROM calendar_events WHERE id = ? AND user_id = ?', [id, user.id]);
+      } catch (e) { }
     }
-    
+
     if (!event) {
         event = await dbAsync.get('SELECT * FROM calendar_events WHERE microsoft_id = ? AND user_id = ?', [id, user.id]);
     }
 
-    // If not found and user is admin/boss, search without user_id filter
     if (!event && isAdminOrBoss) {
         if (!isNaN(id)) {
             try {
                 event = await dbAsync.get('SELECT * FROM calendar_events WHERE id = ?', [id]);
-            } catch (e) { /* Ignore */ }
+            } catch (e) {  }
         }
         if (!event) {
             event = await dbAsync.get('SELECT * FROM calendar_events WHERE microsoft_id = ?', [id]);
@@ -1176,7 +1245,6 @@ app.patch('/events/:id', authenticate, async (req, res) => {
 
     const isLocalOnly = !event.microsoft_id || event.microsoft_id.startsWith('local_');
 
-    // Update Outlook using event OWNER's token if linked
     const eventOwner = event.user_id === user.id 
       ? user 
       : await dbAsync.get('SELECT id, microsoft_access_token, microsoft_refresh_token FROM users WHERE id = ?', [event.user_id]);
@@ -1190,7 +1258,6 @@ app.patch('/events/:id', authenticate, async (req, res) => {
             if (subject) updateEvent.subject = subject;
             if (body) updateEvent.body = { contentType: 'Text', content: body };
             if (isAllDay !== undefined) updateEvent.isAllDay = isAllDay;
-            // For all-day events, use dateTime with T00:00:00 (DateTimeTimeZone has no 'date' property)
             if (startTime) {
                 updateEvent.start = isAllDay
                     ? { dateTime: `${startTime.split('T')[0]}T00:00:00`, timeZone: 'Europe/Madrid' }
@@ -1208,11 +1275,9 @@ app.patch('/events/:id', authenticate, async (req, res) => {
             console.log(`[OUTLOOK] Event updated in Cloud for user ${event.user_id}: ${event.microsoft_id}`);
         } catch (e) {
             console.error('[OUTLOOK] Update failed:', e.message);
-            // Token already attempted refresh in getValidAccessToken
         }
     }
 
-    // Update Local DB - dynamic update builder
     let sets = [];
     let vals = [];
     if (subject) { sets.push('subject = ?'); vals.push(subject); }
@@ -1240,7 +1305,6 @@ app.patch('/events/:id', authenticate, async (req, res) => {
   }
 });
 
-// NEW ENDPOINT: Delete Event
 app.delete('/events/:id', authenticate, async (req, res) => {
   try {
     const { id } = req.params;
@@ -1248,24 +1312,22 @@ app.delete('/events/:id', authenticate, async (req, res) => {
     const user = await dbAsync.get('SELECT id, microsoft_access_token, microsoft_refresh_token, role FROM users WHERE username = ?', [username]);
     const isAdminOrBoss = user.role === 'admin' || user.role === 'boss';
 
-    // Find event - first try with user_id filter
     let event = null;
     if (!isNaN(id)) {
         try {
             event = await dbAsync.get('SELECT * FROM calendar_events WHERE id = ? AND user_id = ?', [id, user.id]);
-        } catch (e) { /* Ignore */ }
+        } catch (e) {  }
     }
 
     if (!event) {
         event = await dbAsync.get('SELECT * FROM calendar_events WHERE microsoft_id = ? AND user_id = ?', [id, user.id]);
     }
 
-    // If not found and user is admin/boss, search without user_id filter (for assigned events)
     if (!event && isAdminOrBoss) {
         if (!isNaN(id)) {
             try {
                 event = await dbAsync.get('SELECT * FROM calendar_events WHERE id = ?', [id]);
-            } catch (e) { /* Ignore */ }
+            } catch (e) {  }
         }
         if (!event) {
             event = await dbAsync.get('SELECT * FROM calendar_events WHERE microsoft_id = ?', [id]);
@@ -1274,7 +1336,6 @@ app.delete('/events/:id', authenticate, async (req, res) => {
 
     if (!event) return res.status(404).json({ error: 'Event not found' });
 
-    // Delete from Outlook using event OWNER's token (not admin's)
     if (event.microsoft_id && !event.microsoft_id.startsWith('local_')) {
         const eventOwner = event.user_id === user.id 
           ? user 
@@ -1294,7 +1355,6 @@ app.delete('/events/:id', authenticate, async (req, res) => {
         }
     }
 
-    // Delete Local
     await dbAsync.run('DELETE FROM calendar_events WHERE id = ?', [event.id]);
     res.json({ success: true, message: 'Deleted' });
 
@@ -1304,9 +1364,7 @@ app.delete('/events/:id', authenticate, async (req, res) => {
   }
 });
 
-// --- EVENT ATTACHMENTS ---
 
-// Helper: Get MIME type from filename
 function getMimeType(fileName) {
   const ext = (fileName || '').split('.').pop().toLowerCase();
   const mimeTypes = {
@@ -1330,7 +1388,6 @@ function getMimeType(fileName) {
   return mimeTypes[ext] || 'application/octet-stream';
 }
 
-// Attach a file to an event (saves locally + uploads to Outlook if linked)
 app.post('/attachments', authenticate, async (req, res) => {
   try {
     const { eventId, fileName, filePath, fileOwner, fileSize } = req.body;
@@ -1340,7 +1397,31 @@ app.post('/attachments', authenticate, async (req, res) => {
       return res.status(400).json({ error: 'Missing required fields (eventId, fileName, filePath)' });
     }
 
-    // Save to local DB first
+    const requester = await dbAsync.get('SELECT id, role FROM users WHERE username = ?', [username]);
+    if (!requester) return res.status(401).json({ error: 'Unauthorized' });
+    const isAdminOrBoss = requester.role === 'admin' || requester.role === 'boss';
+    let targetEvent = await dbAsync.get('SELECT user_id FROM calendar_events WHERE microsoft_id = ?', [eventId]);
+    if (!targetEvent && !isNaN(eventId)) {
+      targetEvent = await dbAsync.get('SELECT user_id FROM calendar_events WHERE id = ?', [parseInt(eventId)]);
+    }
+    if (!targetEvent) {
+      return res.status(404).json({ error: 'Evento no encontrado' });
+    }
+    if (targetEvent.user_id !== requester.id && !isAdminOrBoss) {
+      return res.status(403).json({ error: 'No tienes permiso para adjuntar a este evento' });
+    }
+
+    const resolvedFileOwner = fileOwner || username;
+    if (resolvedFileOwner !== username && !isAdminOrBoss) {
+      const shareRow = await dbAsync.get(
+        'SELECT id FROM shared_files WHERE path = ? AND owner_username = ? AND shared_with_username = ?',
+        [filePath, resolvedFileOwner, username]
+      );
+      if (!shareRow) {
+        return res.status(403).json({ error: 'No tienes acceso a este archivo' });
+      }
+    }
+
     const result = await dbAsync.run(
       `INSERT INTO event_attachments (event_id, file_name, file_path, file_owner, attached_by, file_size)
        VALUES (?, ?, ?, ?, ?, ?)`,
@@ -1357,9 +1438,7 @@ app.post('/attachments', authenticate, async (req, res) => {
       fileSize: fileSize || 0
     };
 
-    // Try to upload to Microsoft Outlook via Graph API
     try {
-      // Check if event has a microsoft_id (not local-only)
       const dbEvent = await dbAsync.get(
         'SELECT microsoft_id, user_id FROM calendar_events WHERE microsoft_id = ?',
         [eventId]
@@ -1375,7 +1454,6 @@ app.post('/attachments', authenticate, async (req, res) => {
           const validToken = await getValidAccessToken(eventOwner);
           
           if (validToken) {
-            // Download file from file-service (internal docker network)
             const fileOwnerName = fileOwner || username;
             const fileId = Buffer.from(filePath).toString('base64');
             const internalToken = jwt.sign(
@@ -1393,7 +1471,6 @@ app.post('/attachments', authenticate, async (req, res) => {
               const base64Content = fileBuffer.toString('base64');
               const contentType = getMimeType(fileName);
 
-              // Upload to Graph API (files < 3MB use simple attachment)
               if (fileBuffer.length < 3 * 1024 * 1024) {
                 const client = getAuthenticatedClient(validToken);
                 await client.api(`/me/events/${dbEvent.microsoft_id}/attachments`).post({
@@ -1413,7 +1490,6 @@ app.post('/attachments', authenticate, async (req, res) => {
         }
       }
     } catch (graphError) {
-      // Don't fail the whole request if Graph upload fails - attachment is saved locally
       console.error('[OUTLOOK] Error uploading attachment to Graph:', graphError.message);
     }
 
@@ -1427,11 +1503,25 @@ app.post('/attachments', authenticate, async (req, res) => {
   }
 });
 
-// Get attachments for an event
 app.get('/:eventId/attachments', authenticate, async (req, res) => {
   try {
     const { eventId } = req.params;
-    
+    const username = req.user.username;
+
+    const requester = await dbAsync.get('SELECT id, role FROM users WHERE username = ?', [username]);
+    if (!requester) return res.status(401).json({ error: 'Unauthorized' });
+    const isAdminOrBoss = requester.role === 'admin' || requester.role === 'boss';
+    let targetEvent = await dbAsync.get('SELECT user_id FROM calendar_events WHERE microsoft_id = ?', [eventId]);
+    if (!targetEvent && !isNaN(eventId)) {
+      targetEvent = await dbAsync.get('SELECT user_id FROM calendar_events WHERE id = ?', [parseInt(eventId)]);
+    }
+    if (!targetEvent) {
+      return res.json({ success: true, attachments: [] });
+    }
+    if (targetEvent.user_id !== requester.id && !isAdminOrBoss) {
+      return res.status(403).json({ error: 'No autorizado' });
+    }
+
     const attachments = await dbAsync.all(
       'SELECT * FROM event_attachments WHERE event_id = ? ORDER BY created_at DESC',
       [eventId]
@@ -1456,13 +1546,11 @@ app.get('/:eventId/attachments', authenticate, async (req, res) => {
   }
 });
 
-// Remove an attachment
 app.delete('/attachments/:attachmentId', authenticate, async (req, res) => {
   try {
     const { attachmentId } = req.params;
     const username = req.user.username;
 
-    // Only the person who attached or the file owner can remove
     const attachment = await dbAsync.get(
       'SELECT * FROM event_attachments WHERE id = ?',
       [attachmentId]

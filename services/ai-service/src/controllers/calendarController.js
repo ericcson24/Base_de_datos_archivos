@@ -24,18 +24,15 @@ const isGenericTitle = (title) => {
 const createEvent = async (req, res) => {
   try {
     const { query, assignMode = 'me', targetUserId, groupId } = req.body;
-    const userId = req.user.id; // Added via authenticateToken middleware
+    const userId = req.user.id;
 
     if (!query || query.trim() === '') {
       return res.status(400).json({ error: 'Query vacío' });
     }
 
-    // 1. Contexto de Tiempo (User Timezone)
-    // Asumimos Europe/Madrid por contexto del usuario
     const userTimeZone = 'Europe/Madrid'; 
     const now = new Date();
     
-    // Formato DD/MM/YYYY HH:mm:ss determinista para la IA
     const parts = new Intl.DateTimeFormat('es-ES', {
       timeZone: userTimeZone,
       year: 'numeric',
@@ -58,7 +55,6 @@ const createEvent = async (req, res) => {
     
     console.log(`[AI CALENDAR] Usuario ${userId}: "${query}" [UserTZ: ${nowInUserTZ}]`);
 
-    // 2.1 Fetch available categories from Outlook so AI can match correctly
     let availableCategories = [];
     try {
       const catRes = await fetch(`${OUTLOOK_SERVICE_URL}/categories`, {
@@ -77,7 +73,6 @@ const createEvent = async (req, res) => {
       ? `\n- Categorías disponibles del usuario: ${JSON.stringify(availableCategories)}\n- IMPORTANTE: Cuando el usuario mencione una categoría, usa el nombre EXACTO de esta lista. Por ejemplo si dice "roja" y existe "Categoría roja", usa "Categoría roja". Si no coincide con ninguna existente, usa el texto tal cual.`
       : '';
 
-    // 2. Prompt para Gemini (Inteligente con Zonas Horarias)
     const prompt = `Eres un asistente de calendario inteligente.
 Contexto Actual:
 - Fecha y hora actual en formato DD/MM/YYYY HH:mm:ss (zona ${userTimeZone}): ${nowInUserTZ}
@@ -127,7 +122,7 @@ IMPORTANTE SOBRE UPDATES Y DELETES:
 
 Estructura JSON de Respuesta:
 {
-  "intent": "create", // "query", "update", "delete", "add_category", "attach_file"
+  "intent": "create",
   "title": "TÍTULO DEL EVENTO O NUEVO TÍTULO",
   "searchTitle": "TÍTULO ACTUAL del evento (solo para update/delete/attach_file)", 
   "startTimeUTC": "YYYY-MM-DDTHH:mm:ssZ", 
@@ -135,7 +130,7 @@ Estructura JSON de Respuesta:
   "description": "Descripción opcional",
   "location": "Nombre del lugar o dirección completa. Ej: 'Starbucks Gran Vía', 'Calle Mayor 12, Madrid', 'Oficina central'. Usa el nombre real del establecimiento si se menciona.",
   "isAllDay": false,
-  "categories": ["Categoría1"], // Array de nombres de categorías a asignar
+  "categories": ["Categoría1"],
   "categoryName": "Nombre de la categoría nueva (solo para add_category)",
   "categoryColor": "preset0-preset24 (solo para add_category)",
   "fileName": "nombre del archivo a adjuntar (solo para attach_file, puede ser parcial)",
@@ -151,7 +146,6 @@ Responde SOLO el JSON.`;
 
     const model = genAI.getGenerativeModel({ model: 'gemini-flash-latest' });
     
-    // Retry logic for rate limiting
     let aiResponse;
     let retryCount = 0;
     const maxRetries = 3;
@@ -160,11 +154,10 @@ Responde SOLO el JSON.`;
       try {
         const result = await model.generateContent(prompt);
         aiResponse = result.response.text().trim();
-        break; // Success, exit loop
+        break;
       } catch (apiError) {
         retryCount++;
         
-        // Check if it's a rate limit error (429 or quota exceeded)
         if (apiError.message && (
           apiError.message.includes('429') ||
           apiError.message.includes('quota') ||
@@ -172,7 +165,7 @@ Responde SOLO el JSON.`;
           apiError.message.includes('Too Many Requests')
         )) {
           if (retryCount < maxRetries) {
-            const waitTime = Math.pow(2, retryCount) * 1000; // Exponential backoff: 2s, 4s, 8s
+            const waitTime = Math.pow(2, retryCount) * 1000;
             console.log(`[AI CALENDAR] Rate limit hit, waiting ${waitTime}ms before retry ${retryCount}/${maxRetries}`);
             await new Promise(resolve => setTimeout(resolve, waitTime));
             continue;
@@ -185,7 +178,6 @@ Responde SOLO el JSON.`;
           });
         }
         
-        // Other errors, throw immediately
         throw apiError;
       }
     }
@@ -208,7 +200,6 @@ Responde SOLO el JSON.`;
       return res.status(400).json({ error: eventData.error || 'No se pudo procesar la solicitud' });
     }
 
-    // 3. Manejo de Intenciones
     
     // --- ROADMAP TASK (Bridge to Roadmap Service) ---
     if (eventData.intent === 'roadmap_task') {
@@ -285,8 +276,7 @@ Responde SOLO el JSON.`;
 
     // --- QUERY ---
     if (eventData.intent === 'query') {
-        const timeFilter = eventData.dateFilter || 'today'; // prompt should support this
-        // Placeholder message
+        const timeFilter = eventData.dateFilter || 'today';
         return res.json({
             success: true,
             message: "Consulta no soportada en modal rápido.",
@@ -294,12 +284,10 @@ Responde SOLO el JSON.`;
         });
     }
 
-    // --- UPDATE or DELETE ---
     if (eventData.intent === 'update' || eventData.intent === 'delete') {
         const searchTitle = eventData.searchTitle || eventData.title;
         const isGeneric = isGenericTitle(searchTitle);
 
-        // 1. Fetch ALL events from outlook-service (the source of truth for the frontend)
         let allEvents = [];
         try {
             const now = new Date();
@@ -326,46 +314,38 @@ Responde SOLO el JSON.`;
             return res.status(404).json({ error: 'No hay eventos en tu calendario.', success: false });
         }
 
-        // 2. Smart search through events
         let targetEvent = null;
 
-        // Parse AI date to compare
         const aiDate = eventData.startTimeUTC ? new Date(eventData.startTimeUTC) : null;
 
-        // Score each event for relevance
         const scored = allEvents.map(ev => {
             let score = 0;
             
-            // Title match (case-insensitive, partial)
             if (searchTitle && !isGeneric) {
                 const t = (ev.title || '').toLowerCase();
                 const s = searchTitle.toLowerCase();
-                if (t === s) score += 100;        // Exact match
-                else if (t.includes(s)) score += 60;  // Partial match
-                else if (s.includes(t)) score += 40;  // Reverse partial
-                // Also search in preview/description
+                if (t === s) score += 100;
+                else if (t.includes(s)) score += 60;
+                else if (s.includes(t)) score += 40;
                 const p = (ev.preview || '').toLowerCase();
                 if (p.includes(s)) score += 20;
             }
 
-            // Date match
             if (aiDate) {
                 const evStart = new Date(ev.start);
                 const diffMs = Math.abs(evStart.getTime() - aiDate.getTime());
                 const diffHours = diffMs / (1000 * 60 * 60);
                 
-                if (diffHours < 1) score += 80;       // Within 1 hour
-                else if (diffHours < 6) score += 60;   // Within 6 hours
-                else if (diffHours < 24) score += 40;  // Same day
-                else if (diffHours < 48) score += 20;  // Next day
-                // Penalize very far events
+                if (diffHours < 1) score += 80;
+                else if (diffHours < 6) score += 60;
+                else if (diffHours < 24) score += 40;
+                else if (diffHours < 48) score += 20;
                 else score -= Math.min(50, diffHours / 24);
             }
 
             return { event: ev, score };
         });
 
-        // Sort by score descending, pick the best
         scored.sort((a, b) => b.score - a.score);
         
         if (scored.length > 0 && scored[0].score > 0) {
@@ -373,13 +353,12 @@ Responde SOLO el JSON.`;
             console.log(`[AI CALENDAR] Best match: "${targetEvent.title}" (score: ${scored[0].score}, id: ${targetEvent.id})`);
         }
 
-        // If no good match by title+date, try just by date proximity
         if (!targetEvent && aiDate) {
             const byDate = allEvents
                 .map(ev => ({ event: ev, diff: Math.abs(new Date(ev.start).getTime() - aiDate.getTime()) }))
                 .sort((a, b) => a.diff - b.diff);
             
-            if (byDate.length > 0 && byDate[0].diff < 48 * 60 * 60 * 1000) { // Within 48h
+            if (byDate.length > 0 && byDate[0].diff < 48 * 60 * 60 * 1000) {
                 targetEvent = byDate[0].event;
                 console.log(`[AI CALENDAR] Date fallback match: "${targetEvent.title}" (id: ${targetEvent.id})`);
             }
@@ -394,7 +373,6 @@ Responde SOLO el JSON.`;
         
         if (eventData.intent === 'delete') {
              try {
-                 // Delete via outlook-service (handles both Outlook cloud + local SQLite)
                  const delRes = await fetch(`${OUTLOOK_SERVICE_URL}/${targetEvent.id}`, {
                      method: 'DELETE',
                      headers: { 'Authorization': req.headers.authorization || '' }
@@ -415,11 +393,8 @@ Responde SOLO el JSON.`;
         
         if (eventData.intent === 'update') {
              try {
-                 // Build update payload for outlook-service PUT endpoint
-                 // The PUT /:id endpoint expects: title, start, end, allDay, location, description, categories
                  const updatePayload = {};
                  
-                 // Title: only update if AI provides a new name different from current
                  let newTitle = null;
                  if (eventData.title && eventData.title !== searchTitle) {
                      newTitle = eventData.title;
@@ -429,7 +404,6 @@ Responde SOLO el JSON.`;
                      }
                  }
                  
-                 // Use existing event data as base, override with AI changes
                  updatePayload.title = newTitle || targetEvent.title;
                  updatePayload.start = eventData.startTimeUTC || targetEvent.start;
                  updatePayload.end = eventData.endTimeUTC || targetEvent.end;
@@ -437,17 +411,14 @@ Responde SOLO el JSON.`;
                  updatePayload.location = eventData.location || targetEvent.location || '';
                  updatePayload.description = eventData.description || targetEvent.preview || '';
                  
-                 // Categories - this is the key fix: always include categories in the update
                  if (eventData.categories && Array.isArray(eventData.categories) && eventData.categories.length > 0) {
                      updatePayload.categories = eventData.categories;
                  } else {
-                     // Preserve existing categories
                      updatePayload.categories = targetEvent.categories || [];
                  }
 
                  console.log(`[AI CALENDAR] Updating event "${targetEvent.title}" (id: ${targetEvent.id}), payload:`, JSON.stringify(updatePayload));
 
-                 // Use PUT endpoint which fully updates the event in outlook-service (cloud + local SQLite)
                  const upRes = await fetch(`${OUTLOOK_SERVICE_URL}/${targetEvent.id}`, {
                      method: 'PUT',
                      headers: { 
@@ -473,7 +444,6 @@ Responde SOLO el JSON.`;
         }
     }
 
-    // --- ATTACH FILE ---
     if (eventData.intent === 'attach_file') {
         const searchTitle = eventData.searchTitle || eventData.title;
         const fileName = eventData.fileName;
@@ -484,7 +454,6 @@ Responde SOLO el JSON.`;
             return res.status(400).json({ error: 'No especificaste qué archivo adjuntar.', success: false });
         }
 
-        // 1. Find the target event (same logic as update/delete)
         let allEvents = [];
         try {
             const now = new Date();
@@ -560,7 +529,6 @@ Responde SOLO el JSON.`;
             });
         }
 
-        // 2. Search user's files via file-service
         let matchedFile = null;
         try {
             const filesRes = await fetch(`${FILE_SERVICE_URL}/user-files?search=${encodeURIComponent(fileName)}`, {
@@ -573,7 +541,6 @@ Responde SOLO el JSON.`;
                 console.log(`[AI CALENDAR] Attach: Found ${files.length} files matching "${fileName}"`);
 
                 if (files.length > 0) {
-                    // Score files by name similarity
                     const searchLower = fileName.toLowerCase();
                     const scoredFiles = files.map(f => {
                         const fName = (f.name || '').toLowerCase();
@@ -588,7 +555,7 @@ Responde SOLO el JSON.`;
                     if (scoredFiles[0].score > 0) {
                         matchedFile = scoredFiles[0].file;
                     } else {
-                        matchedFile = files[0]; // Fallback to first result
+                        matchedFile = files[0];
                     }
                     console.log(`[AI CALENDAR] Attach: Best file match: "${matchedFile.name}"`);
                 }
@@ -606,7 +573,6 @@ Responde SOLO el JSON.`;
             });
         }
 
-        // 3. Create the attachment link via outlook-service
         try {
             const attachRes = await fetch(`${OUTLOOK_SERVICE_URL}/attachments`, {
                 method: 'POST',
@@ -618,7 +584,7 @@ Responde SOLO el JSON.`;
                     eventId: targetEvent.id,
                     fileName: matchedFile.name,
                     filePath: matchedFile.path || matchedFile.id || '',
-                    fileOwner: attachUsername,
+                    fileOwner: matchedFile.owner || attachUsername,
                     fileSize: matchedFile.size || 0
                 })
             });
@@ -640,11 +606,10 @@ Responde SOLO el JSON.`;
         }
     }
 
-    // --- ADD CATEGORY ---
     if (eventData.intent === 'add_category') {
         try {
             const categoryName = eventData.categoryName || eventData.title;
-            const categoryColor = eventData.categoryColor || 'preset6'; // Default blue
+            const categoryColor = eventData.categoryColor || 'preset6';
             
             if (!categoryName) {
                 return res.status(400).json({ error: 'Nombre de categoría requerido' });
@@ -675,7 +640,6 @@ Responde SOLO el JSON.`;
         }
     }
 
-    // --- CREATE (Existing Logic) ---
     let targetUserIds = [];
     if (assignMode === 'group' && groupId) {
       const groupResult = await db.query('SELECT user_id FROM group_members WHERE group_id = $1', [groupId]);
@@ -686,10 +650,8 @@ Responde SOLO el JSON.`;
       targetUserIds = [userId];
     }
 
-    // 5. Crear Eventos (Loop)
     const createdEvents = [];
     
-    // Descripción automática
     let finalDescription = eventData.description || '';
     if (assignMode !== 'me') {
       const creatorResult = await db.query('SELECT username FROM users WHERE id = $1', [userId]);
@@ -700,7 +662,6 @@ Responde SOLO el JSON.`;
     for (const targetId of targetUserIds) {
       let createdEvent = null;
 
-      // INTENTO 1: Usar Outlook Service (para mí mismo - usa mis credenciales)
       if (targetId === userId) {
         try {
             const outlookRes = await fetch(`${OUTLOOK_SERVICE_URL}/events`, {
@@ -743,8 +704,6 @@ Responde SOLO el JSON.`;
             console.error('[AI CALENDAR] Error contactando Outlook Service:', e.message);
         }
       } else {
-        // ASIGNACIÓN A OTRO USUARIO: Usar endpoint /assign-user del outlook-service
-        // Esto crea el evento en el Outlook del usuario destino y envía notificación
         try {
             const assignRes = await fetch(`${OUTLOOK_SERVICE_URL}/assign-user`, {
                 method: 'POST',
@@ -782,7 +741,6 @@ Responde SOLO el JSON.`;
         }
       }
 
-      // FALLBACK: Inserción local directa (si todos los intentos anteriores fallaron)
       if (!createdEvent) {
           const insertResult = await db.query(
             `INSERT INTO calendar_events (user_id, subject, body_preview, start_time, end_time, location, is_all_day, created_at)
@@ -800,19 +758,17 @@ Responde SOLO el JSON.`;
           );
           createdEvent = insertResult.rows[0];
 
-          // Notificar manualmente si es para otro (ya que no pasó por assign-user)
           if (targetId !== userId) {
             try {
               await sendNotification({
                 userId: targetId,
-                title: '📅 Nuevo Evento Asignado',
+                title: '[Calendar] Nuevo Evento Asignado',
                 message: `"${eventData.title}" para el ${new Date(eventData.startTimeUTC).toLocaleDateString()}`,
                 type: 'info',
                 link: '/calendar',
                 metadata: { eventId: createdEvent.id || createdEvent.microsoft_id }
               });
             } catch (notifError) { 
-                // Ignorar error notif
             }
           }
       }
@@ -832,9 +788,6 @@ Responde SOLO el JSON.`;
   }
 };
 
-// ===========================
-// SUGGEST FILES FOR AN EVENT
-// ===========================
 const suggestFiles = async (req, res) => {
   try {
     const { title, description, location, categories } = req.body;
@@ -844,7 +797,6 @@ const suggestFiles = async (req, res) => {
       return res.json({ success: true, suggestions: [] });
     }
 
-    // 1. Fetch ALL user files (no search filter - we want everything)
     let allFiles = [];
     try {
       const filesRes = await fetch(`${FILE_SERVICE_URL}/user-files`, {
@@ -858,7 +810,6 @@ const suggestFiles = async (req, res) => {
       console.error('[AI SUGGEST] Error fetching files:', e.message);
     }
 
-    // Also fetch files from subfolders by listing directories
     try {
       const dirsRes = await fetch(`${FILE_SERVICE_URL}/list?path=`, {
         headers: { 'Authorization': req.headers.authorization || '' }
@@ -867,7 +818,6 @@ const suggestFiles = async (req, res) => {
         const dirsData = await dirsRes.json();
         const folders = (dirsData.files || []).filter(f => f.isDirectory);
         
-        // Fetch files from each subfolder (max 5 folders deep)
         for (const folder of folders.slice(0, 10)) {
           try {
             const subRes = await fetch(`${FILE_SERVICE_URL}/user-files?path=${encodeURIComponent(folder.name)}`, {
@@ -882,21 +832,19 @@ const suggestFiles = async (req, res) => {
               }));
               allFiles = [...allFiles, ...subFiles];
             }
-          } catch (e) { /* skip folder */ }
+          } catch (e) {  }
         }
       }
-    } catch (e) { /* skip subfolders */ }
+    } catch (e) {  }
 
     if (allFiles.length === 0) {
       return res.json({ success: true, suggestions: [] });
     }
 
-    // 2. Build file list for AI (limit to prevent token overflow)
     const fileList = allFiles.slice(0, 200).map((f, i) => 
       `${i + 1}. "${f.name}" (${formatSize(f.size)}, ${f.extension || '?'})`
     ).join('\n');
 
-    // 3. Ask Gemini to pick relevant files
     const eventContext = [
       title && `Título: ${title}`,
       description && `Descripción: ${description}`,
@@ -947,7 +895,6 @@ Máximo 5 sugerencias. SOLO responde el JSON, nada más.`;
 
     const responseText = aiResponse.response.text();
     
-    // Parse AI response
     let parsed = [];
     try {
       const jsonMatch = responseText.match(/\[[\s\S]*\]/);
@@ -959,7 +906,6 @@ Máximo 5 sugerencias. SOLO responde el JSON, nada más.`;
       return res.json({ success: true, suggestions: [] });
     }
 
-    // 4. Map back to actual files
     const suggestions = parsed
       .filter(s => s.index >= 1 && s.index <= allFiles.length)
       .slice(0, 5)
@@ -981,7 +927,7 @@ Máximo 5 sugerencias. SOLO responde el JSON, nada más.`;
 
   } catch (error) {
     console.error('[AI SUGGEST] Error:', error);
-    return res.json({ success: true, suggestions: [] }); // Fail silently
+    return res.json({ success: true, suggestions: [] });
   }
 };
 

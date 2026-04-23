@@ -27,12 +27,9 @@ async function syncDatabaseWithDisk() {
     console.log('🔄 Iniciando sincronización de disco con base de datos...');
     
     try {
-        // 1. Obtener usuarios para saber qué carpetas escanear
         const usersResult = await db.query('SELECT id, username FROM users');
-        const users = usersResult.rows; // [{ id: 1, username: 'admin' }, ...]
+        const users = usersResult.rows;
 
-        // 2. Obtener lista actual de archivos en BD para no duplicar
-        // Guardamos un Set de physical_path normalizados
         const dbFilesResult = await db.query('SELECT physical_path FROM files');
         const dbPaths = new Set(dbFilesResult.rows.map(row => row.physical_path));
 
@@ -46,30 +43,24 @@ async function syncDatabaseWithDisk() {
              try {
                  await fs.access(userDir);
              } catch (e) {
-                 // Carpeta de usuario no existe en disco, skip
                  continue;
              }
 
-             // Leer archivos de la carpeta del usuario
              const files = await fs.readdir(userDir);
              
              for (const fileName of files) {
                  const fullPath = path.join(userDir, fileName);
                  
-                 // Normalizar para comparar con BD (usar forward slashes)
                  const normalizedPath = fullPath.replace(/\\/g, '/');
 
                  if (dbPaths.has(normalizedPath)) {
-                     // Ya existe en BD
                      continue;
                  }
 
-                 // Verificar que sea archivo y no carpeta (simple, no recursivo por ahora)
                  try {
                     const stats = await fs.stat(fullPath);
                     if (stats.isDirectory()) continue;
 
-                    // Nuevo archivo detectado! Insertar en BD
                     const ext = path.extname(fileName).toLowerCase();
                     const mimeType = MIME_MAP[ext] || 'application/octet-stream';
                     

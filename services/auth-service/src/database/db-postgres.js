@@ -10,7 +10,6 @@ const pool = new Pool({
   port: process.env.DB_PORT || 5432,
 });
 
-// Helper to convert ? to $n
 const convertSql = (sql) => {
   let i = 0;
   return sql.replace(/\?/g, () => {
@@ -42,8 +41,6 @@ const dbAsync = {
     try {
       let pgSql = convertSql(sql);
       
-      // Hack for compatibility: SQLite returns lastID for INSERTs.
-      // Postgres needs RETURNING id.
       if (pgSql.trim().toUpperCase().startsWith('INSERT') && !pgSql.toUpperCase().includes('RETURNING')) {
          pgSql += ' RETURNING id';
          try {
@@ -52,7 +49,6 @@ const dbAsync = {
                  return { lastID: res.rows[0].id, changes: res.rowCount };
              }
          } catch (e) {
-             // Fallback if table doesn't have 'id' column or other error, try without RETURNING
              const res = await pool.query(convertSql(sql), params);
              return { lastID: null, changes: res.rowCount };
          }
@@ -67,9 +63,7 @@ const dbAsync = {
   }
 };
 
-// Init Database
 const initDatabase = async () => {
-    // Wait a bit for Postgres to be ready (simple retry logic could be added here)
     let client;
     let retries = 5;
     while (retries > 0) {
@@ -91,7 +85,6 @@ const initDatabase = async () => {
     try {
         await client.query('BEGIN');
 
-        // Users
         await client.query(`CREATE TABLE IF NOT EXISTS users (
             id SERIAL PRIMARY KEY,
             username TEXT UNIQUE NOT NULL,
@@ -107,7 +100,6 @@ const initDatabase = async () => {
             microsoft_refresh_token TEXT
         )`);
 
-        // User Credentials
         await client.query(`CREATE TABLE IF NOT EXISTS user_credentials (
             user_id INTEGER PRIMARY KEY,
             password_hash TEXT NOT NULL,
@@ -121,7 +113,6 @@ const initDatabase = async () => {
             FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
         )`);
 
-        // Security Settings
         await client.query(`CREATE TABLE IF NOT EXISTS security_settings (
             id SERIAL PRIMARY KEY,
             user_id INTEGER UNIQUE,
@@ -130,7 +121,6 @@ const initDatabase = async () => {
             FOREIGN KEY(user_id) REFERENCES users(id)
         )`);
 
-        // Admin Inbox
         await client.query(`CREATE TABLE IF NOT EXISTS admin_inbox (
             id SERIAL PRIMARY KEY,
             type TEXT NOT NULL,
@@ -141,7 +131,6 @@ const initDatabase = async () => {
             FOREIGN KEY(user_id) REFERENCES users(id)
         )`);
 
-        // Folders
         await client.query(`CREATE TABLE IF NOT EXISTS folders (
             id SERIAL PRIMARY KEY,
             parent_id INTEGER,
@@ -152,7 +141,6 @@ const initDatabase = async () => {
             FOREIGN KEY(parent_id) REFERENCES folders(id)
         )`);
 
-        // Files
         await client.query(`CREATE TABLE IF NOT EXISTS files (
             id SERIAL PRIMARY KEY,
             folder_id INTEGER,
@@ -166,7 +154,6 @@ const initDatabase = async () => {
             FOREIGN KEY(owner_id) REFERENCES users(id)
         )`);
 
-        // Groups
         await client.query(`CREATE TABLE IF NOT EXISTS groups (
             id SERIAL PRIMARY KEY,
             name TEXT NOT NULL,
@@ -175,7 +162,6 @@ const initDatabase = async () => {
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )`);
 
-        // Group Members
         await client.query(`CREATE TABLE IF NOT EXISTS group_members (
             group_id INTEGER,
             user_id INTEGER,
@@ -186,7 +172,6 @@ const initDatabase = async () => {
             FOREIGN KEY(user_id) REFERENCES users(id)
         )`);
 
-        // Calendar Events
         await client.query(`CREATE TABLE IF NOT EXISTS calendar_events (
             id SERIAL PRIMARY KEY,
             microsoft_id TEXT UNIQUE,
@@ -204,7 +189,6 @@ const initDatabase = async () => {
             FOREIGN KEY(user_id) REFERENCES users(id)
         )`);
 
-        // Audit Logs
         await client.query(`CREATE TABLE IF NOT EXISTS audit_logs (
             id SERIAL PRIMARY KEY,
             user_id INTEGER,
@@ -215,7 +199,6 @@ const initDatabase = async () => {
             timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )`);
 
-        // Shared Files
         await client.query(`CREATE TABLE IF NOT EXISTS shared_files (
             id SERIAL PRIMARY KEY,
             path TEXT NOT NULL,
@@ -225,7 +208,6 @@ const initDatabase = async () => {
             UNIQUE(path, owner_username, shared_with_username)
         )`);
 
-        // Default Admin
         const adminUser = 'administrador';
         const adminPass = process.env.ADMIN_INITIAL_PASSWORD || 'admin123';
         
@@ -248,7 +230,6 @@ const initDatabase = async () => {
     }
 };
 
-// Initialize on load
 initDatabase();
 
 module.exports = { db: pool, dbAsync };

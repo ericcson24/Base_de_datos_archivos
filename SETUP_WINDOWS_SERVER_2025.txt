@@ -1,0 +1,328 @@
+=== SETUP WINDOWS SERVER 2025 - Docker Engine + Cloudflare + RDP ===
+Date: 2026-04-18
+Workspace: C:/Users/Administrador/Desktop/Base_de_datos_archivos
+
+Goal
+- Run the full platform on Windows Server 2025 without Docker Desktop.
+- Keep app access working on localhost and through Cloudflare.
+- Keep RDP flow working through gateway (/api/rdp).
+- Document all steps, validations, and recovery actions.
+
+1) Host and WSL base
+- OS validated: Windows Server 2025 Datacenter Evaluation (build 26100).
+- Windows features enabled:
+  - Microsoft-Windows-Subsystem-Linux
+  - VirtualMachinePlatform
+- Ubuntu installed in WSL2.
+- systemd enabled in WSL.
+
+2) Docker Engine in WSL (without Docker Desktop)
+- Docker Engine installed from official Docker repository inside Ubuntu WSL.
+- Docker CLI and Compose plugin installed.
+- Verified versions used in this session:
+  - Docker 29.4.0
+  - Docker Compose v5.1.3
+- Docker service running under systemd.
+- Linux user added to docker group.
+
+3) Stack bring-up
+- Compose project started from:
+  - /mnt/c/Users/Administrador/Desktop/Base_de_datos_archivos
+- Core command:
+  - docker compose up -d
+- Services in architecture:
+  - frontend
+  - gateway
+  - postgres
+  - redis
+  - auth-service
+  - notification-service
+  - outlook-service
+  - file-service
+  - user-service
+  - admin-service
+  - email-service
+  - ai-service
+  - rdp-service
+  - guacd
+  - tunnel (cloudflared)
+
+4) Stability hardening already applied in compose
+- restart: unless-stopped configured on critical services to auto-recover.
+- This reduces partial-up states after daemon/WSL restarts.
+
+5) Root cause found for intermittent gateway drops
+Issue observed:
+- gateway sometimes failed at startup with error:
+  - host not found in upstream "file-service" in /etc/nginx/nginx.conf
+
+Impact:
+- If gateway exits, localhost:8080 and Cloudflare app route can fail.
+
+Fix applied:
+- Updated gateway/nginx.conf to use Docker DNS resolver + variable-based upstreams.
+- This prevents nginx hard-failing when upstream DNS entries are briefly unavailable during startup.
+
+File changed:
+- gateway/nginx.conf
+
+6) Cloudflare status and validation
+Tunnel container:
+- image: cloudflare/cloudflared:latest
+- command uses token + http2 protocol
+
+Observed in logs:
+- tunnel connections registered successfully (multiple connIndex)
+- ingress config points hostname to gateway service
+
+Validated from host:
+- https://proyectonube.xyz -> HTTP 200
+
+7) RDP path status and validation
+Route architecture:
+- Browser -> gateway -> /api/rdp -> rdp-service -> guacd -> target RDP host
+
+Validated from host:
+- http://localhost:8080/api/rdp/ -> HTTP 200, body: "RDP Service Running"
+- https://proyectonube.xyz/api/rdp/ -> HTTP 200, body: "RDP Service Running"
+
+RDP defaults in compose:
+- RDP_SERVER_HOST defaults to host.docker.internal
+- RDP_SERVER_PORT defaults to 3389
+
+Note:
+- For full remote desktop session, target host credentials and RDP access on target machine must be valid.
+
+8) Current app access points
+- Local gateway: http://localhost:8080
+- Cloudflare hostname: https://proyectonube.xyz
+- Local Postgres mapped: localhost:5433
+- Local Redis mapped: localhost:6379
+
+9) Operational commands
+Start or recover all services:
+- cd /mnt/c/Users/Administrador/Desktop/Base_de_datos_archivos
+- docker compose up -d
+
+Check service state:
+- docker compose ps
+
+Check local app:
+- curl -I http://localhost:8080
+
+Check local RDP endpoint:
+- curl -i http://localhost:8080/api/rdp/
+
+Check Cloudflare app:
+- curl -I https://proyectonube.xyz
+
+Check Cloudflare RDP endpoint:
+- curl -i https://proyectonube.xyz/api/rdp/
+
+Inspect key logs:
+- docker compose logs --tail=120 gateway
+- docker compose logs --tail=120 rdp-service
+- docker compose logs --tail=120 tunnel
+
+10) Clean stop/start
+Stop stack:
+- docker compose down
+
+Start stack:
+- docker compose up -d
+
+11) Important notes
+- Docker Desktop was not installed.
+- Environment runs on Docker Engine in WSL2, compatible with Windows Server.
+- cloudflared token-based mode may use managed ingress from Cloudflare side.
+- If adding extra hostnames (for example www), verify route in Cloudflare Tunnel dashboard as well.
+
+12) Final verification snapshot for this update
+- localhost root: HTTP 200
+- Cloudflare root: HTTP 200
+- localhost RDP endpoint: HTTP 200 (RDP Service Running)
+- Cloudflare RDP endpoint: HTTP 200 (RDP Service Running)
+- gateway hardened against startup DNS race condition
+
+13) Incident note - Cloudflare 530 observed and resolved (2026-04-18)
+- Symptom:
+  - https://proyectonube.xyz returned HTTP 530 intermittently.
+- Diagnosis:
+  - DNS A resolution for proyectonube.xyz was correct.
+  - Tunnel logs showed repeated graceful shutdown events exactly when services
+    were being recreated, creating short windows where Cloudflare had no active
+    origin connection.
+  - This was operational churn during stack restarts, not permanent DNS failure.
+- Validation after recovery:
+  - https://proyectonube.xyz -> HTTP 200 (repeated checks)
+  - http://localhost:8080 -> HTTP 200
+  - https://proyectonube.xyz/api/rdp/ -> HTTP 200
+
+14) DNS note for www subdomain
+- www.proyectonube.xyz did not resolve in host DNS check.
+- If www is required, create the DNS record in Cloudflare and map it to the
+  tunnel/public hostname route.
+
+15) Incident note - Cloudflare 1033 observed and resolved (2026-04-18)
+- Symptom:
+  - Cloudflare page showed: Error 1033 (Cloudflare Tunnel error).
+- What it means:
+  - Cloudflare edge could not reach an active tunnel connector for this route
+    at that moment.
+- Recovery applied:
+  - Verified stack state in Docker/Compose.
+  - Re-established service state so gateway + tunnel were both Up.
+- Validation after recovery:
+  - http://localhost:8080 -> HTTP 200
+  - https://proyectonube.xyz -> HTTP 200
+
+16) Fast recovery runbook for Error 1033
+- In WSL project folder:
+  - docker compose up -d
+  - docker compose ps tunnel gateway
+  - docker compose logs --tail=80 tunnel
+- Then validate from host:
+  - Invoke-WebRequest https://proyectonube.xyz -UseBasicParsing
+
+17) Hardening update for recurring 1033 windows
+- Change applied in docker-compose.yml:
+  - Removed tunnel depends_on gateway.
+- Reason:
+  - During maintenance/recreates, dependency coupling can restart tunnel with
+    gateway and create brief Cloudflare 1033 windows.
+- Result after change:
+  - https://proyectonube.xyz -> HTTP 200 (repeated checks)
+  - http://localhost:8080 -> HTTP 200
+
+18) Login API incident fixed (503/502/404 while signing in)
+- Symptom:
+  - Login page loaded, but auth requests failed through gateway.
+- Root cause:
+  - Auth route forwarding in gateway was inconsistent after nginx hardening
+    changes, and gateway image had to be rebuilt because nginx.conf is copied
+    at image build time.
+- Fix applied:
+  - Updated auth location in gateway/nginx.conf to:
+    - location /api/auth/ { proxy_pass http://auth-service:5001/; }
+  - Rebuilt and restarted gateway service:
+    - docker compose build gateway
+    - docker compose up -d gateway
+- Validation after fix:
+  - GET /api/auth/verify returns 401 (expected without session)
+  - POST /api/auth/login returns 401 for invalid credentials (expected), not
+    503/502/404
+
+19) Recurring stop issue fixed (services stopping after a short time)
+- Symptom:
+  - Stack started correctly, then many services stopped together minutes later.
+  - Usually only tunnel/rdp/guacd stayed running.
+- Root cause:
+  - Most services had no restart policy, so after daemon/WSL restarts or
+    transient container lifecycle events they stayed down.
+- Permanent fix applied in docker-compose.yml:
+  - Added restart: unless-stopped to:
+    frontend, gateway, ai-service, postgres, auth-service,
+    notification-service, outlook-service, file-service, user-service,
+    admin-service, email-service, redis.
+- Extra cleanup:
+  - Removed stray container cloudflared-stable to avoid confusion.
+- Validation after fix:
+  - LOCAL_STATUS=200 on http://localhost:8080
+  - CF_STATUS=200 on https://proyectonube.xyz
+
+20) Recommended runbook (stable)
+- Start all:
+  - docker compose up -d
+- If ingress appears down:
+  - docker compose up -d gateway notification-service tunnel
+- Check state:
+  - docker compose ps
+- Check logs for ingress:
+  - docker compose logs --tail=120 gateway notification-service tunnel
+
+21) Root cause and permanent fix (no watchdog)
+- Symptom:
+  - "Everything drops together" every so often.
+- Evidence captured from Docker daemon journal:
+  - Multiple containers receive "stopping restart-manager" at the same time.
+  - Then daemon logs: "Daemon shutdown complete".
+  - Shortly after, docker.service starts again and restores containers.
+- Conclusion:
+  - This is not an app-level crash loop.
+  - The whole Docker daemon inside WSL was being stopped/restarted at host/WSL
+    lifecycle level, which drops all services together.
+- Permanent fix applied:
+  - Created host file C:/Users/Administrador/.wslconfig with:
+    - [wsl2]
+    - vmIdleTimeout=0
+  - Applied with one-time command:
+    - wsl --shutdown
+- Why this fix:
+  - Prevents WSL2 VM idle shutdown from stopping dockerd.
+  - Keeps stack continuity without using watchdog scripts.
+- Validation after fix:
+  - Docker service in WSL reached active state.
+  - All compose services restored and running.
+  - http://localhost:8080 -> 200
+  - https://proyectonube.xyz -> 200
+
+22) Follow-up stability fix (WSL shutdown loop on this host)
+- New evidence observed:
+  - Ubuntu/WSL was entering full shutdown.target repeatedly.
+  - Pattern in journal:
+    - Started docker.service
+    - Stopping docker.service
+    - Daemon shutdown complete
+    - Full WSL unmount/shutdown sequence
+  - This occurred every ~1 minute and caused recurrent Cloudflare 502 windows.
+- Important correction:
+  - vmIdleTimeout value in .wslconfig did not stop the shutdown loop on this
+    specific host/build behavior.
+- Stabilization applied:
+  - Created Windows Scheduled Task:
+    - TaskName: WSL-Ubuntu-Anchor
+    - Trigger: At logon (Administrador)
+    - Action: wsl.exe -d Ubuntu -- sh -lc "while true; do sleep 600; done"
+  - Started task immediately and kept stack up with docker compose up -d.
+- Why this works:
+  - Keeps one lightweight WSL process alive so the distro is not auto-terminated.
+  - Does not restart containers; it only prevents host-side WSL shutdown.
+- Validation after applying anchor:
+  - http://localhost:8080 -> 200
+  - https://proyectonube.xyz -> 200
+  - No new docker shutdown events after last start in the verification window.
+
+23) Hardening for unattended/server startup
+- Additional improvement applied:
+  - Created a second scheduled task that starts at Windows boot as SYSTEM:
+    - TaskName: WSL-Ubuntu-Anchor-Startup
+    - Trigger: AtStartup
+    - Principal: SYSTEM (ServiceAccount)
+    - Action: wsl.exe -d Ubuntu -- sh -lc "while true; do sleep 600; done"
+- Purpose:
+  - Keep Ubuntu WSL active even before user logon, avoiding host-side WSL
+    auto-shutdown behavior that was causing Docker/tunnel interruptions.
+- Current validation snapshot:
+  - LOCAL (http://localhost:8080) = 200
+  - CLOUDFLARE (https://proyectonube.xyz) = 200
+  - Docker journal since 16:46 only shows one "Started docker.service" and no
+    new "Stopping docker.service" or "Daemon shutdown complete" entries.
+
+24) Definitive 502 fix (Cloudflare Host Error while local=200)
+- Incident pattern:
+  - Local gateway stayed at 200, but Cloudflare intermittently returned 502.
+  - Tunnel was connected, yet some requests did not reach gateway logs.
+- Root cause found:
+  - The `tunnel` service had external DNS override (`1.1.1.1`, `8.8.8.8`).
+  - Cloudflared ingress target is `http://gateway:80` (Docker internal name).
+  - With external DNS forced, internal service-name resolution can fail,
+    producing Cloudflare 502 Host Error.
+- Fix applied in docker-compose.yml:
+  - Removed `dns:` override from `tunnel` service.
+  - Kept `--protocol http2` for cloudflared (QUIC had handshake timeouts on
+    this network).
+  - Kept tunnel decoupled from gateway startup (`depends_on` removed earlier).
+- Validation after fix:
+  - Tunnel registered 4 active connections (connIndex 0..3).
+  - LOCAL=200 on http://localhost:8080
+  - CF=200 on https://proyectonube.xyz

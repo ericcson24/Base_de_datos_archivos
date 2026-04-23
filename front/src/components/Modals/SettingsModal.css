@@ -11,7 +11,7 @@
 }
 
 [data-theme="dark"] .settings-modal {
-  background-color: #141414; /* Darker background as requested */
+  background-color: #141414; 
   color: #ffffff;
 }
 
@@ -453,7 +453,6 @@
   to { opacity: 1; }
 }
 
-/* Export Calendar Button in Settings */
 .export-calendar-btn {
   display: flex;
   align-items: center;

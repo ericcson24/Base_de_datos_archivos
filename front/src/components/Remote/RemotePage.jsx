@@ -4,7 +4,7 @@ import { getAuthToken } from '../../utils/fileUtils';
 import NotificationCenter from '../Common/NotificationCenter';
 import SettingsModal from '../Modals/SettingsModal';
 import RDPViewer from '../RDP/RDPViewer';
-import { FiArrowLeft, FiLayout, FiCalendar, FiSettings, FiLogOut, FiMonitor, FiWifi } from 'react-icons/fi';
+import { FiArrowLeft, FiLayout, FiCalendar, FiSettings, FiLogOut, FiMonitor, FiWifi, FiMenu, FiLock, FiStopCircle } from 'react-icons/fi';
 import './RemotePage.css';
 import './RemotePageDesktop.css';
 import './RemotePageMobile.css';
@@ -21,7 +21,6 @@ const RemotePage = ({ user, onLogout, onGoBack, onGoToPanel, onGoToCalendar, onT
 
     useEffect(() => {
         fetchData();
-        // Fetch server info for display
         const token = user?.token || getAuthToken();
         fetch('/api/rdp/server-info', { headers: { 'Authorization': `Bearer ${token}` } })
             .then(r => r.ok ? r.json() : null)
@@ -58,7 +57,6 @@ const RemotePage = ({ user, onLogout, onGoBack, onGoToPanel, onGoToCalendar, onT
     };
 
     const handleConnectionClick = async (connectionId) => {
-        // Use token from user object, fallback to localStorage
         const token = user?.token || getAuthToken();
         console.log('handleConnectionClick - token from user:', token);
         console.log('handleConnectionClick - connectionId:', connectionId);
@@ -150,7 +148,7 @@ const RemotePage = ({ user, onLogout, onGoBack, onGoToPanel, onGoToCalendar, onT
             <div className="remote-main">
                 <div className="remote-header">
                     <div className="remote-header-content">
-                        <button className="mobile-menu-btn" onClick={() => setSidebarOpen(true)}>☰</button>
+                        <button className="mobile-menu-btn" onClick={() => setSidebarOpen(true)}><FiMenu /></button>
                         <h1>{t('rdp.selectConnection')}</h1>
                     </div>
                     <div className="remote-header-actions">
@@ -174,12 +172,12 @@ const RemotePage = ({ user, onLogout, onGoBack, onGoToPanel, onGoToCalendar, onT
                                     </div>
                                     {settings.maintenance_mode === 'true' && (
                                         <div className="status-badge maintenance">
-                                            🛑 {t('rdp.maintenanceMode')}
+                                            <FiStopCircle style={{ verticalAlign: 'middle', marginRight: 4 }} /> {t('rdp.maintenanceMode')}
                                         </div>
                                     )}
                                     {settings.lan_only === 'true' && (
                                         <div className="status-badge lan">
-                                            🔒 {t('rdp.lanOnly')}
+                                            <FiLock style={{ verticalAlign: 'middle', marginRight: 4 }} /> {t('rdp.lanOnly')}
                                         </div>
                                     )}
                                 </div>
@@ -188,7 +186,7 @@ const RemotePage = ({ user, onLogout, onGoBack, onGoToPanel, onGoToCalendar, onT
                             <div className="remote-connections-grid">
                                 {connections.length === 0 ? (
                                     <div className="remote-empty-state">
-                                        <div className="empty-icon">🔌</div>
+                                        <div className="empty-icon">[Plug]</div>
                                         <h3>{t('rdp.noConnections')}</h3>
                                         <p>{t('rdp.noConnectionsDesc')}</p>
                                         <button 
@@ -204,7 +202,7 @@ const RemotePage = ({ user, onLogout, onGoBack, onGoToPanel, onGoToCalendar, onT
                                             key={conn.id} 
                                             className="remote-connection-card"
                                         >
-                                            <div className="connection-icon">🖥️</div>
+                                            <div className="connection-icon"><FiMonitor /></div>
                                             <div className="connection-info">
                                                 <h3>{conn.name}</h3>
                                                 <p className="connection-host">

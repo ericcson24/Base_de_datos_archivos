@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { FiAlertTriangle, FiImage, FiVideo, FiMusic, FiArchive, FiFileText, FiFile } from 'react-icons/fi';
 import ImageEditor from './editors/ImageEditor';
 import PDFEditor from './editors/PDFEditor';
 import TextEditor from './editors/TextEditor';
@@ -44,20 +45,15 @@ const FileEditorPanel = ({ file, onClose, position, zIndex, onBringToFront, pane
 
   const fileType = getFileType(file.name);
   
-  // Si es inline, no usar dragging ni positioning
-  // const isFloating = !isInline; // No usado actualmente
 
-  // Load file content
   useEffect(() => {
     const loadFile = async () => {
       setLoading(true);
       try {
         const token = getAuthToken();
-        // URL base autenticada
         const authenticatedUrl = `/api/files/preview/${encodeURIComponent(file.id)}?token=${encodeURIComponent(token)}`;
         console.log('🔗 [FileEditorPanel] Generated URL:', authenticatedUrl);
         
-        // Para tipos nativos, usar URL directa para evitar problemas con blobs y memoria
         if (['image', 'video', 'audio', 'pdf'].includes(fileType)) {
           console.log('🔗 [FileEditorPanel] Using direct URL for native type:', fileType);
           setFileUrl(authenticatedUrl);
@@ -65,7 +61,6 @@ const FileEditorPanel = ({ file, onClose, position, zIndex, onBringToFront, pane
           return;
         }
 
-        // Para otros tipos (Word, Excel, Zip) que necesitan procesamiento, descargar el blob
         console.log('📥 [FileEditorPanel] Fetching blob for processed type:', fileType);
         const response = await fetch(authenticatedUrl, {
           headers: {
@@ -82,22 +77,19 @@ const FileEditorPanel = ({ file, onClose, position, zIndex, onBringToFront, pane
 
         if (['zip', 'excel', 'word', 'powerpoint'].includes(fileType)) {
           const blob = await response.blob();
-          console.log('📦 [FileEditorPanel] Blob created:', blob.size, blob.type);
+          console.log('[Archive] [FileEditorPanel] Blob created:', blob.size, blob.type);
           
-          // Allow empty Word, Excel, and PowerPoint files (they can be edited)
           if (blob.size === 0 && !['word', 'excel', 'powerpoint'].includes(fileType)) {
              console.error('❌ [FileEditorPanel] Blob is empty');
              throw new Error(t('fileEditor.emptyFile'));
           }
           
           if (blob.size === 0 && ['word', 'excel', 'powerpoint'].includes(fileType)) {
-             console.log('📝 [FileEditorPanel] Empty file - will allow editing');
+             console.log('[Text] [FileEditorPanel] Empty file - will allow editing');
           }
           
-          // Check if blob is actually an error page (HTML/JSON)
           if (blob.size > 0 && (blob.type.includes('text/html') || blob.type.includes('application/json'))) {
-             console.warn('⚠️ [FileEditorPanel] Blob type is suspicious for binary file:', blob.type);
-             // Try to read as text to see if it's an error
+             console.warn('[Warning] [FileEditorPanel] Blob type is suspicious for binary file:', blob.type);
              const text = await blob.text();
              console.log('📄 [FileEditorPanel] Suspicious blob content start:', text.substring(0, 100));
              if (text.includes('Error') || text.includes('success":false')) {
@@ -106,8 +98,6 @@ const FileEditorPanel = ({ file, onClose, position, zIndex, onBringToFront, pane
           }
 
           setFileBlob(blob);
-          // Mantener fileUrl por compatibilidad si algún componente lo usa, 
-          // pero preferir fileBlob para editores
           const url = URL.createObjectURL(blob);
           setFileUrl(url);
         } else if (fileType === 'text') {
@@ -126,15 +116,12 @@ const FileEditorPanel = ({ file, onClose, position, zIndex, onBringToFront, pane
     loadFile();
 
     return () => {
-      // Solo revocar si es un blob URL (comienza con blob:)
       if (fileUrl && fileUrl.startsWith('blob:')) {
         URL.revokeObjectURL(fileUrl);
       }
     };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [file.id, fileType, t]);
 
-  // Dragging handlers - Usando la misma lógica que file-grid
   const handleMouseDown = useCallback((e) => {
     if (e.target.closest('.resize-handle')) return;
     if (e.target.closest('.panel-controls')) return;
@@ -148,12 +135,10 @@ const FileEditorPanel = ({ file, onClose, position, zIndex, onBringToFront, pane
     
     if (!mainPanel || !panel) return;
 
-    // Capturar dimensiones actuales en píxeles
     const currentWidth = panel.offsetWidth;
     const currentHeight = panel.offsetHeight;
     setSize({ width: currentWidth, height: currentHeight });
     
-    // Calcular offset del mouse respecto al panel
     const panelRect = panel.getBoundingClientRect();
     const offsetX = e.clientX - panelRect.left;
     const offsetY = e.clientY - panelRect.top;
@@ -170,11 +155,9 @@ const FileEditorPanel = ({ file, onClose, position, zIndex, onBringToFront, pane
       
       const mainPanelRect = mainPanel.getBoundingClientRect();
       
-      // Posición donde DEBE estar la esquina superior izquierda
       let newX = e.clientX - mainPanelRect.left - dragOffset.x;
       let newY = e.clientY - mainPanelRect.top - dragOffset.y;
 
-      // Boundaries - igual que file-grid
       const panelHeaderMain = document.querySelector('.panel-header-main');
       const headerHeight = panelHeaderMain ? panelHeaderMain.offsetHeight : 0;
       
@@ -205,7 +188,6 @@ const FileEditorPanel = ({ file, onClose, position, zIndex, onBringToFront, pane
     }
   }, [isDragging, handleMouseMove, handleMouseUp]);
 
-  // Window controls
   const handleMinimize = () => {
     setIsMinimized(!isMinimized);
   };
@@ -236,7 +218,7 @@ const FileEditorPanel = ({ file, onClose, position, zIndex, onBringToFront, pane
       return (
         <div className="flex items-center justify-center h-full text-red-500">
           <div className="text-center">
-            <p className="text-xl mb-2">⚠️</p>
+            <p className="text-xl mb-2"><FiAlertTriangle /></p>
             <p>{error}</p>
           </div>
         </div>
@@ -247,7 +229,7 @@ const FileEditorPanel = ({ file, onClose, position, zIndex, onBringToFront, pane
       case 'image':
         return <ImageEditor fileUrl={fileUrl} file={file} />;
       case 'pdf':
-        return <PDFEditor fileUrl={fileUrl} file={file} />;
+        return <PDFEditor fileUrl={fileUrl} file={file} onFileSaved={onFileSaved} />;
       case 'text':
         return <TextEditor content={fileUrl} file={file} />;
       case 'video':
@@ -277,20 +259,19 @@ const FileEditorPanel = ({ file, onClose, position, zIndex, onBringToFront, pane
     }
   };
 
-  // Modo Inline - Diseño simple sin flotación
   if (isInline) {
     return (
       <div className="file-editor-panel-inline w-full h-full flex flex-col">
-        {/* Header Simple */}
+        
         <div className="panel-header-inline glassmorphism-strong p-3 flex items-center justify-between border-b border-gray-200 dark:border-gray-700">
           <div className="flex items-center space-x-2">
             <span className="text-xl">
-              {fileType === 'image' ? '🖼️' : 
+              {fileType === 'image' ? <FiImage /> : 
                fileType === 'pdf' ? '📄' : 
-               fileType === 'video' ? '🎥' : 
-               fileType === 'audio' ? '🎵' : 
-               fileType === 'zip' ? '📦' : 
-               '📝'}
+               fileType === 'video' ? <FiVideo /> : 
+               fileType === 'audio' ? <FiMusic /> : 
+               fileType === 'zip' ? <FiArchive /> : 
+               <FiFileText />}
             </span>
             <span className="text-sm font-medium text-gray-700 dark:text-gray-200 truncate">
               {file.name}
@@ -306,7 +287,7 @@ const FileEditorPanel = ({ file, onClose, position, zIndex, onBringToFront, pane
             </svg>
           </button>
         </div>
-        {/* Editor Content */}
+        
         <div className="editor-content flex-1 overflow-auto">
           {renderEditor()}
         </div>
@@ -314,7 +295,6 @@ const FileEditorPanel = ({ file, onClose, position, zIndex, onBringToFront, pane
     );
   }
 
-  // Modo Flotante (original)
   if (isMinimized) {
     return (
       <div
@@ -323,7 +303,7 @@ const FileEditorPanel = ({ file, onClose, position, zIndex, onBringToFront, pane
         onClick={handleMinimize}
       >
         <div className="flex items-center space-x-2">
-          <span className="text-2xl">{fileType === 'image' ? '🖼️' : fileType === 'pdf' ? '📄' : fileType === 'video' ? '🎥' : '📝'}</span>
+          <span className="text-2xl">{fileType === 'image' ? <FiImage /> : fileType === 'pdf' ? '📄' : fileType === 'video' ? <FiVideo /> : <FiFileText />}</span>
           <span className="text-sm font-medium text-gray-700 dark:text-gray-200">{file.name}</span>
         </div>
       </div>
@@ -343,26 +323,26 @@ const FileEditorPanel = ({ file, onClose, position, zIndex, onBringToFront, pane
       }}
       onClick={onBringToFront}
     >
-      {/* Header */}
+      
       <div
         className="panel-header glassmorphism-strong"
         onMouseDown={handleMouseDown}
       >
         <div className="flex items-center space-x-2 flex-1 min-w-0">
           <span className="text-xl">
-            {fileType === 'image' ? '🖼️' : 
+            {fileType === 'image' ? <FiImage /> : 
              fileType === 'pdf' ? '📄' : 
-             fileType === 'video' ? '🎥' : 
-             fileType === 'audio' ? '🎵' : 
-             fileType === 'zip' ? '📦' : 
-             '📝'}
+             fileType === 'video' ? <FiVideo /> : 
+             fileType === 'audio' ? <FiMusic /> : 
+             fileType === 'zip' ? <FiArchive /> : 
+             <FiFileText />}
           </span>
           <span className="text-sm font-medium text-gray-700 dark:text-gray-200 truncate">
             {file.name}
           </span>
         </div>
 
-        {/* Window Controls */}
+        
         <div className="panel-controls flex items-center space-x-1">
           <button
             onClick={handleMinimize}
@@ -398,7 +378,7 @@ const FileEditorPanel = ({ file, onClose, position, zIndex, onBringToFront, pane
         </div>
       </div>
 
-      {/* Editor Content */}
+      
       <div className="editor-content">
         {renderEditor()}
       </div>

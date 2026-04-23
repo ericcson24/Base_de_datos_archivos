@@ -18,7 +18,6 @@ const app = express();
 const PORT = process.env.PORT || 5009;
 const JWT_SECRET = process.env.JWT_SECRET || 'fallback-secret-change-me';
 
-// Middleware
 app.use(cors());
 app.use(express.json({ limit: '50mb' }));
 
@@ -26,7 +25,6 @@ if (!process.env.GEMINI_API_KEY) {
   console.error(' GEMINI_API_KEY no está configurado - AI Service funcionará limitado');
 }
 
-// Authentication middleware
 const authenticateToken = (req, res, next) => {
   const authHeader = req.headers.authorization;
   let token = null;
@@ -53,17 +51,12 @@ const authenticateToken = (req, res, next) => {
   }
 };
 
-// ===================================
-// ENDPOINTS
-// ===================================
 
-// --- Search & Panel Commands ---
 app.post('/command', authenticateToken, searchController.handleCommand);
 app.post('/search', authenticateToken, searchController.searchFiles);
 app.post('/edit', authenticateToken, searchController.editContent);
 app.post('/analyze-file', authenticateToken, searchController.analyzeFile);
 
-// --- Calendar ---
 app.post('/create-event', authenticateToken, calendarController.createEvent);
 app.post('/suggest-files', authenticateToken, calendarController.suggestFiles);
 
@@ -77,7 +70,6 @@ app.post('/explain-text', authenticateToken, documentController.explainText);
 app.post('/edit-suggestion', authenticateToken, documentController.editSuggestion);
 app.post('/highlight-analysis', authenticateToken, documentController.highlightAnalysis);
 
-// --- Indexing Status ---
 app.get('/indexing-status', authenticateToken, (req, res) => {
   const status = dualNodeIndexing.getUserStatus(req.user.id);
   const systemStats = dualNodeIndexing.getStats();
@@ -99,7 +91,6 @@ app.get('/indexing-status', authenticateToken, (req, res) => {
   });
 });
 
-// --- System & Stats ---
 app.post('/test-auth', (req, res) => {
   const authHeader = req.headers.authorization;
   let token = null;
@@ -135,7 +126,6 @@ app.post('/test-auth', (req, res) => {
 });
 
 app.get('/stats', authenticateToken, (req, res) => {
-  // Verificar que sea admin
   if (req.user.role !== 'admin' && req.user.role !== 'boss') {
     return res.status(403).json({ error: 'No autorizado' });
   }
@@ -193,14 +183,11 @@ app.get('/health', (req, res) => {
   });
 });
 
-// Start server
 app.listen(PORT, async () => {
   console.log(` AI Service running on port ${PORT}`);
   
-  // Initialize Redis for Notifications
   await initRedis();
   
-  // 1. Initial Sync & Analysis: Ejecutar al arranque
   setTimeout(async () => {
     try {
         await syncDatabaseWithDisk();
@@ -210,17 +197,13 @@ app.listen(PORT, async () => {
     }
   }, 3000); 
 
-  // 2. Scheduled Sync: Ejecutar sincronización de disco cada 30 segundos
-  // Esto detecta archivos que se hayan subido por FTP o copiado manualmente
   setInterval(async () => {
       try {
-          // Sync disco -> DB
           await syncDatabaseWithDisk();
-          // El sistema incremental detectará los nuevos registros en DB automáticamente en su ciclo de 30s
       } catch (err) {
           console.error(' Error en sincronización programada:', err);
       }
-  }, 30 * 1000); // 30 segundos
+  }, 30 * 1000);
 });
 
 module.exports = app;

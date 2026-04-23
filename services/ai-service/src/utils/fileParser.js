@@ -1,19 +1,12 @@
-const fs = require('fs').promises;
+﻿const fs = require('fs').promises;
 const path = require('path');
 const mammoth = require('mammoth');
 const xlsx = require('xlsx');
 const pdf = require('pdf-parse');
 const officeParser = require('office-text-extractor');
 
-/**
- * Extract text from various file formats
- * @param {string} filePath - Physical path to the file
- * @param {string} mimeType - Mime type of the file
- * @returns {Promise<string>} Extracted text
- */
 async function extractTextFromFile(filePath, mimeType) {
   try {
-    // Verificar si el archivo existe
     try {
       await fs.access(filePath);
     } catch (e) {
@@ -23,8 +16,6 @@ async function extractTextFromFile(filePath, mimeType) {
 
     const ext = path.extname(filePath).toLowerCase();
 
-    // 1. Text / Markdown / Code / Config
-    // Added more extensions like .sql, .log, .ini, .bat, .sh, .rtf (simple)
     const textExtensions = [
         '.txt', '.md', '.js', '.py', '.java', '.c', '.cpp', '.h', '.cs', '.php', 
         '.json', '.html', '.css', '.xml', '.yml', '.yaml', '.csv', '.sql', 
@@ -33,76 +24,60 @@ async function extractTextFromFile(filePath, mimeType) {
     
     if (mimeType.startsWith('text/') || textExtensions.includes(ext)) {
       try {
-          // Intentar leer como UTF-8
           const content = await fs.readFile(filePath, 'utf8');
           return content;
       } catch (err) {
           console.warn(`[FILE PARSER] Falló lectura UTF-8 para ${filePath}, intentando latin1`);
-          // Fallback para otros encodings si es necesario, 
-          // pero por ahora devolvemos vacío o lo que se pudo
           return "";
       }
     }
 
-    // 2. PDF
     if (mimeType === 'application/pdf' || ext === '.pdf') {
       try {
           const dataBuffer = await fs.readFile(filePath);
           const data = await pdf(dataBuffer);
           let text = data.text || '';
           
-          // Clean up PDF text extraction issues:
-          // Some PDFs (especially scanned/OCR) return text with per-character newlines
-          // e.g. "H\ne\nl\nl\no" instead of "Hello"
-          // Detect this pattern: if avg word length < 2 chars, it's likely per-char split
           const words = text.split(/\s+/).filter(w => w.length > 0);
           if (words.length > 10) {
             const avgWordLen = words.reduce((sum, w) => sum + w.length, 0) / words.length;
             if (avgWordLen < 2.5) {
-              // Per-character newlines detected - rejoin characters
               text = text.replace(/(\S)\n(\S)/g, '$1$2');
               text = text.replace(/(\S)\r\n(\S)/g, '$1$2');
             }
           }
           
-          // General cleanup: collapse excessive whitespace while preserving paragraph breaks
-          text = text.replace(/\n{3,}/g, '\n\n');  // Max 2 newlines (paragraph break)
-          text = text.replace(/[ \t]+/g, ' ');       // Collapse horizontal whitespace
-          text = text.replace(/\n /g, '\n');          // Remove leading spaces after newline
+          text = text.replace(/\n{3,}/g, '\n\n');
+          text = text.replace(/[ \t]+/g, ' ');
+          text = text.replace(/\n /g, '\n');
           
           return text;
       } catch (pdfError) {
           console.error(`[FILE PARSER] PDF Error en ${filePath}:`, pdfError.message);
-          return ""; // PDF corrupto o encriptado
+          return "";
       }
     }
 
-    // 3. Word (.docx)
     if (ext === '.docx' || mimeType === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document') {
       try {
         const result = await mammoth.extractRawText({ path: filePath });
         if (result.value && result.value.trim().length > 0) {
             return result.value;
         }
-        // If empty, it might be a disguised text/html file
         throw new Error("Empty result from mammoth");
       } catch (err) {
         console.warn(`[FILE PARSER] Mammoth failed for ${filePath}, trying raw text fallback.`);
-        // Fallback: Read as text to check if it's actually HTML/Text
         try {
             const rawContent = await fs.readFile(filePath, 'utf8');
-            // Basic heuristic: contains typical text chars or html tags 
             if (rawContent.includes('<html') || rawContent.includes('<!DOCTYPE') || rawContent.length > 0) {
                  return rawContent;
             }
         } catch (readErr) {
-            // Ignore fallback error
         }
         return ""; 
       }
     }
 
-    // 4. Excel (.xlsx, .xls, .csv, .ods)
     if (['.xlsx', '.xls', '.csv', '.ods'].includes(ext) || mimeType.includes('spreadsheet') || mimeType.includes('excel')) {
       const workbook = xlsx.readFile(filePath);
       let text = "";
@@ -115,18 +90,16 @@ async function extractTextFromFile(filePath, mimeType) {
       return text;
     }
 
-    // 5. PowerPoint (.pptx, .odp)
     if (['.pptx', '.odp'].includes(ext) || mimeType.includes('presentation') || mimeType.includes('powerpoint')) {
-      // office-text-extractor requires the file path
       const text = await officeParser.getText(filePath);
       return text;
     }
 
-    return ""; // Formato no soportado
+    return "";
 
   } catch (error) {
     console.error(`[FILE PARSER] Error leyendo ${filePath}:`, error.message);
-    return ""; // Retornar vacío en error para no romper el flujo
+    return "";
   }
 }
 

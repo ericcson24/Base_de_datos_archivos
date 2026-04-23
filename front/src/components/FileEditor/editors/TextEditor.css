@@ -34,3 +34,21 @@ textarea:focus {
   opacity: 0.5;
   cursor: not-allowed;
 }
+
+@media (max-width: 768px) {
+  .line-numbers {
+    min-width: 36px;
+    font-size: 11px;
+  }
+
+  .text-editor-textarea {
+    font-size: 14px;
+  }
+}
+
+@media (max-width: 480px) {
+  .line-numbers {
+    min-width: 30px;
+    font-size: 10px;
+  }
+}

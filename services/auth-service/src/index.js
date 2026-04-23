@@ -17,20 +17,23 @@ const app = express();
 const PORT = process.env.PORT || 5001;
 const EMAIL_SERVICE_URL = process.env.EMAIL_SERVICE_URL || 'http://email-service:5007';
 
-// --- Rate Limiter (brute-force protection for /login) ---
-const loginAttempts = new Map(); // IP -> { count, resetTime }
-const RATE_LIMIT_WINDOW = 15 * 60 * 1000; // 15 minutos
-const RATE_LIMIT_MAX = 10; // max 10 intentos por ventana
+app.set('trust proxy', 1);
+
+const loginAttempts = new Map();
+const RATE_LIMIT_WINDOW = 15 * 60 * 1000;
+const RATE_LIMIT_MAX = 10;
 
 const loginRateLimiter = (req, res, next) => {
   const ip = req.ip || req.headers['x-forwarded-for'] || req.connection.remoteAddress || 'unknown';
+  const user = (req.body && req.body.username ? String(req.body.username).toLowerCase().trim() : '').slice(0, 64);
+  const key = `${ip}|${user}`;
   const now = Date.now();
-  const record = loginAttempts.get(ip);
+  const record = loginAttempts.get(key);
 
   if (record && now < record.resetTime) {
     if (record.count >= RATE_LIMIT_MAX) {
       const retryAfter = Math.ceil((record.resetTime - now) / 1000);
-      console.log(`🚫 Rate limit exceeded for IP: ${ip} (${record.count} attempts)`);
+      console.log(`[Blocked] Rate limit exceeded for ${key} (${record.count} attempts)`);
       return res.status(429).json({
         success: false,
         message: 'Demasiados intentos de login. Intente de nuevo más tarde.',
@@ -39,27 +42,24 @@ const loginRateLimiter = (req, res, next) => {
     }
     record.count++;
   } else {
-    loginAttempts.set(ip, { count: 1, resetTime: now + RATE_LIMIT_WINDOW });
+    loginAttempts.set(key, { count: 1, resetTime: now + RATE_LIMIT_WINDOW });
   }
 
   next();
 };
 
-// Cleanup expired rate limit entries every 30 min
 setInterval(() => {
   const now = Date.now();
-  for (const [ip, record] of loginAttempts) {
-    if (now >= record.resetTime) loginAttempts.delete(ip);
+  for (const [key, record] of loginAttempts) {
+    if (now >= record.resetTime) loginAttempts.delete(key);
   }
 }, 30 * 60 * 1000);
 
-// Ensure uploads directory exists
 const uploadDir = path.join(__dirname, '../uploads');
 if (!fs.existsSync(uploadDir)) {
     fs.mkdirSync(uploadDir, { recursive: true });
 }
 
-// Configure Multer
 const storage = multer.diskStorage({
     destination: function (req, file, cb) {
         cb(null, uploadDir)
@@ -73,7 +73,7 @@ const storage = multer.diskStorage({
 
 const upload = multer({ 
     storage: storage,
-    limits: { fileSize: 5 * 1024 * 1024 }, // 5MB limit
+    limits: { fileSize: 5 * 1024 * 1024 },
     fileFilter: (req, file, cb) => {
         if (file.mimetype.startsWith('image/')) {
             cb(null, true);
@@ -83,7 +83,6 @@ const upload = multer({
     }
 });
 
-// Middleware
 app.use(cors({
   origin: true,
   credentials: true
@@ -92,7 +91,6 @@ app.use(express.json());
 app.use(cookieParser());
 app.use('/uploads', express.static(uploadDir));
 
-// Helper to send email via Email Service
 async function sendEmail(to, subject, html) {
     try {
         await axios.post(`${EMAIL_SERVICE_URL}/send`, { to, subject, html });
@@ -103,7 +101,6 @@ async function sendEmail(to, subject, html) {
     }
 }
 
-// --- Logic from back/routes/auth.js ---
 
 async function validateCredentials(username, password) {
   try {
@@ -200,7 +197,6 @@ async function validateCredentials(username, password) {
   }
 }
 
-// Login endpoint (rate limited)
 app.post('/login', loginRateLimiter, async (req, res) => {
   const { username, password } = req.body;
 
@@ -212,7 +208,7 @@ app.post('/login', loginRateLimiter, async (req, res) => {
   }
 
   try {
-    console.log(`🔐 Validando credenciales para: ${username}`);
+    console.log(`[Secure] Validando credenciales para: ${username}`);
 
     const result = await validateCredentials(username, password);
 
@@ -259,7 +255,6 @@ app.post('/login', loginRateLimiter, async (req, res) => {
   }
 });
 
-// Logout endpoint
 app.post('/logout', (req, res) => {
   try {
     console.log('👋 Cerrando sesión. Cookies recibidas:', req.cookies);
@@ -283,7 +278,6 @@ app.post('/logout', (req, res) => {
   }
 });
 
-// Recuperar contraseña (Simulado)
 app.post('/recover-password', async (req, res) => {
   const { username } = req.body;
   if (!username) return res.status(400).json({ success: false, message: 'Usuario requerido' });
@@ -300,7 +294,6 @@ app.post('/recover-password', async (req, res) => {
   }
 });
 
-// Middleware de autenticación
 const authenticate = (req, res, next) => {
   const authHeader = req.headers.authorization;
   let token = null;
@@ -324,21 +317,18 @@ const authenticate = (req, res, next) => {
   }
 };
 
-// Verify endpoint
 app.get('/verify', async (req, res) => {
   try {
     const token = req.cookies.auth_token || req.headers.authorization?.split(' ')[1];
     if (!token) return res.status(401).json({ success: false, message: 'No hay sesión activa' });
 
     const userData = jwt.verify(token, JWT_SECRET);
-    // Return clean user data (without JWT internal fields)
     res.json({ success: true, user: { id: userData.id, username: userData.username, role: userData.role } });
   } catch (error) {
     res.status(401).json({ success: false, message: 'Token inválido o expirado' });
   }
 });
 
-// Settings endpoints
 app.get('/settings', authenticate, async (req, res) => {
   try {
     const user = await dbAsync.get(
@@ -369,7 +359,7 @@ app.get('/settings', authenticate, async (req, res) => {
 
 app.put('/settings', authenticate, async (req, res) => {
   try {
-    const { theme, avatarUrl, language, notifications, newPassword } = req.body;
+    const { theme, avatarUrl, language, notifications, newPassword, currentPassword } = req.body;
     const username = req.user.username;
 
     if (theme) await dbAsync.run('UPDATE users SET theme_preference = ? WHERE username = ?', [theme, username]);
@@ -377,13 +367,20 @@ app.put('/settings', authenticate, async (req, res) => {
     if (language) await dbAsync.run('UPDATE users SET language = ? WHERE username = ?', [language, username]);
     if (notifications !== undefined) await dbAsync.run('UPDATE users SET notifications = ? WHERE username = ?', [notifications ? 1 : 0, username]);
     if (newPassword) {
-      const hash = await bcrypt.hash(newPassword, 10);
-      // Note: This updates the legacy password field. Should also update user_credentials if possible.
-      // For now, we update the legacy field as per original code, but let's try to update credentials too.
-      const user = await dbAsync.get('SELECT id FROM users WHERE username = ?', [username]);
-      if (user) {
-          await dbAsync.run('UPDATE user_credentials SET password_hash = ? WHERE user_id = ?', [hash, user.id]);
+      if (typeof newPassword !== 'string' || newPassword.length < 8) {
+        return res.status(400).json({ success: false, message: 'La nueva contraseña debe tener al menos 8 caracteres' });
       }
+      if (!currentPassword || typeof currentPassword !== 'string') {
+        return res.status(400).json({ success: false, message: 'Debes introducir tu contraseña actual' });
+      }
+      const user = await dbAsync.get('SELECT id FROM users WHERE username = ?', [username]);
+      if (!user) return res.status(404).json({ success: false, message: 'Usuario no encontrado' });
+      const creds = await dbAsync.get('SELECT password_hash FROM user_credentials WHERE user_id = ?', [user.id]);
+      if (!creds) return res.status(400).json({ success: false, message: 'Credenciales no encontradas' });
+      const ok = await bcrypt.compare(currentPassword, creds.password_hash);
+      if (!ok) return res.status(401).json({ success: false, message: 'Contraseña actual incorrecta' });
+      const hash = await bcrypt.hash(newPassword, 10);
+      await dbAsync.run('UPDATE user_credentials SET password_hash = ? WHERE user_id = ?', [hash, user.id]);
     }
 
     res.json({ success: true, message: 'Configuración actualizada' });
@@ -392,7 +389,6 @@ app.put('/settings', authenticate, async (req, res) => {
   }
 });
 
-// Microsoft Link endpoints
 app.post('/link-microsoft', authenticate, async (req, res) => {
   try {
     const { accessToken, refreshToken, email, accountId } = req.body;
@@ -427,11 +423,9 @@ app.get('/microsoft/url', authenticate, (req, res) => {
   
   let redirectUri = process.env.MICROSOFT_REDIRECT_URI;
   
-  // Si no está configurado o es localhost, intentar construir desde la petición
   if (!redirectUri || redirectUri.includes('localhost')) {
       const host = req.get('host');
       if (host && !host.includes('localhost') && !host.includes('127.0.0.1')) {
-          // Forzar HTTPS para dominios de producción
           const protocol = 'https'; 
           redirectUri = `${protocol}://${host}/api/auth/microsoft/callback`;
       }
@@ -456,11 +450,9 @@ app.get('/microsoft/callback', async (req, res) => {
     const clientSecret = process.env.MICROSOFT_CLIENT_SECRET;
     
     let redirectUri = process.env.MICROSOFT_REDIRECT_URI;
-    // Si no está configurado o es localhost, intentar construir desde la petición
     if (!redirectUri || redirectUri.includes('localhost')) {
         const host = req.get('host');
         if (host && !host.includes('localhost') && !host.includes('127.0.0.1')) {
-            // Forzar HTTPS para dominios de producción
             const protocol = 'https';
             redirectUri = `${protocol}://${host}/api/auth/microsoft/callback`;
         }
@@ -488,7 +480,6 @@ app.get('/microsoft/callback', async (req, res) => {
       throw new Error(tokenData.error_description);
     }
 
-    // Get user email
     const userResponse = await fetch('https://graph.microsoft.com/v1.0/me', {
       headers: { 'Authorization': `Bearer ${tokenData.access_token}` }
     });
@@ -499,7 +490,6 @@ app.get('/microsoft/callback', async (req, res) => {
       [tokenData.access_token, tokenData.refresh_token, userData.mail || userData.userPrincipalName, userData.id, state]
     );
 
-    // Determine redirect URL
     let baseUrl = 'http://localhost';
     const host = req.get('host');
     if (host && !host.includes('localhost') && !host.includes('127.0.0.1')) {
@@ -520,21 +510,15 @@ app.get('/microsoft/callback', async (req, res) => {
   }
 });
 
-// Avatar endpoints
 app.post('/avatar', authenticate, upload.single('avatar'), async (req, res) => {
     try {
         if (!req.file) {
             return res.status(400).json({ success: false, message: 'No file uploaded' });
         }
 
-        // Construct URL. Since we serve /uploads at /api/auth/uploads via gateway mapping
-        // We need to return the full path that the frontend can use.
-        // Gateway maps /api/auth/ -> auth-service:5001/
-        // So auth-service:5001/uploads/file.png -> /api/auth/uploads/file.png
         const avatarUrl = `/api/auth/uploads/${req.file.filename}`;
         const username = req.user.username;
 
-        // Update user in DB
         await dbAsync.run('UPDATE users SET avatar_url = ? WHERE username = ?', [avatarUrl, username]);
 
         res.json({ success: true, avatarUrl: avatarUrl });
@@ -547,8 +531,6 @@ app.post('/avatar', authenticate, upload.single('avatar'), async (req, res) => {
 app.delete('/avatar', authenticate, async (req, res) => {
     try {
         const username = req.user.username;
-        // Optional: Delete file from disk if we want to be clean
-        // For now just clear DB
         await dbAsync.run('UPDATE users SET avatar_url = NULL WHERE username = ?', [username]);
         res.json({ success: true });
     } catch (error) {
@@ -557,16 +539,10 @@ app.delete('/avatar', authenticate, async (req, res) => {
 });
 
 app.get('/avatars', async (req, res) => {
-    // Return list of default avatars if any
-    // For now return empty to let frontend use dicebear
     res.json({ success: true, avatars: [] });
 });
 
-// ==========================================
-// SECURITY MANAGEMENT ENDPOINTS (Admin only)
-// ==========================================
 
-// Middleware: require admin role
 const requireAdmin = (req, res, next) => {
   if (!req.user || req.user.role !== 'admin') {
     return res.status(403).json({ success: false, message: 'Acceso denegado: se requiere rol de administrador' });
@@ -574,7 +550,6 @@ const requireAdmin = (req, res, next) => {
   next();
 };
 
-// GET /security/rate-limits - List all currently rate-limited IPs
 app.get('/security/rate-limits', authenticate, requireAdmin, (req, res) => {
   try {
     const now = Date.now();
@@ -597,14 +572,12 @@ app.get('/security/rate-limits', authenticate, requireAdmin, (req, res) => {
   }
 });
 
-// DELETE /security/rate-limits/:ip - Unblock a specific IP
 app.delete('/security/rate-limits/:ip', authenticate, requireAdmin, (req, res) => {
   try {
     const ip = decodeURIComponent(req.params.ip);
     if (loginAttempts.has(ip)) {
       loginAttempts.delete(ip);
-      console.log(`🔓 Admin ${req.user.username} unblocked rate-limit for IP: ${ip}`);
-      // Log the action
+      console.log(`[Unlock] Admin ${req.user.username} unblocked rate-limit for IP: ${ip}`);
       dbAsync.run('INSERT INTO audit_logs (user_id, username, action, details, ip_address) VALUES (?, ?, ?, ?, ?)',
         [req.user.id, req.user.username, 'RATE_LIMIT_CLEAR', `IP desbloqueada: ${ip}`, '::1']);
       return res.json({ success: true, message: `IP ${ip} desbloqueada` });
@@ -615,12 +588,11 @@ app.delete('/security/rate-limits/:ip', authenticate, requireAdmin, (req, res) =
   }
 });
 
-// DELETE /security/rate-limits - Clear ALL rate limits
 app.delete('/security/rate-limits', authenticate, requireAdmin, (req, res) => {
   try {
     const count = loginAttempts.size;
     loginAttempts.clear();
-    console.log(`🔓 Admin ${req.user.username} cleared all rate limits (${count} entries)`);
+    console.log(`[Unlock] Admin ${req.user.username} cleared all rate limits (${count} entries)`);
     dbAsync.run('INSERT INTO audit_logs (user_id, username, action, details, ip_address) VALUES (?, ?, ?, ?, ?)',
       [req.user.id, req.user.username, 'RATE_LIMIT_CLEAR_ALL', `Se limpiaron ${count} entradas de rate limit`, '::1']);
     res.json({ success: true, message: `${count} entradas de rate limit eliminadas` });
@@ -629,7 +601,6 @@ app.delete('/security/rate-limits', authenticate, requireAdmin, (req, res) => {
   }
 });
 
-// GET /security/blocked-accounts - List locked user accounts
 app.get('/security/blocked-accounts', authenticate, requireAdmin, async (req, res) => {
   try {
     const accounts = await dbAsync.all(`
@@ -645,13 +616,12 @@ app.get('/security/blocked-accounts', authenticate, requireAdmin, async (req, re
   }
 });
 
-// POST /security/unlock-account/:userId - Unlock a user account
 app.post('/security/unlock-account/:userId', authenticate, requireAdmin, async (req, res) => {
   try {
     const { userId } = req.params;
     await dbAsync.run('UPDATE user_credentials SET is_locked = FALSE, lockout_until = NULL, failed_attempts = 0 WHERE user_id = ?', [userId]);
     const user = await dbAsync.get('SELECT username FROM users WHERE id = ?', [userId]);
-    console.log(`🔓 Admin ${req.user.username} unlocked account for user ID: ${userId}`);
+    console.log(`[Unlock] Admin ${req.user.username} unlocked account for user ID: ${userId}`);
     await dbAsync.run('INSERT INTO audit_logs (user_id, username, action, details, ip_address) VALUES (?, ?, ?, ?, ?)',
       [req.user.id, req.user.username, 'ACCOUNT_UNLOCK', `Cuenta desbloqueada: ${user?.username || userId}`, '::1']);
     res.json({ success: true, message: `Cuenta desbloqueada` });
@@ -660,11 +630,10 @@ app.post('/security/unlock-account/:userId', authenticate, requireAdmin, async (
   }
 });
 
-// GET /security/audit-logs - Get security-related audit logs
 app.get('/security/audit-logs', authenticate, requireAdmin, async (req, res) => {
   try {
     const limit = parseInt(req.query.limit) || 50;
-    const filter = req.query.filter || 'all'; // all, logins, failures, blocks, admin_actions
+    const filter = req.query.filter || 'all';
     
     let whereClause = '';
     if (filter === 'logins') {
@@ -679,7 +648,6 @@ app.get('/security/audit-logs', authenticate, requireAdmin, async (req, res) => 
     
     const logs = await dbAsync.all(`SELECT * FROM audit_logs ${whereClause} ORDER BY timestamp DESC LIMIT ?`, [limit]);
     
-    // Also get stats
     const stats = await dbAsync.get(`
       SELECT 
         COUNT(*) FILTER (WHERE action = 'LOGIN' AND timestamp > NOW() - INTERVAL '24 hours') as logins_24h,

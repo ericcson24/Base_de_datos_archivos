@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from 'react';
+import { FiRefreshCw, FiUser } from 'react-icons/fi';
 import { getFileType, canPreview, getAuthenticatedPreviewUrl, getAuthToken } from '../../utils/fileUtils';
 import { useLanguage } from '../../context/LanguageContext';
 import FolderIcon from '../Common/FolderIcon';
 import FileTypeIcon from '../Common/FileTypeIcon';
 
-// Office preview component for recents
 const RecentOfficePreview = React.memo(({ fileId, fileType, fileName }) => {
   const [content, setContent] = useState(null);
   const [error, setError] = useState(false);
@@ -85,7 +85,6 @@ const RecentFileItem = ({ file, isDarkMode, onFileClick }) => {
 
   useEffect(() => {
     const loadPreview = async () => {
-      // Don't load preview URL for office types (they use OfficePreview component)
       if (file.type === 'folder' || !canPreview(file.name) || isOfficeType) return;
       
       setIsLoading(true);
@@ -118,7 +117,7 @@ const RecentFileItem = ({ file, isDarkMode, onFileClick }) => {
             <RecentOfficePreview fileId={file.id} fileType={fileType} fileName={file.name} />
           </div>
         ) : isLoading ? (
-          <div className="loading-preview">⟳</div>
+          <div className="loading-preview"><FiRefreshCw className="spin" /></div>
         ) : previewUrl && canPreview(file.name) ? (
           <div className="file-preview-container">
             {fileType === 'image' && (
@@ -155,7 +154,7 @@ const RecentFileItem = ({ file, isDarkMode, onFileClick }) => {
                 <source src={previewUrl} />
               </video>
             )}
-            {/* Fallback icon */}
+            
             <div className="file-fallback-icon fallback-icon-hidden">
               <FileTypeIcon type={fileType} size={36} />
             </div>
@@ -166,7 +165,7 @@ const RecentFileItem = ({ file, isDarkMode, onFileClick }) => {
           </div>
         )}
         
-        {/* File type indicator */}
+        
         <div className="file-type-indicator">
           {file.name.split('.').pop()?.toUpperCase()}
         </div>
@@ -179,7 +178,7 @@ const RecentFileItem = ({ file, isDarkMode, onFileClick }) => {
         <p className="recent-file-date">
           {file.shared && file.owner && (
             <span className="recent-shared-badge" title={`${t('contextMenu.from', { owner: file.owner })}`}>
-              👤 {file.owner}
+              <FiUser style={{ verticalAlign: 'middle', marginRight: 4 }} /> {file.owner}
             </span>
           )}
           {displayDate ? 

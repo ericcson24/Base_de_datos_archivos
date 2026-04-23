@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import Guacamole from 'guacamole-common-js';
+import { FiMonitor, FiUser, FiLock, FiEye, FiEyeOff, FiShield, FiUnlock, FiBarChart2, FiAlertTriangle } from 'react-icons/fi';
 import { useLanguage } from '../../context/LanguageContext';
 import './RDPViewer.css';
 
@@ -16,17 +17,15 @@ const RDPViewer = ({ connectionId, token, onClose }) => {
     const [lastSync, setLastSync] = useState(null);
     const [frameCount, setFrameCount] = useState(0);
 
-    // Credentials modal state
     const [showCredentials, setShowCredentials] = useState(true);
     const [rdpUsername, setRdpUsername] = useState('');
     const [rdpPassword, setRdpPassword] = useState('');
     const [showPassword, setShowPassword] = useState(false);
 
-    // Fallback credentials modal for when guacd asks mid-connection
     const [pendingRequired, setPendingRequired] = useState(null);
     const [fallbackPassword, setFallbackPassword] = useState('');
+    const wasConnectedRef = useRef(false);
 
-    // Start the actual Guacamole connection after user submits credentials
     const startConnection = useCallback(() => {
         if (!token || !connectionId || !elementRef.current) {
             console.warn('RDPViewer - Missing required params:', {
@@ -46,12 +45,10 @@ const RDPViewer = ({ connectionId, token, onClose }) => {
 
         console.log('RDPViewer - Initializing connection:', { connectionId, rdpUsername });
 
-        // Create tunnel - use the current browser host/protocol
         const host = window.location.host;
         const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
         
         const tunnelUrl = `${protocol}//${host}/api/rdp`;
-        // Use the actual container size so the RDP session fills the view 1:1
         const ctr = elementRef.current;
         const screenW = (ctr && ctr.clientWidth > 0) ? ctr.clientWidth : window.innerWidth;
         const screenH = (ctr && ctr.clientHeight > 0) ? ctr.clientHeight : (window.innerHeight - 50);
@@ -65,36 +62,36 @@ const RDPViewer = ({ connectionId, token, onClose }) => {
         const guacClient = new Guacamole.Client(tunnel);
         clientRef.current = guacClient;
 
-        // Track sync frames for ping calculation
         let syncCounter = 0;
 
-        // Error handler
         guacClient.onerror = (error) => {
             console.error('Guacamole error:', error);
-            // Guacamole.Status has .code and .message
             const code = error?.code ?? '';
             const msg = error?.message || '';
             let displayMsg = msg || 'Unknown error';
-            // Map common Guacamole status codes to user-friendly messages
-            if (code === 0x0203 || code === 515) displayMsg = t('rdp.authFailed') || 'Authentication failed — check your username and password';
-            else if (code === 0x0200 || code === 512) displayMsg = t('rdp.serverError') || 'Server error — could not connect';
-            else if (code === 0x0308 || code === 776) displayMsg = t('rdp.upstreamError') || 'Remote desktop server unreachable';
-            else if (msg) displayMsg = msg;
+            const msgLower = (msg || '').toLowerCase();
+            const isAuthError = msgLower.includes('authentication') || msgLower.includes('credentials') || msgLower.includes('logon') || msgLower.includes('login');
+            if (code === 0x0203 || code === 515 || code === 769 || code === 0x0301 || isAuthError) {
+                displayMsg = t('rdp.authFailed') || 'Authentication failed \u2014 check your username and password';
+            } else if (code === 0x0200 || code === 512) {
+                displayMsg = t('rdp.serverError') || 'Server error \u2014 could not connect';
+            } else if (code === 0x0308 || code === 776) {
+                displayMsg = t('rdp.upstreamError') || 'Remote desktop server unreachable';
+            } else if (msg) {
+                displayMsg = msg;
+            }
             console.error('RDP Error -', 'code:', code, 'message:', msg, 'display:', displayMsg);
             setConnectionState('ERROR');
             setErrorMsg(displayMsg);
         };
 
-        // Handle 'required' instruction — guacd needs credentials interactively (fallback)
         guacClient.onrequired = (params) => {
             console.warn('Guacamole requires params:', params);
             if (params && params.includes('password')) {
-                // Show a smaller inline modal for password re-entry
                 setPendingRequired({ params, client: guacClient });
             }
         };
 
-        // Sync handler — track ping/latency and frame count
         guacClient.onsync = (timestamp) => {
             syncCounter++;
             const now = Date.now();
@@ -106,13 +103,13 @@ const RDPViewer = ({ connectionId, token, onClose }) => {
             setFrameCount(syncCounter);
         };
 
-        // State change handler
         guacClient.onstatechange = (state) => {
             switch (state) {
                 case 0: setConnectionState('IDLE'); break;
                 case 1: setConnectionState('CONNECTING'); break;
                 case 2: setConnectionState('WAITING'); break;
                 case 3: 
+                    wasConnectedRef.current = true;
                     setConnectionState('CONNECTED');
                     setTimeout(() => {
                         const displayEl = elementRef.current?.querySelector('div');
@@ -120,16 +117,26 @@ const RDPViewer = ({ connectionId, token, onClose }) => {
                     }, 200);
                     break;
                 case 4: setConnectionState('DISCONNECTING'); break;
-                case 5: setConnectionState('DISCONNECTED'); break;
+                case 5:
+                    setConnectionState(prev => {
+                        if (prev === 'ERROR') return 'ERROR';
+                        return 'DISCONNECTED';
+                    });
+                    if (!wasConnectedRef.current) {
+                        setErrorMsg(prev => prev || (t('rdp.connectionFailed') || 'Connection failed \u2014 could not establish remote desktop session'));
+                        setConnectionState(prev => {
+                            if (prev === 'ERROR') return 'ERROR';
+                            return 'ERROR';
+                        });
+                    }
+                    break;
                 default: break;
             }
         };
 
-        // Get display
         const guacDisplay = guacClient.getDisplay();
         setDisplay(guacDisplay);
         
-        // Add display to DOM
         const displayElement = guacDisplay.getElement();
         const containerEl = elementRef.current;
         containerEl.innerHTML = '';
@@ -138,14 +145,11 @@ const RDPViewer = ({ connectionId, token, onClose }) => {
         displayElement.tabIndex = 0;
         displayElement.style.outline = 'none';
 
-        // Connect
         guacClient.connect(connectData);
 
-        // ========== MOUSE ==========
         const mouse = new Guacamole.Mouse(displayElement);
 
         mouse.onmousedown = mouse.onmouseup = mouse.onmousemove = (mouseState) => {
-            // Scale coordinates to match the remote desktop resolution
             const scale = guacDisplay.getScale() || 1;
             mouseState.x = mouseState.x / scale;
             mouseState.y = mouseState.y / scale;
@@ -166,7 +170,6 @@ const RDPViewer = ({ connectionId, token, onClose }) => {
             };
         }
 
-        // ========== KEYBOARD ==========
         const keyboard = new Guacamole.Keyboard(document);
         keyboardRef.current = keyboard;
 
@@ -181,7 +184,6 @@ const RDPViewer = ({ connectionId, token, onClose }) => {
 
         displayElement.focus();
 
-        // Store cleanup function
         cleanupRef.current = () => {
             keyboard.onkeydown = null;
             keyboard.onkeyup = null;
@@ -200,14 +202,12 @@ const RDPViewer = ({ connectionId, token, onClose }) => {
         };
     }, [token, connectionId, rdpUsername, rdpPassword]);
 
-    // Cleanup on unmount
     useEffect(() => {
         return () => {
             if (cleanupRef.current) cleanupRef.current();
         };
     }, []);
 
-    // Handler for fallback password submission (when guacd asks mid-connection)
     const handleFallbackPasswordSubmit = useCallback(() => {
         if (!pendingRequired) return;
         const { client } = pendingRequired;
@@ -219,13 +219,11 @@ const RDPViewer = ({ connectionId, token, onClose }) => {
         setFallbackPassword('');
     }, [pendingRequired, fallbackPassword]);
 
-    // Handle credentials form submission
     const handleCredentialsSubmit = (e) => {
         e.preventDefault();
         startConnection();
     };
 
-    // Fit to screen
     useEffect(() => {
         if (!display || !elementRef.current) return;
         
@@ -234,7 +232,6 @@ const RDPViewer = ({ connectionId, token, onClose }) => {
             const w = container.clientWidth;
             const h = container.clientHeight;
             
-            // Calculate scale to fit
             const defaultWidth = display.getWidth();
             const defaultHeight = display.getHeight();
             
@@ -248,14 +245,13 @@ const RDPViewer = ({ connectionId, token, onClose }) => {
         };
 
         window.addEventListener('resize', resize);
-        // Initial resize after connection — with max attempts guard
         let attempts = 0;
         const interval = setInterval(() => {
              if (display.getWidth() > 0) {
                  resize();
                  clearInterval(interval);
              } else if (++attempts > 100) {
-                 clearInterval(interval); // Stop after 10s to prevent infinite polling
+                 clearInterval(interval);
              }
         }, 100);
 
@@ -263,9 +259,8 @@ const RDPViewer = ({ connectionId, token, onClose }) => {
             clearInterval(interval);
             window.removeEventListener('resize', resize);
         };
-    }, [display]); // Only re-run when display changes, not on every state change
+    }, [display]);
 
-    // Ping "alive" indicator — detect stale connection
     const [isStale, setIsStale] = useState(false);
     useEffect(() => {
         if (connectionState !== 'CONNECTED') return;
@@ -282,8 +277,6 @@ const RDPViewer = ({ connectionId, token, onClose }) => {
     const sendCtrlAltDel = useCallback(() => {
         const c = clientRef.current;
         if (!c) return;
-        // Send Ctrl+Alt+Del sequence
-        // 0xFFE3 (Ctrl), 0xFFE9 (Alt), 0xFFFF (Delete)
         c.sendKeyEvent(1, 0xFFE3);
         c.sendKeyEvent(1, 0xFFE9);
         c.sendKeyEvent(1, 0xFFFF);
@@ -292,27 +285,26 @@ const RDPViewer = ({ connectionId, token, onClose }) => {
         c.sendKeyEvent(0, 0xFFE3);
     }, []);
 
-    // Format ping display
     const getPingDisplay = () => {
         if (connectionState !== 'CONNECTED') return null;
-        if (isStale) return { text: 'STALE', color: '#f44336', icon: '🔴' };
-        if (pingMs === null) return { text: '...', color: '#ff9800', icon: '🟡' };
-        if (pingMs < 50) return { text: `${pingMs}ms`, color: '#4caf50', icon: '🟢' };
-        if (pingMs < 150) return { text: `${pingMs}ms`, color: '#8bc34a', icon: '🟢' };
-        if (pingMs < 300) return { text: `${pingMs}ms`, color: '#ff9800', icon: '🟡' };
-        return { text: `${pingMs}ms`, color: '#f44336', icon: '🔴' };
+        if (isStale) return { text: 'STALE', color: '#f44336', icon: '[Red]' };
+        if (pingMs === null) return { text: '...', color: '#ff9800', icon: '[Yellow]' };
+        if (pingMs < 50) return { text: `${pingMs}ms`, color: '#4caf50', icon: '[Green]' };
+        if (pingMs < 150) return { text: `${pingMs}ms`, color: '#8bc34a', icon: '[Green]' };
+        if (pingMs < 300) return { text: `${pingMs}ms`, color: '#ff9800', icon: '[Yellow]' };
+        return { text: `${pingMs}ms`, color: '#f44336', icon: '[Red]' };
     };
 
     const pingInfo = getPingDisplay();
 
     return (
         <div className="rdp-viewer-container">
-            {/* ===== Credentials Modal ===== */}
+            
             {showCredentials && (
                 <div className="rdp-credentials-overlay">
                     <form className="rdp-credentials-modal glassmorphism" onSubmit={handleCredentialsSubmit}>
                         <div className="rdp-credentials-header">
-                            <div className="rdp-credentials-icon">🖥️</div>
+                            <div className="rdp-credentials-icon"><FiMonitor /></div>
                             <h2>{t('rdp.connectTitle') || 'Remote Desktop Connection'}</h2>
                             <p className="rdp-credentials-subtitle">
                                 {t('rdp.enterCredentials') || 'Enter your Windows credentials to connect'}
@@ -322,7 +314,7 @@ const RDPViewer = ({ connectionId, token, onClose }) => {
                         <div className="rdp-credentials-body">
                             <div className="rdp-input-group">
                                 <label htmlFor="rdp-username">
-                                    <span className="rdp-input-icon">👤</span>
+                                    <span className="rdp-input-icon"><FiUser /></span>
                                     {t('rdp.username') || 'Username'}
                                 </label>
                                 <input
@@ -339,7 +331,7 @@ const RDPViewer = ({ connectionId, token, onClose }) => {
 
                             <div className="rdp-input-group">
                                 <label htmlFor="rdp-password">
-                                    <span className="rdp-input-icon">🔒</span>
+                                    <span className="rdp-input-icon"><FiLock /></span>
                                     {t('rdp.password') || 'Password'}
                                 </label>
                                 <div className="rdp-password-wrapper">
@@ -348,7 +340,7 @@ const RDPViewer = ({ connectionId, token, onClose }) => {
                                         type={showPassword ? 'text' : 'password'}
                                         value={rdpPassword}
                                         onChange={(e) => setRdpPassword(e.target.value)}
-                                        placeholder="••••••••"
+                                        placeholder="********"
                                         autoComplete="current-password"
                                     />
                                     <button
@@ -357,7 +349,7 @@ const RDPViewer = ({ connectionId, token, onClose }) => {
                                         onClick={() => setShowPassword(!showPassword)}
                                         tabIndex={-1}
                                     >
-                                        {showPassword ? '🙈' : '👁️'}
+                                        {showPassword ? <FiEyeOff /> : <FiEye />}
                                     </button>
                                 </div>
                             </div>
@@ -368,19 +360,19 @@ const RDPViewer = ({ connectionId, token, onClose }) => {
                                 {t('common.cancel') || 'Cancel'}
                             </button>
                             <button type="submit" className="rdp-btn primary">
-                                🖥️ {t('rdp.connect') || 'Connect'}
+                                <FiMonitor style={{ marginRight: 6, verticalAlign: 'middle' }} /> {t('rdp.connect') || 'Connect'}
                             </button>
                         </div>
                     </form>
                 </div>
             )}
 
-            {/* ===== Fallback password modal (when guacd requests mid-connection) ===== */}
+            
             {pendingRequired && (
                 <div className="rdp-credentials-overlay">
                     <div className="rdp-credentials-modal glassmorphism rdp-credentials-compact">
                         <div className="rdp-credentials-header">
-                            <div className="rdp-credentials-icon">🔐</div>
+                            <div className="rdp-credentials-icon"><FiShield /></div>
                             <h2>{t('rdp.passwordRequired') || 'Password Required'}</h2>
                             <p className="rdp-credentials-subtitle">
                                 {t('rdp.serverRequestsPassword') || 'The remote server is requesting your password'}
@@ -389,7 +381,7 @@ const RDPViewer = ({ connectionId, token, onClose }) => {
                         <div className="rdp-credentials-body">
                             <div className="rdp-input-group">
                                 <label htmlFor="rdp-fallback-password">
-                                    <span className="rdp-input-icon">🔒</span>
+                                    <span className="rdp-input-icon"><FiLock /></span>
                                     {t('rdp.password') || 'Password'}
                                 </label>
                                 <input
@@ -397,7 +389,7 @@ const RDPViewer = ({ connectionId, token, onClose }) => {
                                     type="password"
                                     value={fallbackPassword}
                                     onChange={(e) => setFallbackPassword(e.target.value)}
-                                    placeholder="••••••••"
+                                    placeholder="********"
                                     autoFocus
                                     onKeyDown={(e) => { if (e.key === 'Enter') handleFallbackPasswordSubmit(); }}
                                 />
@@ -412,14 +404,14 @@ const RDPViewer = ({ connectionId, token, onClose }) => {
                                 {t('common.cancel') || 'Cancel'}
                             </button>
                             <button className="rdp-btn primary" onClick={handleFallbackPasswordSubmit}>
-                                🔓 {t('rdp.authenticate') || 'Authenticate'}
+                                <FiUnlock style={{ marginRight: 6, verticalAlign: 'middle' }} /> {t('rdp.authenticate') || 'Authenticate'}
                             </button>
                         </div>
                     </div>
                 </div>
             )}
 
-            {/* Toolbar */}
+            
             <div className="rdp-toolbar glassmorphism" onMouseDown={(e) => e.stopPropagation()}>
                 <div className="rdp-status">
                     <span className={`status-dot ${connectionState.toLowerCase()}`}></span>
@@ -431,7 +423,7 @@ const RDPViewer = ({ connectionId, token, onClose }) => {
                     )}
                     {connectionState === 'CONNECTED' && (
                         <span className="rdp-frames">
-                            📊 {frameCount} frames
+                            <FiBarChart2 style={{ verticalAlign: 'middle', marginRight: 4 }} /> {frameCount} frames
                         </span>
                     )}
                 </div>
@@ -440,12 +432,12 @@ const RDPViewer = ({ connectionId, token, onClose }) => {
                         ⌨ CAD
                     </button>
                     <button onClick={onClose} className="rdp-btn danger" title={t('rdp.disconnect')}>
-                        ✕
+                        x
                     </button>
                 </div>
             </div>
 
-            {/* Canvas Container */}
+            
             <div 
                 className={`rdp-display${connectionState === 'CONNECTED' ? ' cursor-hidden' : ''}`} 
                 ref={elementRef}
@@ -455,7 +447,7 @@ const RDPViewer = ({ connectionId, token, onClose }) => {
                 }}
             ></div>
 
-            {/* Loading Overlay */}
+            
             {(connectionState === 'CONNECTING' || connectionState === 'WAITING') && !showCredentials ? (
                 <div className="rdp-overlay">
                     <div className="spinner"></div>
@@ -463,10 +455,10 @@ const RDPViewer = ({ connectionId, token, onClose }) => {
                 </div>
             ) : null}
 
-            {/* Error Overlay */}
-            {connectionState === 'ERROR' && (
+            
+            {(connectionState === 'ERROR' || (connectionState === 'DISCONNECTED' && errorMsg)) && (
                 <div className="rdp-overlay error">
-                    <div className="error-icon">⚠️</div>
+                    <div className="error-icon"><FiAlertTriangle /></div>
                     <h3>{t('rdp.error')}</h3>
                     <p>{errorMsg || t('rdp.unknownError') || 'Unknown error'}</p>
                     <button onClick={onClose} className="rdp-btn">

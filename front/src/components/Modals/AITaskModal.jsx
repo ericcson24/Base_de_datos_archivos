@@ -12,14 +12,12 @@ const AITaskModal = ({ isOpen, onClose, onTaskCreated, user }) => {
   const [prompt, setPrompt] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   
-  // Assignment State
-  const [assignMode, setAssignMode] = useState('me'); // 'me', 'group', 'user'
+  const [assignMode, setAssignMode] = useState('me');
   const [targetUserId, setTargetUserId] = useState('');
   const [groupId, setGroupId] = useState('');
   const [users, setUsers] = useState([]);
   const [groups, setGroups] = useState([]);
 
-  // Fetch users and groups if admin/boss
   useEffect(() => {
     if (isOpen && user && (user.role === 'admin' || user.role === 'boss')) {
       const fetchData = async () => {
@@ -27,7 +25,6 @@ const AITaskModal = ({ isOpen, onClose, onTaskCreated, user }) => {
           const token = getAuthToken();
           const headers = { 'Authorization': `Bearer ${token}` };
 
-          // Default header if token exists
           const fetchOptions = { headers };
 
           const [usersRes, groupsRes] = await Promise.all([
@@ -78,11 +75,10 @@ const AITaskModal = ({ isOpen, onClose, onTaskCreated, user }) => {
       
       if (response.ok && data.success) {
         addToast(data.message || t('calendar.eventCreated'), 'success');
-        setPrompt(''); // Clear prompt
-        onTaskCreated(); // Refresh calendar
-        onClose(); // Close modal
+        setPrompt('');
+        onTaskCreated();
+        onClose();
       } else if (response.status === 429) {
-        // Rate limit error
         const retryAfter = data.retryAfter || 10;
         addToast(
           data.error || t('ai.rateLimitError', { seconds: retryAfter }),
@@ -113,7 +109,7 @@ const AITaskModal = ({ isOpen, onClose, onTaskCreated, user }) => {
             <span style={{ marginRight: '10px' }}>✨</span>
             {t('calendar.aiTaskBuilder') || 'Asistente IA de Tareas'}
           </h2>
-          <button className="close-button" onClick={onClose}>✕</button>
+          <button className="close-button" onClick={onClose}>x</button>
         </div>
 
         <div className="modal-body">

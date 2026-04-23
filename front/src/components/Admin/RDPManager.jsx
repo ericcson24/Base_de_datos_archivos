@@ -14,7 +14,6 @@ const RDPManager = () => {
     const [defaultConnection, setDefaultConnection] = useState(null);
     const [serverInfo, setServerInfo] = useState(null);
 
-    // Fetch server info for display
     useEffect(() => {
         const token = getAuthToken();
         fetch('/api/rdp/server-info', { headers: { 'Authorization': `Bearer ${token}` } })
@@ -89,7 +88,6 @@ const RDPManager = () => {
                 method: 'POST',
                 headers: { 'Authorization': `Bearer ${token}` }
             });
-            // Re-enable
             await fetch('/api/rdp/settings', {
                 method: 'POST',
                 headers: {
@@ -153,7 +151,7 @@ session bpp:i:32
                     </div>
 
                     <div className="rdp-dashboard-grid">
-                        {/* Status Card */}
+                        
                         <div className={`rdp-status-card glassmorphism ${isRunning ? 'status-active' : 'status-stopped'}`}>
                             <div className="status-indicator-large">
                                 <div className="indicator-dot"></div>
@@ -176,7 +174,7 @@ session bpp:i:32
                             </div>
                         </div>
 
-                        {/* Connection Card */}
+                        
                         <div className="rdp-connection-card glassmorphism">
                             <h3>{t('rdp.access') || 'Access Methods'}</h3>
                             {loading ? <p>{t('common.loading')}</p> : (
@@ -211,7 +209,7 @@ session bpp:i:32
                             )}
                         </div>
                         
-                        {/* Info Card */}
+                        
                          <div className="rdp-info-card glassmorphism">
                             <h4>ℹ️ {t('common.info')}</h4>
                             <p><strong>{t('rdp.serverId')}:</strong> {settings.server_id}</p>

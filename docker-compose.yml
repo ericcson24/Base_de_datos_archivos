@@ -1,15 +1,27 @@
 services:
   # --- Frontend (React) ---
   frontend:
-    build: ./front
+    build: 
+      context: ./front
+      network: host
+    restart: unless-stopped
     networks:
       - app-network
 
   # --- API Gateway ---
   gateway:
-    build: ./gateway
+    build: 
+      context: ./gateway
+      network: host
+    restart: unless-stopped
     ports:
       - "8080:80"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:80/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
     depends_on:
       - frontend
       - auth-service
@@ -27,7 +39,10 @@ services:
 
   # --- AI Service (5009) ---
   ai-service:
-    build: ./services/ai-service
+    build: 
+      context: ./services/ai-service
+      network: host
+    restart: unless-stopped
     environment:
       - DB_TYPE=postgres
       - DB_HOST=postgres
@@ -66,6 +81,7 @@ services:
   # --- Postgres Database (Production) ---
   postgres:
     image: postgres:15
+    restart: unless-stopped
     environment:
       POSTGRES_USER: ${DB_USER:-admin}
       POSTGRES_PASSWORD: ${DB_PASSWORD:-admin123}
@@ -80,7 +96,10 @@ services:
 
   # --- Auth Service (5001) ---
   auth-service:
-    build: ./services/auth-service
+    build: 
+      context: ./services/auth-service
+      network: host
+    restart: unless-stopped
     environment:
       - DB_TYPE=postgres
       - DB_HOST=postgres
@@ -101,7 +120,10 @@ services:
 
   # --- Notification Service (5002) ---
   notification-service:
-    build: ./services/notification-service
+    build: 
+      context: ./services/notification-service
+      network: host
+    restart: unless-stopped
     environment:
       - PORT=5002
       - JWT_SECRET=${JWT_SECRET}
@@ -119,7 +141,10 @@ services:
 
   # --- Outlook Service (5003) ---
   outlook-service:
-    build: ./services/outlook-service
+    build: 
+      context: ./services/outlook-service
+      network: host
+    restart: unless-stopped
     environment:
       - DB_TYPE=postgres
       - DB_HOST=postgres
@@ -138,7 +163,10 @@ services:
 
   # --- File Service (5004) ---
   file-service:
-    build: ./services/file-service
+    build: 
+      context: ./services/file-service
+      network: host
+    restart: unless-stopped
     environment:
       - DB_TYPE=postgres
       - DB_HOST=postgres
@@ -157,7 +185,10 @@ services:
 
   # --- User Service (5005) ---
   user-service:
-    build: ./services/user-service
+    build: 
+      context: ./services/user-service
+      network: host
+    restart: unless-stopped
     environment:
       - DB_TYPE=postgres
       - DB_HOST=postgres
@@ -174,7 +205,10 @@ services:
 
   # --- Admin Service (5006) ---
   admin-service:
-    build: ./services/admin-service
+    build: 
+      context: ./services/admin-service
+      network: host
+    restart: unless-stopped
     environment:
       - DB_TYPE=postgres
       - DB_HOST=postgres
@@ -193,7 +227,10 @@ services:
 
   # --- Email Service (5007) ---
   email-service:
-    build: ./services/email-service
+    build: 
+      context: ./services/email-service
+      network: host
+    restart: unless-stopped
     environment:
       - PORT=5007
       - SMTP_HOST=${SMTP_HOST}
@@ -205,7 +242,9 @@ services:
 
   # --- RDP Service (5008) ---
   rdp-service:
-    build: ./services/rdp-service
+    build: 
+      context: ./services/rdp-service
+      network: host
     restart: unless-stopped
     expose:
       - "5008"
@@ -253,6 +292,7 @@ services:
   # --- Redis (Message Broker) ---
   redis:
     image: redis:alpine
+    restart: unless-stopped
     ports:
       - "6379:6379"
     networks:
@@ -261,16 +301,43 @@ services:
   # --- Cloudflare Tunnel (Global Access) ---
   tunnel:
     image: cloudflare/cloudflared:latest
-    command: tunnel --config /etc/cloudflared/config.yml run
+    command: tunnel --no-autoupdate run --token ${TUNNEL_TOKEN} --protocol http2
     environment:
       - TUNNEL_TOKEN=${TUNNEL_TOKEN}
-    volumes:
-      - ./cloudflared-config.yml:/etc/cloudflared/config.yml:ro
     restart: unless-stopped
+    stop_grace_period: 35s
     networks:
       - app-network
     depends_on:
-      - gateway
+      gateway:
+        condition: service_healthy
+
+  # --- Windows Integration Service (5010) ---
+  windows-service:
+    build: 
+      context: ./services/windows-service
+      network: host
+    restart: unless-stopped
+    environment:
+      - DB_TYPE=postgres
+      - DB_HOST=postgres
+      - DB_USER=${DB_USER:-admin}
+      - DB_PASSWORD=${DB_PASSWORD:-admin123}
+      - DB_NAME=${DB_NAME:-server_db}
+      - PORT=5010
+      - JWT_SECRET=${JWT_SECRET}
+      - HOST_USERS_DIR=/host-users
+      - UPLOAD_DIR=/app/uploads
+      - SYNC_STATE_DIR=/app/sync-state
+    volumes:
+      - C:\Users:/host-users
+      - ../Datos:/app/uploads
+      - ../database_storage/windows-sync-state:/app/sync-state
+    depends_on:
+      - postgres
+    networks:
+      - app-network
+    
 
 volumes:
   postgres_data:
@@ -279,3 +346,5 @@ volumes:
 networks:
   app-network:
     driver: bridge
+    driver_opts:
+      com.docker.network.driver.mtu: 1280

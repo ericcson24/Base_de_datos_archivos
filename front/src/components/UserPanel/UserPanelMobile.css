@@ -1,38 +1,38 @@
 
-/* =========================================
-   MOBILE RESPONSIVENESS
-   ========================================= */
+
 
 @media (max-width: 768px) {
   :root {
-    --sidebar-width: 100%; /* Sidebar takes full width on mobile when open */
+    --sidebar-width: 100%;
     --header-height: 60px;
     --main-padding: 1rem;
   }
 
   .user-panel {
     flex-direction: column;
+    height: 100vh;
+    height: 100dvh;
   }
 
-  /* Sidebar Mobile Logic */
   .sidebar {
     position: fixed;
     top: 0;
     left: 0;
     height: 100vh;
-    width: 80%; /* Slide out width */
+    height: 100dvh;
+    width: 80%;
     max-width: 300px;
     transform: translateX(-100%);
     transition: transform 0.3s ease;
     z-index: 1000;
     box-shadow: 2px 0 10px rgba(0,0,0,0.2);
+    padding-top: env(safe-area-inset-top, 0px);
   }
 
   .sidebar.open {
     transform: translateX(0);
   }
 
-  /* Overlay for sidebar */
   .sidebar-overlay {
     display: none;
     position: fixed;
@@ -49,20 +49,23 @@
     display: block;
   }
 
-  /* Main Panel Adjustments */
   .main-panel {
     width: 100%;
-    padding: 1rem;
-    padding-top: 70px; /* Space for mobile header */
+    padding: 0.75rem;
+    padding-top: calc(70px + env(safe-area-inset-top, 0px));
+    box-sizing: border-box;
+    overflow-y: auto;
+    overflow-x: hidden;
+    -webkit-overflow-scrolling: touch;
   }
 
-  /* Mobile Header (Hamburger) */
   .mobile-header {
     display: flex;
     align-items: center;
     justify-content: space-between;
     padding: 0.5rem 1rem;
-    height: 60px;
+    padding-top: calc(0.5rem + env(safe-area-inset-top, 0px));
+    height: calc(60px + env(safe-area-inset-top, 0px));
     position: fixed;
     top: 0;
     left: 0;
@@ -71,6 +74,7 @@
     z-index: 900;
     backdrop-filter: blur(10px);
     border-bottom: 1px solid var(--sidebar-border);
+    box-sizing: border-box;
   }
 
   .hamburger-btn {
@@ -80,9 +84,9 @@
     color: var(--text-color);
     cursor: pointer;
     padding: 0.5rem;
+    -webkit-tap-highlight-color: transparent;
   }
 
-  /* File Grid */
   .file-grid {
     grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
     gap: 1rem;
@@ -100,33 +104,91 @@
     font-size: 3rem;
   }
 
-  /* Search Bar */
-  .search-container {
-    width: 100%;
-    margin-bottom: 1rem;
-  }
-  
-  .search-container.expanded {
-     width: 100%;
+  .search-controls-bar {
+    flex-direction: column !important;
+    align-items: stretch !important;
+    gap: 0.75rem;
+    padding: 0.75rem !important;
   }
 
-  /* Fix for the specific div mentioned by user */
+  .search-controls-bar > .flex.items-center.space-x-3 {
+    max-width: 100% !important;
+    width: 100%;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+
+  .search-container {
+    width: 100%;
+    margin-bottom: 0;
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+
+  .search-container.collapsed {
+    width: 40px;
+    flex: 0 0 40px;
+  }
+
+  .search-container.expanded {
+    width: 100% !important;
+    flex: 1 1 100%;
+  }
+
+  .ai-container {
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+
+  .ai-container.collapsed {
+    width: 40px;
+    flex: 0 0 40px;
+  }
+
+  .ai-container.expanded {
+    width: 100% !important;
+    flex: 1 1 100%;
+  }
+
+  .search-controls-bar > .flex.items-center.space-x-2 {
+    justify-content: flex-end;
+    flex-wrap: nowrap;
+    gap: 0.25rem;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+
+  .search-controls-bar > .flex.items-center.space-x-2::-webkit-scrollbar {
+    display: none;
+  }
+
+  .search-controls-bar > .flex.items-center.space-x-2 .p-2 {
+    padding: 6px;
+  }
+
+  .search-controls-bar > .flex.items-center.space-x-2 .space-x-1 {
+    gap: 2px;
+  }
+
   .search-controls-wrapper {
     padding-left: 0 !important;
     padding-right: 0 !important;
-    margin-bottom: 1rem !important;
+    margin-bottom: 0.75rem !important;
+    min-height: auto !important;
   }
 
-  /* Modals */
   .modal-content {
-    width: 90%;
+    width: calc(100% - 2rem);
+    min-width: 0;
     max-width: none;
     margin: 1rem;
     max-height: 90vh;
+    max-height: 90dvh;
     overflow-y: auto;
+    box-sizing: border-box;
   }
 
-  /* Hide desktop specific elements if needed */
   .desktop-only {
     display: none !important;
   }
@@ -139,10 +201,10 @@
     color: var(--text-color);
     cursor: pointer;
     margin-left: auto;
+    -webkit-tap-highlight-color: transparent;
   }
   
-  /* Adjust buttons in sidebar footer */
   .sidebar-footer {
-    padding-bottom: 2rem; /* Extra space for bottom safe area */
+    padding-bottom: calc(1rem + env(safe-area-inset-bottom, 0px));
   }
 }

@@ -1,4 +1,4 @@
-tunnel: 4c804487-8c50-4564-97ba-14cb9d48e2fd
+tunnel: 8eb053d2-9fee-4d55-884b-a6715ae22cbd
 
 ingress:
   - hostname: proyectonube.xyz

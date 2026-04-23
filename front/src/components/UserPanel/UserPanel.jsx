@@ -18,7 +18,7 @@ import CreateFileModal from '../Modals/CreateFileModal';
 import SidebarPanel from './SidebarPanel';
 import FileItem from './FileItem';
 import NotificationCenter from '../Common/NotificationCenter';
-import { FiHardDrive, FiUsers, FiArrowLeft, FiCalendar, FiMonitor, FiSettings, FiLogOut, FiLayout } from 'react-icons/fi';
+import { FiHardDrive, FiUsers, FiArrowLeft, FiCalendar, FiMonitor, FiSettings, FiLogOut, FiLayout, FiMenu } from 'react-icons/fi';
 import { 
   getAuthToken, 
   downloadFile, 
@@ -41,7 +41,7 @@ const UserPanel = ({ user, onLogout, onBackToFolders, onThemeToggle, isDarkMode,
   const [files, setFiles] = useState([]);
   const [currentView, setCurrentView] = useState('privada');
   const [currentPath, setCurrentPath] = useState([]);
-  const [loading, setLoading] = useState(false); // Cambiar a false para evitar loading inicial
+  const [loading, setLoading] = useState(false);
   const [uploadMenuOpen, setUploadMenuOpen] = useState(false);
   const [sharedFolders, setSharedFolders] = useState([]);
   const [sharedDropdownOpen, setSharedDropdownOpen] = useState(false);
@@ -64,7 +64,6 @@ const UserPanel = ({ user, onLogout, onBackToFolders, onThemeToggle, isDarkMode,
   const [showCustomizeModal, setShowCustomizeModal] = useState(false);
   const [customizeFolder, setCustomizeFolder] = useState(null);
 
-  // Check for URL parameters on mount
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     if (params.get('settings') === 'true') {
@@ -73,20 +72,13 @@ const UserPanel = ({ user, onLogout, onBackToFolders, onThemeToggle, isDarkMode,
         setSettingsInitialTab(params.get('tab'));
       }
       if (params.get('status') === 'success') {
-        // Clean URL
         window.history.replaceState({}, document.title, window.location.pathname);
-        // Show success message
         addToast(t('userPanel.microsoftLinkedSuccess'), 'success');
       }
     }
     
-    // Check for initialView prop
-    // if (initialView === 'remote') {
-    //   setShowRDPModal(true);
-    // }
   }, []);
 
-  // Listener para abrir editor desde el modal
   useEffect(() => {
     const handleOpenEditor = (event) => {
       openEditorPanel(event.detail);
@@ -98,41 +90,32 @@ const UserPanel = ({ user, onLogout, onBackToFolders, onThemeToggle, isDarkMode,
     };
   }, []);
 
-  // Estados para viewer
   const [viewerFile, setViewerFile] = useState(null);
   const [showFileViewer, setShowFileViewer] = useState(false);
 
-  // Nuevos estados para redimensionamiento y panel lateral
   const [sidebarPanelOpen, setSidebarPanelOpen] = useState(false);
   const [sidebarPanelFile, setSidebarPanelFile] = useState(null);
   
-  // Z-index para file-grid (inicia en 1, paneles en 10+)
   
-  // Estados para drag and drop
   const [isDragOver, setIsDragOver] = useState(false);
   
-  // Estado para progreso de subida (popup estilo Google Drive)
   const [uploads, setUploads] = useState([]);
   const uploadIdRef = useRef(0);
   const xhrMapRef = useRef({});
   const fileInputRef = useRef(null);
   const folderInputRef = useRef(null);
 
-  // Estado para modal de archivos duplicados
   const [duplicateModalData, setDuplicateModalData] = useState(null);
 
-  // Ref para acceder a la lista de archivos actual dentro de callbacks
   const filesRef = useRef([]);
   useEffect(() => { filesRef.current = files; }, [files]);
 
-  // Estados para búsqueda y ordenamiento
   const [searchQuery, setSearchQuery] = useState('');
   const [isSearchExpanded, setIsSearchExpanded] = useState(false);
-  const [sortBy, setSortBy] = useState('type'); // 'name', 'type', 'date' - Default: type
-  const [sortOrder, setSortOrder] = useState('asc'); // 'asc', 'desc' - Default: asc
-  const [viewMode, setViewMode] = useState('grid'); // 'list', 'grid'
+  const [sortBy, setSortBy] = useState('type');
+  const [sortOrder, setSortOrder] = useState('asc');
+  const [viewMode, setViewMode] = useState('grid');
 
-  // Estados para múltiples paneles de edición
   const [editorPanels, setEditorPanels] = useState([]);
   const [nextPanelId, setNextPanelId] = useState(1);
   const [highestZIndex, setHighestZIndex] = useState(1000);
@@ -140,7 +123,6 @@ const UserPanel = ({ user, onLogout, onBackToFolders, onThemeToggle, isDarkMode,
   const [fileDragging, setFileDragging] = useState(null);
   const [backBtnDragOver, setBackBtnDragOver] = useState(false);
 
-  // Estados para archivos recientes y IA
   const [recentFiles, setRecentFiles] = useState([]);
   const [isAIExpanded, setIsAIExpanded] = useState(false);
   const [aiQuery, setAIQuery] = useState('');
@@ -150,12 +132,10 @@ const UserPanel = ({ user, onLogout, onBackToFolders, onThemeToggle, isDarkMode,
   const [indexingStatus, setIndexingStatus] = useState(null);
   const [isAILoading, setIsAILoading] = useState(false);
 
-  // Estados para modal de crear archivo
   const [showCreateFileModal, setShowCreateFileModal] = useState(false);
   const [createFileDefaultName, setCreateFileDefaultName] = useState('');
   const [createFileType, setCreateFileType] = useState('');
 
-  // Check indexing status when AI is expanded
   useEffect(() => {
     if (!isAIExpanded) return;
 
@@ -175,16 +155,30 @@ const UserPanel = ({ user, onLogout, onBackToFolders, onThemeToggle, isDarkMode,
     };
 
     checkStatus();
-    const interval = setInterval(checkStatus, 3000);
+    const interval = setInterval(async () => {
+      try {
+        const token = localStorage.getItem('auth_token');
+        const res = await fetch('/api/ai/indexing-status', {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        if (res.ok) {
+          const data = await res.json();
+          setIndexingStatus(data);
+          if (data.isIndexed && !data.isBuilding) {
+            clearInterval(interval);
+          }
+        }
+      } catch (err) {
+        console.error('Error checking indexing status:', err);
+      }
+    }, 15000);
     return () => clearInterval(interval);
   }, [isAIExpanded]);
 
-  // Función para toggle del tema
   const toggleTheme = () => {
     onThemeToggle();
   };
 
-  // Funciones para búsqueda y ordenamiento
   const handleSearch = (e) => {
     setSearchQuery(e.target.value);
   };
@@ -210,7 +204,6 @@ const UserPanel = ({ user, onLogout, onBackToFolders, onThemeToggle, isDarkMode,
     
     try {
       const token = localStorage.getItem('auth_token');
-      // Usar el endpoint real de búsqueda de AI
       const response = await fetch('/api/ai/search', {
         method: 'POST',
         headers: {
@@ -245,7 +238,6 @@ const UserPanel = ({ user, onLogout, onBackToFolders, onThemeToggle, isDarkMode,
     const invalidFiles = [];
 
     for (let file of files) {
-      // Validar que el archivo no esté vacío
       if (file.size === 0) {
         invalidFiles.push(t('userPanel.fileEmpty', { name: file.name }));
       }
@@ -254,10 +246,8 @@ const UserPanel = ({ user, onLogout, onBackToFolders, onThemeToggle, isDarkMode,
     return invalidFiles;
   };
 
-  // useEffect para manejar clicks fuera de los menús
   useEffect(() => {
     const handleClickOutside = (event) => {
-      // Cerrar mini-menu-frosted si se hace click fuera
       if (uploadMenuOpen) {
         const uploadBtn = document.querySelector('.create-event-btn');
         const miniMenu = document.querySelector('.mini-menu-frosted');
@@ -266,7 +256,6 @@ const UserPanel = ({ user, onLogout, onBackToFolders, onThemeToggle, isDarkMode,
         }
       }
 
-      // Cerrar shared dropdown si se hace click fuera
       if (sharedDropdownOpen) {
         const sharedBtn = document.querySelector('.sidebar-btn[title="Compartidos"]');
         const dropdown = document.querySelector('.dropdown-content');
@@ -275,7 +264,6 @@ const UserPanel = ({ user, onLogout, onBackToFolders, onThemeToggle, isDarkMode,
         }
       }
 
-      // Cerrar búsqueda si se hace click fuera
       if (isSearchExpanded) {
         const searchContainer = document.querySelector('.search-container');
         if (searchContainer && !searchContainer.contains(event.target)) {
@@ -284,7 +272,6 @@ const UserPanel = ({ user, onLogout, onBackToFolders, onThemeToggle, isDarkMode,
         }
       }
 
-      // Cerrar IA si se hace click fuera
       if (isAIExpanded) {
         const aiContainer = document.querySelector('.ai-container');
         if (aiContainer && !aiContainer.contains(event.target)) {
@@ -306,7 +293,6 @@ const loadFiles = useCallback(async () => {
     setLoading(true);
     
     if (currentView === 'shared' && currentPath.length === 0) {
-      // Cargar lista de compartidos conmigo (raíz de compartidos)
       const response = await fetch('/api/files/shared-with-me', {
         headers: {
           'Authorization': `Bearer ${getAuthToken()}`
@@ -319,17 +305,10 @@ const loadFiles = useCallback(async () => {
 
     const queryParams = new URLSearchParams();
     if (currentPath.length > 0) {
-      // currentPath contiene objetos carpeta, necesitamos sus nombres
       const pathString = currentPath.map(p => p.name).join('/');
       queryParams.append('path', pathString);
       
-      // Si estamos navegando dentro de una carpeta compartida, necesitamos pasar el owner
       if (currentView === 'shared') {
-        // El primer elemento del path debe tener la info del owner si venimos de la vista compartida
-        // Pero currentPath se construye al navegar.
-        // Necesitamos saber quién es el owner de la carpeta raíz compartida.
-        // Una forma es guardar el owner en el estado currentPath o tener un estado separado.
-        // Vamos a asumir que el primer elemento de currentPath tiene la propiedad 'owner' si es compartido.
         const rootShared = currentPath[0];
         if (rootShared && rootShared.owner) {
           queryParams.append('owner', rootShared.owner);
@@ -356,7 +335,6 @@ const loadFiles = useCallback(async () => {
   }
 }, [currentPath, searchQuery, sortBy, sortOrder, currentView]);
 
-// Función para cargar archivos recientes
 const loadRecentFiles = useCallback(async () => {
   try {
     const response = await fetch('/api/files/recent', {
@@ -399,7 +377,6 @@ useEffect(() => {
   const handleFileUpload = useCallback(async (files) => {
     if (!files || files.length === 0) return;
 
-    // Validar archivos
     const validationErrors = validateFiles(files);
     if (validationErrors.length > 0) {
       addToast(t('userPanel.validationErrors') + '\n' + validationErrors.join('\n'), 'error');
@@ -408,7 +385,6 @@ useEffect(() => {
 
     let filesToUpload = Array.from(files);
 
-    // ── Detección de archivos duplicados ──────────────────────
     const existingNames = new Set(
       (Array.isArray(filesRef.current) ? filesRef.current : [])
         .filter(f => f.type !== 'folder')
@@ -418,25 +394,22 @@ useEffect(() => {
       .map(f => f.name)
       .filter(n => existingNames.has(n.toLowerCase()));
 
-    let duplicateAction = null; // 'replace' | 'keepBoth' | 'skip' | null(cancel)
+    let duplicateAction = null;
     if (dupNames.length > 0) {
       duplicateAction = await new Promise((resolve) => {
         setDuplicateModalData({ names: dupNames, resolve });
       });
       setDuplicateModalData(null);
 
-      if (!duplicateAction) return; // user closed modal = cancel upload
+      if (!duplicateAction) return;
 
       if (duplicateAction === 'skip') {
         const dupSet = new Set(dupNames.map(n => n.toLowerCase()));
         filesToUpload = filesToUpload.filter(f => !dupSet.has(f.name.toLowerCase()));
         if (filesToUpload.length === 0) return;
       }
-      // 'replace' → upload normally (multer overwrites)
-      // 'keepBoth' → we send duplicateAction header so backend renames
     }
 
-    // Crear entradas de upload para cada archivo
     const newUploads = filesToUpload.map((file) => {
       uploadIdRef.current += 1;
       return {
@@ -458,7 +431,6 @@ useEffect(() => {
 
     const uploadPath = currentPath.map(p => p.name).join('/');
 
-    // Subir archivos uno a uno con XHR para tracking de progreso
     let successCount = 0;
     let failCount = 0;
     for (const entry of newUploads) {
@@ -536,7 +508,6 @@ useEffect(() => {
       });
     }
 
-    // Recargar archivos después de subir todo
     loadFiles();
     loadRecentFiles();
 
@@ -552,14 +523,12 @@ useEffect(() => {
   const handleFolderUpload = useCallback(async (files) => {
     if (!files || files.length === 0) return;
 
-    // Validar archivos
     const validationErrors = validateFiles(files);
     if (validationErrors.length > 0) {
       addToast(t('userPanel.validationErrors') + '\n' + validationErrors.join('\n'), 'error');
       return;
     }
 
-    // Crear entradas de upload para cada archivo de la carpeta
     const newUploads = Array.from(files).map((file) => {
       uploadIdRef.current += 1;
       return {
@@ -583,7 +552,6 @@ useEffect(() => {
     let uploadedCount = 0;
     let failedCount = 0;
 
-    // Subir archivos uno a uno con XHR
     for (const entry of newUploads) {
       await new Promise((resolve) => {
         const startTime = Date.now();
@@ -661,7 +629,6 @@ useEffect(() => {
 
     console.log(`Uploaded ${uploadedCount} files from folder, ${failedCount} failed`);
 
-    // Recargar archivos
     loadFiles();
 
     if (failedCount === 0) {
@@ -733,7 +700,6 @@ useEffect(() => {
         setShowCreateFolderModal(false);
         setNewFolderName('');
         
-        // Recargar archivos y recientes
         loadFiles();
         loadRecentFiles();
         addToast(t('userPanel.folderCreatedSuccess'), 'success');
@@ -765,8 +731,8 @@ useEffect(() => {
       const result = await response.json();
       
       if (result.success) {
-        loadFiles(); // Recargar archivos
-        loadRecentFiles(); // Recargar recientes
+        loadFiles();
+        loadRecentFiles();
         addToast(t('userPanel.itemDeletedSuccess'), 'success');
       } else {
         addToast(t('userPanel.errorDeleting') + ': ' + result.message, 'error');
@@ -804,7 +770,7 @@ useEffect(() => {
         setShowRenameModal(false);
         setRenameItem(null);
         setRenameValue('');
-        loadFiles(); // Recargar archivos
+        loadFiles();
         addToast(t('userPanel.itemRenamedSuccess'), 'success');
       } else {
         addToast(t('userPanel.errorRenaming') + ': ' + result.message, 'error');
@@ -827,7 +793,7 @@ useEffect(() => {
       const result = await response.json();
       
       if (result.success) {
-        loadFiles(); // Recargar archivos
+        loadFiles();
         addToast(t('userPanel.fileDuplicatedSuccess'), 'success');
       } else {
         addToast(t('userPanel.errorDuplicating') + ': ' + result.message, 'error');
@@ -838,7 +804,6 @@ useEffect(() => {
     }
   };
 
-  // Remove a shared file from recipient's view (does NOT delete the original)
   const handleRemoveShared = async (item) => {
     try {
       const response = await fetch('/api/files/remove-shared', {
@@ -865,10 +830,34 @@ useEffect(() => {
     }
   };
 
-  // Save a shared file to own files (copies the file, removes from shared)
-  // Unshare - Owner removes sharing for a file (removes ALL shares for that file)
+  const handleToggleAIExclude = async (item) => {
+    const itemPath = (item.path || '').replace(/\\/g, '/');
+    try {
+      const response = await fetch('/api/files/ai-exclude/toggle', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${getAuthToken()}`
+        },
+        body: JSON.stringify({ path: itemPath })
+      });
+      const result = await response.json();
+      if (result.success) {
+        const msg = result.excluded
+          ? (t('contextMenu.excludedFromAIMsg') || `"${item.name}" excluido de la IA`)
+          : (t('contextMenu.includedInAIMsg') || `"${item.name}" incluido en la IA`);
+        addToast(msg, 'success');
+        loadFiles();
+      } else {
+        addToast(t('common.error'), 'error');
+      }
+    } catch (error) {
+      console.error('Error toggling AI exclusion:', error);
+      addToast(t('common.error'), 'error');
+    }
+  };
+
   const handleUnshare = async (item) => {
-    if (!item.sharedWith || item.sharedWith.length === 0) return;
     try {
       let allSuccess = true;
       for (const targetUsername of item.sharedWith) {
@@ -914,7 +903,7 @@ useEffect(() => {
       const result = await response.json();
       if (result.success) {
         addToast(t('userPanel.savedToMyFiles', { name: result.savedName || item.name }) || `"${result.savedName || item.name}" guardado en tus archivos`, 'success');
-        loadFiles(); // Refresh - file now appears as own file, removed from shared
+        loadFiles();
       } else {
         addToast(result.message || t('common.error'), 'error');
       }
@@ -924,7 +913,6 @@ useEffect(() => {
     }
   };
 
-  // Unpin a shared file from own panel (remove from main listing, keep in shared)
   const handleUnpinFromPanel = async (item) => {
     try {
       const response = await fetch('/api/files/unpin-from-panel', {
@@ -951,6 +939,32 @@ useEffect(() => {
     }
   };
 
+  const handlePinToPanel = async (item) => {
+    try {
+      const response = await fetch('/api/files/pin-to-panel', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${getAuthToken()}`
+        },
+        body: JSON.stringify({
+          path: item.path,
+          ownerUsername: item.owner
+        })
+      });
+      const result = await response.json();
+      if (result.success) {
+        addToast(t('userPanel.pinnedToPanel') || 'Anclado al panel', 'success');
+        loadFiles();
+      } else {
+        addToast(result.message || t('common.error'), 'error');
+      }
+    } catch (error) {
+      console.error('Error pinning to panel:', error);
+      addToast(t('common.error'), 'error');
+    }
+  };
+
   const handleMoveItem = async (item, destinationPath) => {
     try {
       const response = await fetch(`/api/files/${encodeURIComponent(item.id)}/move`, {
@@ -969,7 +983,7 @@ useEffect(() => {
       if (result.success) {
         setShowMoveModal(false);
         setMoveItem(null);
-        loadFiles(); // Recargar archivos
+        loadFiles();
         addToast(t('userPanel.itemMovedSuccess'), 'success');
       } else {
         addToast(t('userPanel.errorMoving') + ': ' + result.message, 'error');
@@ -980,9 +994,37 @@ useEffect(() => {
     }
   };
 
-  const handleShareItem = async (item, targetUsername) => {
+  const handleShareItem = async (item, targetUsername, permission = 'edit') => {
     try {
       const response = await fetchWithNotify('/api/files/share', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${getAuthToken()}`
+        },
+        body: JSON.stringify({
+          path: item.path,
+          username: targetUsername,
+          permission
+        })
+      });
+
+      const result = await response.json();
+      
+      if (result.success) {
+        loadFiles();
+      } else {
+        throw new Error(result.message);
+      }
+    } catch (error) {
+      console.error('Error sharing item:', error);
+      throw error;
+    }
+  };
+
+  const handleUnshareUser = async (item, targetUsername) => {
+    try {
+      const response = await fetch('/api/files/unshare', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -993,16 +1035,11 @@ useEffect(() => {
           username: targetUsername
         })
       });
-
       const result = await response.json();
-      
-      if (result.success) {
-        // Notification handled by backend
-      } else {
-        throw new Error(result.message);
-      }
+      if (!result.success) throw new Error(result.message);
+      loadFiles();
     } catch (error) {
-      console.error('Error sharing item:', error);
+      console.error('Error unsharing:', error);
       throw error;
     }
   };
@@ -1072,7 +1109,6 @@ useEffect(() => {
     setViewerFile(file);
     setShowFileViewer(true);
     
-    // Log file open for recents tracking (fire and forget)
     try {
       fetch('/api/files/log-open', {
         method: 'POST',
@@ -1082,11 +1118,9 @@ useEffect(() => {
         },
         body: JSON.stringify({ fileId: file.id })
       }).then(() => {
-        // Refresh recents after a short delay
         setTimeout(() => loadRecentFiles(), 500);
       }).catch(() => {});
     } catch (e) {
-      // Don't block file viewer
     }
   };
 
@@ -1098,7 +1132,6 @@ useEffect(() => {
   const handleDragEnter = useCallback((e) => {
     e.preventDefault();
     e.stopPropagation();
-    // Only show upload drag-over for external files (not internal file moves)
     if (!e.dataTransfer.types.includes('application/x-internal-file')) {
       setIsDragOver(true);
     }
@@ -1120,13 +1153,11 @@ useEffect(() => {
     e.stopPropagation();
     setIsDragOver(false);
 
-    // Ignore internal file drags (those are handled by folder drop targets)
     const internalData = e.dataTransfer.getData('application/x-internal-file');
     if (internalData) return;
 
     const files = Array.from(e.dataTransfer.files);
     if (files.length > 0) {
-      // External files from desktop/system → upload to current folder
       const hasFolders = files.some(file => file.webkitRelativePath && file.webkitRelativePath.includes('/'));
       
       if (hasFolders) {
@@ -1137,10 +1168,8 @@ useEffect(() => {
     }
   }, [handleFileUpload, handleFolderUpload]);
 
-  // Handle dropping a file onto a folder to move it
   const handleDropToFolder = useCallback(async (draggedFile, targetFolder) => {
     try {
-      // Build the destination path: currentPath + target folder name
       const basePath = currentPath.map(p => p.name).join('/');
       const destinationPath = basePath ? `${basePath}/${targetFolder.name}` : targetFolder.name;
       
@@ -1166,12 +1195,10 @@ useEffect(() => {
       console.error('Error moving file to folder:', error);
       addToast(t('userPanel.errorMoving'), 'error');
     }
-    // Clean up drag state
     setFileDragging(null);
     setShowDropZone(false);
   }, [currentPath, loadFiles, loadRecentFiles, addToast, t]);
 
-  // Handle dropping a file onto the back button to move it to the parent folder
   const handleDropToParent = useCallback(async (e) => {
     e.preventDefault();
     e.stopPropagation();
@@ -1182,7 +1209,6 @@ useEffect(() => {
     
     try {
       const draggedFile = JSON.parse(internalData);
-      // Parent path is one level up from current
       const parentPath = currentPath.slice(0, -1).map(p => p.name).join('/');
       
       const response = await fetch(`/api/files/${encodeURIComponent(draggedFile.id)}/move`, {
@@ -1225,7 +1251,6 @@ useEffect(() => {
     setBackBtnDragOver(false);
   }, []);
 
-  // Funciones para el panel lateral
   const openSidebarPanel = (file, action = 'view') => {
     setSidebarPanelFile({ ...file, action });
     setSidebarPanelOpen(true);
@@ -1236,32 +1261,25 @@ useEffect(() => {
     setSidebarPanelFile(null);
   };
 
-  // Funciones para múltiples paneles de edición
   const openEditorPanel = (file) => {
-    // Verificar si el archivo ya está abierto
     const existingPanel = editorPanels.find(panel => panel.file.id === file.id);
     if (existingPanel) {
-      // Traer al frente el panel existente
       bringPanelToFront(existingPanel.id);
       return;
     }
 
-    // NUEVO: Cerrar todos los paneles anteriores (solo un panel a la vez)
-    // Esto asegura que solo haya un editor abierto a la vez
     
-    // Crear nuevo panel
     const newZIndex = highestZIndex + 1;
     const newPanel = {
       id: nextPanelId,
       file: file,
       position: {
-        x: 100 + (nextPanelId * 30), // Offset para que no se superpongan exactamente
+        x: 100 + (nextPanelId * 30),
         y: 100 + (nextPanelId * 30)
       },
       zIndex: newZIndex
     };
 
-    // Reemplazar todos los paneles con solo el nuevo panel
     setEditorPanels([newPanel]);
     setNextPanelId(nextPanelId + 1);
     setHighestZIndex(newZIndex);
@@ -1281,12 +1299,9 @@ useEffect(() => {
     setHighestZIndex(newZIndex);
   };
 
-  // Drag and Drop para archivos internos
   const handleFileDragStart = useCallback((file, e) => {
     setFileDragging(file);
-    // Don't show drop zone overlay — it blocks folder drop targets
     e.dataTransfer.effectAllowed = 'move';
-    // Set internal drag marker
     e.dataTransfer.setData('application/x-internal-file', JSON.stringify({ id: file.id, name: file.name, path: file.path }));
   }, []);
 
@@ -1308,46 +1323,45 @@ useEffect(() => {
     }
     setFileDragging(null);
     setShowDropZone(false);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fileDragging]);
 
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
 
   return (
     <div className="user-panel">
-      {/* Background */}
+      
       <div className="bg"></div>
 
-      {/* Mobile Header */}
+      
       <div className="mobile-header">
         <div className="logo-container">
           <img className="logo-img" src="/icons/nube.svg" alt="Nube" />
           <span>{t('userPanel.personalCloud')}</span>
         </div>
         <button className="hamburger-btn" onClick={() => setMobileSidebarOpen(!mobileSidebarOpen)}>
-          ☰
+          <FiMenu />
         </button>
       </div>
 
-      {/* Sidebar Overlay */}
+      
       <div 
         className={`sidebar-overlay ${mobileSidebarOpen ? 'visible' : ''}`}
         onClick={() => setMobileSidebarOpen(false)}
       ></div>
 
-      {/* Sidebar */}
+      
       <div className={`sidebar ${mobileSidebarOpen ? 'open' : ''}`}>
         <div className="sidebar-header">
           <div className="logo-container">
             <img className="logo-img" src="/icons/nube.svg" alt="Nube" />
             <span>{t('userPanel.personalCloud')}</span>
           </div>
-          {/* Close button for mobile sidebar */}
+          
           <button 
             className="mobile-close-btn" 
             onClick={() => setMobileSidebarOpen(false)}
           >
-            ✕
+            x
           </button>
         </div>
 
@@ -1457,7 +1471,7 @@ useEffect(() => {
         </div>
       </div>
 
-      {/* Main Panel */}
+      
       <div className="main-panel">
         <div className="panel-header">
           <h1 className="panel-title">
@@ -1471,7 +1485,7 @@ useEffect(() => {
           </div>
         </div>
 
-        {/* Contenedor flexible para file-grid y paneles */}
+        
         <div className="main-content-container">
         
         <div 
@@ -1480,10 +1494,10 @@ useEffect(() => {
           onDragLeave={handleDragLeave}
           onDragOver={handleDragOver}
           onDrop={handleDrop}
-        >{/* Modern Search and Controls Bar - Moved outside file-grid */}
+        >
         <div className="search-controls-wrapper relative z-10 mb-6 w-full min-h-[5%]">
           <div className="search-controls-bar flex items-center justify-between glassmorphism rounded-2xl p-4 shadow-lg border-gray-200/50 transition-all duration-300 hover:shadow-xl">
-            {/* Search Section */}
+            
             <div className="flex items-center space-x-3 flex-1 max-w-md">
               <div
   role="search"
@@ -1494,7 +1508,7 @@ useEffect(() => {
       : 'collapsed w-10 h-10 rounded-lg justify-center'
   }`}
 >
-  {/* 🔍 Icono */}
+  
   <svg
     className="w-4 h-4 flex-shrink-0 search-icon-color"
     fill="none"
@@ -1509,7 +1523,7 @@ useEffect(() => {
     />
   </svg>
 
-  {/* Input — solo visible cuando expandido, en flujo normal */}
+  
   {isSearchExpanded && (
     <>
       <input
@@ -1541,7 +1555,7 @@ useEffect(() => {
 
 
 
-              {/* Botón IA — mismo estilo cuadrado que el buscador */}
+              
               <div
                 role="search"
                 onClick={() => !isAIExpanded && setIsAIExpanded(true)}
@@ -1552,17 +1566,24 @@ useEffect(() => {
                 }`}
                 title={t('userPanel.aiChatbotTitle')}
               >
-                  {/* Icono IA */}
+                  
                   <svg
-                    className="w-4 h-4 flex-shrink-0 text-purple-500"
+                    className="w-4 h-4 flex-shrink-0"
                     fill="none"
-                    stroke="currentColor"
+                    stroke="url(#aiIconGrad)"
                     viewBox="0 0 24 24"
                   >
+                    <defs>
+                      <linearGradient id="aiIconGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                        <stop offset="0%" stopColor="#c084fc" />
+                        <stop offset="50%" stopColor="#818cf8" />
+                        <stop offset="100%" stopColor="#38bdf8" />
+                      </linearGradient>
+                    </defs>
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
                   </svg>
 
-                  {/* Input + controles — solo visible cuando expandido, en flujo normal */}
+                  
                   {isAIExpanded && (
                     <>
                       <input
@@ -1587,25 +1608,25 @@ useEffect(() => {
                         className="ai-input flex-1 min-w-0 bg-transparent border-none outline-none text-[13px] search-input-reset"
                       />
 
-                      {/* Indicador de indexación */}
+                      
                       {indexingStatus && (indexingStatus.isBuilding || !indexingStatus.isIndexed) && (
                         <span className="flex h-2.5 w-2.5 flex-shrink-0 relative" title="Indexando archivos...">
-                          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-purple-400 opacity-75"></span>
-                          <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-purple-500"></span>
+                          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-indigo-400 opacity-75"></span>
+                          <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-indigo-500"></span>
                         </span>
                       )}
 
-                      {/* Botón enviar */}
+                      
                       {aiQuery && (
                         <button
                           onClick={(e) => {
                             e.stopPropagation();
                             submitAIQuery();
                           }}
-                          className="flex-shrink-0 flex items-center justify-center w-5 h-5 rounded transition-colors duration-200 hover:bg-purple-100 dark:hover:bg-purple-900/30"
+                          className="flex-shrink-0 flex items-center justify-center w-5 h-5 rounded transition-colors duration-200 hover:bg-indigo-100 dark:hover:bg-indigo-900/30"
                           title={t('userPanel.sendAIQuery')}
                         >
-                          <svg className="w-3.5 h-3.5 text-purple-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <svg className="w-3.5 h-3.5 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
                           </svg>
                         </button>
@@ -1614,7 +1635,7 @@ useEffect(() => {
                   )}
               </div>
 
-              {/* Search Results Counter */}
+              
               {searchQuery && (
                 <div className={`animate-fade-in ${isDarkMode ? 'bg-blue-900/20 text-blue-300 border-blue-800' : 'bg-blue-50 text-blue-700 border-blue-200'} px-3 py-1 rounded-lg text-sm font-medium border`}>
                   {t('userPanel.searchResults', { count: files.length })}
@@ -1622,9 +1643,9 @@ useEffect(() => {
               )}
             </div>
 
-            {/* Controls Section */}
+            
             <div className="flex items-center space-x-2">
-              {/* Sort Controls */}
+              
               <div className={`flex items-center space-x-1 ${isDarkMode ? 'bg-slate-700' : 'bg-gray-50'} rounded-xl p-1`}>
                 <button
                   className={`p-2 rounded-lg transition-all duration-200 transform hover:scale-105 ${
@@ -1668,7 +1689,7 @@ useEffect(() => {
                 </button>
               </div>
 
-              {/* Sort Direction */}
+              
               <button
                 className={`p-2 ${isDarkMode ? 'bg-slate-700 hover:bg-slate-600' : 'bg-gray-50 hover:bg-gray-200'} rounded-xl transition-all duration-200 transform hover:scale-105`}
                 onClick={() => setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')}
@@ -1684,7 +1705,7 @@ useEffect(() => {
                 </svg>
               </button>
 
-              {/* View Mode Toggle */}
+              
               <div className={`flex items-center space-x-1 ${isDarkMode ? 'bg-slate-700' : 'bg-gray-50'} rounded-xl p-1`}>
                 <button
                   className={`p-2 rounded-lg transition-all duration-200 transform hover:scale-105 ${
@@ -1717,7 +1738,7 @@ useEffect(() => {
           </div>
         </div>
 
-        {/* Sección de Archivos Recientes - Rediseño Elegante */}
+        
         {showRecentSection && recentFiles.length > 0 && (
           <div className="recent-files-section">
             <div className="recent-files-header">
@@ -1730,11 +1751,11 @@ useEffect(() => {
                 className="recent-close-btn"
                 title={t('userPanel.hideRecent')}
               >
-                ✕
+                x
               </button>
             </div>
             
-            {/* Lista horizontal de archivos recientes */}
+            
             <div className="recent-files-grid">
               {recentFiles.slice(0, 15).map((file, index) => (
                 <RecentFileItem
@@ -1745,7 +1766,6 @@ useEffect(() => {
                     if (file.type === 'folder') {
                       navigateToFolder(file.name);
                     } else if (canEdit(file.name) || canPreview(file.name)) {
-                      // Abrir archivos de Office y previsualizable en el visor modal
                       openFileViewer(file);
                     } else {
                       downloadFile(file.id, file.name, t);
@@ -1757,7 +1777,7 @@ useEffect(() => {
           </div>
         )}
 
-        {/* Botón para mostrar archivos recientes si está oculto */}
+        
         {!showRecentSection && (
           <div className="mb-6 w-full px-1">
             <button
@@ -1787,7 +1807,7 @@ useEffect(() => {
           </div>
         )}
 
-          {/* Files and folders */}
+          
           <div className={`files-container ${viewMode === 'grid' ? 'grid-view' : 'list-view'}`}>
             {loading ? (
               <div className="files-loading-container">
@@ -1796,7 +1816,7 @@ useEffect(() => {
               </div>
             ) : (
               <>
-                {/* Back button — also a drop target for moving files up one level */}
+                
                 {currentPath.length > 0 && (
                   <button 
                     className={`back-btn${backBtnDragOver ? ' back-btn-drag-over' : ''}`}
@@ -1810,7 +1830,7 @@ useEffect(() => {
                   </button>
                 )}
 
-                {/* Files and folders */}
+                
                 {getCurrentFiles().map((item, index) => (
                   <FileItem
                     key={`${item.name}-${index}`}
@@ -1831,12 +1851,15 @@ useEffect(() => {
                     viewMode={viewMode}
                     isSharedView={currentView === 'shared' || item.pinnedFromShared}
                     onSaveToMyFiles={currentView === 'shared' ? handleSaveToMyFiles : (item.pinnedFromShared ? handleUnpinFromPanel : undefined)}
-                    onRemoveShared={currentView === 'shared' ? handleRemoveShared : undefined}
+                    onRemoveShared={handleRemoveShared}
+                    onPinToPanel={currentView === 'shared' && !item.pinned_to_panel ? handlePinToPanel : undefined}
+                    onUnpinFromPanel={(currentView === 'shared' && item.pinned_to_panel) || item.pinnedFromShared ? handleUnpinFromPanel : undefined}
                     onCustomizeFolder={openCustomizeFolder}
+                    onToggleAIExclude={currentView !== 'shared' ? handleToggleAIExclude : undefined}
                   />
                 ))}
 
-                {/* Empty state */}
+                
                 {getCurrentFiles().length === 0 && !loading && (
                   <div className="empty-state">
                     <span></span>
@@ -1852,7 +1875,7 @@ useEffect(() => {
             )}
           </div>
 
-          {/* Sidebar Panel */}
+          
           {sidebarPanelOpen && sidebarPanelFile && (
             <SidebarPanel
               file={sidebarPanelFile}
@@ -1862,7 +1885,7 @@ useEffect(() => {
           )}
         </div>
 
-        {/* Editor Panels Container - Al lado del file-grid */}
+        
         {editorPanels.length > 0 && (
           <div className="editor-panels-container transition-all duration-300">
             {editorPanels.map(panel => (
@@ -1885,10 +1908,10 @@ useEffect(() => {
           </div>
         )}
         
-        </div> {/* Cierre main-content-container */}
-      </div> {/* Cierre main-panel */}
+        </div> 
+      </div> 
 
-      {/* Hidden file inputs */}
+      
       <input
         ref={fileInputRef}
         type="file"
@@ -1919,7 +1942,7 @@ useEffect(() => {
         }}
       />
 
-      {/* Create Folder Modal */}
+      
       <CreateFolderModal
         isOpen={showCreateFolderModal}
         onClose={() => setShowCreateFolderModal(false)}
@@ -1928,7 +1951,7 @@ useEffect(() => {
         handleCreateFolder={handleCreateFolder}
       />
 
-      {/* Rename Modal */}
+      
       <RenameModal
         isOpen={showRenameModal}
         onClose={() => setShowRenameModal(false)}
@@ -1938,7 +1961,7 @@ useEffect(() => {
         handleRenameItem={handleRenameItem}
       />
 
-      {/* Move Modal */}
+      
       <MoveModal
         isOpen={showMoveModal}
         onClose={() => setShowMoveModal(false)}
@@ -1946,15 +1969,16 @@ useEffect(() => {
         onMove={handleMoveItem}
       />
 
-      {/* Share Modal */}
+      
       <ShareModal
         isOpen={showShareModal}
         onClose={() => setShowShareModal(false)}
         onShare={handleShareItem}
+        onUnshareUser={handleUnshareUser}
         item={shareItem}
       />
 
-      {/* AI Results Modal */}
+      
       <AIResultsModal 
         isOpen={showAIResults}
         onClose={() => setShowAIResults(false)}
@@ -1963,7 +1987,7 @@ useEffect(() => {
         onDownloadFile={(file) => downloadFile(file.id, file.name, t)}
       />
 
-      {/* Settings Modal */}
+      
       {showSettingsModal && (
         <SettingsModal
           onClose={() => setShowSettingsModal(false)}
@@ -1975,7 +1999,7 @@ useEffect(() => {
         />
       )}
 
-      {/* Delete Confirmation Modal */}
+      
       <FileDeleteModal
         isOpen={showDeleteModal}
         onClose={() => setShowDeleteModal(false)}
@@ -1984,7 +2008,7 @@ useEffect(() => {
         itemType={itemToDelete ? itemToDelete.type : 'file'}
       />
 
-      {/* File Viewer Modal */}
+      
       {showFileViewer && viewerFile && (
         <FileViewerModal
           file={viewerFile}
@@ -1993,7 +2017,7 @@ useEffect(() => {
         />
       )}
 
-      {/* RDP Connection Modal (Deprecated in favor of /remote page but kept for backward compatibility if triggered internally) */}
+      
       {showRDPModal && (
         <RDPConnectionModal
             onClose={() => setShowRDPModal(false)}
@@ -2005,7 +2029,7 @@ useEffect(() => {
         />
       )}
 
-      {/* RDP Viewer */}
+      
       {showRDPViewer && (
         <RDPViewer
           token={getAuthToken()}
@@ -2017,7 +2041,7 @@ useEffect(() => {
         />
       )}
 
-      {/* Create File Modal */}
+      
       <CreateFileModal
         isOpen={showCreateFileModal}
         onClose={() => setShowCreateFileModal(false)}
@@ -2026,23 +2050,51 @@ useEffect(() => {
         fileType={createFileType}
       />
 
-      {/* AI Loading Overlay */}
+      
       {isAILoading && (
-        <div className="fixed inset-0 bg-black/30 dark:bg-black/50 flex items-center justify-center z-[9999] backdrop-blur-sm">
-          <div className="glassmorphism-modal dark:bg-slate-800 rounded-2xl shadow-2xl border border-gray-200 dark:border-slate-600 p-8 flex flex-col items-center gap-4 max-w-sm mx-4">
+        <div className="fixed inset-0 bg-black/40 dark:bg-black/60 flex items-center justify-center z-[9999] backdrop-blur-md">
+          <div className="relative rounded-2xl p-8 flex flex-col items-center gap-5 max-w-sm mx-4 border overflow-hidden"
+               style={{
+                 background: 'linear-gradient(135deg, rgba(15,23,42,0.88), rgba(30,41,59,0.82), rgba(15,23,42,0.9))',
+                 borderColor: 'rgba(129,140,248,0.2)',
+                 backdropFilter: 'blur(40px) saturate(180%)',
+                 WebkitBackdropFilter: 'blur(40px) saturate(180%)',
+                 boxShadow: 'inset 0 0 0 1px rgba(255,255,255,0.06), inset 0 1px 0 rgba(255,255,255,0.08), 0 25px 60px -12px rgba(0,0,0,0.5), 0 0 80px -20px rgba(129,140,248,0.12)',
+               }}>
+            
+            <div className="absolute inset-0 rounded-2xl opacity-30 pointer-events-none"
+                 style={{
+                   background: 'radial-gradient(circle at 50% 30%, rgba(129,140,248,0.15), transparent 70%)',
+                 }} />
             <div className="relative">
-              <div className="w-14 h-14 rounded-full border-4 border-purple-200 dark:border-purple-900 border-t-purple-500 animate-spin"></div>
-              <svg className="w-6 h-6 text-purple-500 absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <div className="w-16 h-16 rounded-full border-[3px] animate-spin"
+                   style={{
+                     borderColor: 'rgba(129,140,248,0.15)',
+                     borderTopColor: '#818cf8',
+                     borderRightColor: '#38bdf8',
+                     filter: 'drop-shadow(0 0 8px rgba(129,140,248,0.3))',
+                   }} />
+              <svg className="w-7 h-7 absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2" fill="none" stroke="url(#aiGradient)" viewBox="0 0 24 24">
+                <defs>
+                  <linearGradient id="aiGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                    <stop offset="0%" stopColor="#c084fc" />
+                    <stop offset="50%" stopColor="#818cf8" />
+                    <stop offset="100%" stopColor="#38bdf8" />
+                  </linearGradient>
+                </defs>
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
               </svg>
             </div>
-            <p className="text-base font-semibold text-gray-800 dark:text-slate-100">{t('userPanel.aiLoading')}</p>
-            <p className="text-sm text-gray-500 dark:text-slate-400 text-center">{t('userPanel.aiLoadingDescription')}</p>
+            <p className="text-base font-semibold text-slate-200"
+               >
+              {t('userPanel.aiLoading')}
+            </p>
+            <p className="text-sm text-slate-400 text-center">{t('userPanel.aiLoadingDescription')}</p>
           </div>
         </div>
       )}
 
-      {/* Folder Customize Modal */}
+      
       <FolderCustomizeModal
         isOpen={showCustomizeModal}
         onClose={() => { setShowCustomizeModal(false); setCustomizeFolder(null); }}
@@ -2050,7 +2102,7 @@ useEffect(() => {
         onSave={handleSaveFolderCustomization}
       />
 
-      {/* Upload Progress Popup (Google Drive style) */}
+      
       <UploadPopup
         uploads={uploads}
         onClose={() => setUploads([])}
@@ -2060,7 +2112,7 @@ useEffect(() => {
         }}
       />
 
-      {/* Duplicate Files Modal */}
+      
       <DuplicateFilesModal
         isOpen={!!duplicateModalData}
         duplicateNames={duplicateModalData?.names || []}

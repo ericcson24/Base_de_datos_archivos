@@ -15,7 +15,6 @@ app.use(cors({
 }));
 app.use(express.json());
 
-// Middleware de autenticación simple
 const authenticate = (req, res, next) => {
   const authHeader = req.headers.authorization;
   let token = null;
@@ -41,6 +40,13 @@ const authenticate = (req, res, next) => {
   }
 };
 
+const requireAdminOrBoss = (req, res, next) => {
+  if (!req.user || (req.user.role !== 'admin' && req.user.role !== 'boss')) {
+    return res.status(403).json({ success: false, message: 'Permiso denegado: se requiere rol admin o boss' });
+  }
+  next();
+};
+
 app.get('/', (req, res) => {
   res.send('User Service is running');
 });
@@ -52,7 +58,6 @@ app.get('/search', authenticate, async (req, res) => {
       return res.json({ users: [] });
     }
 
-    // Search for users excluding the current user
     const users = await dbAsync.all(
       'SELECT id, username, avatar_url AS "avatarUrl" FROM users WHERE username LIKE ? AND username != ? LIMIT 10',
       [`%${q}%`, req.user.username]
@@ -65,9 +70,7 @@ app.get('/search', authenticate, async (req, res) => {
   }
 });
 
-// --- NOTIFICATIONS (INBOX) ENDPOINTS ---
 
-// 1. Get my notifications
 app.get('/notifications', authenticate, async (req, res) => {
   try {
     const notifications = await dbAsync.all(
@@ -81,8 +84,7 @@ app.get('/notifications', authenticate, async (req, res) => {
   }
 });
 
-// 2. Create notification (Internal/Admin)
-app.post('/notifications', authenticate, async (req, res) => {
+app.post('/notifications', authenticate, requireAdminOrBoss, async (req, res) => {
   try {
     const { userId, title, message, type, link } = req.body;
     
@@ -102,7 +104,6 @@ app.post('/notifications', authenticate, async (req, res) => {
   }
 });
 
-// 3. Mark as read
 app.put('/notifications/:id/read', authenticate, async (req, res) => {
   try {
     const notificationId = req.params.id;
@@ -117,7 +118,6 @@ app.put('/notifications/:id/read', authenticate, async (req, res) => {
   }
 });
 
-// 4. Mark ALL as read
 app.put('/notifications/read-all', authenticate, async (req, res) => {
   try {
     await dbAsync.run(
@@ -131,14 +131,11 @@ app.put('/notifications/read-all', authenticate, async (req, res) => {
   }
 });
 
-// --- GROUP MANAGEMENT ENDPOINTS ---
 
-// 1. List all groups (Admin/Boss only ideally, but open for now)
 app.get('/groups', authenticate, async (req, res) => {
   try {
     const groups = await dbAsync.all('SELECT * FROM groups ORDER BY name ASC');
     
-    // Get member count for each group
     for (let group of groups) {
       const count = await dbAsync.get('SELECT COUNT(*) as count FROM group_members WHERE group_id = ?', [group.id]);
       group.memberCount = count ? count.count : 0;
@@ -151,8 +148,7 @@ app.get('/groups', authenticate, async (req, res) => {
   }
 });
 
-// 2. Create a new group
-app.post('/groups', authenticate, async (req, res) => {
+app.post('/groups', authenticate, requireAdminOrBoss, async (req, res) => {
   try {
     const { name, description } = req.body;
     
@@ -160,7 +156,6 @@ app.post('/groups', authenticate, async (req, res) => {
       return res.status(400).json({ success: false, message: 'Group name is required' });
     }
 
-    // Check if group exists
     const existing = await dbAsync.get('SELECT id FROM groups WHERE name = ?', [name]);
     if (existing) {
       return res.status(400).json({ success: false, message: 'Group name already exists' });
@@ -178,13 +173,10 @@ app.post('/groups', authenticate, async (req, res) => {
   }
 });
 
-// 3. Delete a group
-app.delete('/groups/:id', authenticate, async (req, res) => {
+app.delete('/groups/:id', authenticate, requireAdminOrBoss, async (req, res) => {
   try {
     const groupId = req.params.id;
-    // First remove members
     await dbAsync.run('DELETE FROM group_members WHERE group_id = ?', [groupId]);
-    // Then remove group
     await dbAsync.run('DELETE FROM groups WHERE id = ?', [groupId]);
     
     res.json({ success: true, message: 'Group deleted' });
@@ -194,7 +186,6 @@ app.delete('/groups/:id', authenticate, async (req, res) => {
   }
 });
 
-// 4. Get members of a group
 app.get('/groups/:id/members', authenticate, async (req, res) => {
   try {
     const groupId = req.params.id;
@@ -212,21 +203,18 @@ app.get('/groups/:id/members', authenticate, async (req, res) => {
   }
 });
 
-// 5. Add member to group
-app.post('/groups/:id/members', authenticate, async (req, res) => {
+app.post('/groups/:id/members', authenticate, requireAdminOrBoss, async (req, res) => {
   try {
     const groupId = req.params.id;
     const { userId } = req.body;
 
     if (!userId) return res.status(400).json({ success: false, message: 'User ID required' });
 
-    // Check user role
     const user = await dbAsync.get('SELECT role FROM users WHERE id = ?', [userId]);
     if (user && user.role === 'guest') {
       return res.status(403).json({ success: false, message: 'Los usuarios invitados no pueden ser añadidos a grupos' });
     }
 
-    // Check if already in group
     const existing = await dbAsync.get(
       'SELECT * FROM group_members WHERE group_id = ? AND user_id = ?',
       [groupId, userId]
@@ -248,8 +236,7 @@ app.post('/groups/:id/members', authenticate, async (req, res) => {
   }
 });
 
-// 6. Remove member from group
-app.delete('/groups/:id/members/:userId', authenticate, async (req, res) => {
+app.delete('/groups/:id/members/:userId', authenticate, requireAdminOrBoss, async (req, res) => {
   try {
     const { id: groupId, userId } = req.params;
     await dbAsync.run(
@@ -263,7 +250,6 @@ app.delete('/groups/:id/members/:userId', authenticate, async (req, res) => {
   }
 });
 
-// 7. List all users (for selection)
 app.get('/users', authenticate, async (req, res) => {
   try {
     const users = await dbAsync.all('SELECT id, username, role, avatar_url FROM users ORDER BY username ASC');

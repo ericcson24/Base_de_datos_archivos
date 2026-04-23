@@ -23,7 +23,6 @@ export const LanguageProvider = ({ children }) => {
   const [language, setLanguage] = useState('es');
 
   useEffect(() => {
-    // Load language from cookie
     const savedLanguage = document.cookie.split('; ').find(row => row.startsWith('language='));
     if (savedLanguage) {
       const lang = savedLanguage.split('=')[1];
@@ -36,7 +35,6 @@ export const LanguageProvider = ({ children }) => {
   const changeLanguage = (lang) => {
     if (translations[lang]) {
       setLanguage(lang);
-      // Save to cookie
       document.cookie = `language=${lang};path=/;max-age=31536000;SameSite=Lax`;
     }
   };
@@ -49,20 +47,18 @@ export const LanguageProvider = ({ children }) => {
       if (value && value[k]) {
         value = value[k];
       } else {
-        // Fallback to Spanish if key missing
         let fallback = translations['es'];
         for (const fk of keys) {
             if (fallback && fallback[fk]) {
                 fallback = fallback[fk];
             } else {
-                return key; // Return key if not found anywhere
+                return key;
             }
         }
         value = fallback;
       }
     }
 
-    // Interpolation
     if (typeof value === 'string' && params) {
       Object.keys(params).forEach(param => {
         value = value.replace(`{{${param}}}`, params[param]);

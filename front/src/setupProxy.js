@@ -1,7 +1,6 @@
 const { createProxyMiddleware } = require('http-proxy-middleware');
 
 module.exports = function(app) {
-  // Proxy to the API Gateway (port 8080) — ws: true enables WebSocket upgrade for RDP
   app.use(
     '/api',
     createProxyMiddleware({

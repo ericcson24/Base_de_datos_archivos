@@ -9,7 +9,6 @@ const pool = new Pool({
   port: process.env.DB_PORT || 5432,
 });
 
-// Helper to convert ? to $n
 const convertSql = (sql) => {
   let i = 0;
   return sql.replace(/\?/g, () => {
@@ -41,15 +40,12 @@ const dbAsync = {
     try {
       let pgSql = convertSql(sql);
       
-      // Hack for compatibility: SQLite returns lastID for INSERTs.
-      // Postgres needs RETURNING id.
       if (pgSql.trim().toUpperCase().startsWith('INSERT') && !pgSql.toUpperCase().includes('RETURNING')) {
          const sqlWithReturning = pgSql + ' RETURNING id';
          try {
              const res = await pool.query(sqlWithReturning, params);
              return { lastID: res.rows[0]?.id, changes: res.rowCount };
          } catch (err) {
-             // If table doesn't have id (code 42703), fall back to original query
              if (err.code === '42703') {
                  const res = await pool.query(pgSql, params);
                  return { changes: res.rowCount };
@@ -67,7 +63,6 @@ const dbAsync = {
   }
 };
 
-// Wait for postgres to be ready
 const waitForDb = async (maxRetries = 15, delay = 2000) => {
   for (let i = 0; i < maxRetries; i++) {
     try {
@@ -82,13 +77,11 @@ const waitForDb = async (maxRetries = 15, delay = 2000) => {
   throw new Error('Could not connect to database after retries');
 };
 
-// Initialize DB
 const initDb = async () => {
   try {
     await waitForDb();
     console.log('Initializing RDP Database...');
     
-    // Create rdp_connections table (if it doesn't exist at all)
     await pool.query(`
       CREATE TABLE IF NOT EXISTS rdp_connections (
         id SERIAL PRIMARY KEY,
@@ -106,7 +99,6 @@ const initDb = async () => {
       )
     `);
 
-    // Check columns and add missing ones (migration support)
     try {
         const res = await pool.query(`
             SELECT column_name 
@@ -144,9 +136,6 @@ const initDb = async () => {
         console.error('Error verifying/migrating columns:', e);
     }
 
-    // Ensure rdp_settings is the correct key-value schema
-    // The old schema from 01_schema.sql had (id, user_id, default_security, ...)
-    // We need the simple key-value format (setting_key, setting_value)
     try {
       const settingsCheck = await pool.query(`
         SELECT column_name FROM information_schema.columns
@@ -155,7 +144,6 @@ const initDb = async () => {
       const settingsCols = settingsCheck.rows.map(r => r.column_name);
       
       if (settingsCols.length > 0 && !settingsCols.includes('setting_key')) {
-        // Old schema detected - need to recreate
         console.log('Migrating rdp_settings from old schema to key-value store...');
         await pool.query('DROP TABLE IF EXISTS rdp_settings CASCADE');
       }
@@ -163,7 +151,6 @@ const initDb = async () => {
       console.log('rdp_settings check:', e.message);
     }
 
-    // Create rdp_settings table (key-value store)
     await pool.query(`
       CREATE TABLE IF NOT EXISTS rdp_settings (
         setting_key VARCHAR(50) PRIMARY KEY,
@@ -171,11 +158,16 @@ const initDb = async () => {
       )
     `);
 
-    // Insert default settings if not exist
     await pool.query(`
       INSERT INTO rdp_settings (setting_key, setting_value)
       VALUES ('lan_only', 'false'), ('server_id', ''), ('maintenance_mode', 'false')
       ON CONFLICT (setting_key) DO NOTHING
+    `);
+
+    await pool.query(`
+      UPDATE rdp_connections
+      SET security = 'nla'
+      WHERE security IS NULL OR security = '' OR security = 'any'
     `);
     
     console.log('RDP Database initialized successfully');

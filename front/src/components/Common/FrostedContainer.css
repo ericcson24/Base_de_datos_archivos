@@ -1,4 +1,4 @@
-/* FrostedContainer.css - Glassmorphism effects for React components */
+
 
 .frosted-svg-def {
   position: absolute;
@@ -8,101 +8,180 @@
 
 .frosted-container {
   position: relative;
-  background: rgba(255, 255, 255, 0.6);
-  backdrop-filter: url(#frosted);
-  -webkit-backdrop-filter: url(#frosted);
-  border: 1px solid rgba(0, 0, 0, 0.05);
-  border-radius: 12px;
+  background: linear-gradient(
+    135deg,
+    rgba(241, 245, 249, 0.75),
+    rgba(226, 232, 240, 0.65),
+    rgba(241, 245, 249, 0.78)
+  );
+  backdrop-filter: blur(32px) saturate(170%) brightness(1.04);
+  -webkit-backdrop-filter: blur(32px) saturate(170%) brightness(1.04);
+  border: 1px solid rgba(148, 163, 184, 0.18);
+  border-radius: 16px;
   box-shadow:
-    0 8px 32px rgba(0, 0, 0, 0.05),
-    inset 0 1px 0 rgba(255, 255, 255, 0.5);
+    0 0 0 1px rgba(255, 255, 255, 0.4) inset,
+    0 1px 0 rgba(255, 255, 255, 0.6) inset,
+    0 10px 40px -10px rgba(0, 0, 0, 0.1);
   padding: 20px;
-  transition: all 0.3s ease;
+  transition: all 0.35s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-
-/* Variants */
 .frosted-container.card {
   padding: 16px;
-  border-radius: 8px;
+  border-radius: 12px;
 }
 
 .frosted-container.modal {
   max-width: 500px;
   margin: 0 auto;
   padding: 24px;
-  border-radius: 16px;
-  background: rgba(255, 255, 255, 0.8);
+  border-radius: 20px;
+  background: linear-gradient(
+    135deg,
+    rgba(241, 245, 249, 0.88),
+    rgba(226, 232, 240, 0.82),
+    rgba(241, 245, 249, 0.9)
+  );
+  box-shadow:
+    0 0 0 1px rgba(255, 255, 255, 0.5) inset,
+    0 1px 0 rgba(255, 255, 255, 0.7) inset,
+    0 25px 60px -12px rgba(0, 0, 0, 0.12);
 }
 
 .frosted-container.sidebar {
   padding: 12px;
-  border-radius: 8px;
-  background: rgba(255, 255, 255, 0.5);
+  border-radius: 12px;
+  background: linear-gradient(
+    135deg,
+    rgba(241, 245, 249, 0.6),
+    rgba(226, 232, 240, 0.5)
+  );
 }
 
 .frosted-container.button {
   padding: 12px 24px;
-  border-radius: 6px;
+  border-radius: 10px;
   cursor: pointer;
   display: inline-block;
   text-align: center;
-  transition: all 0.2s ease;
-  background: rgba(255, 255, 255, 0.5);
-  border: 1px solid rgba(0, 0, 0, 0.05);
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  background: linear-gradient(
+    135deg,
+    rgba(241, 245, 249, 0.65),
+    rgba(226, 232, 240, 0.55)
+  );
+  border: 1px solid rgba(148, 163, 184, 0.15);
 }
 
 .frosted-container.button:hover {
-  background: rgba(255, 255, 255, 0.8);
+  background: linear-gradient(
+    135deg,
+    rgba(241, 245, 249, 0.8),
+    rgba(226, 232, 240, 0.7)
+  );
   transform: translateY(-1px);
+  box-shadow:
+    0 0 0 1px rgba(255, 255, 255, 0.5) inset,
+    0 8px 24px -6px rgba(0, 0, 0, 0.1);
 }
 
 .frosted-container.button:active {
   transform: translateY(0);
   box-shadow:
-    0 4px 16px rgba(0, 0, 0, 0.05),
-    inset 0 1px 0 rgba(255, 255, 255, 0.2);
+    0 4px 12px rgba(0, 0, 0, 0.06),
+    inset 0 1px 0 rgba(255, 255, 255, 0.3);
 }
 
-/* Dark theme support */
 [data-theme="dark"] .frosted-container {
-  background: rgba(0, 0, 0, 0.2);
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: linear-gradient(
+    135deg,
+    rgba(15, 23, 42, 0.75),
+    rgba(30, 41, 59, 0.65),
+    rgba(15, 23, 42, 0.78)
+  );
+  border: 1px solid rgba(148, 163, 184, 0.1);
   box-shadow:
-    0 8px 32px rgba(0, 0, 0, 0.3),
-    inset 0 1px 0 rgba(255, 255, 255, 0.05);
+    0 0 0 1px rgba(255, 255, 255, 0.04) inset,
+    0 1px 0 rgba(255, 255, 255, 0.06) inset,
+    0 10px 40px -10px rgba(0, 0, 0, 0.4);
 }
 
 [data-theme="dark"] .frosted-container:hover {
-  background: rgba(0, 0, 0, 0.3);
+  background: linear-gradient(
+    135deg,
+    rgba(15, 23, 42, 0.82),
+    rgba(30, 41, 59, 0.72),
+    rgba(15, 23, 42, 0.85)
+  );
   box-shadow:
-    0 12px 40px rgba(0, 0, 0, 0.4),
-    inset 0 1px 0 rgba(255, 255, 255, 0.1);
+    0 0 0 1px rgba(255, 255, 255, 0.06) inset,
+    0 1px 0 rgba(255, 255, 255, 0.08) inset,
+    0 14px 48px -10px rgba(0, 0, 0, 0.5);
 }
 
 [data-theme="dark"] .frosted-container.modal {
-  background: rgba(20, 20, 20, 0.8);
+  background: linear-gradient(
+    135deg,
+    rgba(15, 23, 42, 0.88),
+    rgba(30, 41, 59, 0.82),
+    rgba(15, 23, 42, 0.9)
+  );
+  border-color: rgba(148, 163, 184, 0.12);
+  box-shadow:
+    0 0 0 1px rgba(255, 255, 255, 0.05) inset,
+    0 1px 0 rgba(255, 255, 255, 0.07) inset,
+    0 25px 60px -12px rgba(0, 0, 0, 0.5);
 }
 
 [data-theme="dark"] .frosted-container.button {
-  background: rgba(255, 255, 255, 0.1);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  color: white;
+  background: linear-gradient(
+    135deg,
+    rgba(148, 163, 184, 0.08),
+    rgba(129, 140, 248, 0.06)
+  );
+  border: 1px solid rgba(148, 163, 184, 0.12);
+  color: #e2e8f0;
 }
 
 [data-theme="dark"] .frosted-container.button:hover {
-  background: rgba(255, 255, 255, 0.2);
+  background: linear-gradient(
+    135deg,
+    rgba(148, 163, 184, 0.14),
+    rgba(129, 140, 248, 0.1)
+  );
+  box-shadow:
+    0 0 0 1px rgba(255, 255, 255, 0.06) inset,
+    0 8px 24px -6px rgba(0, 0, 0, 0.3);
 }
 
-/* Responsive adjustments */
 @media (max-width: 768px) {
   .frosted-container {
     padding: 16px;
-    border-radius: 8px;
+    border-radius: 12px;
   }
 
   .frosted-container.modal {
     padding: 20px;
     margin: 10px;
+    max-width: 100%;
+  }
+}
+
+@media (max-width: 480px) {
+  .frosted-container.modal {
+    padding: 20px 16px;
+    margin: 0;
+    border-radius: 16px;
+  }
+}
+
+@media (max-width: 360px) {
+  .frosted-container {
+    padding: 12px;
+  }
+
+  .frosted-container.modal {
+    padding: 16px 12px;
+    border-radius: 14px;
   }
 }

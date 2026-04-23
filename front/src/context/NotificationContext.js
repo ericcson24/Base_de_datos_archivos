@@ -1,6 +1,7 @@
 import React, { createContext, useEffect, useRef, useState, useCallback } from 'react';
 import io from 'socket.io-client';
 import { useToast } from './ToastContext';
+import { getAuthToken } from '../utils/fileUtils';
 
 const NotificationContext = createContext();
 
@@ -9,7 +10,7 @@ export const NotificationProvider = ({ children, user, onNavigate }) => {
   const userRef = useRef(user);
   const [notifications, setNotifications] = useState([]);
   const [unreadCount, setUnreadCount] = useState(0);
-  const recentNotifIds = useRef(new Set()); // Dedup guard for socket events
+  const recentNotifIds = useRef(new Set());
 
   useEffect(() => {
     userRef.current = user;
@@ -19,11 +20,7 @@ export const NotificationProvider = ({ children, user, onNavigate }) => {
     if (onNavigate) {
       onNavigate(link);
     } else if (link === '/calendar') {
-      // Fallback for specific known links if onNavigate is not provided
-      // This relies on the app structure where we might not have passed the prop
-      // But ideally onNavigate should be passed from App.js
       window.history.pushState(null, '', '/calendar');
-      // We can't force App re-render from here easily without context
     }
   };
 
@@ -96,7 +93,6 @@ export const NotificationProvider = ({ children, user, onNavigate }) => {
     if (user) {
       fetchNotifications();
       
-      // Poll every 60 seconds as a fallback
       const interval = setInterval(fetchNotifications, 60000);
       return () => clearInterval(interval);
     }
@@ -105,16 +101,15 @@ export const NotificationProvider = ({ children, user, onNavigate }) => {
   useEffect(() => {
     if (!user) return;
 
-    // Connect to socket
-    // The path must match the nginx location for notifications
+    const token = getAuthToken();
     const newSocket = io('/', {
       path: '/api/notifications/socket.io',
-      transports: ['websocket', 'polling']
+      transports: ['websocket', 'polling'],
+      auth: { token }
     });
 
     newSocket.on('connect', () => {
       console.log('Connected to notification service');
-      // Join user-specific room for targeted notifications
       if (userRef.current && userRef.current.id) {
         newSocket.emit('join', userRef.current.id);
       }
@@ -123,35 +118,45 @@ export const NotificationProvider = ({ children, user, onNavigate }) => {
     newSocket.on('notification', (data) => {
       console.log('Notification received:', data);
       
-      // Only process notifications for the current user
       const currentUserId = userRef.current?.id;
       if (data.user_id && currentUserId && data.user_id !== currentUserId) {
         return;
       }
 
-      // Dedup: skip if we already processed this notification ID recently
       const notifId = data.id || `${data.title}_${data.created_at}`;
       if (recentNotifIds.current.has(notifId)) {
         return;
       }
       recentNotifIds.current.add(notifId);
-      // Clean up old IDs after 10 seconds
       setTimeout(() => recentNotifIds.current.delete(notifId), 10000);
 
-      // Refresh notifications list (this updates the bell icon + dropdown)
       fetchNotifications();
 
-      // Show a translated toast notification
       if (userRef.current) {
         const meta = data.metadata || {};
         let toastTitle = data.title || 'Notificación';
         let toastMessage = data.message || '';
 
-        // Translate known notification types for the toast
         if (meta.notifType === 'file_share') {
           toastTitle = '📁 Archivo compartido';
           toastMessage = meta.from && meta.fileName 
             ? `${meta.from} compartió "${meta.fileName}" contigo`
+            : toastMessage;
+        } else if (meta.notifType === 'file_unshared') {
+          toastTitle = '🚫 Acceso revocado';
+          toastMessage = meta.from && meta.fileName
+            ? `${meta.from} dejó de compartir "${meta.fileName}" contigo`
+            : toastMessage;
+        } else if (meta.notifType === 'file_shared_deleted') {
+          toastTitle = '🗑️ Archivo eliminado';
+          toastMessage = meta.from && meta.fileName
+            ? `${meta.from} eliminó "${meta.fileName}" (compartido contigo)`
+            : toastMessage;
+        } else if (meta.notifType === 'file_permission_changed') {
+          toastTitle = '🔑 Permiso actualizado';
+          const permLabel = meta.permission === 'read' ? 'solo lectura' : 'edición';
+          toastMessage = meta.from && meta.fileName
+            ? `${meta.from} cambió el permiso de "${meta.fileName}" a ${permLabel}`
             : toastMessage;
         } else if (meta.notifType === 'calendar_assign' || meta.notifType === 'calendar_group') {
           toastTitle = '📅 Evento asignado';

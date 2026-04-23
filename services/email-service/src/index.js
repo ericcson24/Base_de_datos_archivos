@@ -12,22 +12,17 @@ app.use(cors({
 }));
 app.use(express.json());
 
-// Configuración del transporte (SMTP)
 const transporter = nodemailer.createTransport({
   host: process.env.SMTP_HOST || 'smtp.gmail.com',
   port: process.env.SMTP_PORT || 587,
-  secure: false, // true para 465, false para otros puertos
+  secure: false,
   auth: {
     user: process.env.SMTP_USER || 'tu_correo@gmail.com',
     pass: process.env.SMTP_PASS || 'tu_contraseña_app'
   }
 });
 
-// Middleware de autenticación simple (solo interno o con token)
 const authenticate = (req, res, next) => {
-  // En una arquitectura real, esto debería validar un token de servicio a servicio
-  // Por ahora, permitimos acceso si viene de la red interna o tiene un header específico
-  // Simplificado para este ejemplo
   next();
 };
 

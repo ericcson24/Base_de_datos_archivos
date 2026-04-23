@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { FiDownload } from 'react-icons/fi';
 import Button from '../Common/Button';
 import { getAuthToken } from '../../utils/fileUtils';
 import { useToast } from '../../context/ToastContext';
@@ -19,7 +20,7 @@ const ExportCalendarModal = ({ onClose }) => {
     d.setMonth(d.getMonth() + 1, 0);
     return d.toISOString().split('T')[0];
   });
-  const [format, setFormat] = useState('pdf'); // 'pdf' | 'json'
+  const [format, setFormat] = useState('pdf');
 
   const fetchEvents = async () => {
     const response = await fetch(`/api/events/?start=${startDate}T00:00:00&end=${endDate}T23:59:59`, {
@@ -73,7 +74,7 @@ const ExportCalendarModal = ({ onClose }) => {
       'Preset4': '#16a34a', 'Green category': '#16a34a',
       'Preset5': '#0d9488', 'Teal category': '#0d9488',
       'Preset6': '#2563eb', 'Blue category': '#2563eb',
-      'Preset7': '#7c3aed', 'Purple category': '#7c3aed',
+      'Preset7': '#0284c7', 'Purple category': '#0284c7',
       'Preset8': '#db2777', 'Pink category': '#db2777',
       'Preset9': '#64748b', 'Steel category': '#64748b',
     };
@@ -100,15 +101,12 @@ const ExportCalendarModal = ({ onClose }) => {
   };
 
   const handleExportPDF = async () => {
-    // Open window SYNCHRONOUSLY (before any await) to avoid popup blockers
     const printWindow = window.open('', '_blank');
     if (!printWindow) {
-      // Popup was blocked — fall back to download
       addToast(t('export.popupBlocked') || 'Please allow popups to export as PDF, or try JSON format.', 'warning');
       setLoading(false);
       return;
     }
-    // Show loading message immediately in the new window
     printWindow.document.write(`<html><head><title>${t('export.documentTitle')}</title></head><body style="display:flex;align-items:center;justify-content:center;height:100vh;font-family:system-ui;color:#6b7280;"><p style="font-size:18px;">⏳ ${t('export.exporting') || 'Exporting...'}...</p></body></html>`);
     printWindow.document.close();
 
@@ -116,7 +114,6 @@ const ExportCalendarModal = ({ onClose }) => {
     try {
       const events = await fetchEvents();
       
-      // Group events by date
       const grouped = {};
       events.forEach(ev => {
         const start = ev.start || ev.start_time;
@@ -126,10 +123,8 @@ const ExportCalendarModal = ({ onClose }) => {
         grouped[dateKey].push(ev);
       });
 
-      // Sort dates
       const sortedDates = Object.keys(grouped).sort();
 
-      // Sort events within each date by start time
       sortedDates.forEach(date => {
         grouped[date].sort((a, b) => new Date(a.start || a.start_time) - new Date(b.start || b.start_time));
       });
@@ -137,7 +132,6 @@ const ExportCalendarModal = ({ onClose }) => {
       const totalEvents = events.length;
       const allDayCount = events.filter(e => e.allDay || e.is_all_day).length;
 
-      // Build HTML document
       const html = `<!DOCTYPE html>
 <html lang="es">
 <head>
@@ -145,7 +139,6 @@ const ExportCalendarModal = ({ onClose }) => {
 <title>${t('export.documentTitle')} — ${startDate} / ${endDate}</title>
 <style>
   @page { margin: 20mm 15mm; size: A4; }
-  * { box-sizing: border-box; margin: 0; padding: 0; }
   body { 
     font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; 
     color: #1f2937; 
@@ -294,12 +287,11 @@ const ExportCalendarModal = ({ onClose }) => {
         const startTime = ev.start || ev.start_time;
         const endTime = ev.end || ev.end_time;
 
-        // For multi-day all-day events, show date range
         let timeDisplay;
         if (isAllDay) {
           const startD = new Date(startTime);
           const endD = new Date(endTime);
-          endD.setDate(endD.getDate() - 1); // end is exclusive
+          endD.setDate(endD.getDate() - 1);
           const isMultiDay = startD.toISOString().split('T')[0] !== endD.toISOString().split('T')[0];
           if (isMultiDay) {
             timeDisplay = '<span class="all-day-badge">' + formatShortDate(startTime) + ' — ' + formatShortDate(endD) + '</span>';
@@ -319,7 +311,7 @@ const ExportCalendarModal = ({ onClose }) => {
           <div class="event-details">
             <div class="event-title">${title}</div>
             <div class="event-meta">
-              ${location ? `<span class="event-location">📍 ${location}</span>` : ''}
+              ${location ? `<span class="event-location">[Location] ${location}</span>` : ''}
               ${cats.length > 0 ? ` · ${cats.join(', ')}` : ''}
               ${description ? `<br/>${description.substring(0, 120)}${description.length > 120 ? '...' : ''}` : ''}
             </div>
@@ -337,7 +329,6 @@ const ExportCalendarModal = ({ onClose }) => {
 </body>
 </html>`;
 
-      // Write the final HTML into the already-open window
       printWindow.document.open();
       printWindow.document.write(html);
       printWindow.document.close();
@@ -359,7 +350,6 @@ const ExportCalendarModal = ({ onClose }) => {
     }
   };
 
-  // Quick range setters
   const setThisWeek = () => {
     const now = new Date();
     const dayOfWeek = now.getDay();
@@ -398,9 +388,9 @@ const ExportCalendarModal = ({ onClose }) => {
   return (
     <div className="modal-overlay export-modal-overlay" onClick={onClose}>
       <div className="modal-content export-modal" onClick={e => e.stopPropagation()}>
-        {/* Header */}
+        
         <div className="export-header">
-          <div className="export-header-icon">📤</div>
+          <div className="export-header-icon"><FiDownload /></div>
           <div>
             <h2 className="export-title">{t('export.title')}</h2>
             <p className="export-subtitle">{t('export.subtitle')}</p>
@@ -412,7 +402,7 @@ const ExportCalendarModal = ({ onClose }) => {
           </button>
         </div>
 
-        {/* Quick Range Buttons */}
+        
         <div className="export-quick-ranges">
           <button className="export-quick-btn" onClick={setThisWeek}>{t('export.thisWeek')}</button>
           <button className="export-quick-btn" onClick={setThisMonth}>{t('export.thisMonth')}</button>
@@ -420,7 +410,7 @@ const ExportCalendarModal = ({ onClose }) => {
           <button className="export-quick-btn" onClick={setLast30Days}>{t('export.last30Days')}</button>
         </div>
 
-        {/* Date Range */}
+        
         <div className="export-date-range">
           <div className="export-date-field">
             <label className="export-label">{t('export.from')}</label>
@@ -443,7 +433,7 @@ const ExportCalendarModal = ({ onClose }) => {
           </div>
         </div>
 
-        {/* Format Selection */}
+        
         <div className="export-format-section">
           <label className="export-label">{t('export.format')}</label>
           <div className="export-format-options">
@@ -470,7 +460,7 @@ const ExportCalendarModal = ({ onClose }) => {
           </div>
         </div>
 
-        {/* Footer */}
+        
         <div className="export-footer">
           <Button variant="secondary" onClick={onClose}>
             {t('common.cancel')}
@@ -485,7 +475,7 @@ const ExportCalendarModal = ({ onClose }) => {
                 {t('export.exporting')}
               </span>
             ) : (
-              `📤 ${t('export.exportBtn')}`
+              <span className="flex items-center gap-2"><FiDownload /> {t('export.exportBtn')}</span>
             )}
           </Button>
         </div>

@@ -16,7 +16,6 @@ const CreateFileModal = ({ isOpen, onClose, onCreateFile, defaultName, fileType 
   useEffect(() => {
     if (isOpen) {
       setFileName(defaultName || '');
-      // Focus and select the name part (without extension)
       setTimeout(() => {
         if (inputRef.current) {
           inputRef.current.focus();

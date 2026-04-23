@@ -9,13 +9,11 @@ const GroupManager = () => {
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [newGroup, setNewGroup] = useState({ name: '', description: '' });
-  const [selectedUsers, setSelectedUsers] = useState({}); // { groupId: userId }
-  const [expandedGroups, setExpandedGroups] = useState({}); // { groupId: boolean } to load members on demand if needed, but I'll load them with the group or separately.
+  const [selectedUsers, setSelectedUsers] = useState({});
+  const [expandedGroups, setExpandedGroups] = useState({});
   const [errorMsg, setErrorMsg] = useState('');
+  const [successMsg, setSuccessMsg] = useState('');
 
-  // Actually, the list groups endpoint returns member count. 
-  // I should probably fetch members when a group is expanded or just fetch all for now if not too many.
-  // Let's fetch members for a group when we want to see them.
 
   useEffect(() => {
     loadData();
@@ -44,15 +42,12 @@ const GroupManager = () => {
   const loadData = async () => {
     setLoading(true);
     try {
-      // Load users first to ensure we have them for the select
       const usersRes = await fetchWithAuth('/api/users/users');
       if (usersRes.success) setUsers(usersRes.users);
 
       const groupsRes = await fetchWithAuth('/api/users/groups');
       if (groupsRes.success) {
         setGroups(groupsRes.groups);
-        // Pre-load members for all groups
-        // Use Promise.allSettled to avoid one failure blocking others
         await Promise.allSettled(groupsRes.groups.map(g => loadGroupMembers(g.id)));
       }
     } catch (error) {
@@ -76,26 +71,29 @@ const GroupManager = () => {
   };
 
   const handleCreateGroup = async (e) => {
-    e.preventDefault();
-    if (!newGroup.name.trim()) return;
+    if (e && e.preventDefault) e.preventDefault();
+    const name = (newGroup.name || '').trim();
+    const description = (newGroup.description || '').trim();
+    if (!name) {
+      setErrorMsg(t('admin.groupNameRequired') || 'El nombre del grupo es obligatorio');
+      setTimeout(() => setErrorMsg(''), 4000);
+      return;
+    }
 
     try {
       const res = await fetchWithAuth('/api/users/groups', {
         method: 'POST',
-        body: JSON.stringify(newGroup)
+        body: JSON.stringify({ name, description })
       });
 
       if (res.success) {
         setNewGroup({ name: '', description: '' });
-        // Reload groups only
-        const groupsRes = await fetchWithAuth('/api/users/groups');
-        if (groupsRes.success) {
-           setGroups(groupsRes.groups);
-           // Load members for the new group (empty initially but consistent)
-           // Actually we can just append the new group if the API returned it, 
-           // but the API returns { success: true, message: ... }
-           // So reloading is safer.
-        }
+        setSuccessMsg(t('admin.groupCreated') || 'Grupo creado correctamente');
+        setTimeout(() => setSuccessMsg(''), 3000);
+        await loadData();
+      } else {
+        setErrorMsg(res.message || t('admin.errorCreatingGroup') || 'Error creating group');
+        setTimeout(() => setErrorMsg(''), 4000);
       }
     } catch (error) {
       console.error('Error creating group:', error);
@@ -166,7 +164,7 @@ const GroupManager = () => {
       </div>
 
       <div className="create-group-form">
-        <form onSubmit={handleCreateGroup}>
+        <form onSubmit={handleCreateGroup} autoComplete="off">
           <div className="form-row">
             <div className="form-group">
               <label>{t('admin.groupName') || 'Nombre del Grupo'}</label>
@@ -175,6 +173,7 @@ const GroupManager = () => {
                 className="form-input"
                 value={newGroup.name}
                 onChange={e => setNewGroup({ ...newGroup, name: e.target.value })}
+                onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); handleCreateGroup(e); } }}
                 placeholder={t('admin.groupNamePlaceholder') || 'Ej: Montadores'}
               />
             </div>
@@ -185,15 +184,35 @@ const GroupManager = () => {
                 className="form-input"
                 value={newGroup.description}
                 onChange={e => setNewGroup({ ...newGroup, description: e.target.value })}
+                onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); handleCreateGroup(e); } }}
                 placeholder={t('admin.descriptionPlaceholder') || 'Descripción opcional'}
               />
             </div>
-            <button type="submit" className="btn-primary">
+            <button
+              type="button"
+              className="btn-primary"
+              onClick={handleCreateGroup}
+            >
               <FiPlus /> {t('admin.createGroup') || 'Crear Grupo'}
             </button>
           </div>
         </form>
       </div>
+
+      {successMsg && (
+        <div style={{
+          padding: '12px 20px',
+          borderRadius: '10px',
+          marginBottom: '16px',
+          fontWeight: 500,
+          fontSize: '14px',
+          background: 'rgba(52, 199, 89, 0.12)',
+          color: '#34c759',
+          border: '1px solid rgba(52, 199, 89, 0.25)'
+        }}>
+          {successMsg}
+        </div>
+      )}
 
       {errorMsg && (
         <div style={{

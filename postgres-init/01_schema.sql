@@ -552,4 +552,15 @@ CREATE TABLE IF NOT EXISTS roadmap_calendar_links (
     FOREIGN KEY(issue_id) REFERENCES roadmap_issues(id) ON DELETE CASCADE,
     FOREIGN KEY(linked_by) REFERENCES users(id) ON DELETE CASCADE,
     UNIQUE(calendar_event_id, issue_id)
+-- Windows User Links (cloud ↔ Windows Server user mapping)
+CREATE TABLE IF NOT EXISTS windows_user_links (
+    id SERIAL PRIMARY KEY,
+    cloud_username TEXT NOT NULL UNIQUE,
+    windows_username TEXT NOT NULL UNIQUE,
+    sync_enabled BOOLEAN DEFAULT TRUE,
+    sync_desktop BOOLEAN DEFAULT TRUE,
+    sync_documents BOOLEAN DEFAULT TRUE,
+    sync_downloads BOOLEAN DEFAULT TRUE,
+    linked_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    last_sync TIMESTAMP
 );

@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { FiMonitor, FiLock } from 'react-icons/fi';
 import { useLanguage } from '../../context/LanguageContext';
 import { getAuthToken } from '../../utils/fileUtils';
 import './RDPConnectionModal.css';
@@ -45,12 +46,12 @@ const RDPConnectionModal = ({ onClose, onConnect }) => {
                             </div>
                             {settings.lan_only === 'true' && (
                                 <div className="status-badge lan-only">
-                                    🔒 LAN Only Mode
+                                    <FiLock style={{ verticalAlign: 'middle', marginRight: 4 }} /> LAN Only Mode
                                 </div>
                             )}
                             {settings.maintenance_mode === 'true' && (
                                 <div className="status-badge maintenance">
-                                    🛑 Maintenance Mode
+                                    [Stop] Maintenance Mode
                                 </div>
                             )}
                         </div>
@@ -70,7 +71,6 @@ const RDPConnectionModal = ({ onClose, onConnect }) => {
                                                         method: 'POST',
                                                         headers: { 'Authorization': `Bearer ${token}` }
                                                     });
-                                                    // Reload
                                                     const res = await fetch('/api/rdp/connections', { headers: { 'Authorization': `Bearer ${token}` } });
                                                     if (res.ok) setConnections(await res.json());
                                                 } catch (e) {
@@ -84,7 +84,7 @@ const RDPConnectionModal = ({ onClose, onConnect }) => {
                                 ) : (
                                     connections.map(conn => (
                                         <div key={conn.id} className="connection-item" onClick={() => onConnect(conn.id)}>
-                                            <div className="conn-icon">🖥️</div>
+                                            <div className="conn-icon"><FiMonitor /></div>
                                             <div className="conn-details">
                                                 <span className="conn-name">{conn.name}</span>
                                                 <span className="conn-host">{conn.hostname}</span>

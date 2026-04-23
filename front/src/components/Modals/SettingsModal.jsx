@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { FiSun, FiMoon, FiMail, FiCpu, FiCalendar, FiDownload } from 'react-icons/fi';
 import Button from '../Common/Button';
 import Input from '../Common/Input';
 import ExportCalendarModal from './ExportCalendarModal';
@@ -22,9 +23,9 @@ const SettingsModal = ({ onClose, user, onThemeToggle, isDarkMode, initialTab = 
     theme: isDarkMode ? 'dark' : 'light',
     language: currentLanguage || 'es',
     notifications: user?.notifications ?? true,
-    microsoftAccount: null // { email: '...', name: '...' }
+    microsoftAccount: null
   });
-  const [activeTab, setActiveTab] = useState(initialTab); // general, integrations, ia
+  const [activeTab, setActiveTab] = useState(initialTab);
   const [showAvatarSelector, setShowAvatarSelector] = useState(false);
   const [defaultAvatars, setDefaultAvatars] = useState([]);
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
@@ -68,7 +69,6 @@ const SettingsModal = ({ onClose, user, onThemeToggle, isDarkMode, initialTab = 
         if (data.success && data.avatars.length > 0) {
           setDefaultAvatars(data.avatars);
         } else {
-          // Fallback to dicebear if no local avatars
           setDefaultAvatars([
             'https://api.dicebear.com/7.x/avataaars/svg?seed=Felix',
             'https://api.dicebear.com/7.x/avataaars/svg?seed=Aneka',
@@ -110,16 +110,13 @@ const SettingsModal = ({ onClose, user, onThemeToggle, isDarkMode, initialTab = 
       const data = await response.json();
       if (data.success) {
         setSettings({ ...settings, avatarUrl: data.avatarUrl });
-        // Actualizar estado global inmediatamente
         if (onUserUpdate) {
           onUserUpdate({ avatarUrl: data.avatarUrl });
         }
-        // Notification handled by backend
         setShowAvatarSelector(false);
       }
     } catch (error) {
       console.error('Error uploading avatar:', error);
-      // Notification handled by backend or generic error
     } finally {
       setUploadingAvatar(false);
     }
@@ -167,10 +164,8 @@ const SettingsModal = ({ onClose, user, onThemeToggle, isDarkMode, initialTab = 
           setSettings(prev => ({
             ...prev,
             ...data.settings,
-            // Mantener el estado visual actual para evitar inconsistencias
             theme: isDarkMode ? 'dark' : 'light',
             language: currentLanguage,
-            // Asegurar que notifications sea booleano
             notifications: data.settings.notifications === undefined ? true : !!data.settings.notifications
           }));
         }
@@ -201,7 +196,6 @@ const SettingsModal = ({ onClose, user, onThemeToggle, isDarkMode, initialTab = 
       });
 
       if (response.ok) {
-        // Actualizar estado global del usuario
         if (onUserUpdate) {
           onUserUpdate({
             avatarUrl: settings.avatarUrl,
@@ -211,11 +205,9 @@ const SettingsModal = ({ onClose, user, onThemeToggle, isDarkMode, initialTab = 
           });
         }
 
-        // Si cambió el tema, aplicar
         if ((settings.theme === 'dark' && !isDarkMode) || (settings.theme === 'light' && isDarkMode)) {
           onThemeToggle();
         }
-        // Si cambió el idioma, aplicar
         changeLanguage(settings.language);
         
         addToast(t('common.success'), 'success');
@@ -279,11 +271,9 @@ const SettingsModal = ({ onClose, user, onThemeToggle, isDarkMode, initialTab = 
       });
       
       if (response.ok) {
-        // Notification handled by backend
       }
     } catch (error) {
       console.error('Error syncing:', error);
-      // Notification handled by backend or generic error
     } finally {
       setSyncing(false);
     }
@@ -419,7 +409,7 @@ const SettingsModal = ({ onClose, user, onThemeToggle, isDarkMode, initialTab = 
                 </select>
               </div>
 
-              {/* Tema */}
+              
               <div>
                 <label className="settings-label mb-2">{t('settings.theme')}</label>
                 <div className="theme-options">
@@ -428,7 +418,7 @@ const SettingsModal = ({ onClose, user, onThemeToggle, isDarkMode, initialTab = 
                     className={`theme-btn ${settings.theme === 'light' ? 'active' : ''}`}
                   >
                     <div className="theme-btn-content">
-                      <span>☀️</span>
+                      <span><FiSun /></span>
                       <span className="theme-btn-text">{t('common.theme.light')}</span>
                     </div>
                   </button>
@@ -437,14 +427,14 @@ const SettingsModal = ({ onClose, user, onThemeToggle, isDarkMode, initialTab = 
                     className={`theme-btn ${settings.theme === 'dark' ? 'active' : ''}`}
                   >
                     <div className="theme-btn-content">
-                      <span>🌙</span>
+                      <span><FiMoon /></span>
                       <span className="theme-btn-text">{t('common.theme.dark')}</span>
                     </div>
                   </button>
                 </div>
               </div>
 
-              {/* Export Calendar - solo visible desde Calendar */}
+              
               {isCalendar && (
                 <div className="mt-6 pt-6" style={{ borderTop: '1px solid var(--border-color, #e5e7eb)' }}>
                   <label className="settings-label mb-2">{t('export.sectionTitle')}</label>
@@ -452,7 +442,7 @@ const SettingsModal = ({ onClose, user, onThemeToggle, isDarkMode, initialTab = 
                     className="export-calendar-btn"
                     onClick={() => setShowExportModal(true)}
                   >
-                    <div className="export-calendar-btn-icon">📤</div>
+                    <div className="export-calendar-btn-icon"><FiDownload /></div>
                     <div className="export-calendar-btn-info">
                       <span className="export-calendar-btn-title">{t('export.title')}</span>
                       <span className="export-calendar-btn-desc">{t('export.subtitle')}</span>
@@ -476,7 +466,7 @@ const SettingsModal = ({ onClose, user, onThemeToggle, isDarkMode, initialTab = 
                     <div className="integration-card">
                       <div className="integration-info">
                         <div className="integration-icon">
-                          📧
+                          <FiMail />
                         </div>
                         <div>
                           <p className="integration-email">{settings.microsoftEmail}</p>
@@ -525,7 +515,7 @@ const SettingsModal = ({ onClose, user, onThemeToggle, isDarkMode, initialTab = 
                 ) : (
                   <div className="text-center py-8">
                     <div className="w-16 h-16 bg-gray-200 dark:bg-gray-600 rounded-full flex items-center justify-center text-3xl mx-auto mb-4 text-gray-500 dark:text-gray-400">
-                        📅
+                        <FiCalendar />
                     </div>
                     <h4 className="connect-calendar-title">{t('settings.connectCalendar')}</h4>
                     <p className="connect-calendar-desc">
@@ -562,7 +552,7 @@ const SettingsModal = ({ onClose, user, onThemeToggle, isDarkMode, initialTab = 
                     </div>
                  ) : (
                     <div className="space-y-6">
-                        {/* Estado General */}
+                        
                         <div className="bg-white dark:bg-slate-700/50 p-4 rounded-lg border border-gray-200 dark:border-slate-600 shadow-sm">
                             <div className="flex justify-between items-center mb-2">
                                 <span className="font-medium text-gray-700 dark:text-gray-200">Estado del Nodo</span>
@@ -610,7 +600,7 @@ const SettingsModal = ({ onClose, user, onThemeToggle, isDarkMode, initialTab = 
                             </div>
                         </div>
 
-                        {/* Cache de búsquedas */}
+                        
                         {aiStatus.cache && (
                             <div className="bg-white dark:bg-slate-700/50 p-4 rounded-lg border border-gray-200 dark:border-slate-600 shadow-sm">
                                 <div className="font-medium text-gray-700 dark:text-gray-200 mb-2">Caché de Búsquedas</div>
@@ -629,7 +619,7 @@ const SettingsModal = ({ onClose, user, onThemeToggle, isDarkMode, initialTab = 
                             </div>
                         )}
 
-                        {/* Contenido en Progreso */}
+                        
                         {aiStatus.progress && aiStatus.progress.state === 'indexing' ? (
                             <div className="bg-white dark:bg-slate-700/50 p-4 rounded-lg border border-gray-200 dark:border-slate-600 shadow-sm animate-pulse">
                                 <div className="flex justify-between text-sm mb-2 text-gray-600 dark:text-gray-300">
@@ -642,7 +632,7 @@ const SettingsModal = ({ onClose, user, onThemeToggle, isDarkMode, initialTab = 
                                 </div>
                                 
                                 <div className="bg-gray-100 dark:bg-slate-900 p-3 rounded text-xs font-mono text-gray-600 dark:text-gray-400 overflow-hidden text-ellipsis whitespace-nowrap border border-gray-200 dark:border-slate-700">
-                                    <span className="text-blue-500 mr-2">➜</span>
+                                    <span className="text-blue-500 mr-2">-></span>
                                     {aiStatus.progress.currentFile || 'Iniciando proceso...'}
                                 </div>
                                 
@@ -654,7 +644,7 @@ const SettingsModal = ({ onClose, user, onThemeToggle, isDarkMode, initialTab = 
                             </div>
                         ) : (
                              <div className="text-center py-6 text-gray-500 dark:text-gray-400 border-t border-gray-100 dark:border-slate-700 pt-6">
-                                <div className="text-4xl mb-3 opacity-80">🧠</div>
+                                <div className="text-4xl mb-3 opacity-80 flex justify-center"><FiCpu /></div>
                                 <p className="text-sm">El nodo está sincronizado.</p>
                                 <p className="text-xs mt-1 opacity-70">Se actualiza automáticamente cada 30 segundos.</p>
                              </div>

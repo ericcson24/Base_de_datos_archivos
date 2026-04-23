@@ -29,7 +29,6 @@ const UploadPopup = ({ uploads, onClose, onCancel }) => {
   const [visible, setVisible] = useState(true);
   const containerRef = useRef(null);
 
-  // Auto-hide after all done
   const allDone = uploads.length > 0 && uploads.every(u => u.status === 'done' || u.status === 'error');
   const hasErrors = uploads.some(u => u.status === 'error');
 
@@ -51,12 +50,10 @@ const UploadPopup = ({ uploads, onClose, onCancel }) => {
   const pendingCount = uploads.filter(u => u.status === 'pending').length;
   const totalCount = uploads.length;
 
-  // Overall progress
   const totalBytes = uploads.reduce((acc, u) => acc + (u.totalSize || 0), 0);
   const loadedBytes = uploads.reduce((acc, u) => acc + (u.loadedSize || 0), 0);
   const overallPercent = totalBytes > 0 ? Math.round((loadedBytes / totalBytes) * 100) : 0;
 
-  // Overall remaining time (weighted average)
   const activeUploads = uploads.filter(u => u.status === 'uploading' && u.remainingTime > 0);
   const maxRemaining = activeUploads.length > 0
     ? Math.max(...activeUploads.map(u => u.remainingTime))
@@ -99,7 +96,7 @@ const UploadPopup = ({ uploads, onClose, onCancel }) => {
       ref={containerRef}
       className={`upload-popup ${minimized ? 'minimized' : ''} ${!visible ? 'hiding' : ''}`}
     >
-      {/* Header */}
+      
       <div className="upload-popup-header" onClick={() => setMinimized(!minimized)}>
         <div className="upload-popup-header-left">
           {!allDone && (
@@ -132,7 +129,7 @@ const UploadPopup = ({ uploads, onClose, onCancel }) => {
         </div>
       </div>
 
-      {/* Overall progress bar (visible even when minimized) */}
+      
       {!allDone && (
         <div className="upload-popup-overall">
           <div className="upload-popup-overall-bar">
@@ -149,7 +146,7 @@ const UploadPopup = ({ uploads, onClose, onCancel }) => {
         </div>
       )}
 
-      {/* File list */}
+      
       {!minimized && (
         <div className="upload-popup-list">
           {uploads.map((upload) => (
@@ -166,10 +163,10 @@ const UploadPopup = ({ uploads, onClose, onCancel }) => {
                     <>
                       <span>{formatFileSize(upload.loadedSize || 0)} / {formatFileSize(upload.totalSize || 0)}</span>
                       {upload.speed > 0 && (
-                        <span className="upload-item-speed">• {formatFileSize(upload.speed)}/s</span>
+                        <span className="upload-item-speed">* {formatFileSize(upload.speed)}/s</span>
                       )}
                       {upload.remainingTime > 0 && (
-                        <span className="upload-item-remaining">• {formatTime(upload.remainingTime)}</span>
+                        <span className="upload-item-remaining">* {formatTime(upload.remainingTime)}</span>
                       )}
                     </>
                   )}
@@ -183,7 +180,7 @@ const UploadPopup = ({ uploads, onClose, onCancel }) => {
                     <span className="upload-item-pending">{t('upload.waiting')}</span>
                   )}
                 </div>
-                {/* Per-file progress bar */}
+                
                 {upload.status === 'uploading' && (
                   <div className="upload-item-progress">
                     <div

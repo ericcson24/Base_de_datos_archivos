@@ -286,7 +286,6 @@
     color: rgba(255,255,255,0.5);
 }
 
-/* Switch Toggle */
 .switch {
   position: relative;
   display: inline-block;
@@ -340,7 +339,6 @@ input:checked + .slider:before {
   transform: translateX(26px);
 }
 
-/* Rounded sliders */
 .slider.round {
   border-radius: 34px;
 }
@@ -350,7 +348,7 @@ input:checked + .slider:before {
 }
 
   
-/* Settings Panel Styles */  
+  
 .rdp-settings-panel {  
     margin-bottom: 24px;  
     padding: 24px;  
@@ -391,7 +389,7 @@ input:checked + .slider:before {
     font-family: monospace;  
 }  
   
-/* Dashboard Layout */  
+  
 .rdp-dashboard-grid {  
     display: grid;  
     grid-template-columns: 1fr 1fr;  
@@ -493,14 +491,12 @@ input:checked + .slider:before {
     align-items: center;  
 }
 
-/* Glassmorphism base class */
 .glassmorphism {
     background: var(--sidebar-bg, rgba(255,255,255,0.05));
     backdrop-filter: blur(10px);
     border: 1px solid var(--sidebar-border, rgba(255,255,255,0.1));
 }
 
-/* Back button for RDP viewer */
 .back-btn {
     background: var(--sidebar-btn-bg, rgba(255,255,255,0.1));
     color: var(--text-color, #fff);
@@ -517,7 +513,6 @@ input:checked + .slider:before {
     background: var(--sidebar-btn-hover, rgba(255,255,255,0.15));
 }
 
-/* RDP viewer wrapper */
 .rdp-viewer-wrapper {
     position: relative;
     width: 100%;
@@ -526,7 +521,6 @@ input:checked + .slider:before {
     flex-direction: column;
 }
 
-/* Connect button variants */
 .connect-btn.primary {
     background: #fff;
     color: #000;
@@ -554,20 +548,17 @@ input:checked + .slider:before {
     transform: none;
 }
 
-/* Access methods container */
 .access-methods {
     display: flex;
     flex-direction: column;
     gap: 10px;
 }
 
-/* Small variant of setting toggle row */
 .setting-toggle-row.small {
     padding: 4px 0;
     margin-bottom: 8px;
 }
 
-/* Small setting label */
 .setting-label-small {
     font-weight: 500;
     font-size: 0.85rem;
@@ -575,25 +566,21 @@ input:checked + .slider:before {
     opacity: 0.8;
 }
 
-/* Action button disabled state */
 .action-btn:disabled {
     opacity: 0.4;
     cursor: not-allowed;
 }
 
-/* Setting description theme-aware */
 .setting-desc {  
     font-size: 0.85rem;  
     color: var(--text-secondary, rgba(255,255,255,0.6));  
 }
 
-/* Modal content theme-aware */
 .modal-content {
     background: var(--sidebar-bg, #1a1a1a);
     color: var(--text-color, #fff);
 }
 
-/* Responsive layout */
 @media (max-width: 768px) {
     .rdp-dashboard-grid {
         grid-template-columns: 1fr;
@@ -626,9 +613,7 @@ input:checked + .slider:before {
     }
 }
 
-/* ============ Light Theme Overrides ============ */
 
-/* Status text in light mode */
 .rdp-manager-container {
     color: var(--admin-text-light, var(--text-color, #1d1d1f));
 }
@@ -637,7 +622,6 @@ input:checked + .slider:before {
     color: var(--admin-text-dark, var(--text-color, #f5f5f7));
 }
 
-/* Connection card light mode */
 .rdp-connection-card {
     border: 1px solid var(--admin-border-light, rgba(0,0,0,0.1));
 }
@@ -646,7 +630,6 @@ input:checked + .slider:before {
     border: 1px solid var(--admin-border-dark, rgba(255,255,255,0.1));
 }
 
-/* Method rows in light mode */
 .method-row {
     background: rgba(0,0,0,0.03);
 }
@@ -655,7 +638,6 @@ input:checked + .slider:before {
     background: rgba(255,255,255,0.03);
 }
 
-/* Info card light mode */
 .rdp-info-card {
     background: rgba(0,0,0,0.03);
 }
@@ -664,7 +646,6 @@ input:checked + .slider:before {
     background: rgba(0,0,0,0.2);
 }
 
-/* Connect button light adjustments */
 .connect-btn.primary {
     background: var(--admin-text-light, #1d1d1f);
     color: #fff;
@@ -694,7 +675,6 @@ input:checked + .slider:before {
     border: 1px solid var(--admin-border-dark, rgba(255,255,255,0.2));
 }
 
-/* Restart button light mode */
 .btn-restart {
     background-color: rgba(0,0,0,0.05);
     color: var(--admin-text-light, #1d1d1f);
@@ -707,7 +687,6 @@ input:checked + .slider:before {
     border: 1px solid rgba(255,255,255,0.2);
 }
 
-/* Status card border in light mode */
 .rdp-status-card {
     border: 1px solid var(--admin-border-light, rgba(0,0,0,0.1));
 }
@@ -716,7 +695,6 @@ input:checked + .slider:before {
     border: 1px solid rgba(255,255,255,0.1);
 }
 
-/* Glassmorphism light mode */
 .rdp-manager-container .glassmorphism {
     background: var(--admin-glass-light, rgba(255,255,255,0.7));
     border: 1px solid var(--admin-border-light, rgba(0,0,0,0.1));
@@ -727,7 +705,6 @@ input:checked + .slider:before {
     border: 1px solid var(--admin-border-dark, rgba(255,255,255,0.1));
 }
 
-/* Setting description light mode */
 .setting-desc {
     color: var(--admin-text-light, #666);
     opacity: 0.6;
