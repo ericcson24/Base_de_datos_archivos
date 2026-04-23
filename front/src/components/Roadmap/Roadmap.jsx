@@ -48,28 +48,80 @@ const LINK_TYPES = {
 };
 
 // ============================================
+// SYNC STATUS CONFIG + BADGE (shared)
+// ============================================
+const SYNC_STATES = {
+  synced:      { label: 'Sincronizado',    color: 'var(--rm-success, #22c55e)', icon: FiCheckCircle, dot: '#22c55e' },
+  out_of_sync: { label: 'Desfase',          color: 'var(--rm-warning, #f59e0b)', icon: FiRepeat,      dot: '#f59e0b' },
+  broken:      { label: 'Evento borrado',   color: 'var(--rm-danger, #ef4444)',  icon: FiAlertTriangle, dot: '#ef4444' },
+  error:       { label: 'Error de sync',    color: 'var(--rm-danger, #ef4444)',  icon: FiAlertTriangle, dot: '#ef4444' },
+  not_synced:  { label: 'Sin sincronizar',  color: 'var(--rm-muted, #94a3b8)',   icon: FiCircle,      dot: '#94a3b8' },
+  pending:     { label: 'Sincronizando…',   color: 'var(--rm-info, #3b82f6)',    icon: FiRefreshCw,   dot: '#3b82f6' }
+};
+
+const SyncBadge = ({ issue, size = 'sm', onClick, showLabel = false }) => {
+  if (!issue) return null;
+  // Prefer explicit sync_status; fall back to calendar_event_id presence
+  const status = issue.calendar_sync_status
+    || (issue.calendar_event_id ? 'synced' : 'not_synced');
+  const conf = SYNC_STATES[status] || SYNC_STATES.not_synced;
+  const Icon = conf.icon;
+  return (
+    <span
+      className={`rm-sync-badge rm-sync-badge-${status} size-${size}${onClick ? ' clickable' : ''}`}
+      style={{ color: conf.color, borderColor: conf.color }}
+      title={`Outlook: ${conf.label}`}
+      onClick={onClick ? (e) => { e.stopPropagation(); onClick(e); } : undefined}
+    >
+      <Icon size={size === 'sm' ? 10 : 12} />
+      {showLabel && <span>{conf.label}</span>}
+    </span>
+  );
+};
+
+
+// ============================================
 // KANBAN CARD
 // ============================================
-const KanbanCard = ({ issue, onEdit, onDelete, onDragStart, onDragEnd, isDragging, t }) => {
+const KanbanCard = ({ issue, onEdit, onDelete, onDragStart, onDragEnd, isDragging, t, bulkMode, selected, onToggleSelect }) => {
   const [showMenu, setShowMenu] = useState(false);
   const priority = PRIORITIES[issue.priority] || PRIORITIES.medium;
   const issueType = ISSUE_TYPES[issue.issue_type] || ISSUE_TYPES.task;
   const isOverdue = issue.due_date && new Date(issue.due_date) < new Date() && issue.status !== 'done';
 
   const handleDragStart = (e) => {
+    if (bulkMode) { e.preventDefault(); return; }
     e.dataTransfer.setData('text/plain', JSON.stringify({ issueId: issue.id, fromColumnId: issue.column_id }));
     e.dataTransfer.effectAllowed = 'move';
     onDragStart?.(issue.id);
   };
 
+  const handleCardClick = (e) => {
+    if (bulkMode) {
+      e.stopPropagation();
+      onToggleSelect?.(issue.id);
+      return;
+    }
+    onEdit(issue);
+  };
+
   return (
     <div
-      className={`rm-card ${isDragging ? 'dragging' : ''} ${isOverdue ? 'overdue' : ''}`}
-      draggable
+      className={`rm-card ${isDragging ? 'dragging' : ''} ${isOverdue ? 'overdue' : ''} ${selected ? 'selected' : ''}`}
+      draggable={!bulkMode}
       onDragStart={handleDragStart}
       onDragEnd={() => onDragEnd?.()}
     >
       <div className="rm-card-top">
+        {bulkMode && (
+          <input
+            type="checkbox"
+            className="rm-card-checkbox"
+            checked={!!selected}
+            onChange={() => onToggleSelect?.(issue.id)}
+            onClick={e => e.stopPropagation()}
+          />
+        )}
         <div className="rm-card-type-key">
           <span className="rm-card-type-icon" style={{ color: issueType.color }} title={issueType.labelKey ? t(`roadmap.issueTypes.${issueType.labelKey}`) : ''}>
             {issueType.icon}
@@ -94,7 +146,7 @@ const KanbanCard = ({ issue, onEdit, onDelete, onDragStart, onDragEnd, isDraggin
         </div>
       </div>
 
-      <h4 className="rm-card-title" onClick={() => onEdit(issue)}>{issue.title}</h4>
+      <h4 className="rm-card-title" onClick={handleCardClick}>{issue.title}</h4>
 
       {issue.description && (
         <p className="rm-card-desc">{issue.description.substring(0, 80)}{issue.description.length > 80 ? '...' : ''}</p>
@@ -121,6 +173,9 @@ const KanbanCard = ({ issue, onEdit, onDelete, onDragStart, onDragEnd, isDraggin
               <FiClock size={11} /> {new Date(issue.due_date).toLocaleDateString('es-ES', { day: '2-digit', month: 'short' })}
             </span>
           )}
+          {(issue.calendar_event_id || issue.calendar_sync_status) && (
+            <SyncBadge issue={issue} size="sm" />
+          )}
         </div>
       </div>
 
@@ -141,7 +196,7 @@ const KanbanCard = ({ issue, onEdit, onDelete, onDragStart, onDragEnd, isDraggin
 // ============================================
 // KANBAN COLUMN
 // ============================================
-const KanbanColumn = ({ column, issues, onAddIssue, onEditIssue, onDeleteIssue, onDrop, onDragStart, onDragEnd, draggingIssueId, t }) => {
+const KanbanColumn = ({ column, issues, onAddIssue, onEditIssue, onDeleteIssue, onDrop, onDragStart, onDragEnd, draggingIssueId, t, bulkMode, selectedIds, onToggleSelect }) => {
   const [isDragOver, setIsDragOver] = useState(false);
   const columnIssues = issues.filter(i => i.column_id === column.id);
   const isOverWip = column.wip_limit > 0 && columnIssues.length >= column.wip_limit;
@@ -174,7 +229,8 @@ const KanbanColumn = ({ column, issues, onAddIssue, onEditIssue, onDeleteIssue, 
       <div className="rm-col-body">
         {columnIssues.map(issue => (
           <KanbanCard key={issue.id} issue={issue} onEdit={onEditIssue} onDelete={onDeleteIssue}
-            onDragStart={onDragStart} onDragEnd={onDragEnd} isDragging={draggingIssueId === issue.id} t={t} />
+            onDragStart={onDragStart} onDragEnd={onDragEnd} isDragging={draggingIssueId === issue.id} t={t}
+            bulkMode={bulkMode} selected={selectedIds?.includes(issue.id)} onToggleSelect={onToggleSelect} />
         ))}
         {columnIssues.length === 0 && <div className="rm-col-empty"><span>{t('roadmap.messages.noTasks')}</span></div>}
       </div>
@@ -211,6 +267,9 @@ const IssueModal = ({ issue, columns, members, sprints, epics, onSave, onUpdate,
   const [newLabel, setNewLabel] = useState('');
   const [comments, setComments] = useState([]);
   const [newComment, setNewComment] = useState('');
+  // @mention autocomplete state
+  const [mentionQuery, setMentionQuery] = useState(null); // null | string (open dropdown when non-null)
+  const commentRef = React.useRef(null);
   const [loadingComments, setLoadingComments] = useState(false);
   const [showDocPicker, setShowDocPicker] = useState(false);
   const [docSearch, setDocSearch] = useState('');
@@ -240,7 +299,8 @@ const IssueModal = ({ issue, columns, members, sprints, epics, onSave, onUpdate,
       setForm(prev => ({
         ...prev,
         labels: issue.labels || [],
-        story_points: issue.story_points || ''
+        story_points: issue.story_points || '',
+        syncCalendar: issue.sync_calendar !== false
       }));
     }
   }, [issue]);
@@ -252,6 +312,17 @@ const IssueModal = ({ issue, columns, members, sprints, epics, onSave, onUpdate,
     fetch(`/api/roadmap/issues/${issue.id}/comments`, { headers }).then(r => r.json()).then(d => setComments(Array.isArray(d) ? d : [])).catch(() => {}).finally(() => setLoadingComments(false));
     fetch(`/api/roadmap/issues/${issue.id}/time-logs`, { headers }).then(r => r.json()).then(d => setTimeLogs(Array.isArray(d) ? d : [])).catch(() => {});
     fetch(`/api/roadmap/issues/${issue.id}/history`, { headers }).then(r => r.json()).then(d => setHistory(Array.isArray(d) ? d : [])).catch(() => {});
+    // Auto-verify sync status on open (only if linked)
+    if (issue.calendar_event_id) {
+      fetch(`/api/roadmap/issues/${issue.id}/sync-status`, { headers })
+        .then(r => r.ok ? r.json() : null)
+        .then(data => {
+          if (data && data.sync_status && data.sync_status !== issue.calendar_sync_status) {
+            onUpdate?.();
+          }
+        })
+        .catch(() => {});
+    }
   }, [issue?.id, token]);
 
   const handleSubmit = () => {
@@ -708,8 +779,52 @@ const IssueModal = ({ issue, columns, members, sprints, epics, onSave, onUpdate,
                     </label>
                   </div>
                   <div className="rm-comment-input-row">
-                    <textarea className="rm-comment-textarea" placeholder={t('roadmap.comments.writeComment')} value={newComment}
-                      onChange={e => setNewComment(e.target.value)} onKeyDown={e => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) addComment(); }} rows={3} />
+                    <div className="rm-comment-input-wrap">
+                      <textarea
+                        ref={commentRef}
+                        className="rm-comment-textarea"
+                        placeholder={t('roadmap.comments.writeComment')}
+                        value={newComment}
+                        onChange={e => {
+                          const v = e.target.value;
+                          setNewComment(v);
+                          // Detect @mention being typed before the caret
+                          const caret = e.target.selectionStart || v.length;
+                          const before = v.slice(0, caret);
+                          const m = before.match(/(^|\s)@([\wáéíóúñÁÉÍÓÚÑ]{0,30})$/);
+                          setMentionQuery(m ? m[2] : null);
+                        }}
+                        onKeyDown={e => {
+                          if (e.key === 'Escape' && mentionQuery !== null) { setMentionQuery(null); return; }
+                          if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) addComment();
+                        }}
+                        rows={3} />
+                      {mentionQuery !== null && (() => {
+                        const q = mentionQuery.toLowerCase();
+                        const matches = (members || []).filter(m => (m.username || '').toLowerCase().includes(q)).slice(0, 6);
+                        if (matches.length === 0) return null;
+                        const pickMention = (m) => {
+                          const caret = commentRef.current?.selectionStart || newComment.length;
+                          const before = newComment.slice(0, caret);
+                          const after = newComment.slice(caret);
+                          const replaced = before.replace(/(^|\s)@([\wáéíóúñÁÉÍÓÚÑ]{0,30})$/,
+                            (full, pre) => `${pre}<span class="rm-mention" data-user-id="${m.user_id}">@${m.username}</span>&nbsp;`);
+                          setNewComment(replaced + after);
+                          setMentionQuery(null);
+                          setTimeout(() => commentRef.current?.focus(), 0);
+                        };
+                        return (
+                          <div className="rm-mention-dropdown">
+                            {matches.map(m => (
+                              <button key={m.user_id} type="button" className="rm-mention-item" onClick={() => pickMention(m)}>
+                                <span className="rm-avatar-sm">{(m.username || '?').charAt(0).toUpperCase()}</span>
+                                <span>{m.username}</span>
+                              </button>
+                            ))}
+                          </div>
+                        );
+                      })()}
+                    </div>
                     <button onClick={addComment}><FiSend size={14} /></button>
                   </div>
                 </div>
@@ -827,44 +942,70 @@ const IssueModal = ({ issue, columns, members, sprints, epics, onSave, onUpdate,
             <div className="rm-sync-section">
               <div className="rm-sync-header">
                 <FiRefreshCw size={14} />
-                <span>{t('roadmap.fields.syncCalendar')}</span>
+                <span className="rm-sync-header-label">{t('roadmap.fields.syncCalendar')}</span>
+                {issue?.id && <SyncBadge issue={{ ...issue, ...form }} size="sm" />}
               </div>
               <label className="rm-sync-toggle">
                 <input type="checkbox" checked={form.syncCalendar} onChange={e => setForm(f => ({ ...f, syncCalendar: e.target.checked }))} />
                 <span className="rm-sync-toggle-slider" />
-                <span className="rm-sync-toggle-label">{form.syncCalendar ? 'ON' : 'OFF'}</span>
+                <span className="rm-sync-toggle-label">
+                  {form.syncCalendar ? 'Auto-sync ON' : 'Auto-sync OFF'}
+                </span>
               </label>
-              {issue?.calendar_event_id && (
-                <div className="rm-sync-status linked">
-                  <FiCheckCircle size={12} /> {t('roadmap.messages.linkedToCalendar')}
-                  <button className="rm-link-btn" onClick={() => window.location.href = '/calendar'} title="Ver en Calendario">
-                    <FiExternalLink size={12} />
-                  </button>
+              {issue?.id && issue.calendar_sync_error && (
+                <div className="rm-sync-error-msg"><FiAlertTriangle size={11} /> {issue.calendar_sync_error}</div>
+              )}
+              {issue?.id && (
+                <div className="rm-sync-actions">
+                  {(form.due_date || form.start_date) && (
+                    <button type="button" className="rm-sync-btn primary" onClick={async () => {
+                      try {
+                        const endpoint = issue.calendar_sync_status === 'broken' ? 'resync' : 'sync';
+                        const res = await fetch(`/api/roadmap/issues/${issue.id}/${endpoint}`, {
+                          method: 'POST',
+                          headers: { 'Authorization': `Bearer ${token}` }
+                        });
+                        const data = await res.json().catch(() => ({}));
+                        if (res.ok) {
+                          onUpdate?.();
+                        } else {
+                          alert(data.error || 'No se pudo sincronizar. ¿Has vinculado Microsoft?');
+                        }
+                      } catch { alert('Error de conexión'); }
+                    }}>
+                      <FiRefreshCw size={12} /> {issue.calendar_sync_status === 'broken' ? 'Recrear en Outlook' : (issue.calendar_event_id ? 'Re-sincronizar' : 'Sincronizar ahora')}
+                    </button>
+                  )}
+                  {issue.calendar_event_id && (
+                    <>
+                      <button type="button" className="rm-sync-btn" onClick={async () => {
+                        try {
+                          const res = await fetch(`/api/roadmap/issues/${issue.id}/sync-status`, {
+                            headers: { 'Authorization': `Bearer ${token}` }
+                          });
+                          if (res.ok) { onUpdate?.(); }
+                        } catch {}
+                      }}><FiCheckCircle size={12} /> Verificar</button>
+                      <button type="button" className="rm-sync-btn danger" onClick={async () => {
+                        if (!window.confirm('Desvincular del calendario (elimina el evento en Outlook). ¿Continuar?')) return;
+                        try {
+                          const res = await fetch(`/api/roadmap/issues/${issue.id}/unsync`, {
+                            method: 'POST',
+                            headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ keepEvent: false })
+                          });
+                          if (res.ok) onUpdate?.();
+                        } catch {}
+                      }}><FiX size={12} /> Desvincular</button>
+                      <button type="button" className="rm-link-btn" onClick={() => window.location.href = '/calendar'} title="Ver en Outlook">
+                        <FiExternalLink size={12} /> Abrir en Outlook
+                      </button>
+                    </>
+                  )}
                 </div>
               )}
-              {issue?.id && (form.due_date || form.start_date) && (
-                <button className="rm-sync-now-btn" onClick={async () => {
-                  try {
-                    const res = await fetch(`/api/roadmap/issues/${issue.id}/sync`, {
-                      method: 'POST',
-                      headers: { 'Authorization': `Bearer ${token}` }
-                    });
-                    if (res.ok) {
-                      const data = await res.json();
-                      if (data.calendar_event_id) {
-                        onUpdate?.();
-                      }
-                    } else {
-                      const err = await res.json().catch(() => ({}));
-                      alert(err.error || 'Error al sincronizar');
-                    }
-                  } catch (e) { alert('Error de conexión al sincronizar'); }
-                }}>
-                  <FiRefreshCw size={12} /> Sincronizar ahora
-                </button>
-              )}
               {issue?.id && !form.due_date && !form.start_date && (
-                <div className="rm-sync-hint">Añade fechas para poder sincronizar</div>
+                <div className="rm-sync-hint">Añade fecha de inicio o vencimiento para poder sincronizar</div>
               )}
             </div>
             <button className="rm-save-btn" onClick={handleSubmit}>
@@ -1234,6 +1375,10 @@ const Roadmap = ({ user, onLogout, onBackToFolders, onGoToCalendar, onGoToPanel,
   const [filterPriority, setFilterPriority] = useState('');
   const [filterAssignee, setFilterAssignee] = useState('');
   const [filterSprint, setFilterSprint] = useState('');
+  // Swimlane grouping + bulk edit
+  const [swimlaneBy, setSwimlaneBy] = useState('none'); // none | assignee | priority | epic | issue_type
+  const [bulkMode, setBulkMode] = useState(false);
+  const [selectedIssueIds, setSelectedIssueIds] = useState([]);
   const [searchQuery, setSearchQuery] = useState('');
 
   // UI
@@ -1878,12 +2023,118 @@ const Roadmap = ({ user, onLogout, onBackToFolders, onGoToCalendar, onGoToPanel,
               <button className="rm-filter-clear" onClick={clearFilters}><FiX size={12} /> {t('roadmap.filters.clear')}</button>
             )}
             <div className="rm-toolbar-spacer" />
+            {activeView === 'board' && (
+              <>
+                <select className="rm-filter-select rm-swimlane-select" value={swimlaneBy} onChange={e => setSwimlaneBy(e.target.value)} title="Swimlanes">
+                  <option value="none">Sin carril</option>
+                  <option value="assignee">Por responsable</option>
+                  <option value="priority">Por prioridad</option>
+                  <option value="epic">Por épica</option>
+                  <option value="issue_type">Por tipo</option>
+                </select>
+                <button
+                  className={`rm-filter-select rm-bulk-toggle ${bulkMode ? 'active' : ''}`}
+                  onClick={() => { setBulkMode(m => !m); setSelectedIssueIds([]); }}
+                  title="Selección múltiple"
+                >
+                  <FiCheckSquare size={13} /> {bulkMode ? 'Salir' : 'Selección'}
+                </button>
+              </>
+            )}
             <span className="rm-filter-count">{filteredIssues.length} {t('roadmap.filters.tasks')}</span>
           </div>
         )}
 
         {/* ========== VIEW CONTENT ========== */}
         <div className="rm-content">
+          {/* Bulk edit action bar */}
+          {bulkMode && activeView === 'board' && selectedIssueIds.length > 0 && (
+            <div className="rm-bulk-bar">
+              <div className="rm-bulk-info">
+                <FiCheckSquare size={14} /> {selectedIssueIds.length} seleccionada{selectedIssueIds.length !== 1 ? 's' : ''}
+              </div>
+              <div className="rm-bulk-actions">
+                <select
+                  className="rm-bulk-select"
+                  defaultValue=""
+                  onChange={async e => {
+                    const sprintId = e.target.value === 'null' ? null : parseInt(e.target.value) || null;
+                    if (e.target.value === '') return;
+                    try {
+                      await fetch(`/api/roadmap/projects/${selectedProjectId}/issues/bulk`, {
+                        method: 'PUT',
+                        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${getToken()}` },
+                        body: JSON.stringify({ issue_ids: selectedIssueIds, updates: { sprint_id: sprintId } })
+                      });
+                      setSelectedIssueIds([]);
+                      fetchProjectData(selectedProjectId);
+                    } catch {}
+                    e.target.value = '';
+                  }}
+                >
+                  <option value="">Mover a sprint…</option>
+                  <option value="null">Backlog (sin sprint)</option>
+                  {sprints.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                </select>
+                <select
+                  className="rm-bulk-select"
+                  defaultValue=""
+                  onChange={async e => {
+                    if (e.target.value === '') return;
+                    const assigneeId = e.target.value === 'null' ? null : parseInt(e.target.value);
+                    try {
+                      await fetch(`/api/roadmap/projects/${selectedProjectId}/issues/bulk`, {
+                        method: 'PUT',
+                        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${getToken()}` },
+                        body: JSON.stringify({ issue_ids: selectedIssueIds, updates: { assigned_to: assigneeId } })
+                      });
+                      setSelectedIssueIds([]);
+                      fetchProjectData(selectedProjectId);
+                    } catch {}
+                    e.target.value = '';
+                  }}
+                >
+                  <option value="">Asignar a…</option>
+                  <option value="null">Sin asignar</option>
+                  {members.map(m => <option key={m.user_id} value={m.user_id}>{m.username}</option>)}
+                </select>
+                <select
+                  className="rm-bulk-select"
+                  defaultValue=""
+                  onChange={async e => {
+                    if (e.target.value === '') return;
+                    try {
+                      await fetch(`/api/roadmap/projects/${selectedProjectId}/issues/bulk`, {
+                        method: 'PUT',
+                        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${getToken()}` },
+                        body: JSON.stringify({ issue_ids: selectedIssueIds, updates: { priority: e.target.value } })
+                      });
+                      setSelectedIssueIds([]);
+                      fetchProjectData(selectedProjectId);
+                    } catch {}
+                    e.target.value = '';
+                  }}
+                >
+                  <option value="">Prioridad…</option>
+                  {Object.keys(PRIORITIES).map(p => <option key={p} value={p}>{t(`roadmap.priorities.${PRIORITIES[p].labelKey}`)}</option>)}
+                </select>
+                <button className="rm-bulk-btn danger" onClick={async () => {
+                  if (!window.confirm(`¿Eliminar ${selectedIssueIds.length} tareas?`)) return;
+                  for (const id of selectedIssueIds) {
+                    try {
+                      await fetch(`/api/roadmap/issues/${id}`, {
+                        method: 'DELETE',
+                        headers: { 'Authorization': `Bearer ${getToken()}` }
+                      });
+                    } catch {}
+                  }
+                  setSelectedIssueIds([]);
+                  fetchProjectData(selectedProjectId);
+                }}><FiTrash2 size={12} /> Eliminar</button>
+                <button className="rm-bulk-btn" onClick={() => setSelectedIssueIds([])}>Limpiar</button>
+              </div>
+            </div>
+          )}
           {/* NO PROJECT SELECTED — show empty state for all views */}
           {!selectedProjectId && !loading ? (
             <div className="rm-empty">
@@ -1904,18 +2155,78 @@ const Roadmap = ({ user, onLogout, onBackToFolders, onGoToCalendar, onGoToPanel,
                 <h2>{t('roadmap.messages.noColumns')}</h2>
                 <p>{t('roadmap.messages.noColumnsDesc')}</p>
               </div>
-            ) : (
-              <div className="rm-board">
-                {columns.map(col => (
-                  <KanbanColumn key={col.id} column={col} issues={filteredIssues}
-                    onAddIssue={(colId) => { setPreselectedColumnId(colId); setEditingIssueId(null); setShowIssueModal(true); }}
-                    onEditIssue={(issue) => { setEditingIssueId(issue.id); setShowIssueModal(true); }}
-                    onDeleteIssue={handleDeleteIssue} onDrop={handleDrop}
-                    onDragStart={(id) => setDraggingIssueId(id)} onDragEnd={() => setDraggingIssueId(null)}
-                    draggingIssueId={draggingIssueId} t={t} />
-                ))}
-              </div>
-            )
+            ) : (() => {
+              const boardProps = {
+                onAddIssue: (colId) => { setPreselectedColumnId(colId); setEditingIssueId(null); setShowIssueModal(true); },
+                onEditIssue: (issue) => { setEditingIssueId(issue.id); setShowIssueModal(true); },
+                onDeleteIssue: handleDeleteIssue,
+                onDrop: handleDrop,
+                onDragStart: (id) => setDraggingIssueId(id),
+                onDragEnd: () => setDraggingIssueId(null),
+                draggingIssueId, t,
+                bulkMode,
+                selectedIds: selectedIssueIds,
+                onToggleSelect: (id) => setSelectedIssueIds(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id])
+              };
+              if (swimlaneBy === 'none') {
+                return (
+                  <div className="rm-board">
+                    {columns.map(col => (
+                      <KanbanColumn key={col.id} column={col} issues={filteredIssues} {...boardProps} />
+                    ))}
+                  </div>
+                );
+              }
+              // Build swimlanes
+              const getLaneKey = (i) => {
+                switch (swimlaneBy) {
+                  case 'assignee': return i.assigned_to || '__none__';
+                  case 'priority': return i.priority || 'medium';
+                  case 'epic': return i.epic_id || '__none__';
+                  case 'issue_type': return i.issue_type || 'task';
+                  default: return '__none__';
+                }
+              };
+              const getLaneLabel = (key) => {
+                if (key === '__none__') return 'Sin asignar';
+                switch (swimlaneBy) {
+                  case 'assignee': {
+                    const m = members.find(mm => mm.user_id === key);
+                    return m?.username || `Usuario #${key}`;
+                  }
+                  case 'priority': return t(`roadmap.priorities.${PRIORITIES[key]?.labelKey || 'medium'}`);
+                  case 'epic': {
+                    const ep = epics.find(e => e.id === key);
+                    return ep ? `${ep.issue_key || ''} ${ep.title}`.trim() : 'Sin épica';
+                  }
+                  case 'issue_type': return t(`roadmap.issueTypes.${ISSUE_TYPES[key]?.labelKey || 'task'}`);
+                  default: return String(key);
+                }
+              };
+              const lanes = new Map();
+              filteredIssues.forEach(i => {
+                const k = getLaneKey(i);
+                if (!lanes.has(k)) lanes.set(k, []);
+                lanes.get(k).push(i);
+              });
+              return (
+                <div className="rm-swimlanes">
+                  {Array.from(lanes.entries()).map(([laneKey, laneIssues]) => (
+                    <div key={String(laneKey)} className="rm-swimlane">
+                      <div className="rm-swimlane-header">
+                        <span className="rm-swimlane-title">{getLaneLabel(laneKey)}</span>
+                        <span className="rm-swimlane-count">{laneIssues.length}</span>
+                      </div>
+                      <div className="rm-board">
+                        {columns.map(col => (
+                          <KanbanColumn key={col.id} column={col} issues={laneIssues} {...boardProps} />
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              );
+            })()
           )}
 
           {/* BACKLOG VIEW */}
@@ -2283,35 +2594,86 @@ const Roadmap = ({ user, onLogout, onBackToFolders, onGoToCalendar, onGoToPanel,
               <button className="rm-modal-close" onClick={() => setShowBurndown(false)}><FiX size={20} /></button>
             </div>
             <div className="rm-burndown-content">
-              {burndownData.burndown.length > 0 ? (
-                <div className="rm-burndown-chart">
-                  <svg viewBox={`0 0 ${burndownData.burndown.length * 80} 200`} className="rm-burndown-svg">
-                    <line x1="20" y1="20" x2={burndownData.burndown.length * 80 - 20} y2="180" stroke="var(--rm-text-secondary)" strokeWidth="1" strokeDasharray="5,5" />
-                    <polyline fill="none" stroke="#4b9cdb" strokeWidth="2"
-                      points={burndownData.burndown.map((d, i) => {
-                        const maxPts = Math.max(...burndownData.burndown.map(b => b.remaining_points + b.completed_points), 1);
-                        const x = 20 + i * (burndownData.burndown.length > 1 ? (burndownData.burndown.length * 80 - 40) / (burndownData.burndown.length - 1) : 0);
-                        const y = 180 - (d.remaining_points / maxPts) * 160;
-                        return `${x},${y}`;
-                      }).join(' ')} />
-                    {burndownData.burndown.map((d, i) => {
-                      const maxPts = Math.max(...burndownData.burndown.map(b => b.remaining_points + b.completed_points), 1);
-                      const x = 20 + i * (burndownData.burndown.length > 1 ? (burndownData.burndown.length * 80 - 40) / (burndownData.burndown.length - 1) : 0);
-                      const y = 180 - (d.remaining_points / maxPts) * 160;
-                      return (
+              {burndownData.burndown.length > 0 ? (() => {
+                const data = burndownData.burndown;
+                const W = Math.max(data.length * 70, 500);
+                const H = 260;
+                const padL = 48, padR = 24, padT = 20, padB = 40;
+                const chartW = W - padL - padR;
+                const chartH = H - padT - padB;
+                const maxPts = Math.max(
+                  ...data.map(b => (b.remaining_points || 0) + (b.completed_points || 0)),
+                  data[0]?.remaining_points || 0,
+                  1
+                );
+                const xFor = (i) => padL + (data.length === 1 ? chartW / 2 : (i * chartW) / (data.length - 1));
+                const yFor = (v) => padT + chartH - (v / maxPts) * chartH;
+                const gridTicks = [0, 0.25, 0.5, 0.75, 1].map(r => Math.round(maxPts * r));
+                const actualPoints = data.map((d, i) => `${xFor(i)},${yFor(d.remaining_points || 0)}`).join(' ');
+                const completedPoints = data.map((d, i) => `${xFor(i)},${yFor(d.completed_points || 0)}`).join(' ');
+                return (
+                  <div className="rm-burndown-chart">
+                    <svg viewBox={`0 0 ${W} ${H}`} className="rm-burndown-svg" preserveAspectRatio="xMidYMid meet">
+                      {/* Grid */}
+                      {gridTicks.map((tick, idx) => {
+                        const y = yFor(tick);
+                        return (
+                          <g key={idx}>
+                            <line x1={padL} y1={y} x2={W - padR} y2={y} stroke="var(--rm-border, #30363d)" strokeWidth="0.5" strokeDasharray="2,4" />
+                            <text x={padL - 6} y={y + 3} textAnchor="end" fontSize="10" fill="var(--rm-text-secondary, #94a3b8)">{tick}</text>
+                          </g>
+                        );
+                      })}
+                      {/* Axes */}
+                      <line x1={padL} y1={padT} x2={padL} y2={H - padB} stroke="var(--rm-text-secondary, #94a3b8)" strokeWidth="1" />
+                      <line x1={padL} y1={H - padB} x2={W - padR} y2={H - padB} stroke="var(--rm-text-secondary, #94a3b8)" strokeWidth="1" />
+                      {/* Ideal line */}
+                      <line x1={xFor(0)} y1={yFor(data[0]?.remaining_points || 0)} x2={xFor(data.length - 1)} y2={yFor(0)}
+                        stroke="var(--rm-muted, #94a3b8)" strokeWidth="1.5" strokeDasharray="6,4" opacity="0.7" />
+                      {/* Completed area */}
+                      <polyline fill="none" stroke="var(--rm-success, #22c55e)" strokeWidth="2" points={completedPoints} opacity="0.7" />
+                      {/* Remaining line */}
+                      <polyline fill="none" stroke="var(--rm-info, #3b82f6)" strokeWidth="2.5" points={actualPoints} />
+                      {/* Points */}
+                      {data.map((d, i) => (
                         <g key={i}>
-                          <circle cx={x} cy={y} r="4" fill="#4b9cdb" />
-                          <text x={x} y="198" textAnchor="middle" fontSize="10" fill="var(--rm-text-secondary)">
-                            {new Date(d.date).toLocaleDateString('es-ES', { day: '2-digit', month: 'short' })}
+                          <circle cx={xFor(i)} cy={yFor(d.remaining_points || 0)} r="4" fill="var(--rm-info, #3b82f6)" stroke="var(--rm-bg, #0d1117)" strokeWidth="1.5" />
+                          <circle cx={xFor(i)} cy={yFor(d.completed_points || 0)} r="3" fill="var(--rm-success, #22c55e)" opacity="0.8" />
+                          <text x={xFor(i)} y={H - padB + 16} textAnchor="middle" fontSize="10" fill="var(--rm-text-secondary, #94a3b8)">
+                            {new Date(d.snapshot_date || d.date).toLocaleDateString('es-ES', { day: '2-digit', month: 'short' })}
                           </text>
-                          <text x={x} y={y - 10} textAnchor="middle" fontSize="10" fill="var(--rm-text)">{d.remaining_points}</text>
                         </g>
-                      );
-                    })}
-                  </svg>
+                      ))}
+                      {/* Legend */}
+                      <g transform={`translate(${W - padR - 200}, ${padT})`}>
+                        <rect x="0" y="0" width="200" height="60" fill="var(--rm-bg-elevated, rgba(20,20,20,0.85))" rx="4" opacity="0.9" />
+                        <circle cx="14" cy="15" r="4" fill="var(--rm-info, #3b82f6)" />
+                        <text x="24" y="19" fontSize="11" fill="var(--rm-text, #e2e8f0)">Restante (puntos)</text>
+                        <circle cx="14" cy="32" r="4" fill="var(--rm-success, #22c55e)" />
+                        <text x="24" y="36" fontSize="11" fill="var(--rm-text, #e2e8f0)">Completado</text>
+                        <line x1="10" y1="49" x2="18" y2="49" stroke="var(--rm-muted, #94a3b8)" strokeWidth="1.5" strokeDasharray="3,2" />
+                        <text x="24" y="53" fontSize="11" fill="var(--rm-text, #e2e8f0)">Ideal</text>
+                      </g>
+                    </svg>
+                  </div>
+                );
+              })() : (
+                <div className="rm-burndown-empty">
+                  <FiTrendingUp size={32} style={{ opacity: 0.4 }} />
+                  <p className="rm-loading-text">Aún no hay datos de burndown.</p>
+                  <p className="rm-loading-text" style={{ fontSize: '0.85em', opacity: 0.7 }}>
+                    Se generan automáticamente cuando se actualiza el sprint. Puedes forzar un snapshot manual.
+                  </p>
+                  <button className="rm-action-btn" onClick={async () => {
+                    try {
+                      const res = await fetch(`/api/roadmap/sprints/${burndownData.sprint?.id}/snapshot`, {
+                        method: 'POST',
+                        headers: { 'Authorization': `Bearer ${getToken()}` }
+                      });
+                      if (res.ok) await handleFetchBurndown(burndownData.sprint?.id);
+                    } catch {}
+                  }}><FiRefreshCw size={12} /> Generar snapshot ahora</button>
                 </div>
-              ) : (
-                <p className="rm-loading-text">Sin datos de burndown. Se generan diariamente durante el sprint.</p>
               )}
               <div className="rm-burndown-stats">
                 <div className="rm-burndown-stat">
@@ -2320,6 +2682,18 @@ const Roadmap = ({ user, onLogout, onBackToFolders, onGoToCalendar, onGoToPanel,
                 </div>
                 {burndownData.sprint?.velocity > 0 && (
                   <div className="rm-burndown-stat"><label>Velocidad</label><span>{burndownData.sprint.velocity} puntos</span></div>
+                )}
+                {burndownData.burndown?.length > 0 && (
+                  <>
+                    <div className="rm-burndown-stat">
+                      <label>Días con datos</label>
+                      <span>{burndownData.burndown.length}</span>
+                    </div>
+                    <div className="rm-burndown-stat">
+                      <label>Restante</label>
+                      <span>{burndownData.burndown[burndownData.burndown.length - 1]?.remaining_points || 0} pts</span>
+                    </div>
+                  </>
                 )}
               </div>
             </div>

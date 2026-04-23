@@ -1120,6 +1120,95 @@ app.post('/assign-user', authenticate, async (req, res) => {
 });
 
 
+// NEW ENDPOINT: Get Event by ID (verify existence for sync-status checks)
+app.get('/events/:id', authenticate, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const username = req.user.username;
+    const user = await dbAsync.get('SELECT id, microsoft_access_token, microsoft_refresh_token FROM users WHERE username = ?', [username]);
+    if (!user) return res.status(404).json({ error: 'User not found' });
+
+    // Try local DB first
+    let event = null;
+    if (!isNaN(id)) {
+      try {
+        event = await dbAsync.get('SELECT * FROM calendar_events WHERE id = ? AND user_id = ?', [id, user.id]);
+      } catch {}
+    }
+    if (!event) {
+      event = await dbAsync.get('SELECT * FROM calendar_events WHERE microsoft_id = ? AND user_id = ?', [id, user.id]);
+    }
+
+    // If it's a Microsoft-backed event, also check live in Graph
+    if (event && event.microsoft_id && !event.microsoft_id.startsWith('local_') && user.microsoft_access_token) {
+      try {
+        const validToken = await getValidAccessToken(user);
+        if (validToken) {
+          const client = getAuthenticatedClient(validToken);
+          const remote = await client.api(`/me/events/${event.microsoft_id}`).get();
+          return res.json({
+            exists: true,
+            source: 'graph',
+            id: event.id,
+            microsoftId: remote.id,
+            subject: remote.subject,
+            start: remote.start,
+            end: remote.end,
+            webLink: remote.webLink
+          });
+        }
+      } catch (e) {
+        // 404 from Graph means event was deleted
+        if (e.statusCode === 404 || (e.code && e.code === 'ErrorItemNotFound')) {
+          return res.status(404).json({ exists: false, error: 'Event not found in Outlook' });
+        }
+        console.warn('[OUTLOOK] Graph lookup failed, falling back to local:', e.message);
+      }
+    }
+
+    if (event) {
+      return res.json({
+        exists: true,
+        source: 'local',
+        id: event.id,
+        microsoftId: event.microsoft_id,
+        subject: event.subject,
+        start: { dateTime: event.start_time },
+        end: { dateTime: event.end_time }
+      });
+    }
+
+    // Not in local and not verifiable → if looks like MS id and we have token, check graph directly
+    if (user.microsoft_access_token) {
+      try {
+        const validToken = await getValidAccessToken(user);
+        if (validToken) {
+          const client = getAuthenticatedClient(validToken);
+          const remote = await client.api(`/me/events/${id}`).get();
+          return res.json({
+            exists: true,
+            source: 'graph',
+            microsoftId: remote.id,
+            subject: remote.subject,
+            start: remote.start,
+            end: remote.end
+          });
+        }
+      } catch (e) {
+        if (e.statusCode === 404 || (e.code && e.code === 'ErrorItemNotFound')) {
+          return res.status(404).json({ exists: false, error: 'Event not found' });
+        }
+      }
+    }
+
+    return res.status(404).json({ exists: false, error: 'Event not found' });
+  } catch (error) {
+    console.error('[OUTLOOK] Error in GET /events/:id:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+
 // NEW ENDPOINT: Create Event (AI/Manual)
 app.post('/events', authenticate, async (req, res) => {
   try {

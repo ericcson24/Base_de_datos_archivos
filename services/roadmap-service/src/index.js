@@ -53,100 +53,194 @@ const sendNotification = async (userId, title, message, type = 'info', metadata 
 
 // ========================================
 // HELPER: Sync issue to calendar
+// Reliable bidirectional tracking. Returns detailed state so callers can react.
+// Actions: create | update | delete | verify | resync
 // ========================================
+const computeSyncHash = (issue) => {
+  const payload = [
+    issue.title || '',
+    issue.description || '',
+    issue.start_date || '',
+    issue.due_date || ''
+  ].join('||');
+  // Simple stable hash (no crypto dep needed for coarse comparison)
+  let h = 0;
+  for (let i = 0; i < payload.length; i++) {
+    h = ((h << 5) - h) + payload.charCodeAt(i);
+    h |= 0;
+  }
+  return String(h);
+};
+
+const buildEventPayload = (issue) => {
+  const hasStart = !!issue.start_date;
+  const hasDue = !!issue.due_date;
+  if (!hasStart && !hasDue) return null;
+  const startDate = hasStart ? new Date(issue.start_date) : new Date(issue.due_date);
+  const dueDate = hasDue ? new Date(issue.due_date) : new Date(issue.start_date);
+  let endDate = new Date(dueDate);
+  if (!hasStart || startDate.getTime() === dueDate.getTime()) {
+    endDate = new Date(dueDate.getTime() + 60 * 60 * 1000);
+  }
+  return {
+    subject: `[Roadmap] ${issue.title}`,
+    body: issue.description || `Tarea del Roadmap: ${issue.title}`,
+    startTime: startDate.toISOString(),
+    endTime: endDate.toISOString(),
+    categories: ['Roadmap']
+  };
+};
+
+const updateSyncState = async (issueId, status, extra = {}) => {
+  const fields = ['calendar_sync_status = ?'];
+  const vals = [status];
+  if (extra.eventId !== undefined) { fields.push('calendar_event_id = ?'); vals.push(extra.eventId); }
+  if (extra.hash !== undefined) { fields.push('calendar_synced_hash = ?'); vals.push(extra.hash); }
+  if (extra.error !== undefined) { fields.push('calendar_sync_error = ?'); vals.push(extra.error); }
+  if (status === 'synced') { fields.push('calendar_synced_at = CURRENT_TIMESTAMP'); }
+  vals.push(issueId);
+  await dbAsync.run(`UPDATE roadmap_issues SET ${fields.join(', ')} WHERE id = ?`, vals);
+};
+
 const syncIssueToCalendar = async (issue, authHeader, action = 'create') => {
+  const safeHeader = authHeader || '';
   try {
-    if (action === 'create' && (issue.due_date || issue.start_date)) {
-      const startDate = issue.start_date ? new Date(issue.start_date) : new Date(issue.due_date);
-      const dueDate = issue.due_date ? new Date(issue.due_date) : new Date(issue.start_date);
-      
-      // Si no hay start_date o es igual a due_date, ponemos bloque de 1h
-      let endDate = new Date(dueDate);
-      if (!issue.start_date || startDate.getTime() === dueDate.getTime()) {
-        endDate = new Date(dueDate.getTime() + 60 * 60 * 1000);
+    // --- VERIFY: check live if event still exists in Outlook ---
+    if (action === 'verify') {
+      if (!issue.calendar_event_id) {
+        return { status: 'not_synced', eventId: null };
       }
+      try {
+        const response = await fetch(`${OUTLOOK_SERVICE_URL}/events/${issue.calendar_event_id}`, {
+          method: 'GET',
+          headers: { 'Authorization': safeHeader }
+        });
+        if (response.status === 404) {
+          await updateSyncState(issue.id, 'broken', { error: 'Evento no existe en Outlook' });
+          return { status: 'broken', eventId: issue.calendar_event_id };
+        }
+        if (!response.ok) {
+          return { status: issue.calendar_sync_status || 'synced', eventId: issue.calendar_event_id };
+        }
+        // Compare hash with current issue content
+        const currentHash = computeSyncHash(issue);
+        if (issue.calendar_synced_hash && issue.calendar_synced_hash !== currentHash) {
+          await updateSyncState(issue.id, 'out_of_sync');
+          return { status: 'out_of_sync', eventId: issue.calendar_event_id };
+        }
+        await updateSyncState(issue.id, 'synced', { hash: currentHash, error: null });
+        return { status: 'synced', eventId: issue.calendar_event_id };
+      } catch (e) {
+        console.warn('[ROADMAP] Verify event error:', e.message);
+        return { status: issue.calendar_sync_status || 'synced', eventId: issue.calendar_event_id };
+      }
+    }
 
-      // Use the field names the outlook-service expects: subject, startTime, endTime, body (string), categories
-      const eventPayload = {
-        subject: `[Roadmap] ${issue.title}`,
-        body: issue.description || `Tarea del Roadmap: ${issue.title}`,
-        startTime: startDate.toISOString(),
-        endTime: endDate.toISOString(),
-        categories: ['Roadmap']
-      };
-
+    // --- CREATE ---
+    if (action === 'create') {
+      const payload = buildEventPayload(issue);
+      if (!payload) return { status: 'not_synced', eventId: null };
       const response = await fetch(`${OUTLOOK_SERVICE_URL}/events`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Authorization': authHeader },
-        body: JSON.stringify(eventPayload)
+        headers: { 'Content-Type': 'application/json', 'Authorization': safeHeader },
+        body: JSON.stringify(payload)
       });
-
       if (response.ok) {
         const eventData = await response.json();
-        // outlook-service returns { microsoftId, success, ... }
         const eventId = eventData.microsoftId || eventData.id || eventData.microsoft_id;
         if (eventId) {
-          // Store the calendar link
           try {
             await dbAsync.run(
               'INSERT INTO roadmap_issue_events (issue_id, event_id, provider, sync_direction) VALUES (?, ?, ?, ?)',
               [issue.id, eventId, 'outlook', 'both']
             );
           } catch (linkErr) {
-            // Might already exist, ignore duplicate
             console.warn('[ROADMAP] Calendar link insert warning:', linkErr.message);
           }
-          // Update issue with calendar_event_id
-          await dbAsync.run('UPDATE roadmap_issues SET calendar_event_id = ? WHERE id = ?', [eventId, issue.id]);
-          console.log('[ROADMAP] Calendar event created:', eventId, 'for issue:', issue.id);
+          await updateSyncState(issue.id, 'synced', {
+            eventId,
+            hash: computeSyncHash(issue),
+            error: null
+          });
+          return { status: 'synced', eventId };
         }
-        return eventId;
-      } else {
-        const errBody = await response.text();
-        console.error('[ROADMAP] Calendar create failed:', response.status, errBody);
+        await updateSyncState(issue.id, 'error', { error: 'No microsoftId returned' });
+        return { status: 'error', eventId: null };
       }
-    } else if (action === 'update' && issue.calendar_event_id) {
-      const startDate = issue.start_date ? new Date(issue.start_date) : null;
-      const dueDate = issue.due_date ? new Date(issue.due_date) : null;
-      // Use the field names the outlook-service expects
-      const patchBody = { subject: `[Roadmap] ${issue.title}` };
-      
-      if (dueDate) {
-        const actualStart = startDate || dueDate;
-        let endDate = new Date(dueDate);
-        // Si no hay start o coinciden, bloque de 1h
-        if (!startDate || startDate.getTime() === dueDate.getTime()) {
-          endDate = new Date(dueDate.getTime() + 60 * 60 * 1000);
-        }
-        
-        patchBody.startTime = actualStart.toISOString();
-        patchBody.endTime = endDate.toISOString();
+      const errBody = await response.text();
+      console.error('[ROADMAP] Calendar create failed:', response.status, errBody);
+      await updateSyncState(issue.id, 'error', { error: `create ${response.status}` });
+      return { status: 'error', eventId: null, httpStatus: response.status };
+    }
+
+    // --- UPDATE (or fall-through create if no event yet) ---
+    if (action === 'update' || action === 'resync') {
+      if (!issue.calendar_event_id) {
+        // No event yet, try to create one
+        return await syncIssueToCalendar(issue, safeHeader, 'create');
       }
-      if (issue.description) patchBody.body = issue.description;
+      const payload = buildEventPayload(issue) || {
+        subject: `[Roadmap] ${issue.title}`,
+        body: issue.description || ''
+      };
+      const patchBody = { subject: payload.subject };
+      if (payload.body) patchBody.body = payload.body;
+      if (payload.startTime) patchBody.startTime = payload.startTime;
+      if (payload.endTime) patchBody.endTime = payload.endTime;
 
       const response = await fetch(`${OUTLOOK_SERVICE_URL}/events/${issue.calendar_event_id}`, {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json', 'Authorization': authHeader },
+        headers: { 'Content-Type': 'application/json', 'Authorization': safeHeader },
         body: JSON.stringify(patchBody)
       });
-      if (!response.ok) {
-        const errBody = await response.text();
-        console.error('[ROADMAP] Calendar update failed:', response.status, errBody);
+      if (response.ok) {
+        await updateSyncState(issue.id, 'synced', {
+          hash: computeSyncHash(issue),
+          error: null
+        });
+        return { status: 'synced', eventId: issue.calendar_event_id };
       }
-    } else if (action === 'delete' && issue.calendar_event_id) {
+      // 404 => event was deleted in Outlook
+      if (response.status === 404) {
+        if (action === 'resync') {
+          // Recreate
+          const reissue = { ...issue, calendar_event_id: null };
+          return await syncIssueToCalendar(reissue, safeHeader, 'create');
+        }
+        await updateSyncState(issue.id, 'broken', { error: 'Evento no existe en Outlook' });
+        return { status: 'broken', eventId: issue.calendar_event_id };
+      }
+      const errBody = await response.text();
+      console.error('[ROADMAP] Calendar update failed:', response.status, errBody);
+      await updateSyncState(issue.id, 'error', { error: `update ${response.status}` });
+      return { status: 'error', eventId: issue.calendar_event_id, httpStatus: response.status };
+    }
+
+    // --- DELETE ---
+    if (action === 'delete') {
+      if (!issue.calendar_event_id) return { status: 'not_synced', eventId: null };
       const response = await fetch(`${OUTLOOK_SERVICE_URL}/events/${issue.calendar_event_id}`, {
         method: 'DELETE',
-        headers: { 'Authorization': authHeader }
+        headers: { 'Authorization': safeHeader }
       });
-      if (!response.ok) {
+      if (!response.ok && response.status !== 404) {
         const errBody = await response.text();
         console.error('[ROADMAP] Calendar delete failed:', response.status, errBody);
       }
+      await updateSyncState(issue.id, 'not_synced', {
+        eventId: null,
+        hash: null,
+        error: null
+      });
+      return { status: 'not_synced', eventId: null };
     }
+
+    return { status: issue.calendar_sync_status || 'not_synced', eventId: issue.calendar_event_id || null };
   } catch (e) {
     console.error('[ROADMAP] Calendar sync error:', e.message);
+    try { await updateSyncState(issue.id, 'error', { error: e.message }); } catch {}
+    return { status: 'error', eventId: issue.calendar_event_id || null, error: e.message };
   }
-  return null;
 };
 
 // ========================================
@@ -168,9 +262,95 @@ const logActivity = async (projectId, issueId, userId, action, details = {}) => 
 // ========================================
 const runMigrations = async () => {
   try {
-    // Add project_type column
-    await dbAsync.run(`ALTER TABLE roadmap_projects ADD COLUMN IF NOT EXISTS project_type TEXT DEFAULT 'personal'`).catch(() => {});
-    // Create access control table
+    await dbAsync.run(`CREATE TABLE IF NOT EXISTS roadmap_projects (
+      id SERIAL PRIMARY KEY,
+      name TEXT NOT NULL,
+      description TEXT,
+      owner_id INTEGER NOT NULL,
+      status TEXT DEFAULT 'active',
+      project_type TEXT DEFAULT 'personal',
+      project_key TEXT,
+      issue_counter INTEGER DEFAULT 0,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY(owner_id) REFERENCES users(id) ON DELETE CASCADE
+    )`);
+
+    await dbAsync.run(`CREATE TABLE IF NOT EXISTS roadmap_columns (
+      id SERIAL PRIMARY KEY,
+      project_id INTEGER NOT NULL,
+      name TEXT NOT NULL,
+      position INTEGER DEFAULT 0,
+      color TEXT DEFAULT '#5f9ee9',
+      wip_limit INTEGER DEFAULT 0,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY(project_id) REFERENCES roadmap_projects(id) ON DELETE CASCADE
+    )`);
+
+    await dbAsync.run(`CREATE TABLE IF NOT EXISTS roadmap_issues (
+      id SERIAL PRIMARY KEY,
+      project_id INTEGER NOT NULL,
+      column_id INTEGER NOT NULL,
+      title TEXT NOT NULL,
+      description TEXT,
+      issue_type TEXT DEFAULT 'task',
+      issue_key TEXT,
+      priority TEXT DEFAULT 'medium',
+      assigned_to INTEGER,
+      reporter_id INTEGER,
+      created_by INTEGER NOT NULL,
+      due_date TIMESTAMP,
+      start_date TIMESTAMP,
+      position INTEGER DEFAULT 0,
+      labels TEXT DEFAULT '[]',
+      story_points NUMERIC(5,1) DEFAULT 0,
+      estimated_hours NUMERIC(6,2) DEFAULT 0,
+      logged_hours NUMERIC(8,2) DEFAULT 0,
+      remaining_hours NUMERIC(6,2) DEFAULT 0,
+      status TEXT DEFAULT 'open',
+      resolution TEXT,
+      sprint_id INTEGER,
+      epic_id INTEGER,
+      parent_id INTEGER,
+      calendar_event_id TEXT,
+      environment TEXT,
+      acceptance_criteria TEXT,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      completed_at TIMESTAMP,
+      FOREIGN KEY(project_id) REFERENCES roadmap_projects(id) ON DELETE CASCADE,
+      FOREIGN KEY(column_id) REFERENCES roadmap_columns(id) ON DELETE CASCADE,
+      FOREIGN KEY(assigned_to) REFERENCES users(id) ON DELETE SET NULL,
+      FOREIGN KEY(reporter_id) REFERENCES users(id) ON DELETE SET NULL,
+      FOREIGN KEY(created_by) REFERENCES users(id) ON DELETE CASCADE,
+      FOREIGN KEY(parent_id) REFERENCES roadmap_issues(id) ON DELETE CASCADE
+    )`);
+
+    await dbAsync.run(`CREATE TABLE IF NOT EXISTS roadmap_members (
+      project_id INTEGER NOT NULL,
+      user_id INTEGER NOT NULL,
+      role TEXT DEFAULT 'member',
+      joined_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      PRIMARY KEY(project_id, user_id),
+      FOREIGN KEY(project_id) REFERENCES roadmap_projects(id) ON DELETE CASCADE,
+      FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
+    )`);
+
+    await dbAsync.run(`CREATE TABLE IF NOT EXISTS roadmap_activity (
+      id SERIAL PRIMARY KEY,
+      project_id INTEGER NOT NULL,
+      issue_id INTEGER,
+      user_id INTEGER,
+      action TEXT NOT NULL,
+      details JSONB,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY(project_id) REFERENCES roadmap_projects(id) ON DELETE CASCADE
+    )`);
+
+    await dbAsync.run(`ALTER TABLE roadmap_projects ADD COLUMN IF NOT EXISTS project_key TEXT`);
+    await dbAsync.run(`ALTER TABLE roadmap_projects ADD COLUMN IF NOT EXISTS issue_counter INTEGER DEFAULT 0`);
+    await dbAsync.run(`ALTER TABLE roadmap_projects ADD COLUMN IF NOT EXISTS project_type TEXT DEFAULT 'personal'`);
+
     await dbAsync.run(`CREATE TABLE IF NOT EXISTS roadmap_user_access (
       user_id INTEGER PRIMARY KEY,
       access_level TEXT DEFAULT 'member',
@@ -178,8 +358,8 @@ const runMigrations = async () => {
       granted_by INTEGER,
       granted_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
       FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
-    )`).catch(() => {});
-    // Calendar-Roadmap links table
+    )`);
+
     await dbAsync.run(`CREATE TABLE IF NOT EXISTS roadmap_calendar_links (
       id SERIAL PRIMARY KEY,
       calendar_event_id TEXT NOT NULL,
@@ -190,9 +370,8 @@ const runMigrations = async () => {
       FOREIGN KEY(issue_id) REFERENCES roadmap_issues(id) ON DELETE CASCADE,
       FOREIGN KEY(linked_by) REFERENCES users(id) ON DELETE CASCADE,
       UNIQUE(calendar_event_id, issue_id)
-    )`).catch(() => {});
+    )`);
 
-    // Issue-Documents links table
     await dbAsync.run(`CREATE TABLE IF NOT EXISTS roadmap_issue_documents (
       id SERIAL PRIMARY KEY,
       issue_id INTEGER NOT NULL,
@@ -203,14 +382,203 @@ const runMigrations = async () => {
       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
       FOREIGN KEY(issue_id) REFERENCES roadmap_issues(id) ON DELETE CASCADE,
       FOREIGN KEY(linked_by) REFERENCES users(id) ON DELETE CASCADE
-    )`).catch(() => {});
+    )`);
+
+    await dbAsync.run(`CREATE TABLE IF NOT EXISTS roadmap_comments (
+      id SERIAL PRIMARY KEY,
+      issue_id INTEGER NOT NULL,
+      user_id INTEGER NOT NULL,
+      content TEXT NOT NULL,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY(issue_id) REFERENCES roadmap_issues(id) ON DELETE CASCADE,
+      FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
+    )`);
+
+    await dbAsync.run(`CREATE TABLE IF NOT EXISTS roadmap_milestones (
+      id SERIAL PRIMARY KEY,
+      project_id INTEGER NOT NULL,
+      title TEXT NOT NULL,
+      description TEXT,
+      due_date TIMESTAMP,
+      status TEXT DEFAULT 'open',
+      calendar_event_id TEXT,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY(project_id) REFERENCES roadmap_projects(id) ON DELETE CASCADE
+    )`);
+
+    await dbAsync.run(`CREATE TABLE IF NOT EXISTS roadmap_issue_events (
+      id SERIAL PRIMARY KEY,
+      issue_id INTEGER NOT NULL,
+      event_id TEXT NOT NULL,
+      provider TEXT DEFAULT 'outlook',
+      sync_direction TEXT DEFAULT 'both',
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY(issue_id) REFERENCES roadmap_issues(id) ON DELETE CASCADE
+    )`);
+
+    await dbAsync.run(`CREATE TABLE IF NOT EXISTS roadmap_sprints (
+      id SERIAL PRIMARY KEY,
+      project_id INTEGER NOT NULL,
+      name TEXT NOT NULL,
+      goal TEXT,
+      status TEXT DEFAULT 'planning',
+      start_date TIMESTAMP,
+      end_date TIMESTAMP,
+      velocity NUMERIC(6,1) DEFAULT 0,
+      created_by INTEGER NOT NULL,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      completed_at TIMESTAMP,
+      FOREIGN KEY(project_id) REFERENCES roadmap_projects(id) ON DELETE CASCADE,
+      FOREIGN KEY(created_by) REFERENCES users(id) ON DELETE CASCADE
+    )`);
+
+    await dbAsync.run(`CREATE TABLE IF NOT EXISTS roadmap_sprint_burndown (
+      id SERIAL PRIMARY KEY,
+      sprint_id INTEGER NOT NULL,
+      snapshot_date DATE NOT NULL,
+      total_points NUMERIC(6,1) DEFAULT 0,
+      completed_points NUMERIC(6,1) DEFAULT 0,
+      remaining_points NUMERIC(6,1) DEFAULT 0,
+      total_issues INTEGER DEFAULT 0,
+      completed_issues INTEGER DEFAULT 0,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY(sprint_id) REFERENCES roadmap_sprints(id) ON DELETE CASCADE
+    )`);
+
+    await dbAsync.run(`CREATE TABLE IF NOT EXISTS roadmap_subtasks (
+      id SERIAL PRIMARY KEY,
+      issue_id INTEGER NOT NULL,
+      title TEXT NOT NULL,
+      is_completed BOOLEAN DEFAULT FALSE,
+      assigned_to INTEGER,
+      position INTEGER DEFAULT 0,
+      created_by INTEGER NOT NULL,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      completed_at TIMESTAMP,
+      FOREIGN KEY(issue_id) REFERENCES roadmap_issues(id) ON DELETE CASCADE,
+      FOREIGN KEY(assigned_to) REFERENCES users(id) ON DELETE SET NULL,
+      FOREIGN KEY(created_by) REFERENCES users(id) ON DELETE CASCADE
+    )`);
+
+    await dbAsync.run(`CREATE TABLE IF NOT EXISTS roadmap_issue_links (
+      id SERIAL PRIMARY KEY,
+      source_issue_id INTEGER NOT NULL,
+      target_issue_id INTEGER NOT NULL,
+      link_type TEXT NOT NULL,
+      created_by INTEGER NOT NULL,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY(source_issue_id) REFERENCES roadmap_issues(id) ON DELETE CASCADE,
+      FOREIGN KEY(target_issue_id) REFERENCES roadmap_issues(id) ON DELETE CASCADE,
+      FOREIGN KEY(created_by) REFERENCES users(id) ON DELETE CASCADE,
+      UNIQUE(source_issue_id, target_issue_id, link_type)
+    )`);
+
+    await dbAsync.run(`CREATE TABLE IF NOT EXISTS roadmap_watchers (
+      issue_id INTEGER NOT NULL,
+      user_id INTEGER NOT NULL,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      PRIMARY KEY(issue_id, user_id),
+      FOREIGN KEY(issue_id) REFERENCES roadmap_issues(id) ON DELETE CASCADE,
+      FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
+    )`);
+
+    await dbAsync.run(`CREATE TABLE IF NOT EXISTS roadmap_time_logs (
+      id SERIAL PRIMARY KEY,
+      issue_id INTEGER NOT NULL,
+      user_id INTEGER NOT NULL,
+      hours NUMERIC(6,2) NOT NULL,
+      description TEXT,
+      work_date DATE DEFAULT CURRENT_DATE,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY(issue_id) REFERENCES roadmap_issues(id) ON DELETE CASCADE,
+      FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
+    )`);
+
+    await dbAsync.run(`CREATE TABLE IF NOT EXISTS roadmap_custom_fields (
+      id SERIAL PRIMARY KEY,
+      project_id INTEGER NOT NULL,
+      name TEXT NOT NULL,
+      field_type TEXT NOT NULL DEFAULT 'text',
+      options JSONB,
+      is_required BOOLEAN DEFAULT FALSE,
+      position INTEGER DEFAULT 0,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY(project_id) REFERENCES roadmap_projects(id) ON DELETE CASCADE
+    )`);
+
+    await dbAsync.run(`CREATE TABLE IF NOT EXISTS roadmap_custom_field_values (
+      id SERIAL PRIMARY KEY,
+      issue_id INTEGER NOT NULL,
+      field_id INTEGER NOT NULL,
+      value TEXT,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY(issue_id) REFERENCES roadmap_issues(id) ON DELETE CASCADE,
+      FOREIGN KEY(field_id) REFERENCES roadmap_custom_fields(id) ON DELETE CASCADE,
+      UNIQUE(issue_id, field_id)
+    )`);
+
+    await dbAsync.run(`CREATE TABLE IF NOT EXISTS roadmap_issue_history (
+      id SERIAL PRIMARY KEY,
+      issue_id INTEGER NOT NULL,
+      user_id INTEGER NOT NULL,
+      field_name TEXT NOT NULL,
+      old_value TEXT,
+      new_value TEXT,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY(issue_id) REFERENCES roadmap_issues(id) ON DELETE CASCADE,
+      FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
+    )`);
+
+    await dbAsync.run(`CREATE TABLE IF NOT EXISTS roadmap_filters (
+      id SERIAL PRIMARY KEY,
+      project_id INTEGER,
+      user_id INTEGER NOT NULL,
+      name TEXT NOT NULL,
+      filter_config JSONB NOT NULL,
+      is_shared BOOLEAN DEFAULT FALSE,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY(project_id) REFERENCES roadmap_projects(id) ON DELETE CASCADE,
+      FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
+    )`);
+
+    // Sync state columns for reliable Outlook linking
+    // status: not_synced | synced | out_of_sync | broken | error
+    await dbAsync.run(`ALTER TABLE roadmap_issues ADD COLUMN IF NOT EXISTS calendar_sync_status TEXT DEFAULT 'not_synced'`);
+    await dbAsync.run(`ALTER TABLE roadmap_issues ADD COLUMN IF NOT EXISTS calendar_synced_at TIMESTAMP`);
+    await dbAsync.run(`ALTER TABLE roadmap_issues ADD COLUMN IF NOT EXISTS calendar_sync_error TEXT`);
+    await dbAsync.run(`ALTER TABLE roadmap_issues ADD COLUMN IF NOT EXISTS calendar_synced_hash TEXT`);
+    // Per-issue auto-sync preference (default true)
+    await dbAsync.run(`ALTER TABLE roadmap_issues ADD COLUMN IF NOT EXISTS sync_calendar BOOLEAN DEFAULT TRUE`);
+
+    // Make sure existing rows with a calendar_event_id are flagged synced
+    await dbAsync.run(`UPDATE roadmap_issues SET calendar_sync_status = 'synced'
+      WHERE calendar_event_id IS NOT NULL AND (calendar_sync_status IS NULL OR calendar_sync_status = 'not_synced')`);
 
     console.log('[ROADMAP] Migrations completed');
+
+    // --- DATA LOSS GUARD ---
+    // Warn loudly if the roadmap tables are empty after startup.
+    // This does NOT delete anything, only logs a visible warning so we can
+    // catch accidental `docker compose down -v` / volume wipes early.
+    try {
+      const projects = await dbAsync.get('SELECT COUNT(*)::int AS c FROM roadmap_projects');
+      const issues   = await dbAsync.get('SELECT COUNT(*)::int AS c FROM roadmap_issues');
+      console.log(`[ROADMAP] Data snapshot — projects: ${projects?.c ?? 0}, issues: ${issues?.c ?? 0}`);
+      if ((projects?.c || 0) === 0 && (issues?.c || 0) === 0) {
+        console.warn('[ROADMAP] WARNING: roadmap tables are EMPTY.');
+        console.warn('[ROADMAP] If this was unexpected, the postgres volume may have been wiped.');
+        console.warn('[ROADMAP] Check `docker volume ls` and restore a backup from ./backups/.');
+      }
+    } catch (e) {
+      console.warn('[ROADMAP] Data snapshot skipped:', e.message);
+    }
   } catch (e) {
     console.warn('[ROADMAP] Migration warning:', e.message);
+    throw e;
   }
 };
-runMigrations();
 
 // ========================================
 // ACCESS CONTROL MIDDLEWARE
@@ -603,8 +971,8 @@ app.post('/projects/:projectId/issues', authenticateToken, async (req, res) => {
     const result = await dbAsync.run(`
       INSERT INTO roadmap_issues (project_id, column_id, title, description, issue_type, issue_key, priority, assigned_to,
         reporter_id, created_by, due_date, start_date, position, labels, story_points, estimated_hours, remaining_hours,
-        sprint_id, epic_id, parent_id, environment, acceptance_criteria)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        sprint_id, epic_id, parent_id, environment, acceptance_criteria, sync_calendar)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `, [
       req.params.projectId, targetColumnId, title, description || '',
       issue_type || 'task', issueKey, priority || 'medium', assigned_to || null,
@@ -612,7 +980,8 @@ app.post('/projects/:projectId/issues', authenticateToken, async (req, res) => {
       due_date || null, start_date || null, maxPos.max_pos + 1,
       JSON.stringify(labels || []), story_points || 0, estimated_hours || 0, estimated_hours || 0,
       sprint_id || null, epic_id || null, parent_id || null,
-      environment || null, acceptance_criteria || null
+      environment || null, acceptance_criteria || null,
+      syncCalendar === false ? false : true
     ]);
 
     const issue = await dbAsync.get(`
@@ -722,6 +1091,7 @@ app.put('/issues/:id', authenticateToken, async (req, res) => {
         story_points = ?, estimated_hours = ?, remaining_hours = ?,
         status = ?, resolution = ?, completed_at = ?,
         sprint_id = ?, epic_id = ?, environment = ?, acceptance_criteria = ?,
+        sync_calendar = ?,
         updated_at = CURRENT_TIMESTAMP
       WHERE id = ?
     `, [
@@ -745,6 +1115,7 @@ app.put('/issues/:id', authenticateToken, async (req, res) => {
       epic_id !== undefined ? epic_id : existing.epic_id,
       environment !== undefined ? environment : existing.environment,
       acceptance_criteria !== undefined ? acceptance_criteria : existing.acceptance_criteria,
+      syncCalendar !== undefined ? (syncCalendar ? true : false) : (existing.sync_calendar !== false),
       req.params.id
     ]);
 
@@ -757,8 +1128,9 @@ app.put('/issues/:id', authenticateToken, async (req, res) => {
     await trackField('story_points', existing.story_points, story_points);
     if (columnChanged) await trackField('column', oldColName, newColName);
 
-    // Calendar sync
-    if (syncCalendar !== false) {
+    // Calendar sync — respect per-issue preference (request body wins, then row, then default true)
+    const wantsSync = syncCalendar !== undefined ? syncCalendar !== false : (existing.sync_calendar !== false);
+    if (wantsSync) {
       const updatedForSync = { 
         ...existing, 
         ...(title && { title }), 
@@ -859,7 +1231,7 @@ app.delete('/issues/:id', authenticateToken, async (req, res) => {
   }
 });
 
-// POST /issues/:id/sync — explicit calendar sync
+// POST /issues/:id/sync — explicit calendar sync (create or update)
 app.post('/issues/:id/sync', authenticateToken, async (req, res) => {
   try {
     const issue = await dbAsync.get('SELECT * FROM roadmap_issues WHERE id = ?', [req.params.id]);
@@ -868,22 +1240,84 @@ app.post('/issues/:id/sync', authenticateToken, async (req, res) => {
       return res.status(400).json({ error: 'La tarea necesita fecha de inicio o vencimiento para sincronizar' });
     }
     const authHeader = req.headers.authorization || '';
-    let eventId = null;
-    if (issue.calendar_event_id) {
-      await syncIssueToCalendar(issue, authHeader, 'update');
-      eventId = issue.calendar_event_id;
-    } else {
-      eventId = await syncIssueToCalendar(issue, authHeader, 'create');
+    const action = issue.calendar_event_id ? 'update' : 'create';
+    const result = await syncIssueToCalendar(issue, authHeader, action);
+    if (result.status === 'synced') {
+      return res.json({ success: true, calendar_event_id: result.eventId, sync_status: 'synced' });
     }
-    if (eventId) {
-      const updated = await dbAsync.get('SELECT calendar_event_id FROM roadmap_issues WHERE id = ?', [req.params.id]);
-      res.json({ success: true, calendar_event_id: updated?.calendar_event_id || eventId });
-    } else {
-      res.status(500).json({ error: 'No se pudo sincronizar con el calendario. Verifica que Microsoft esté vinculado.' });
-    }
+    return res.status(502).json({
+      error: 'No se pudo sincronizar con el calendario. Verifica que Microsoft esté vinculado.',
+      sync_status: result.status,
+      detail: result.error || null
+    });
   } catch (error) {
     console.error('[ROADMAP] Sync error:', error);
     res.status(500).json({ error: 'Error al sincronizar con calendario' });
+  }
+});
+
+// GET /issues/:id/sync-status — verify link LIVE against Outlook
+app.get('/issues/:id/sync-status', authenticateToken, async (req, res) => {
+  try {
+    const issue = await dbAsync.get('SELECT * FROM roadmap_issues WHERE id = ?', [req.params.id]);
+    if (!issue) return res.status(404).json({ error: 'Issue no encontrada' });
+    const result = await syncIssueToCalendar(issue, req.headers.authorization || '', 'verify');
+    const fresh = await dbAsync.get(
+      'SELECT calendar_event_id, calendar_sync_status, calendar_synced_at, calendar_sync_error FROM roadmap_issues WHERE id = ?',
+      [req.params.id]
+    );
+    res.json({
+      sync_status: result.status,
+      calendar_event_id: fresh?.calendar_event_id || null,
+      synced_at: fresh?.calendar_synced_at || null,
+      sync_error: fresh?.calendar_sync_error || null
+    });
+  } catch (error) {
+    console.error('[ROADMAP] Sync-status error:', error);
+    res.status(500).json({ error: 'Error al verificar estado de sincronización' });
+  }
+});
+
+// POST /issues/:id/resync — force recreate/update, recover from broken
+app.post('/issues/:id/resync', authenticateToken, async (req, res) => {
+  try {
+    const issue = await dbAsync.get('SELECT * FROM roadmap_issues WHERE id = ?', [req.params.id]);
+    if (!issue) return res.status(404).json({ error: 'Issue no encontrada' });
+    if (!issue.due_date && !issue.start_date) {
+      return res.status(400).json({ error: 'La tarea necesita fecha de inicio o vencimiento' });
+    }
+    const result = await syncIssueToCalendar(issue, req.headers.authorization || '', 'resync');
+    if (result.status === 'synced') {
+      return res.json({ success: true, calendar_event_id: result.eventId, sync_status: 'synced' });
+    }
+    return res.status(502).json({ error: 'No se pudo re-sincronizar', sync_status: result.status });
+  } catch (error) {
+    console.error('[ROADMAP] Resync error:', error);
+    res.status(500).json({ error: 'Error al re-sincronizar' });
+  }
+});
+
+// POST /issues/:id/unsync — remove Outlook link (deletes event + clears fields)
+app.post('/issues/:id/unsync', authenticateToken, async (req, res) => {
+  try {
+    const issue = await dbAsync.get('SELECT * FROM roadmap_issues WHERE id = ?', [req.params.id]);
+    if (!issue) return res.status(404).json({ error: 'Issue no encontrada' });
+    if (!issue.calendar_event_id) {
+      return res.json({ success: true, sync_status: 'not_synced' });
+    }
+    const keepEvent = req.body?.keepEvent === true;
+    if (!keepEvent) {
+      await syncIssueToCalendar(issue, req.headers.authorization || '', 'delete');
+    } else {
+      await updateSyncState(issue.id, 'not_synced', { eventId: null, hash: null, error: null });
+    }
+    try {
+      await dbAsync.run('DELETE FROM roadmap_issue_events WHERE issue_id = ?', [issue.id]);
+    } catch {}
+    res.json({ success: true, sync_status: 'not_synced' });
+  } catch (error) {
+    console.error('[ROADMAP] Unsync error:', error);
+    res.status(500).json({ error: 'Error al desvincular' });
   }
 });
 
@@ -945,6 +1379,27 @@ app.post('/issues/:issueId/comments', authenticateToken, async (req, res) => {
         'info',
         { type: 'roadmap_comment', issueId: issue.id }
       );
+    }
+
+    // Parse @mentions from comment content: <span data-user-id="N">@name</span>
+    try {
+      const mentionIds = new Set();
+      const re = /data-user-id=["'](\d+)["']/g;
+      let m;
+      while ((m = re.exec(content)) !== null) {
+        const uid = parseInt(m[1]);
+        if (uid && uid !== req.user.id && uid !== issue.assigned_to) mentionIds.add(uid);
+      }
+      for (const uid of mentionIds) {
+        await sendNotification(uid,
+          'Te mencionaron en un comentario',
+          `${req.user.username} te mencionó en "${issue.title}"`,
+          'info',
+          { type: 'roadmap_mention', issueId: issue.id }
+        );
+      }
+    } catch (err) {
+      console.warn('[ROADMAP] mention parse failed:', err.message);
     }
 
     await logActivity(issue.project_id, issue.id, req.user.id, 'comment_added', {});
@@ -1767,10 +2222,17 @@ app.get('/issues/:issueId/watchers', authenticateToken, async (req, res) => {
 app.post('/issues/:issueId/watchers', authenticateToken, async (req, res) => {
   try {
     const userId = req.body.user_id || req.user.id;
-    await dbAsync.run(
+    const result = await dbAsync.run(
       'INSERT INTO roadmap_watchers (issue_id, user_id) VALUES (?, ?) ON CONFLICT DO NOTHING',
       [req.params.issueId, userId]
     );
+    const watcher = await dbAsync.get('SELECT u.username FROM users u WHERE u.id = ?', [userId]);
+    try {
+      await dbAsync.run(
+        'INSERT INTO roadmap_issue_history (issue_id, user_id, field_name, old_value, new_value) VALUES (?, ?, ?, ?, ?)',
+        [req.params.issueId, req.user.id, 'watcher_added', null, watcher?.username || String(userId)]
+      );
+    } catch {}
     res.status(201).json({ success: true });
   } catch (error) {
     console.error('[ROADMAP] Error adding watcher:', error);
@@ -1781,10 +2243,17 @@ app.post('/issues/:issueId/watchers', authenticateToken, async (req, res) => {
 // DELETE remove watcher
 app.delete('/issues/:issueId/watchers/:userId', authenticateToken, async (req, res) => {
   try {
+    const watcher = await dbAsync.get('SELECT username FROM users WHERE id = ?', [req.params.userId]);
     await dbAsync.run(
       'DELETE FROM roadmap_watchers WHERE issue_id = ? AND user_id = ?',
       [req.params.issueId, req.params.userId]
     );
+    try {
+      await dbAsync.run(
+        'INSERT INTO roadmap_issue_history (issue_id, user_id, field_name, old_value, new_value) VALUES (?, ?, ?, ?, ?)',
+        [req.params.issueId, req.user.id, 'watcher_removed', watcher?.username || String(req.params.userId), null]
+      );
+    } catch {}
     res.json({ success: true });
   } catch (error) {
     console.error('[ROADMAP] Error removing watcher:', error);
@@ -1836,6 +2305,12 @@ app.post('/issues/:issueId/links', authenticateToken, async (req, res) => {
       FROM roadmap_issue_links l LEFT JOIN roadmap_issues si ON l.source_issue_id = si.id LEFT JOIN roadmap_issues ti ON l.target_issue_id = ti.id
       WHERE l.id = ?
     `, [result.lastID || result.id]);
+    try {
+      await dbAsync.run(
+        'INSERT INTO roadmap_issue_history (issue_id, user_id, field_name, old_value, new_value) VALUES (?, ?, ?, ?, ?)',
+        [req.params.issueId, req.user.id, 'link_added', null, `${type}: ${link?.target_key || target_issue_id}`]
+      );
+    } catch {}
     res.status(201).json(link);
   } catch (error) {
     if (error.message?.includes('UNIQUE') || error.code === '23505') return res.status(409).json({ error: 'Enlace ya existe' });
@@ -1847,7 +2322,16 @@ app.post('/issues/:issueId/links', authenticateToken, async (req, res) => {
 // DELETE remove link
 app.delete('/links/:id', authenticateToken, async (req, res) => {
   try {
+    const link = await dbAsync.get('SELECT * FROM roadmap_issue_links WHERE id = ?', [req.params.id]);
     await dbAsync.run('DELETE FROM roadmap_issue_links WHERE id = ?', [req.params.id]);
+    if (link) {
+      try {
+        await dbAsync.run(
+          'INSERT INTO roadmap_issue_history (issue_id, user_id, field_name, old_value, new_value) VALUES (?, ?, ?, ?, ?)',
+          [link.source_issue_id, req.user.id, 'link_removed', `${link.link_type}: ${link.target_issue_id}`, null]
+        );
+      } catch {}
+    }
     res.json({ success: true });
   } catch (error) {
     console.error('[ROADMAP] Error deleting link:', error);
@@ -2438,8 +2922,15 @@ app.get('/health', (req, res) => {
 // ========================================
 // START
 // ========================================
-app.listen(PORT, () => {
-  console.log(`[ROADMAP] Service running on port ${PORT}`);
-});
+runMigrations()
+  .then(() => {
+    app.listen(PORT, () => {
+      console.log(`[ROADMAP] Service running on port ${PORT}`);
+    });
+  })
+  .catch((error) => {
+    console.error('[ROADMAP] Failed to run migrations:', error.message, error.stack);
+    process.exit(1);
+  });
 
 module.exports = app;
