@@ -72,38 +72,7 @@ const FolderSelector = ({ user, onSelectFolder, onLogout, onThemeToggle, isDarkM
                 <FiFolder size={28} />
               </div>
               <span className="app-card-label">{t('userPanel.myFiles')}</span>
-              {user.role === 'admin' && <span className="admin-badge">[Admin] Admin</span>}
-            </div>
-          )}
-
-          <button
-            className="folder-btn"
-            onClick={() => handleFolderSelect('privada')}
-          >
-            <FiFolder className="folder-btn-icon" /> {t('userPanel.myFiles')}
-          </button>
-
-          <button
-            className="folder-btn"
-            onClick={handleRemote}
-          >
-            <FiMonitor className="folder-btn-icon" /> {t('userPanel.remoteWork')}
-          </button>
-
-          <button
-            className="folder-btn"
-            onClick={handleCalendar}
-          >
-            <FiCalendar className="folder-btn-icon" /> {t('userPanel.calendar')}
-          </button>
-
-          
-          {user && user.role === 'admin' && onGoToAdmin && (
-            <button
-              className="folder-btn"
-              onClick={onGoToAdmin}
-            >
-              <FiTool className="folder-btn-icon" /> {t('folders.adminPanel')}
+              {user?.role === 'admin' && <span className="admin-badge">[Admin] Admin</span>}
             </button>
 
             <button className="app-card" onClick={handleRemote}>

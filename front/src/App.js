@@ -31,7 +31,6 @@ function App() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [user, setUser] = useState(null);
   const [currentView, setCurrentView] = useState('login'); // 'login', 'folders', 'panel', 'calendar', 'admin', 'roadmap'
-  const [currentView, setCurrentView] = useState('login');
   const [isLoading, setIsLoading] = useState(true);
 
   const [isDarkMode, setIsDarkMode] = useState(() => {
