@@ -143,23 +143,23 @@ export const NotificationProvider = ({ children, user, onNavigate }) => {
             ? `${meta.from} compartió "${meta.fileName}" contigo`
             : toastMessage;
         } else if (meta.notifType === 'file_unshared') {
-          toastTitle = '[Blocked] Acceso revocado';
+          toastTitle = '🚫 Acceso revocado';
           toastMessage = meta.from && meta.fileName
             ? `${meta.from} dejó de compartir "${meta.fileName}" contigo`
             : toastMessage;
         } else if (meta.notifType === 'file_shared_deleted') {
-          toastTitle = '[Delete] Archivo eliminado';
+          toastTitle = '🗑️ Archivo eliminado';
           toastMessage = meta.from && meta.fileName
             ? `${meta.from} eliminó "${meta.fileName}" (compartido contigo)`
             : toastMessage;
         } else if (meta.notifType === 'file_permission_changed') {
-          toastTitle = '[Key] Permiso actualizado';
+          toastTitle = '🔑 Permiso actualizado';
           const permLabel = meta.permission === 'read' ? 'solo lectura' : 'edición';
           toastMessage = meta.from && meta.fileName
             ? `${meta.from} cambió el permiso de "${meta.fileName}" a ${permLabel}`
             : toastMessage;
         } else if (meta.notifType === 'calendar_assign' || meta.notifType === 'calendar_group') {
-          toastTitle = '[Calendar] Evento asignado';
+          toastTitle = '📅 Evento asignado';
           toastMessage = meta.from && meta.eventTitle
             ? `${meta.from} te asignó "${meta.eventTitle}"`
             : toastMessage;

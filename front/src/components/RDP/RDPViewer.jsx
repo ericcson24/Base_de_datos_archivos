@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import Guacamole from 'guacamole-common-js';
+import { FiMonitor, FiUser, FiLock, FiEye, FiEyeOff, FiShield, FiUnlock, FiBarChart2, FiAlertTriangle } from 'react-icons/fi';
 import { useLanguage } from '../../context/LanguageContext';
 import './RDPViewer.css';
 
@@ -303,7 +304,7 @@ const RDPViewer = ({ connectionId, token, onClose }) => {
                 <div className="rdp-credentials-overlay">
                     <form className="rdp-credentials-modal glassmorphism" onSubmit={handleCredentialsSubmit}>
                         <div className="rdp-credentials-header">
-                            <div className="rdp-credentials-icon">[Desktop]</div>
+                            <div className="rdp-credentials-icon"><FiMonitor /></div>
                             <h2>{t('rdp.connectTitle') || 'Remote Desktop Connection'}</h2>
                             <p className="rdp-credentials-subtitle">
                                 {t('rdp.enterCredentials') || 'Enter your Windows credentials to connect'}
@@ -313,7 +314,7 @@ const RDPViewer = ({ connectionId, token, onClose }) => {
                         <div className="rdp-credentials-body">
                             <div className="rdp-input-group">
                                 <label htmlFor="rdp-username">
-                                    <span className="rdp-input-icon">[User]</span>
+                                    <span className="rdp-input-icon"><FiUser /></span>
                                     {t('rdp.username') || 'Username'}
                                 </label>
                                 <input
@@ -330,7 +331,7 @@ const RDPViewer = ({ connectionId, token, onClose }) => {
 
                             <div className="rdp-input-group">
                                 <label htmlFor="rdp-password">
-                                    <span className="rdp-input-icon">[Lock]</span>
+                                    <span className="rdp-input-icon"><FiLock /></span>
                                     {t('rdp.password') || 'Password'}
                                 </label>
                                 <div className="rdp-password-wrapper">
@@ -348,7 +349,7 @@ const RDPViewer = ({ connectionId, token, onClose }) => {
                                         onClick={() => setShowPassword(!showPassword)}
                                         tabIndex={-1}
                                     >
-                                        {showPassword ? '[Hide]' : '[Show]'}
+                                        {showPassword ? <FiEyeOff /> : <FiEye />}
                                     </button>
                                 </div>
                             </div>
@@ -359,7 +360,7 @@ const RDPViewer = ({ connectionId, token, onClose }) => {
                                 {t('common.cancel') || 'Cancel'}
                             </button>
                             <button type="submit" className="rdp-btn primary">
-                                [Desktop] {t('rdp.connect') || 'Connect'}
+                                <FiMonitor style={{ marginRight: 6, verticalAlign: 'middle' }} /> {t('rdp.connect') || 'Connect'}
                             </button>
                         </div>
                     </form>
@@ -371,7 +372,7 @@ const RDPViewer = ({ connectionId, token, onClose }) => {
                 <div className="rdp-credentials-overlay">
                     <div className="rdp-credentials-modal glassmorphism rdp-credentials-compact">
                         <div className="rdp-credentials-header">
-                            <div className="rdp-credentials-icon">[Secure]</div>
+                            <div className="rdp-credentials-icon"><FiShield /></div>
                             <h2>{t('rdp.passwordRequired') || 'Password Required'}</h2>
                             <p className="rdp-credentials-subtitle">
                                 {t('rdp.serverRequestsPassword') || 'The remote server is requesting your password'}
@@ -380,7 +381,7 @@ const RDPViewer = ({ connectionId, token, onClose }) => {
                         <div className="rdp-credentials-body">
                             <div className="rdp-input-group">
                                 <label htmlFor="rdp-fallback-password">
-                                    <span className="rdp-input-icon">[Lock]</span>
+                                    <span className="rdp-input-icon"><FiLock /></span>
                                     {t('rdp.password') || 'Password'}
                                 </label>
                                 <input
@@ -403,7 +404,7 @@ const RDPViewer = ({ connectionId, token, onClose }) => {
                                 {t('common.cancel') || 'Cancel'}
                             </button>
                             <button className="rdp-btn primary" onClick={handleFallbackPasswordSubmit}>
-                                [Unlock] {t('rdp.authenticate') || 'Authenticate'}
+                                <FiUnlock style={{ marginRight: 6, verticalAlign: 'middle' }} /> {t('rdp.authenticate') || 'Authenticate'}
                             </button>
                         </div>
                     </div>
@@ -422,7 +423,7 @@ const RDPViewer = ({ connectionId, token, onClose }) => {
                     )}
                     {connectionState === 'CONNECTED' && (
                         <span className="rdp-frames">
-                            [Chart] {frameCount} frames
+                            <FiBarChart2 style={{ verticalAlign: 'middle', marginRight: 4 }} /> {frameCount} frames
                         </span>
                     )}
                 </div>
@@ -457,7 +458,7 @@ const RDPViewer = ({ connectionId, token, onClose }) => {
             
             {(connectionState === 'ERROR' || (connectionState === 'DISCONNECTED' && errorMsg)) && (
                 <div className="rdp-overlay error">
-                    <div className="error-icon">[Warning]</div>
+                    <div className="error-icon"><FiAlertTriangle /></div>
                     <h3>{t('rdp.error')}</h3>
                     <p>{errorMsg || t('rdp.unknownError') || 'Unknown error'}</p>
                     <button onClick={onClose} className="rdp-btn">

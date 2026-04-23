@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { FiFileText } from 'react-icons/fi';
 import mammoth from 'mammoth';
 import ReactQuill, { Quill } from 'react-quill';
 import 'react-quill/dist/quill.snow.css';
@@ -1211,7 +1212,7 @@ const WordEditor = ({ fileUrl, fileBlob, file, onClose, onFileSaved, highlightTe
 
       <div className="word-status-bar">
         <div className="word-status-left">
-          <span>[Text] {wordCount} {t('wordEditor.words')}</span>
+          <span><FiFileText style={{ verticalAlign: 'middle', marginRight: 4 }} /> {wordCount} {t('wordEditor.words')}</span>
           <span>🔤 {charCount} {t('wordEditor.characters')}</span>
           <span>⏱️ {Math.ceil(wordCount / 200)} {t('wordEditor.minRead')}</span>
         </div>

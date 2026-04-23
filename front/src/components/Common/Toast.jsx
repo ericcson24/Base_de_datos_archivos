@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { FiAlertTriangle, FiCheckCircle, FiXCircle, FiInfo } from 'react-icons/fi';
 import './Toast.css';
 
 const Toast = ({ id, title, message, type = 'info', duration = 3000, onClose }) => {
@@ -21,10 +22,10 @@ const Toast = ({ id, title, message, type = 'info', duration = 3000, onClose }) 
 
   const getIcon = () => {
     switch (type) {
-      case 'success': return '✅';
-      case 'error': return '❌';
-      case 'warning': return '[Warning]';
-      default: return 'ℹ️';
+      case 'success': return <FiCheckCircle />;
+      case 'error': return <FiXCircle />;
+      case 'warning': return <FiAlertTriangle />;
+      default: return <FiInfo />;
     }
   };
 

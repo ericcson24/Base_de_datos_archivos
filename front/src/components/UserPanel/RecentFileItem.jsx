@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { FiRefreshCw, FiUser } from 'react-icons/fi';
 import { getFileType, canPreview, getAuthenticatedPreviewUrl, getAuthToken } from '../../utils/fileUtils';
 import { useLanguage } from '../../context/LanguageContext';
 import FolderIcon from '../Common/FolderIcon';
@@ -116,7 +117,7 @@ const RecentFileItem = ({ file, isDarkMode, onFileClick }) => {
             <RecentOfficePreview fileId={file.id} fileType={fileType} fileName={file.name} />
           </div>
         ) : isLoading ? (
-          <div className="loading-preview">[Refresh]</div>
+          <div className="loading-preview"><FiRefreshCw className="spin" /></div>
         ) : previewUrl && canPreview(file.name) ? (
           <div className="file-preview-container">
             {fileType === 'image' && (
@@ -177,7 +178,7 @@ const RecentFileItem = ({ file, isDarkMode, onFileClick }) => {
         <p className="recent-file-date">
           {file.shared && file.owner && (
             <span className="recent-shared-badge" title={`${t('contextMenu.from', { owner: file.owner })}`}>
-              [User] {file.owner}
+              <FiUser style={{ verticalAlign: 'middle', marginRight: 4 }} /> {file.owner}
             </span>
           )}
           {displayDate ? 

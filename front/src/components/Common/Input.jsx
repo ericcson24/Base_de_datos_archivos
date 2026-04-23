@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { FiAlertTriangle } from 'react-icons/fi';
 import FrostedContainer from './FrostedContainer';
 import './Input.css';
 
@@ -53,7 +54,7 @@ const Input = ({
         className={inputClasses}
         {...props}
       />
-      {error && <span className="input-error-icon">[Warning]</span>}
+      {error && <span className="input-error-icon"><FiAlertTriangle /></span>}
     </div>
   );
 

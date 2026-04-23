@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { FiArchive, FiAlertTriangle } from 'react-icons/fi';
 import { useLanguage } from '../../../context/LanguageContext';
 import './ZipViewer.css';
 
@@ -64,13 +65,13 @@ const ZipViewer = ({ file }) => {
     
     const ext = entry.name.split('.').pop().toLowerCase();
     const iconMap = {
-      'jpg': '[Image]', 'jpeg': '[Image]', 'png': '[Image]', 'gif': '[Image]', 'bmp': '[Image]',
+      'jpg': '🖼️', 'jpeg': '🖼️', 'png': '🖼️', 'gif': '🖼️', 'bmp': '🖼️',
       'pdf': '📄',
-      'doc': '[Text]', 'docx': '[Text]', 'txt': '[Text]',
-      'xls': '[Chart]', 'xlsx': '[Chart]', 'csv': '[Chart]',
-      'zip': '[Archive]', 'rar': '[Archive]', '7z': '[Archive]',
+      'doc': '📝', 'docx': '📝', 'txt': '📝',
+      'xls': '📊', 'xlsx': '📊', 'csv': '📊',
+      'zip': '🗜️', 'rar': '🗜️', '7z': '🗜️',
       'mp4': '🎬', 'avi': '🎬', 'mkv': '🎬', 'mov': '🎬',
-      'mp3': '[Audio]', 'wav': '[Audio]', 'ogg': '[Audio]',
+      'mp3': '🎵', 'wav': '🎵', 'ogg': '🎵',
       'js': '📜', 'jsx': '📜', 'ts': '📜', 'tsx': '📜',
       'html': '🌐', 'css': '🎨', 'json': '⚙️'
     };
@@ -192,7 +193,7 @@ const ZipViewer = ({ file }) => {
   return (
     <div className="zip-viewer">
       <div className="zip-header">
-        <h3>[Archive] {file.name}</h3>
+        <h3><FiArchive style={{ verticalAlign: 'middle', marginRight: 6 }} /> {file.name}</h3>
         <div className="zip-stats">
           <span>{entries.length} {t('zipViewer.files')}</span>
           <span>{formatSize(entries.reduce((sum, e) => sum + e.size, 0))}</span>
@@ -283,7 +284,7 @@ const ZipViewer = ({ file }) => {
 
               {previewContent?.type === 'unsupported' && (
                 <div className="preview-message">
-                  <p>[Warning] {previewContent.message}</p>
+                  <p><FiAlertTriangle style={{ verticalAlign: 'middle', marginRight: 6 }} /> {previewContent.message}</p>
                   <button onClick={() => handleDownload(selectedEntry)}>
                     {t('zipViewer.downloadFile')}
                   </button>

@@ -12,7 +12,7 @@ import SettingsModal from '../Modals/SettingsModal';
 import RDPConnectionModal from '../Modals/RDPConnectionModal';
 import NotificationCenter from '../Common/NotificationCenter';
 import DayPanel from './DayPanel';
-import { FiArrowLeft, FiLayout, FiMonitor, FiSettings, FiLogOut } from 'react-icons/fi';
+import { FiArrowLeft, FiLayout, FiMonitor, FiSettings, FiLogOut, FiMenu } from 'react-icons/fi';
 import { useToast } from '../../context/ToastContext';
 import { useLanguage } from '../../context/LanguageContext';
 import { getAuthToken } from '../../utils/fileUtils';
@@ -597,7 +597,7 @@ const Calendar = ({ user, onLogout, onBackToPanel, onBackToFolders, onGoToRemote
           <span>{t('calendar.title')}</span>
         </div>
         <button className="hamburger-btn" onClick={() => setMobileSidebarOpen(!mobileSidebarOpen)}>
-          [Menu]
+          <FiMenu />
         </button>
       </div>
 

@@ -56,15 +56,15 @@ export const getFileType = (filename) => {
 export const getFileIcon = (filename) => {
   const type = getFileType(filename);
   const icons = {
-    image: '[Image]',
-    video: '[Video]',
-    audio: '[Audio]',
+    image: '🖼️',
+    video: '🎬',
+    audio: '🎵',
     pdf: '📄',
-    word: '[Text]',
-    excel: '[Chart]',
-    powerpoint: '[Slides]',
+    word: '📝',
+    excel: '📊',
+    powerpoint: '📽️',
     text: '📄',
-    archive: '[Archive]',
+    archive: '🗜️',
     file: '📄'
   };
   return icons[type] || '📄';

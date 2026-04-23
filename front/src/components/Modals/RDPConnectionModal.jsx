@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { FiMonitor, FiLock } from 'react-icons/fi';
 import { useLanguage } from '../../context/LanguageContext';
 import { getAuthToken } from '../../utils/fileUtils';
 import './RDPConnectionModal.css';
@@ -45,7 +46,7 @@ const RDPConnectionModal = ({ onClose, onConnect }) => {
                             </div>
                             {settings.lan_only === 'true' && (
                                 <div className="status-badge lan-only">
-                                    [Lock] LAN Only Mode
+                                    <FiLock style={{ verticalAlign: 'middle', marginRight: 4 }} /> LAN Only Mode
                                 </div>
                             )}
                             {settings.maintenance_mode === 'true' && (
@@ -83,7 +84,7 @@ const RDPConnectionModal = ({ onClose, onConnect }) => {
                                 ) : (
                                     connections.map(conn => (
                                         <div key={conn.id} className="connection-item" onClick={() => onConnect(conn.id)}>
-                                            <div className="conn-icon">[Desktop]</div>
+                                            <div className="conn-icon"><FiMonitor /></div>
                                             <div className="conn-details">
                                                 <span className="conn-name">{conn.name}</span>
                                                 <span className="conn-host">{conn.hostname}</span>

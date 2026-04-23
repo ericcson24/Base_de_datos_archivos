@@ -99,14 +99,14 @@ const buildPptxPreviewHtml = async (zip) => {
     if (s.title) {
       h += `<div class="pptx-title">${s.title.replace(/&/g, '&amp;').replace(/</g, '&lt;')}</div>`;
     } else if (!hasContent) {
-      h += '<div class="pptx-empty-placeholder">[Slides]</div>';
+      h += '<div class="pptx-empty-placeholder">📽️</div>';
     }
     if (s.contents.length > 0) {
       h += s.contents.map(c => `<div class="pptx-content">${c.replace(/&/g, '&amp;').replace(/</g, '&lt;')}</div>`).join('');
     }
     h += '</div>';
     return h;
-  }).join('') : '<div class="pptx-slide"><div class="pptx-empty-placeholder">[Slides]</div></div>';
+  }).join('') : '<div class="pptx-slide"><div class="pptx-empty-placeholder">📽️</div></div>';
 
   return slideHtml;
 };

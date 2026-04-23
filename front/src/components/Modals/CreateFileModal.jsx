@@ -3,9 +3,9 @@ import { useLanguage } from '../../context/LanguageContext';
 
 const FILE_TYPE_ICONS = {
   text: '📄',
-  word: '[Text]',
-  excel: '[Chart]',
-  powerpoint: '[Slides]'
+  word: '📝',
+  excel: '📊',
+  powerpoint: '📽️'
 };
 
 const CreateFileModal = ({ isOpen, onClose, onCreateFile, defaultName, fileType }) => {

@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { FiAlertTriangle, FiUser } from 'react-icons/fi';
 import './EventModal.css';
 import LocationPickerModal from './LocationPickerModal';
 import { useLanguage } from '../../context/LanguageContext';
@@ -499,7 +500,7 @@ const EventModal = ({
           <div className="modal-body">
             {errors.general && (
               <div className="message error">
-                [Warning] {errors.general}
+                <FiAlertTriangle style={{ verticalAlign: 'middle', marginRight: 6 }} /> {errors.general}
               </div>
             )}
 
@@ -557,7 +558,7 @@ const EventModal = ({
                   <div className="detail-group">
                     <label className="detail-label">{t('calendar.assignedBy') || 'Asignado por'}</label>
                     <div className="detail-value" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                      <span style={{ fontSize: '1.1rem' }}>[User]</span>
+                      <span style={{ fontSize: '1.1rem' }}><FiUser /></span>
                       <span style={{ fontWeight: 500, color: '#3b82f6' }}>{event.extendedProps.assignedBy}</span>
                     </div>
                   </div>

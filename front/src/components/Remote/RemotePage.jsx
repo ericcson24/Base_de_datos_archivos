@@ -4,7 +4,7 @@ import { getAuthToken } from '../../utils/fileUtils';
 import NotificationCenter from '../Common/NotificationCenter';
 import SettingsModal from '../Modals/SettingsModal';
 import RDPViewer from '../RDP/RDPViewer';
-import { FiArrowLeft, FiLayout, FiCalendar, FiSettings, FiLogOut, FiMonitor, FiWifi } from 'react-icons/fi';
+import { FiArrowLeft, FiLayout, FiCalendar, FiSettings, FiLogOut, FiMonitor, FiWifi, FiMenu, FiLock, FiStopCircle } from 'react-icons/fi';
 import './RemotePage.css';
 import './RemotePageDesktop.css';
 import './RemotePageMobile.css';
@@ -148,7 +148,7 @@ const RemotePage = ({ user, onLogout, onGoBack, onGoToPanel, onGoToCalendar, onT
             <div className="remote-main">
                 <div className="remote-header">
                     <div className="remote-header-content">
-                        <button className="mobile-menu-btn" onClick={() => setSidebarOpen(true)}>[Menu]</button>
+                        <button className="mobile-menu-btn" onClick={() => setSidebarOpen(true)}><FiMenu /></button>
                         <h1>{t('rdp.selectConnection')}</h1>
                     </div>
                     <div className="remote-header-actions">
@@ -172,12 +172,12 @@ const RemotePage = ({ user, onLogout, onGoBack, onGoToPanel, onGoToCalendar, onT
                                     </div>
                                     {settings.maintenance_mode === 'true' && (
                                         <div className="status-badge maintenance">
-                                            [Stop] {t('rdp.maintenanceMode')}
+                                            <FiStopCircle style={{ verticalAlign: 'middle', marginRight: 4 }} /> {t('rdp.maintenanceMode')}
                                         </div>
                                     )}
                                     {settings.lan_only === 'true' && (
                                         <div className="status-badge lan">
-                                            [Lock] {t('rdp.lanOnly')}
+                                            <FiLock style={{ verticalAlign: 'middle', marginRight: 4 }} /> {t('rdp.lanOnly')}
                                         </div>
                                     )}
                                 </div>
@@ -202,7 +202,7 @@ const RemotePage = ({ user, onLogout, onGoBack, onGoToPanel, onGoToCalendar, onT
                                             key={conn.id} 
                                             className="remote-connection-card"
                                         >
-                                            <div className="connection-icon">[Desktop]</div>
+                                            <div className="connection-icon"><FiMonitor /></div>
                                             <div className="connection-info">
                                                 <h3>{conn.name}</h3>
                                                 <p className="connection-host">

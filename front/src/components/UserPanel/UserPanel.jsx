@@ -18,7 +18,7 @@ import CreateFileModal from '../Modals/CreateFileModal';
 import SidebarPanel from './SidebarPanel';
 import FileItem from './FileItem';
 import NotificationCenter from '../Common/NotificationCenter';
-import { FiHardDrive, FiUsers, FiArrowLeft, FiCalendar, FiMonitor, FiSettings, FiLogOut, FiLayout } from 'react-icons/fi';
+import { FiHardDrive, FiUsers, FiArrowLeft, FiCalendar, FiMonitor, FiSettings, FiLogOut, FiLayout, FiMenu } from 'react-icons/fi';
 import { 
   getAuthToken, 
   downloadFile, 
@@ -1339,7 +1339,7 @@ useEffect(() => {
           <span>{t('userPanel.personalCloud')}</span>
         </div>
         <button className="hamburger-btn" onClick={() => setMobileSidebarOpen(!mobileSidebarOpen)}>
-          [Menu]
+          <FiMenu />
         </button>
       </div>
 

@@ -147,6 +147,578 @@ function convertToSpainTime(dateStr, isAllDay = false) {
   return dateStr;
 }
 
+app.get('/status', authenticate, async (req, res) => {
+  try {
+    const user = await dbAsync.get(
+      'SELECT microsoft_access_token, microsoft_email FROM users WHERE username = ?',
+      [req.user.username]
+    );
+    if (!user) {
+      return res.json({ success: true, linked: false, email: null });
+    }
+    res.json({
+      success: true,
+      linked: !!user.microsoft_access_token,
+      email: user.microsoft_email || null
+    });
+  } catch (error) {
+    console.error('Error in GET /status:', error);
+    res.status(500).json({ success: false, linked: false, email: null });
+  }
+});
+
+app.post('/sync', authenticate, async (req, res) => {
+  try {
+    const username = req.user.username;
+    const user = await dbAsync.get(
+      'SELECT id, microsoft_access_token, microsoft_refresh_token FROM users WHERE username = ?',
+      [username]
+    );
+
+    if (!user) return res.status(404).json({ success: false, error: 'User not found' });
+    if (!user.microsoft_access_token) {
+      return res.status(400).json({ success: false, error: 'Microsoft account not linked' });
+    }
+
+    const validToken = await getValidAccessToken(user);
+    if (!validToken) {
+      return res.status(401).json({ success: false, error: 'Could not obtain valid access token' });
+    }
+
+    const client = getAuthenticatedClient(validToken);
+
+    const now = new Date();
+    const startWindow = new Date(now.getFullYear(), now.getMonth() - 3, 1).toISOString();
+    const endWindow = new Date(now.getFullYear(), now.getMonth() + 6, 0, 23, 59, 59).toISOString();
+
+    let imported = 0;
+    let updated = 0;
+
+    const response = await client
+      .api('/me/calendarView')
+      .query({ startDateTime: startWindow, endDateTime: endWindow })
+      .select('id,subject,bodyPreview,start,end,isAllDay,location,webLink,categories')
+      .top(250)
+      .get();
+
+    const events = (response && response.value) || [];
+
+    for (const ev of events) {
+      const startTime = ev.start?.dateTime || null;
+      const endTime = ev.end?.dateTime || null;
+      const locationName = ev.location?.displayName || null;
+      const categoriesJson = ev.categories ? JSON.stringify(ev.categories) : null;
+      const isAllDay = ev.isAllDay ? 1 : 0;
+
+      const existing = await dbAsync.get(
+        'SELECT id FROM calendar_events WHERE microsoft_id = ?',
+        [ev.id]
+      );
+
+      if (existing) {
+        await dbAsync.run(
+          `UPDATE calendar_events SET user_id = ?, subject = ?, body_preview = ?, start_time = ?, end_time = ?, is_all_day = ?, location = ?, web_link = ?, categories = ?, last_synced = CURRENT_TIMESTAMP WHERE id = ?`,
+          [user.id, ev.subject || '', ev.bodyPreview || '', startTime, endTime, isAllDay, locationName, ev.webLink || null, categoriesJson, existing.id]
+        );
+        updated++;
+      } else {
+        await dbAsync.run(
+          `INSERT INTO calendar_events (microsoft_id, user_id, subject, body_preview, start_time, end_time, is_all_day, location, web_link, categories, last_synced) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)`,
+          [ev.id, user.id, ev.subject || '', ev.bodyPreview || '', startTime, endTime, isAllDay, locationName, ev.webLink || null, categoriesJson]
+        );
+        imported++;
+      }
+    }
+
+    console.log(`[SYNC] User ${username}: imported=${imported} updated=${updated} total=${events.length}`);
+    res.json({ success: true, imported, updated, total: events.length });
+  } catch (error) {
+    console.error('Error in POST /sync:', error.message || error);
+    res.status(500).json({ success: false, error: error.message || 'Error syncing events' });
+  }
+});
+
+function rowToEvent(row) {
+  if (!row) return null;
+  const toIso = (v) => {
+    if (!v) return null;
+    if (v instanceof Date) return v.toISOString();
+    return String(v);
+  };
+  let cats = [];
+  if (row.categories) {
+    try { cats = JSON.parse(row.categories); if (!Array.isArray(cats)) cats = []; }
+    catch (e) { cats = []; }
+  }
+  return {
+    id: row.id,
+    microsoftId: row.microsoft_id,
+    userId: row.user_id,
+    ownerUsername: row.owner_username || null,
+    title: row.subject || '',
+    description: row.body_preview || '',
+    start: toIso(row.start_time),
+    end: toIso(row.end_time),
+    allDay: !!row.is_all_day,
+    location: row.location || '',
+    webLink: row.web_link || null,
+    categories: cats,
+    assignedBy: row.assigned_by || null
+  };
+}
+
+async function canViewUser(requester, targetUserId) {
+  if (!targetUserId) return true;
+  if (String(requester.id) === String(targetUserId)) return true;
+  return requester.role === 'admin' || requester.role === 'boss';
+}
+
+app.get('/', authenticate, async (req, res) => {
+  try {
+    const { start, end, userId } = req.query;
+    const username = req.user.username;
+    const requester = await dbAsync.get('SELECT id, role FROM users WHERE username = ?', [username]);
+    if (!requester) return res.status(401).json({ error: 'Unauthorized' });
+
+    let targetUserId = requester.id;
+    if (userId) {
+      if (!(await canViewUser(requester, userId))) {
+        return res.status(403).json({ error: 'Forbidden' });
+      }
+      targetUserId = parseInt(userId);
+    }
+
+    const params = [targetUserId];
+    let sql = `SELECT ce.*, u.username AS owner_username
+               FROM calendar_events ce
+               LEFT JOIN users u ON u.id = ce.user_id
+               WHERE ce.user_id = ?`;
+    if (start) { sql += ' AND (ce.end_time IS NULL OR ce.end_time >= ?)'; params.push(start); }
+    if (end)   { sql += ' AND (ce.start_time IS NULL OR ce.start_time <= ?)'; params.push(end); }
+    sql += ' ORDER BY ce.start_time ASC';
+
+    const rows = await dbAsync.all(sql, params);
+    res.json(rows.map(rowToEvent));
+  } catch (error) {
+    console.error('Error in GET /:', error);
+    res.status(500).json({ error: 'Error loading events' });
+  }
+});
+
+app.get('/categories', authenticate, async (req, res) => {
+  try {
+    const { userId } = req.query;
+    const username = req.user.username;
+    const requester = await dbAsync.get(
+      'SELECT id, role, microsoft_access_token, microsoft_refresh_token FROM users WHERE username = ?',
+      [username]
+    );
+    if (!requester) return res.status(401).json({ error: 'Unauthorized' });
+
+    let target = requester;
+    if (userId) {
+      if (!(await canViewUser(requester, userId))) return res.status(403).json({ error: 'Forbidden' });
+      target = await dbAsync.get(
+        'SELECT id, microsoft_access_token, microsoft_refresh_token FROM users WHERE id = ?',
+        [parseInt(userId)]
+      );
+      if (!target) return res.status(404).json({ error: 'User not found' });
+    }
+
+    const presetColors = {
+      preset0: '#e74c3c', // Red
+      preset1: '#f39c12', // Orange
+      preset2: '#c19a6b', // Brown (Peach)
+      preset3: '#f1c40f', // Yellow
+      preset4: '#2ecc71', // Green
+      preset5: '#1abc9c', // Teal
+      preset6: '#808000', // Olive
+      preset7: '#3498db', // Blue
+      preset8: '#9b59b6', // Purple
+      preset9: '#c0392b', // Cranberry
+      preset10: '#708090', // Steel
+      preset11: '#2f4f4f', // DarkSteel
+      preset12: '#808080', // Gray
+      preset13: '#404040', // DarkGray
+      preset14: '#000000', // Black
+      preset15: '#8b0000', // DarkRed
+      preset16: '#d2691e', // DarkOrange
+      preset17: '#5d4037', // DarkBrown
+      preset18: '#b8860b', // DarkYellow
+      preset19: '#006400', // DarkGreen
+      preset20: '#008080', // DarkTeal
+      preset21: '#556b2f', // DarkOlive
+      preset22: '#00008b', // DarkBlue
+      preset23: '#4b0082', // DarkPurple
+      preset24: '#8b0a50'  // DarkCranberry
+    };
+
+    const graphCategories = new Map();
+    if (target.microsoft_access_token) {
+      try {
+        const validToken = await getValidAccessToken(target);
+        if (validToken) {
+          const client = getAuthenticatedClient(validToken);
+          const response = await client.api('/me/outlook/masterCategories').get();
+          const items = (response && response.value) || [];
+          for (const it of items) {
+            if (it.displayName) {
+              const key = (it.color || '').toLowerCase();
+              graphCategories.set(it.displayName, {
+                id: `cat-${it.displayName}`,
+                name: it.displayName,
+                color: key || 'preset8',
+                hexColor: presetColors[key] || '#2563eb'
+              });
+            }
+          }
+        }
+      } catch (e) {
+        console.warn('[CATEGORIES] Could not fetch masterCategories:', e.message);
+      }
+    }
+
+    const rows = await dbAsync.all(
+      'SELECT categories FROM calendar_events WHERE user_id = ? AND categories IS NOT NULL',
+      [target.id]
+    );
+    for (const r of rows) {
+      try {
+        const arr = JSON.parse(r.categories);
+        if (Array.isArray(arr)) {
+          for (const name of arr) {
+            if (name && !graphCategories.has(name)) {
+              let hash = 0;
+              for (let i = 0; i < name.length; i++) hash = name.charCodeAt(i) + ((hash << 5) - hash);
+              const c = (hash & 0x00ffffff).toString(16).toUpperCase().padStart(6, '0');
+              graphCategories.set(name, {
+                id: `cat-${name}`,
+                name,
+                color: 'preset8',
+                hexColor: '#' + c
+              });
+            }
+          }
+        }
+      } catch (e) {}
+    }
+
+    res.json(Array.from(graphCategories.values()));
+  } catch (error) {
+    console.error('Error in GET /categories:', error);
+    res.status(500).json({ error: 'Error loading categories' });
+  }
+});
+
+function normalizeEventPayload(body) {
+  const p = body || {};
+  return {
+    subject: p.title !== undefined ? p.title : p.subject,
+    bodyPreview: p.description !== undefined ? p.description : p.body,
+    startTime: p.start !== undefined ? p.start : p.startTime,
+    endTime: p.end !== undefined ? p.end : p.endTime,
+    location: p.location,
+    isAllDay: p.allDay !== undefined ? p.allDay : p.isAllDay,
+    categories: p.categories
+  };
+}
+
+async function pushEventToGraph(owner, payload, existingMsId) {
+  try {
+    const validToken = await getValidAccessToken(owner);
+    if (!validToken) return null;
+    const client = getAuthenticatedClient(validToken);
+    const graphEvent = {};
+    if (payload.subject !== undefined) graphEvent.subject = payload.subject || '';
+    if (payload.bodyPreview !== undefined) graphEvent.body = { contentType: 'Text', content: payload.bodyPreview || '' };
+    if (payload.isAllDay !== undefined) graphEvent.isAllDay = !!payload.isAllDay;
+    if (payload.startTime) {
+      graphEvent.start = payload.isAllDay
+        ? { dateTime: `${String(payload.startTime).split('T')[0]}T00:00:00`, timeZone: 'Europe/Madrid' }
+        : { dateTime: payload.startTime, timeZone: 'UTC' };
+    }
+    if (payload.endTime) {
+      graphEvent.end = payload.isAllDay
+        ? { dateTime: `${String(payload.endTime).split('T')[0]}T00:00:00`, timeZone: 'Europe/Madrid' }
+        : { dateTime: payload.endTime, timeZone: 'UTC' };
+    }
+    if (payload.location !== undefined) graphEvent.location = { displayName: payload.location || '' };
+    if (payload.categories !== undefined) graphEvent.categories = Array.isArray(payload.categories) ? payload.categories : [payload.categories];
+
+    if (existingMsId) {
+      await client.api(`/me/events/${existingMsId}`).patch(graphEvent);
+      return existingMsId;
+    }
+    const created = await client.api('/me/events').post(graphEvent);
+    return created && created.id ? created.id : null;
+  } catch (e) {
+    console.error('[OUTLOOK] Graph push failed:', e.message);
+    return null;
+  }
+}
+
+async function insertLocalEvent(targetUserId, payload, assignedBy) {
+  const catsJson = payload.categories
+    ? JSON.stringify(Array.isArray(payload.categories) ? payload.categories : [payload.categories])
+    : null;
+  const localMsId = `local_${Date.now()}_${Math.floor(Math.random() * 1e6)}`;
+  const result = await dbAsync.run(
+    `INSERT INTO calendar_events (microsoft_id, user_id, subject, body_preview, start_time, end_time, is_all_day, location, categories, assigned_by, last_synced)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)`,
+    [
+      localMsId,
+      targetUserId,
+      payload.subject || '',
+      payload.bodyPreview || '',
+      payload.startTime || null,
+      payload.endTime || null,
+      payload.isAllDay ? 1 : 0,
+      payload.location || null,
+      catsJson,
+      assignedBy || null
+    ]
+  );
+  return { id: result.lastID, microsoftId: localMsId };
+}
+
+app.post('/', authenticate, async (req, res) => {
+  try {
+    const username = req.user.username;
+    const requester = await dbAsync.get(
+      'SELECT id, role, microsoft_access_token, microsoft_refresh_token FROM users WHERE username = ?',
+      [username]
+    );
+    if (!requester) return res.status(401).json({ error: 'Unauthorized' });
+
+    const payload = normalizeEventPayload(req.body);
+    if (!payload.subject) return res.status(400).json({ error: 'title required' });
+    if (!payload.startTime) return res.status(400).json({ error: 'start required' });
+
+    const local = await insertLocalEvent(requester.id, payload, null);
+
+    let finalMsId = local.microsoftId;
+    if (requester.microsoft_access_token) {
+      const msId = await pushEventToGraph(requester, payload, null);
+      if (msId) {
+        finalMsId = msId;
+        await dbAsync.run('UPDATE calendar_events SET microsoft_id = ? WHERE id = ?', [msId, local.id]);
+      }
+    }
+
+    const row = await dbAsync.get(
+      `SELECT ce.*, u.username AS owner_username FROM calendar_events ce LEFT JOIN users u ON u.id = ce.user_id WHERE ce.id = ?`,
+      [local.id]
+    );
+    res.status(201).json({ success: true, event: rowToEvent(row) });
+  } catch (error) {
+    console.error('Error in POST /:', error);
+    res.status(500).json({ error: 'Error creating event' });
+  }
+});
+
+app.post('/assign-user', authenticate, async (req, res) => {
+  try {
+    const username = req.user.username;
+    const requester = await dbAsync.get('SELECT id, role FROM users WHERE username = ?', [username]);
+    if (!requester) return res.status(401).json({ error: 'Unauthorized' });
+    if (requester.role !== 'admin' && requester.role !== 'boss') {
+      return res.status(403).json({ error: 'Forbidden' });
+    }
+
+    const payload = normalizeEventPayload(req.body);
+    const targetUserId = parseInt(req.body.targetUserId);
+    if (!targetUserId) return res.status(400).json({ error: 'targetUserId required' });
+    if (!payload.subject) return res.status(400).json({ error: 'title required' });
+    if (!payload.startTime) return res.status(400).json({ error: 'start required' });
+
+    const target = await dbAsync.get(
+      'SELECT id, microsoft_access_token, microsoft_refresh_token FROM users WHERE id = ?',
+      [targetUserId]
+    );
+    if (!target) return res.status(404).json({ error: 'Target user not found' });
+
+    const local = await insertLocalEvent(targetUserId, payload, username);
+
+    if (target.microsoft_access_token) {
+      const msId = await pushEventToGraph(target, payload, null);
+      if (msId) {
+        await dbAsync.run('UPDATE calendar_events SET microsoft_id = ? WHERE id = ?', [msId, local.id]);
+      }
+    }
+
+    res.status(201).json({ success: true, eventId: local.id });
+  } catch (error) {
+    console.error('Error in POST /assign-user:', error);
+    res.status(500).json({ error: 'Error assigning event' });
+  }
+});
+
+app.post('/group', authenticate, async (req, res) => {
+  try {
+    const username = req.user.username;
+    const requester = await dbAsync.get('SELECT id, role FROM users WHERE username = ?', [username]);
+    if (!requester) return res.status(401).json({ error: 'Unauthorized' });
+    if (requester.role !== 'admin' && requester.role !== 'boss') {
+      return res.status(403).json({ error: 'Forbidden' });
+    }
+
+    const payload = normalizeEventPayload(req.body);
+    const groupId = parseInt(req.body.groupId);
+    if (!groupId) return res.status(400).json({ error: 'groupId required' });
+    if (!payload.subject) return res.status(400).json({ error: 'title required' });
+    if (!payload.startTime) return res.status(400).json({ error: 'start required' });
+
+    let members = [];
+    try {
+      members = await dbAsync.all(
+        `SELECT u.id, u.microsoft_access_token, u.microsoft_refresh_token
+         FROM group_members gm JOIN users u ON u.id = gm.user_id
+         WHERE gm.group_id = ?`,
+        [groupId]
+      );
+    } catch (e) {
+      console.warn('[GROUP] group_members table missing:', e.message);
+    }
+
+    if (!members.length) return res.status(404).json({ error: 'Group has no members' });
+
+    let success = 0, failed = 0;
+    for (const member of members) {
+      try {
+        const local = await insertLocalEvent(member.id, payload, username);
+        if (member.microsoft_access_token) {
+          const msId = await pushEventToGraph(member, payload, null);
+          if (msId) {
+            await dbAsync.run('UPDATE calendar_events SET microsoft_id = ? WHERE id = ?', [msId, local.id]);
+          }
+        }
+        success++;
+      } catch (err) {
+        console.error('[GROUP] Failed to assign to user', member.id, err.message);
+        failed++;
+      }
+    }
+
+    res.status(201).json({ success: true, results: { success, failed, total: members.length } });
+  } catch (error) {
+    console.error('Error in POST /group:', error);
+    res.status(500).json({ error: 'Error creating group events' });
+  }
+});
+
+async function findOwnedEvent(id, requester) {
+  const isAdminOrBoss = requester.role === 'admin' || requester.role === 'boss';
+  let event = null;
+  if (!isNaN(id)) {
+    try {
+      event = await dbAsync.get('SELECT * FROM calendar_events WHERE id = ? AND user_id = ?', [id, requester.id]);
+    } catch (e) {}
+  }
+  if (!event) {
+    event = await dbAsync.get('SELECT * FROM calendar_events WHERE microsoft_id = ? AND user_id = ?', [id, requester.id]);
+  }
+  if (!event && isAdminOrBoss) {
+    if (!isNaN(id)) {
+      try { event = await dbAsync.get('SELECT * FROM calendar_events WHERE id = ?', [id]); } catch (e) {}
+    }
+    if (!event) event = await dbAsync.get('SELECT * FROM calendar_events WHERE microsoft_id = ?', [id]);
+  }
+  return event;
+}
+
+async function updateEventById(id, body, username, res) {
+  const requester = await dbAsync.get(
+    'SELECT id, role, microsoft_access_token, microsoft_refresh_token FROM users WHERE username = ?',
+    [username]
+  );
+  if (!requester) return res.status(401).json({ error: 'Unauthorized' });
+
+  const event = await findOwnedEvent(id, requester);
+  if (!event) return res.status(404).json({ error: 'Event not found or not owned' });
+
+  const payload = normalizeEventPayload(body);
+  const isLocalOnly = !event.microsoft_id || event.microsoft_id.startsWith('local_');
+  const owner = event.user_id === requester.id
+    ? requester
+    : await dbAsync.get(
+        'SELECT id, microsoft_access_token, microsoft_refresh_token FROM users WHERE id = ?',
+        [event.user_id]
+      );
+
+  if (!isLocalOnly && owner && owner.microsoft_access_token) {
+    await pushEventToGraph(owner, payload, event.microsoft_id);
+  }
+
+  const sets = [];
+  const vals = [];
+  if (payload.subject !== undefined) { sets.push('subject = ?'); vals.push(payload.subject || ''); }
+  if (payload.bodyPreview !== undefined) { sets.push('body_preview = ?'); vals.push(payload.bodyPreview || ''); }
+  if (payload.startTime !== undefined) { sets.push('start_time = ?'); vals.push(payload.startTime || null); }
+  if (payload.endTime !== undefined) { sets.push('end_time = ?'); vals.push(payload.endTime || null); }
+  if (payload.location !== undefined) { sets.push('location = ?'); vals.push(payload.location || null); }
+  if (payload.isAllDay !== undefined) { sets.push('is_all_day = ?'); vals.push(payload.isAllDay ? 1 : 0); }
+  if (payload.categories !== undefined) {
+    const catsJson = JSON.stringify(Array.isArray(payload.categories) ? payload.categories : [payload.categories]);
+    sets.push('categories = ?'); vals.push(catsJson);
+  }
+
+  if (sets.length > 0) {
+    sets.push('last_synced = CURRENT_TIMESTAMP');
+    vals.push(event.id);
+    await dbAsync.run(`UPDATE calendar_events SET ${sets.join(', ')} WHERE id = ?`, vals);
+  }
+
+  res.json({ success: true, message: 'Updated' });
+}
+
+app.put('/:id', authenticate, async (req, res) => {
+  try { await updateEventById(req.params.id, req.body, req.user.username, res); }
+  catch (error) { console.error('Error in PUT /:id:', error); res.status(500).json({ error: 'Error updating' }); }
+});
+
+app.patch('/:id', authenticate, async (req, res) => {
+  try { await updateEventById(req.params.id, req.body, req.user.username, res); }
+  catch (error) { console.error('Error in PATCH /:id:', error); res.status(500).json({ error: 'Error updating' }); }
+});
+
+app.delete('/:id', authenticate, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const username = req.user.username;
+    const requester = await dbAsync.get('SELECT id, role FROM users WHERE username = ?', [username]);
+    if (!requester) return res.status(401).json({ error: 'Unauthorized' });
+
+    const event = await findOwnedEvent(id, requester);
+    if (!event) return res.status(404).json({ error: 'Event not found' });
+
+    if (event.microsoft_id && !event.microsoft_id.startsWith('local_')) {
+      const owner = event.user_id === requester.id
+        ? requester
+        : await dbAsync.get(
+            'SELECT id, microsoft_access_token, microsoft_refresh_token FROM users WHERE id = ?',
+            [event.user_id]
+          );
+      if (owner && owner.microsoft_access_token) {
+        try {
+          const validToken = await getValidAccessToken(owner);
+          if (validToken) {
+            const client = getAuthenticatedClient(validToken);
+            await client.api(`/me/events/${event.microsoft_id}`).delete();
+          }
+        } catch (e) {
+          console.error('[OUTLOOK] Delete failed (maybe already deleted):', e.message);
+        }
+      }
+    }
+
+    await dbAsync.run('DELETE FROM calendar_events WHERE id = ?', [event.id]);
+    res.json({ success: true, message: 'Deleted' });
+  } catch (error) {
+    console.error('Error in DELETE /:id:', error);
+    res.status(500).json({ error: 'Error deleting' });
+  }
+});
+
 app.patch('/events/:id', authenticate, async (req, res) => {
   try {
     const { id } = req.params;

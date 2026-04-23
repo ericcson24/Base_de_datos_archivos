@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
+import { FiLayers, FiFileText } from 'react-icons/fi';
 import JSZip from 'jszip';
 import { getAuthToken } from '../../../utils/fileUtils';
 import { useLanguage } from '../../../context/LanguageContext';
@@ -759,7 +760,7 @@ const PowerPointEditor = ({ fileUrl, fileBlob, file, onClose, onFileSaved }) => 
       <div className="ppt-editor" ref={containerRef}>
         <div className="ppt-toolbar">
           <div className="ppt-toolbar-left">
-            <h3>[Slides] {file.name}</h3>
+            <h3><FiLayers style={{ verticalAlign: 'middle', marginRight: 6 }} /> {file.name}</h3>
           </div>
           <div className="ppt-toolbar-right">
             <button className="ppt-btn" onClick={() => setShowSlideSorter(false)}>
@@ -804,7 +805,7 @@ const PowerPointEditor = ({ fileUrl, fileBlob, file, onClose, onFileSaved }) => 
       
       <div className="ppt-toolbar">
         <div className="ppt-toolbar-left">
-          <h3>[Slides] {file.name}</h3>
+          <h3><FiLayers style={{ verticalAlign: 'middle', marginRight: 6 }} /> {file.name}</h3>
         </div>
         <div className="ppt-toolbar-right">
           <button className="ppt-btn" onClick={startPresentation} title={`${t('powerPointEditor.present')} (F5)`}>
@@ -932,7 +933,7 @@ const PowerPointEditor = ({ fileUrl, fileBlob, file, onClose, onFileSaved }) => 
                       className={`ppt-align-btn ${currentSlide.titleAlign === a ? 'active' : ''}`}
                       onClick={() => updateSlide(activeSlide, 'titleAlign', a)}
                     >
-                      {a === 'left' ? '⫷' : a === 'center' ? '[Menu]' : '⫸'}
+                      {a === 'left' ? '⫷' : a === 'center' ? '≡' : '⫸'}
                     </button>
                   ))}
                 </div>
@@ -962,7 +963,7 @@ const PowerPointEditor = ({ fileUrl, fileBlob, file, onClose, onFileSaved }) => 
                       className={`ppt-align-btn ${currentSlide.contentAlign === a ? 'active' : ''}`}
                       onClick={() => updateSlide(activeSlide, 'contentAlign', a)}
                     >
-                      {a === 'left' ? '⫷' : a === 'center' ? '[Menu]' : '⫸'}
+                      {a === 'left' ? '⫷' : a === 'center' ? '≡' : '⫸'}
                     </button>
                   ))}
                 </div>
@@ -973,7 +974,7 @@ const PowerPointEditor = ({ fileUrl, fileBlob, file, onClose, onFileSaved }) => 
                   📄 {t('powerPointEditor.duplicate')}
                 </button>
                 <button className="ppt-format-btn" onClick={() => setShowNotes(!showNotes)} title={t('powerPointEditor.notes')}>
-                  [Text] {t('powerPointEditor.notes')}
+                  <FiFileText style={{ verticalAlign: 'middle', marginRight: 4 }} /> {t('powerPointEditor.notes')}
                 </button>
               </div>
             </div>
@@ -1041,7 +1042,7 @@ const PowerPointEditor = ({ fileUrl, fileBlob, file, onClose, onFileSaved }) => 
           {showNotes && isEditing && (
             <div className="ppt-notes-panel">
               <div className="ppt-notes-header">
-                <span>[Text] {t('powerPointEditor.speakerNotes')}</span>
+                <span><FiFileText style={{ verticalAlign: 'middle', marginRight: 4 }} /> {t('powerPointEditor.speakerNotes')}</span>
                 <button onClick={() => setShowNotes(false)}>x</button>
               </div>
               <textarea

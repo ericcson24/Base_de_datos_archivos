@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { FiSun, FiMoon, FiMail, FiCpu, FiCalendar, FiDownload } from 'react-icons/fi';
 import Button from '../Common/Button';
 import Input from '../Common/Input';
 import ExportCalendarModal from './ExportCalendarModal';
@@ -417,7 +418,7 @@ const SettingsModal = ({ onClose, user, onThemeToggle, isDarkMode, initialTab = 
                     className={`theme-btn ${settings.theme === 'light' ? 'active' : ''}`}
                   >
                     <div className="theme-btn-content">
-                      <span>[Light]</span>
+                      <span><FiSun /></span>
                       <span className="theme-btn-text">{t('common.theme.light')}</span>
                     </div>
                   </button>
@@ -426,7 +427,7 @@ const SettingsModal = ({ onClose, user, onThemeToggle, isDarkMode, initialTab = 
                     className={`theme-btn ${settings.theme === 'dark' ? 'active' : ''}`}
                   >
                     <div className="theme-btn-content">
-                      <span>[Dark]</span>
+                      <span><FiMoon /></span>
                       <span className="theme-btn-text">{t('common.theme.dark')}</span>
                     </div>
                   </button>
@@ -441,7 +442,7 @@ const SettingsModal = ({ onClose, user, onThemeToggle, isDarkMode, initialTab = 
                     className="export-calendar-btn"
                     onClick={() => setShowExportModal(true)}
                   >
-                    <div className="export-calendar-btn-icon">[Export]</div>
+                    <div className="export-calendar-btn-icon"><FiDownload /></div>
                     <div className="export-calendar-btn-info">
                       <span className="export-calendar-btn-title">{t('export.title')}</span>
                       <span className="export-calendar-btn-desc">{t('export.subtitle')}</span>
@@ -465,7 +466,7 @@ const SettingsModal = ({ onClose, user, onThemeToggle, isDarkMode, initialTab = 
                     <div className="integration-card">
                       <div className="integration-info">
                         <div className="integration-icon">
-                          [Mail]
+                          <FiMail />
                         </div>
                         <div>
                           <p className="integration-email">{settings.microsoftEmail}</p>
@@ -514,7 +515,7 @@ const SettingsModal = ({ onClose, user, onThemeToggle, isDarkMode, initialTab = 
                 ) : (
                   <div className="text-center py-8">
                     <div className="w-16 h-16 bg-gray-200 dark:bg-gray-600 rounded-full flex items-center justify-center text-3xl mx-auto mb-4 text-gray-500 dark:text-gray-400">
-                        [Calendar]
+                        <FiCalendar />
                     </div>
                     <h4 className="connect-calendar-title">{t('settings.connectCalendar')}</h4>
                     <p className="connect-calendar-desc">
@@ -643,7 +644,7 @@ const SettingsModal = ({ onClose, user, onThemeToggle, isDarkMode, initialTab = 
                             </div>
                         ) : (
                              <div className="text-center py-6 text-gray-500 dark:text-gray-400 border-t border-gray-100 dark:border-slate-700 pt-6">
-                                <div className="text-4xl mb-3 opacity-80">[AI]</div>
+                                <div className="text-4xl mb-3 opacity-80 flex justify-center"><FiCpu /></div>
                                 <p className="text-sm">El nodo está sincronizado.</p>
                                 <p className="text-xs mt-1 opacity-70">Se actualiza automáticamente cada 30 segundos.</p>
                              </div>

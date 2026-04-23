@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { FiEye } from 'react-icons/fi';
 import FrostedContainer from '../Common/FrostedContainer';
 import Button from '../Common/Button';
 import { useLanguage } from '../../context/LanguageContext';
@@ -79,7 +80,7 @@ const AIResultsModal = ({ isOpen, onClose, results, onOpenFile, onDownloadFile }
   const renderViewer = () => {
     if (!selectedFile) return (
       <div className="empty-viewer-state">
-        <span className="text-6xl mb-4 opacity-50">[Show]</span>
+        <span className="text-6xl mb-4 opacity-50"><FiEye /></span>
         <p>{t('aiResults.selectFileToView') || 'Selecciona un archivo para ver su contenido'}</p>
       </div>
     );
@@ -308,10 +309,10 @@ const getFileIcon = (mimeTypeOrName) => {
   if (mimeType.includes('word') || name.endsWith('.docx') || name.endsWith('.doc')) return '📘';
   if (mimeType.includes('excel') || name.endsWith('.xlsx') || name.endsWith('.xls')) return '📗';
   if (mimeType.includes('powerpoint') || name.endsWith('.pptx') || name.endsWith('.ppt')) return '📙';
-  if (mimeType.includes('image') || /\.(jpg|jpeg|png|gif|bmp|svg)$/.test(name)) return '[Image]';
+  if (mimeType.includes('image') || /\.(jpg|jpeg|png|gif|bmp|svg)$/.test(name)) return '🖼️';
   if (mimeType.includes('video') || /\.(mp4|avi|mov|mkv)$/.test(name)) return '🎬';
-  if (mimeType.includes('audio') || /\.(mp3|wav|ogg)$/.test(name)) return '[Audio]';
-  if (mimeType.includes('zip') || mimeType.includes('compressed') || /\.(zip|rar|7z)$/.test(name)) return '[Archive]';
+  if (mimeType.includes('audio') || /\.(mp3|wav|ogg)$/.test(name)) return '🎵';
+  if (mimeType.includes('zip') || mimeType.includes('compressed') || /\.(zip|rar|7z)$/.test(name)) return '🗜️';
   if (mimeType.includes('text') || name.endsWith('.txt')) return '📃';
   
   return '📄';

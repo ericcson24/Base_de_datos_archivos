@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { FiBarChart2, FiLayers } from 'react-icons/fi';
 import mammoth from 'mammoth';
 import { getFileType, getFileIcon, canPreview, canEdit, getAuthenticatedPreviewUrl, formatFileSize, downloadFile, getAuthToken } from '../../utils/fileUtils';
 import { useLanguage } from '../../context/LanguageContext';
@@ -15,7 +16,7 @@ const ExcelViewerWrapper = ({ file, onFileSaved }) => {
   if (!isEditing) {
     return (
       <div className="viewer-content office-viewer flex flex-col items-center justify-center h-full p-8">
-        <div className="text-6xl mb-4">[Chart]</div>
+        <div className="text-6xl mb-4"><FiBarChart2 /></div>
         <h3 className="text-xl font-semibold mb-2 text-gray-900 dark:text-slate-100">{file.name}</h3>
         <p className="text-gray-600 dark:text-gray-400 text-center mb-6">
           {t('fileViewer.clickToEditExcel')}
@@ -50,7 +51,7 @@ const PowerPointViewerWrapper = ({ file, onFileSaved }) => {
   if (!isEditing) {
     return (
       <div className="viewer-content office-viewer flex flex-col items-center justify-center h-full p-8">
-        <div className="text-6xl mb-4">[Slides]</div>
+        <div className="text-6xl mb-4"><FiLayers /></div>
         <h3 className="text-xl font-semibold mb-2 text-gray-900 dark:text-slate-100">{file.name}</h3>
         <p className="text-gray-600 dark:text-gray-400 text-center mb-6">
           {t('fileViewer.clickToEditPowerPoint')}

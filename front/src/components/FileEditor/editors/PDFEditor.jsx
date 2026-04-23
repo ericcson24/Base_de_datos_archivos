@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { PDFDocument, rgb, StandardFonts, degrees } from 'pdf-lib';
+import { FiSave, FiTrash2, FiZoomIn, FiZoomOut, FiType } from 'react-icons/fi';
 import { getAuthToken } from '../../../utils/fileUtils';
 import { useLanguage } from '../../../context/LanguageContext';
 import { useToast } from '../../../context/ToastContext';
@@ -550,7 +551,7 @@ const PDFEditor = ({ fileUrl, file, onFileSaved }) => {
           ) : (
             <>
               <button className="pdf-btn pdf-btn-success" onClick={handleSave} disabled={isSaving || !hasChanges}>
-                {isSaving ? '⏳' : '💾'} {t('pdfEditor.save') || 'Save'}
+                {isSaving ? '⏳' : <FiSave />} {t('pdfEditor.save') || 'Save'}
               </button>
               <button className="pdf-btn" onClick={() => { setIsEditing(false); setSelectedTool('none'); }}>
                 {t('pdfEditor.readMode') || 'Read'}
@@ -568,9 +569,9 @@ const PDFEditor = ({ fileUrl, file, onFileSaved }) => {
 
         
         <div className="pdf-toolbar-section">
-          <button className="pdf-btn-icon" onClick={handleZoomOut} title={t('pdfEditor.zoomOut')}>[Search]−</button>
+          <button className="pdf-btn-icon" onClick={handleZoomOut} title={t('pdfEditor.zoomOut')}><FiZoomOut /></button>
           <span className="pdf-zoom-info" onClick={handleZoomReset}>{Math.round(scale * 100)}%</span>
-          <button className="pdf-btn-icon" onClick={handleZoomIn} title={t('pdfEditor.zoomIn')}>[Search]+</button>
+          <button className="pdf-btn-icon" onClick={handleZoomIn} title={t('pdfEditor.zoomIn')}><FiZoomIn /></button>
         </div>
 
         
@@ -578,7 +579,7 @@ const PDFEditor = ({ fileUrl, file, onFileSaved }) => {
           <div className="pdf-toolbar-section pdf-tools">
             <button className={`pdf-btn-tool ${selectedTool === 'text' ? 'active' : ''}`}
               onClick={() => setSelectedTool(selectedTool === 'text' ? 'none' : 'text')}>
-              [Text] {t('pdfEditor.text')}
+              <FiType style={{ verticalAlign: 'middle', marginRight: 4 }} /> {t('pdfEditor.text')}
             </button>
             <button className={`pdf-btn-tool ${selectedTool === 'draw' ? 'active' : ''}`}
               onClick={() => setSelectedTool(selectedTool === 'draw' ? 'none' : 'draw')}>
@@ -605,7 +606,7 @@ const PDFEditor = ({ fileUrl, file, onFileSaved }) => {
           <div className="pdf-toolbar-section">
             <button className="pdf-btn-icon" onClick={addBlankPage} title={t('pdfEditor.addPage') || 'Add page'}>📄+</button>
             <button className="pdf-btn-icon" onClick={rotatePage} title={t('pdfEditor.rotatePage') || 'Rotate'}>🔄</button>
-            <button className="pdf-btn-icon pdf-btn-danger-icon" onClick={deletePage} title={t('pdfEditor.deletePage') || 'Delete page'}>[Delete]</button>
+            <button className="pdf-btn-icon pdf-btn-danger-icon" onClick={deletePage} title={t('pdfEditor.deletePage') || 'Delete page'}><FiTrash2 /></button>
           </div>
         )}
 

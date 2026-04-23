@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { FiSun, FiMoon } from 'react-icons/fi';
 import FormContainer from '../Common/FormContainer';
 import Button from '../Common/Button';
 import Input from '../Common/Input';
@@ -92,7 +93,7 @@ const Login = ({ onLogin, onSwitchToRegister, onThemeToggle, isDarkMode }) => {
           onClick={onThemeToggle}
           title={isDarkMode ? t('common.theme.light') : t('common.theme.dark')}
         >
-          {isDarkMode ? '[Light]' : '[Dark]'}
+          {isDarkMode ? <FiSun /> : <FiMoon />}
         </button>
       </div>
 

@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { MapContainer, TileLayer, Marker, Popup, useMapEvents, useMap } from 'react-leaflet';
 import L from 'leaflet';
+import { FiSearch } from 'react-icons/fi';
 import 'leaflet/dist/leaflet.css';
 import './LocationPickerModal.css';
 import { useLanguage } from '../../context/LanguageContext';
@@ -327,7 +328,7 @@ const LocationPickerModal = ({ isOpen, onClose, onSelect, initialLocation }) => 
         
         <div className="picker-search-wrapper" ref={searchRef}>
           <div className="picker-search">
-            <span className="search-icon">[Search]</span>
+            <span className="search-icon"><FiSearch /></span>
             <input 
               ref={inputRef}
               type="text" 

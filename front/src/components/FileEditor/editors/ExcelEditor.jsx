@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import * as XLSX from 'xlsx';
+import { FiSearch, FiTrash2, FiSave, FiEdit2 } from 'react-icons/fi';
 import { useLanguage } from '../../../context/LanguageContext';
 import { useToast } from '../../../context/ToastContext';
 import { getAuthToken } from '../../../utils/fileUtils';
@@ -985,7 +986,7 @@ const ExcelEditor = ({ fileUrl, fileBlob, file, onClose, onFileSaved }) => {
       <div className="excel-toolbar">
         <div className="toolbar-group">
           <button onClick={handleSave} disabled={saving} className="toolbar-btn save-btn" title={t('excelEditor.save')}>
-            💾 {saving ? t('excelEditor.saving') : t('excelEditor.save')}
+            <FiSave /> {saving ? t('excelEditor.saving') : t('excelEditor.save')}
           </button>
         </div>
         <div className="toolbar-separator" />
@@ -1108,7 +1109,7 @@ const ExcelEditor = ({ fileUrl, fileBlob, file, onClose, onFileSaved }) => {
 
         
         <div className="toolbar-group">
-          <button onClick={() => { setShowFind(!showFind); if (!showFind) setTimeout(() => findInputRef.current?.focus(), 100); }} className={`toolbar-btn ${showFind ? 'active' : ''}`} title={`${t('excelEditor.find')} (Ctrl+F)`}>[Search]</button>
+          <button onClick={() => { setShowFind(!showFind); if (!showFind) setTimeout(() => findInputRef.current?.focus(), 100); }} className={`toolbar-btn ${showFind ? 'active' : ''}`} title={`${t('excelEditor.find')} (Ctrl+F)`}><FiSearch /></button>
           <button onClick={handlePrint} className="toolbar-btn" title={t('common.print') || 'Print'}>🖨️</button>
           <button onClick={handleDownload} className="toolbar-btn" title={t('common.download') || 'Download'}>⬇️</button>
           <button onClick={toggleFullscreen} className="toolbar-btn" title={isFullscreen ? (t('common.exitFullscreen') || 'Exit Fullscreen') : (t('common.fullscreen') || 'Fullscreen')}>
@@ -1124,7 +1125,7 @@ const ExcelEditor = ({ fileUrl, fileBlob, file, onClose, onFileSaved }) => {
       {showFind && (
         <div className="excel-find-bar">
           <div className="find-group">
-            <label className="find-label">[Search]</label>
+            <label className="find-label"><FiSearch /></label>
             <input
               ref={findInputRef}
               type="text"
@@ -1285,10 +1286,10 @@ const ExcelEditor = ({ fileUrl, fileBlob, file, onClose, onFileSaved }) => {
           </button>
           <div className="context-separator" />
           <button className="context-danger" onClick={() => { deleteRow(contextMenu.row); setContextMenu(null); }}>
-            [Delete] {t('excelEditor.deleteRow')}
+            <FiTrash2 /> {t('excelEditor.deleteRow')}
           </button>
           <button className="context-danger" onClick={() => { deleteColumn(contextMenu.col); setContextMenu(null); }}>
-            [Delete] {t('excelEditor.deleteCol')}
+            <FiTrash2 /> {t('excelEditor.deleteCol')}
           </button>
           <div className="context-separator" />
           <button onClick={() => { sortColumn(contextMenu.col, true); setContextMenu(null); }}>
@@ -1327,8 +1328,8 @@ const ExcelEditor = ({ fileUrl, fileBlob, file, onClose, onFileSaved }) => {
             <button onClick={addSheet} className="add-sheet-btn" title={t('excelEditor.addSheet')}>+</button>
           </div>
           <div className="sheet-actions">
-            <button onClick={deleteSheet} className="action-btn" title={t('excelEditor.deleteSheet')}>[Delete]</button>
-            <button onClick={renameSheet} className="action-btn" title={t('excelEditor.renameSheet')}>✏️</button>
+            <button onClick={deleteSheet} className="action-btn" title={t('excelEditor.deleteSheet')}><FiTrash2 /></button>
+            <button onClick={renameSheet} className="action-btn" title={t('excelEditor.renameSheet')}><FiEdit2 /></button>
           </div>
         </div>
 

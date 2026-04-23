@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { FiDownload } from 'react-icons/fi';
 import Button from '../Common/Button';
 import { getAuthToken } from '../../utils/fileUtils';
 import { useToast } from '../../context/ToastContext';
@@ -255,7 +256,7 @@ const ExportCalendarModal = ({ onClose }) => {
 </head>
 <body>
   <div class="header">
-    <h1>[Calendar] ${t('export.documentTitle')}</h1>
+    <h1>📅 ${t('export.documentTitle')}</h1>
     <div class="subtitle">${formatDate(startDate)} — ${formatDate(endDate)}</div>
     <div class="stats">
       <div class="stat">
@@ -389,7 +390,7 @@ const ExportCalendarModal = ({ onClose }) => {
       <div className="modal-content export-modal" onClick={e => e.stopPropagation()}>
         
         <div className="export-header">
-          <div className="export-header-icon">[Export]</div>
+          <div className="export-header-icon"><FiDownload /></div>
           <div>
             <h2 className="export-title">{t('export.title')}</h2>
             <p className="export-subtitle">{t('export.subtitle')}</p>
@@ -474,7 +475,7 @@ const ExportCalendarModal = ({ onClose }) => {
                 {t('export.exporting')}
               </span>
             ) : (
-              `[Export] ${t('export.exportBtn')}`
+              <span className="flex items-center gap-2"><FiDownload /> {t('export.exportBtn')}</span>
             )}
           </Button>
         </div>

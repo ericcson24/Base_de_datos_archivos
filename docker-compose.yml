@@ -309,9 +309,11 @@ services:
       - JWT_SECRET=${JWT_SECRET}
       - HOST_USERS_DIR=/host-users
       - UPLOAD_DIR=/app/uploads
+      - SYNC_STATE_DIR=/app/sync-state
     volumes:
-      - C:\Users:/host-users:ro
+      - C:\Users:/host-users
       - ../Datos:/app/uploads
+      - ../database_storage/windows-sync-state:/app/sync-state
     depends_on:
       - postgres
     networks:

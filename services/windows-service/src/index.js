@@ -11,6 +11,8 @@ const PORT = process.env.PORT || 5010;
 const JWT_SECRET = process.env.JWT_SECRET || 'fallback-secret-change-me';
 const HOST_USERS_DIR = process.env.HOST_USERS_DIR || '/host-users';
 const UPLOAD_DIR = process.env.UPLOAD_DIR || '/app/uploads';
+const SYNC_STATE_DIR = process.env.SYNC_STATE_DIR || '/app/sync-state';
+try { fs.mkdirSync(SYNC_STATE_DIR, { recursive: true }); } catch (_) {}
 
 app.use(cors({ origin: true, credentials: true }));
 app.use(express.json());
@@ -75,7 +77,12 @@ function detectWindowsUsers() {
 const SKIP_DIRS = new Set([
   '.git', 'node_modules', '__pycache__', '.venv', 'venv',
   '.cache', '.npm', '.nuget', 'AppData', '$Recycle.Bin',
-  '.vs', '.idea', 'obj', 'bin', '.gradle', 'target'
+  '.vs', '.idea', 'obj', 'bin', '.gradle', 'target',
+  'build', 'dist', '.next', '.nuxt', 'Datos', 'database_storage',
+  'OneDrive', 'OneDriveTemp', 'Dropbox', 'Google Drive',
+  'Application Data', 'Local Settings', 'Cookies',
+  'Program Files', 'Program Files (x86)', 'Windows',
+  'Base_de_datos_archivos', 'Wired_driver_31'
 ]);
 
 function countFiles(dir, depth = 0) {
@@ -116,42 +123,156 @@ function listFilesRecursive(dir, basePath = '') {
   return results;
 }
 
-const MAX_FILES_PER_SYNC = 200;
+const MAX_FILES_PER_SYNC = 500;
+const MAX_FILE_SIZE_BYTES = 100 * 1024 * 1024; // 100 MB
 const fsPromises = require('fs').promises;
 
-async function copyDirRecursiveAsync(src, dest, counter = { copied: 0 }, depth = 0) {
-  if (depth > 5) return 0;
-  try { await fsPromises.mkdir(dest, { recursive: true }); } catch (_) {}
+async function walkFiles(root, basePath = '', depth = 0, out = {}) {
+  if (depth > 4) return out;
   let entries;
-  try { entries = await fsPromises.readdir(src, { withFileTypes: true }); } catch (_) { return 0; }
-  let copied = 0;
+  try { entries = await fsPromises.readdir(root, { withFileTypes: true }); } catch (_) { return out; }
   for (const entry of entries) {
-    if (counter.copied >= MAX_FILES_PER_SYNC) break;
     if (SKIP_DIRS.has(entry.name)) continue;
-    const srcPath = path.join(src, entry.name);
-    const destPath = path.join(dest, entry.name);
+    if (entry.name.toLowerCase() === 'desktop.ini' || entry.name.startsWith('.')) continue;
+    const rel = basePath ? `${basePath}/${entry.name}` : entry.name;
+    const full = path.join(root, entry.name);
     try {
       if (entry.isDirectory()) {
-        copied += await copyDirRecursiveAsync(srcPath, destPath, counter, depth + 1);
-      } else {
-        let needCopy = false;
+        await walkFiles(full, rel, depth + 1, out);
+      } else if (entry.isFile()) {
+        const st = await fsPromises.stat(full);
+        if (st.size > MAX_FILE_SIZE_BYTES) continue;
+        out[rel] = { size: st.size, mtimeMs: st.mtimeMs };
+      }
+    } catch (_) {}
+  }
+  return out;
+}
+
+function loadManifest(linkId, folderKey) {
+  try {
+    const p = path.join(SYNC_STATE_DIR, `${linkId}_${folderKey}.json`);
+    if (!fs.existsSync(p)) return {};
+    return JSON.parse(fs.readFileSync(p, 'utf8'));
+  } catch (_) { return {}; }
+}
+
+function saveManifest(linkId, folderKey, data) {
+  try {
+    const p = path.join(SYNC_STATE_DIR, `${linkId}_${folderKey}.json`);
+    fs.writeFileSync(p, JSON.stringify(data));
+  } catch (e) {
+    console.warn('[sync] Could not save manifest:', e.message);
+  }
+}
+
+async function removeEmptyDirs(root) {
+  try {
+    const entries = await fsPromises.readdir(root, { withFileTypes: true });
+    for (const e of entries) {
+      if (SKIP_DIRS.has(e.name)) continue;
+      if (e.name.startsWith('.')) continue;
+      if (e.isDirectory()) {
+        const sub = path.join(root, e.name);
+        await removeEmptyDirs(sub);
         try {
-          const destStat = await fsPromises.stat(destPath);
-          const srcStat = await fsPromises.stat(srcPath);
-          if (srcStat.mtime > destStat.mtime || srcStat.size !== destStat.size) needCopy = true;
-        } catch (_) {
-          needCopy = true;
+          const remaining = await fsPromises.readdir(sub);
+          if (remaining.length === 0) await fsPromises.rmdir(sub);
+        } catch (_) {}
+      }
+    }
+  } catch (_) {}
+}
+
+async function syncFolderBidirectional(srcWin, srcCloud, linkId, folderKey, counter) {
+  const stats = { copiedToCloud: 0, copiedToWin: 0, deletedFromCloud: 0, deletedFromWin: 0 };
+
+  try { await fsPromises.mkdir(srcWin, { recursive: true }); } catch (_) {}
+  try { await fsPromises.mkdir(srcCloud, { recursive: true }); } catch (_) {}
+
+  const [winFiles, cloudFiles] = await Promise.all([
+    walkFiles(srcWin),
+    walkFiles(srcCloud)
+  ]);
+  const manifest = loadManifest(linkId, folderKey);
+  const newManifest = {};
+
+  const allPaths = new Set([...Object.keys(winFiles), ...Object.keys(cloudFiles)]);
+
+  for (const rel of allPaths) {
+    if (counter.copied >= MAX_FILES_PER_SYNC) break;
+    const w = winFiles[rel];
+    const c = cloudFiles[rel];
+    const prev = manifest[rel];
+    const winFull = path.join(srcWin, rel);
+    const cloudFull = path.join(srcCloud, rel);
+
+    try {
+      if (w && c) {
+        // Exists on both: newer wins
+        if (Math.abs(w.mtimeMs - c.mtimeMs) > 1500 || w.size !== c.size) {
+          if (w.mtimeMs >= c.mtimeMs) {
+            await fsPromises.mkdir(path.dirname(cloudFull), { recursive: true });
+            await fsPromises.copyFile(winFull, cloudFull);
+            const srcT = new Date(w.mtimeMs);
+            try { await fsPromises.utimes(cloudFull, srcT, srcT); } catch (_) {}
+            stats.copiedToCloud++;
+            counter.copied++;
+          } else {
+            await fsPromises.mkdir(path.dirname(winFull), { recursive: true });
+            await fsPromises.copyFile(cloudFull, winFull);
+            const srcT = new Date(c.mtimeMs);
+            try { await fsPromises.utimes(winFull, srcT, srcT); } catch (_) {}
+            stats.copiedToWin++;
+            counter.copied++;
+          }
         }
-        if (needCopy) {
-          await fsPromises.copyFile(srcPath, destPath);
-          copied++;
+        const nw = await fsPromises.stat(winFull).catch(() => null);
+        const nc = await fsPromises.stat(cloudFull).catch(() => null);
+        newManifest[rel] = { size: (nw || nc).size, mtimeMs: Math.max(nw?.mtimeMs || 0, nc?.mtimeMs || 0) };
+      } else if (w && !c) {
+        // On Windows only
+        if (prev) {
+          // Was there before → cloud deleted it → delete from Windows
+          await fsPromises.unlink(winFull);
+          stats.deletedFromWin++;
+        } else {
+          // New on Windows → copy to cloud
+          await fsPromises.mkdir(path.dirname(cloudFull), { recursive: true });
+          await fsPromises.copyFile(winFull, cloudFull);
+          const srcT = new Date(w.mtimeMs);
+          try { await fsPromises.utimes(cloudFull, srcT, srcT); } catch (_) {}
+          stats.copiedToCloud++;
           counter.copied++;
+          newManifest[rel] = { size: w.size, mtimeMs: w.mtimeMs };
+        }
+      } else if (!w && c) {
+        // On cloud only
+        if (prev) {
+          // Was there before → Windows deleted it → delete from cloud
+          await fsPromises.unlink(cloudFull);
+          stats.deletedFromCloud++;
+        } else {
+          // New in cloud → copy to Windows
+          await fsPromises.mkdir(path.dirname(winFull), { recursive: true });
+          await fsPromises.copyFile(cloudFull, winFull);
+          const srcT = new Date(c.mtimeMs);
+          try { await fsPromises.utimes(winFull, srcT, srcT); } catch (_) {}
+          stats.copiedToWin++;
+          counter.copied++;
+          newManifest[rel] = { size: c.size, mtimeMs: c.mtimeMs };
         }
       }
     } catch (err) {
+      console.warn(`[sync] Error on "${rel}":`, err.message);
     }
   }
-  return copied;
+
+  await removeEmptyDirs(srcWin);
+  await removeEmptyDirs(srcCloud);
+
+  saveManifest(linkId, folderKey, newManifest);
+  return stats;
 }
 
 
@@ -401,69 +522,93 @@ app.post('/api/windows/auto-create', requireAdmin, async (req, res) => {
 });
 
 async function syncLinkedUser(link) {
-  const result = { desktop: 0, documents: 0, downloads: 0, total: 0 };
+  const result = {
+    desktop: { copiedToCloud: 0, copiedToWin: 0, deletedFromCloud: 0, deletedFromWin: 0 },
+    documents: { copiedToCloud: 0, copiedToWin: 0, deletedFromCloud: 0, deletedFromWin: 0 },
+    downloads: { copiedToCloud: 0, copiedToWin: 0, deletedFromCloud: 0, deletedFromWin: 0 },
+    total: 0
+  };
   const userUploadDir = path.join(UPLOAD_DIR, link.cloud_username);
-  
+
   if (!fs.existsSync(userUploadDir)) {
     fs.mkdirSync(userUploadDir, { recursive: true });
   }
-  
+
   const folderMap = {
     desktop: { enabled: link.sync_desktop, winName: 'Desktop', cloudName: 'Escritorio' },
     documents: { enabled: link.sync_documents, winName: 'Documents', cloudName: 'Documentos' },
     downloads: { enabled: link.sync_downloads, winName: 'Downloads', cloudName: 'Descargas' }
   };
-  
+
   const counter = { copied: 0 };
   for (const [key, config] of Object.entries(folderMap)) {
     if (!config.enabled) continue;
-    const srcDir = path.join(HOST_USERS_DIR, link.windows_username, config.winName);
-    const destDir = path.join(userUploadDir, config.cloudName);
-    
-    if (fs.existsSync(srcDir)) {
-      try {
-        const count = await copyDirRecursiveAsync(srcDir, destDir, counter);
-        result[key] = count;
-        result.total += count;
-      } catch (err) {
-        console.warn(`[sync] Error syncing ${key} for ${link.cloud_username}:`, err.message);
-      }
+    const winDir = path.join(HOST_USERS_DIR, link.windows_username, config.winName);
+    const cloudDir = path.join(userUploadDir, config.cloudName);
+
+    const tStart = Date.now();
+    try {
+      console.log(`[sync] [${link.cloud_username}/${key}] start (win=${winDir})`);
+      const s = await syncFolderBidirectional(winDir, cloudDir, link.id, key, counter);
+      result[key] = s;
+      result.total += s.copiedToCloud + s.copiedToWin + s.deletedFromCloud + s.deletedFromWin;
+      console.log(`[sync] [${link.cloud_username}/${key}] done in ${Date.now()-tStart}ms ${JSON.stringify(s)}`);
+    } catch (err) {
+      console.warn(`[sync] Error syncing ${key} for ${link.cloud_username}:`, err.message);
     }
   }
-  
+
   return result;
 }
 
 let autoSyncInterval = null;
+let autoSyncRunning = false;
 
 async function runAutoSync() {
+  if (autoSyncRunning) {
+    console.log('[auto-sync] Previous run still in progress, skipping tick');
+    return;
+  }
+  autoSyncRunning = true;
+  const tickStart = Date.now();
+  console.log(`[auto-sync] Tick start ${new Date().toISOString()}`);
   try {
     const links = await dbAsync.all("SELECT * FROM windows_user_links WHERE sync_enabled = true");
+    console.log(`[auto-sync] Found ${links.length} enabled links`);
     if (links.length === 0) return;
-    
-    let totalFiles = 0;
-    for (const link of links) {
-      const result = await syncLinkedUser(link);
-      totalFiles += result.total;
-      if (result.total > 0) {
-        await dbAsync.run("UPDATE windows_user_links SET last_sync = ? WHERE id = ?", [new Date().toISOString(), link.id]);
+
+    await Promise.all(links.map(async (link) => {
+      const linkStart = Date.now();
+      try {
+        console.log(`[auto-sync] -> link ${link.id} (${link.cloud_username} <-> ${link.windows_username})`);
+        const result = await Promise.race([
+          syncLinkedUser(link),
+          new Promise((_, reject) => setTimeout(() => reject(new Error('sync timeout 60s')), 60000))
+        ]);
+        const elapsed = Date.now() - linkStart;
+        console.log(`[auto-sync] <- link ${link.id} done in ${elapsed}ms, total=${result.total}, desk=${JSON.stringify(result.desktop)} docs=${JSON.stringify(result.documents)} dl=${JSON.stringify(result.downloads)}`);
+        if (result.total > 0) {
+          await dbAsync.run("UPDATE windows_user_links SET last_sync = ? WHERE id = ?", [new Date().toISOString(), link.id]);
+        }
+      } catch (e) {
+        console.error(`[auto-sync] Error for link ${link.id}/${link.cloud_username} after ${Date.now()-linkStart}ms:`, e.message);
       }
-    }
-    
-    if (totalFiles > 0) {
-      console.log(`[auto-sync] Synced ${totalFiles} files across ${links.length} linked accounts`);
-    }
+    }));
   } catch (err) {
-    console.error('[auto-sync] Error:', err.message);
+    console.error('[auto-sync] Outer error:', err.stack || err.message);
+  } finally {
+    autoSyncRunning = false;
+    console.log(`[auto-sync] Tick done in ${Date.now() - tickStart}ms`);
   }
 }
 
 initDatabase().then(() => {
   app.listen(PORT, () => {
     console.log(`[windows-service] Running on port ${PORT}`);
+    console.log(`[windows-service] HOST_USERS_DIR=${HOST_USERS_DIR}, UPLOAD_DIR=${UPLOAD_DIR}, SYNC_STATE_DIR=${SYNC_STATE_DIR}`);
     
     autoSyncInterval = setInterval(runAutoSync, 15 * 1000);
-    setTimeout(runAutoSync, 10000);
+    setTimeout(runAutoSync, 5000);
   });
 }).catch(err => {
   console.error('[windows-service] Failed to start:', err);

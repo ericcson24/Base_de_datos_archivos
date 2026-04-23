@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { FiAlertTriangle, FiImage, FiVideo, FiMusic, FiArchive, FiFileText, FiFile } from 'react-icons/fi';
 import ImageEditor from './editors/ImageEditor';
 import PDFEditor from './editors/PDFEditor';
 import TextEditor from './editors/TextEditor';
@@ -217,7 +218,7 @@ const FileEditorPanel = ({ file, onClose, position, zIndex, onBringToFront, pane
       return (
         <div className="flex items-center justify-center h-full text-red-500">
           <div className="text-center">
-            <p className="text-xl mb-2">[Warning]</p>
+            <p className="text-xl mb-2"><FiAlertTriangle /></p>
             <p>{error}</p>
           </div>
         </div>
@@ -265,12 +266,12 @@ const FileEditorPanel = ({ file, onClose, position, zIndex, onBringToFront, pane
         <div className="panel-header-inline glassmorphism-strong p-3 flex items-center justify-between border-b border-gray-200 dark:border-gray-700">
           <div className="flex items-center space-x-2">
             <span className="text-xl">
-              {fileType === 'image' ? '[Image]' : 
+              {fileType === 'image' ? <FiImage /> : 
                fileType === 'pdf' ? '📄' : 
-               fileType === 'video' ? '[Video]' : 
-               fileType === 'audio' ? '[Audio]' : 
-               fileType === 'zip' ? '[Archive]' : 
-               '[Text]'}
+               fileType === 'video' ? <FiVideo /> : 
+               fileType === 'audio' ? <FiMusic /> : 
+               fileType === 'zip' ? <FiArchive /> : 
+               <FiFileText />}
             </span>
             <span className="text-sm font-medium text-gray-700 dark:text-gray-200 truncate">
               {file.name}
@@ -302,7 +303,7 @@ const FileEditorPanel = ({ file, onClose, position, zIndex, onBringToFront, pane
         onClick={handleMinimize}
       >
         <div className="flex items-center space-x-2">
-          <span className="text-2xl">{fileType === 'image' ? '[Image]' : fileType === 'pdf' ? '📄' : fileType === 'video' ? '[Video]' : '[Text]'}</span>
+          <span className="text-2xl">{fileType === 'image' ? <FiImage /> : fileType === 'pdf' ? '📄' : fileType === 'video' ? <FiVideo /> : <FiFileText />}</span>
           <span className="text-sm font-medium text-gray-700 dark:text-gray-200">{file.name}</span>
         </div>
       </div>
@@ -329,12 +330,12 @@ const FileEditorPanel = ({ file, onClose, position, zIndex, onBringToFront, pane
       >
         <div className="flex items-center space-x-2 flex-1 min-w-0">
           <span className="text-xl">
-            {fileType === 'image' ? '[Image]' : 
+            {fileType === 'image' ? <FiImage /> : 
              fileType === 'pdf' ? '📄' : 
-             fileType === 'video' ? '[Video]' : 
-             fileType === 'audio' ? '[Audio]' : 
-             fileType === 'zip' ? '[Archive]' : 
-             '[Text]'}
+             fileType === 'video' ? <FiVideo /> : 
+             fileType === 'audio' ? <FiMusic /> : 
+             fileType === 'zip' ? <FiArchive /> : 
+             <FiFileText />}
           </span>
           <span className="text-sm font-medium text-gray-700 dark:text-gray-200 truncate">
             {file.name}
