@@ -326,3 +326,29 @@ Start stack:
   - Tunnel registered 4 active connections (connIndex 0..3).
   - LOCAL=200 on http://localhost:8080
   - CF=200 on https://proyectonube.xyz
+
+25) Compose pull failure from PowerShell with Docker Desktop context (2026-05-10)
+- Symptom:
+  - `docker compose up` built local services but failed while pulling public
+    images such as `postgres:15`, `redis:alpine`, `cloudflare/cloudflared:latest`,
+    and `guacamole/guacd`.
+  - Error text included:
+    - `Docker Desktop has no HTTPS proxy`
+    - timeout connecting to `docker-images-prod...r2.cloudflarestorage.com:443`
+- Diagnosis:
+  - PowerShell was using Docker context `desktop-linux`:
+    - `docker context ls`
+    - `docker info --format "{{.Name}}|{{.OperatingSystem}}|{{.ServerVersion}}|{{.DockerRootDir}}"`
+  - That means the command was going through Docker Desktop, not the Docker
+    Engine inside Ubuntu WSL that this project was validated on.
+  - DNS resolved the registry host, so the failure was on HTTPS reachability /
+    proxy path from the Docker Desktop engine.
+- Recovery path:
+  - Preferred: run the stack from Ubuntu WSL in
+    `/mnt/c/Users/Administrador/Desktop/Base_de_datos_archivos` using:
+    - `docker compose up -d`
+  - Alternative: if Docker Desktop must be used, configure its HTTPS proxy or
+    registry/mirror access so the engine can reach Docker Hub blob storage.
+- Practical rule:
+  - If the error mentions `Docker Desktop has no HTTPS proxy`, treat it as an
+    engine/network issue, not a compose file or image-build issue.
