@@ -1,0 +1,128 @@
+/* estilos globales y variables de color (claro / oscuro) */
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+  -webkit-tap-highlight-color: transparent;
+}
+
+body {
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
+    sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  overflow-x: hidden;
+}
+
+code {
+  font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New', monospace;
+}
+
+:root {
+  --bg-primary: #ffffff;
+  --bg-secondary: #ffffff;
+  --bg-tertiary: #f3f4f6;
+  --bg-hover: rgba(0, 0, 0, 0.06);
+  --text-primary: #1d1d1f;
+  --text-secondary: #6e6e73;
+  --text-muted: #9ca3af;
+  --border-color: rgba(0, 0, 0, 0.12);
+  --primary-color: #2563eb;
+  --primary-color-alpha: rgba(37, 99, 235, 0.2);
+  --primary-hover: #1d4ed8;
+  --danger-color: #ef4444;
+  --danger-hover: #dc2626;
+  --success-color: #10b981;
+  --warning-color: #f59e0b;
+  --modal-overlay: rgba(0, 0, 0, 0.5);
+  --shadow-lg: 0 10px 25px rgba(0, 0, 0, 0.15);
+}
+
+[data-theme="dark"] {
+  --bg-primary: #1a1a1a;
+  --bg-secondary: #1e1e24;
+  --bg-tertiary: #27272e;
+  --bg-hover: rgba(255, 255, 255, 0.08);
+  --text-primary: #f5f5f7;
+  --text-secondary: #a1a1a6;
+  --text-muted: #6b7280;
+  --border-color: rgba(255, 255, 255, 0.12);
+  --primary-color: #3b82f6;
+  --primary-color-alpha: rgba(59, 130, 246, 0.25);
+  --primary-hover: #60a5fa;
+  --danger-color: #f87171;
+  --danger-hover: #ef4444;
+  --success-color: #34d399;
+  --warning-color: #fbbf24;
+  --modal-overlay: rgba(0, 0, 0, 0.75);
+  --shadow-lg: 0 10px 25px rgba(0, 0, 0, 0.6);
+}
+
+.App {
+  text-align: center;
+}
+
+.app-loading-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 100vh;
+  background: #f8fafc;
+  transition: background 0.3s ease;
+}
+
+[data-theme="dark"] .app-loading-container {
+  background: #0f172a;
+}
+
+.app-loading-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 24px;
+}
+
+.app-loading-logo {
+  width: 72px;
+  height: 72px;
+  filter: drop-shadow(0 4px 12px rgba(0, 0, 0, 0.15));
+  animation: app-logo-float 2s ease-in-out infinite;
+}
+
+[data-theme="dark"] .app-loading-logo {
+  filter: drop-shadow(0 4px 12px rgba(0, 0, 0, 0.4));
+}
+
+@keyframes app-logo-float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-8px); }
+}
+
+.app-loading-spinner {
+  width: 36px;
+  height: 36px;
+  border: 3px solid rgba(37, 99, 235, 0.15);
+  border-top-color: #2563eb;
+  border-radius: 50%;
+  animation: app-spin 0.8s linear infinite;
+}
+
+[data-theme="dark"] .app-loading-spinner {
+  border-color: rgba(56, 189, 248, 0.15);
+  border-top-color: #38bdf8;
+}
+
+@keyframes app-spin {
+  to { transform: rotate(360deg); }
+}

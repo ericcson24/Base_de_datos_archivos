@@ -129,6 +129,71 @@
   background-color: rgba(255, 255, 255, 0.1);
 }
 
+.sidebar-footer {
+  padding: 1rem;
+  border-top: 1px solid var(--sidebar-border);
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.sidebar-btn {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.75rem;
+  border: none;
+  background: transparent;
+  color: var(--panel-secondary-text);
+  border-radius: var(--border-radius);
+  cursor: pointer;
+  transition: all 0.2s;
+  font-weight: 500;
+  width: 100%;
+  text-align: left;
+  white-space: nowrap;
+}
+
+.sidebar-btn-icon {
+  font-size: 1.1rem;
+  opacity: 0.45;
+  flex-shrink: 0;
+  transition: opacity 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+}
+
+.sidebar-btn:hover .sidebar-btn-icon,
+.sidebar-btn.active .sidebar-btn-icon {
+  opacity: 0.85;
+}
+
+.sidebar-btn.active,
+.sidebar-btn:hover {
+  background-color: var(--sidebar-border);
+  color: var(--text-color);
+}
+
+.sidebar-btn-logout {
+  color: #ff3b30;
+}
+
+.sidebar-btn-logout .sidebar-btn-icon {
+  opacity: 0.5;
+}
+
+.sidebar-btn-logout:hover {
+  background-color: rgba(255, 59, 48, 0.1);
+  color: #ff3b30;
+}
+
+.sidebar-btn-logout:hover .sidebar-btn-icon {
+  opacity: 0.9;
+}
+
 .ai-assistant-btn {
   background: linear-gradient(
     135deg,

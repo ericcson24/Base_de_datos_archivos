@@ -1,0 +1,436 @@
+/* variables de tema del panel y clases compartidas (modales, glassmorphism) */
+/* esto antes estaba repartido en UserPanel.css pero como muchos componentes */
+/* lo usan, lo dejamos aqui para que este disponible en toda la app */
+
+:root {
+  --sidebar-width: 280px;
+  --sidebar-height-mobile: 60px;
+  --main-padding: 1.5rem;
+  --thumbnail-size: 52px;
+  --font-main: 1rem;
+  --border-radius: 12px;
+  --shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+  --shadow-hover: 0 8px 32px rgba(0, 0, 0, 0.12);
+
+  --bg-gradient: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+  --text-color: #333;
+  --sidebar-bg: rgba(255, 255, 255, 0.9);
+  --sidebar-border: rgba(0, 0, 0, 0.1);
+  --sidebar-text: #333;
+  --sidebar-btn-bg: rgba(0, 0, 0, 0.08);
+  --sidebar-btn-hover: rgba(25, 118, 210, 0.2);
+  --sidebar-btn-text: #333;
+  --file-grid-bg: rgba(255, 255, 255, 0.08);
+  --file-row-bg: rgba(188, 162, 162, 0.08);
+  --file-row-hover: #d2e3fc;
+  --file-name-color: #333;
+  --modal-bg: rgba(255, 255, 255, 0.6);
+  --modal-border: rgba(0, 0, 0, 0.1);
+  --input-border: #e0e0e0;
+  --input-focus-border: #4285f4;
+  --button-secondary-bg: #f8f9fa;
+  --button-secondary-text: #666;
+  --button-primary-bg: #4285f4;
+  --button-primary-text: white;
+  --file-size-bg: linear-gradient(135deg, #e3f2fd, #f3e5f5);
+  --file-size-text: #555;
+  --file-size-border: rgba(0, 0, 0, 0.1);
+  --folder-bg: linear-gradient(135deg, rgba(255, 193, 7, 0.1), rgba(255, 235, 59, 0.1));
+  --folder-border: rgba(255, 193, 7, 0.2);
+  --folder-icon: #f57c00;
+  --menu-bg: rgba(255, 255, 255, 0.9);
+  --menu-border: rgba(0, 0, 0, 0.1);
+  --menu-text: #666;
+  --menu-hover-bg: rgba(0, 0, 0, 0.1);
+  --menu-hover-text: #333;
+  --back-btn-bg: rgba(255, 255, 255, 0.9);
+  --back-btn-border: rgba(0, 0, 0, 0.1);
+  --back-btn-text: #333;
+  --back-btn-hover-bg: #f8f9fa;
+  --empty-text: #666;
+  --panel-bg: rgba(255, 255, 255, 0.9);
+  --panel-border: rgba(0, 0, 0, 0.1);
+  --panel-text: #333;
+  --panel-secondary-text: #666;
+  --viewer-bg: rgba(255, 255, 255, 0.95);
+  --viewer-border: rgba(0, 0, 0, 0.1);
+  --viewer-header-border: #e0e0e0;
+  --text-viewer-bg: #f8f9fa;
+  --text-viewer-text: #333;
+  --hover-preview-bg: rgba(255, 255, 255, 0.95);
+  --hover-preview-border: rgba(0, 0, 0, 0.1);
+  --hover-preview-text: #333;
+  --hover-preview-secondary-text: #666;
+  --control-bg: rgba(255, 255, 255, 0.9);
+  --control-border: rgba(0, 0, 0, 0.1);
+  --control-text: #333;
+  --control-placeholder: #999;
+  --control-btn-bg: #f8f9fa;
+  --control-btn-hover-bg: #e9ecef;
+  --control-btn-text: #666;
+  --control-btn-active-bg: #4285f4;
+  --control-btn-active-text: white;
+  --search-result-bg: rgba(66, 133, 244, 0.08);
+  --search-result-text: #1976d2;
+  --search-result-border: rgba(66, 133, 244, 0.2);
+  --clear-btn-text: #999;
+  --clear-btn-hover-text: #666;
+}
+
+[data-theme="dark"] {
+  --bg-gradient: linear-gradient(135deg, #0a0a0a 0%, #1a1a1a 100%);
+  --text-color: #ffffff;
+  --sidebar-bg: rgba(15, 15, 15, 0.6);
+  --sidebar-border: rgba(255, 255, 255, 0.1);
+  --sidebar-text: #ffffff;
+  --sidebar-btn-bg: rgba(255, 255, 255, 0.08);
+  --sidebar-btn-hover: rgba(66, 133, 244, 0.25);
+  --sidebar-btn-text: #ffffff;
+  --file-grid-bg: rgba(255, 255, 255, 0.03);
+  --file-row-bg: rgba(50, 50, 50, 0.3);
+  --file-row-hover: rgba(66, 133, 244, 0.15);
+  --file-name-color: #ffffff;
+  --modal-bg: rgba(20, 20, 20, 0.95);
+  --modal-border: rgba(255, 255, 255, 0.1);
+  --input-border: #404040;
+  --input-focus-border: #4285f4;
+  --button-secondary-bg: #404040;
+  --button-secondary-text: #cccccc;
+  --button-primary-bg: #4285f4;
+  --button-primary-text: white;
+  --file-size-bg: linear-gradient(135deg, #2a2a2a, #3a3a3a);
+  --file-size-text: #cccccc;
+  --file-size-border: rgba(255, 255, 255, 0.1);
+  --folder-bg: linear-gradient(135deg, rgba(255, 193, 7, 0.1), rgba(255, 152, 0, 0.1));
+  --folder-border: rgba(255, 193, 7, 0.2);
+  --folder-icon: #ffb74d;
+  --menu-bg: rgba(30, 30, 30, 0.9);
+  --menu-border: rgba(255, 255, 255, 0.1);
+  --menu-text: #cccccc;
+  --menu-hover-bg: rgba(255, 255, 255, 0.1);
+  --menu-hover-text: #ffffff;
+  --back-btn-bg: rgba(30, 30, 30, 0.9);
+  --back-btn-border: rgba(255, 255, 255, 0.1);
+  --back-btn-text: #ffffff;
+  --back-btn-hover-bg: #404040;
+  --empty-text: #cccccc;
+  --panel-bg: rgba(30, 30, 30, 0.9);
+  --panel-border: rgba(255, 255, 255, 0.1);
+  --panel-text: #ffffff;
+  --panel-secondary-text: #cccccc;
+  --viewer-bg: rgba(20, 20, 20, 0.95);
+  --viewer-border: rgba(255, 255, 255, 0.1);
+  --viewer-header-border: #404040;
+  --text-viewer-bg: #2a2a2a;
+  --text-viewer-text: #ffffff;
+  --hover-preview-bg: rgba(20, 20, 20, 0.95);
+  --hover-preview-border: rgba(255, 255, 255, 0.1);
+  --hover-preview-text: #ffffff;
+  --hover-preview-secondary-text: #cccccc;
+  --control-bg: rgba(40, 40, 40, 0.9);
+  --control-border: rgba(255, 255, 255, 0.1);
+  --control-text: #ffffff;
+  --control-placeholder: #999;
+  --control-btn-bg: #505050;
+  --control-btn-hover-bg: #606060;
+  --control-btn-text: #cccccc;
+  --control-btn-active-bg: #4285f4;
+  --control-btn-active-text: white;
+  --search-result-bg: rgba(66, 133, 244, 0.15);
+  --search-result-text: #64b5f6;
+  --search-result-border: rgba(66, 133, 244, 0.3);
+  --clear-btn-text: #888;
+  --clear-btn-hover-text: #bbb;
+}
+
+.bg {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  background: var(--bg-gradient);
+}
+
+.search-input-reset {
+  outline: none !important;
+  box-shadow: none !important;
+  border: none !important;
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+.search-input-reset:focus {
+  outline: none !important;
+  box-shadow: none !important;
+  border: none !important;
+}
+
+.hidden-input {
+  display: none;
+}
+
+.fallback-icon-hidden {
+  display: none;
+}
+
+.file-icon.fallback-icon-hidden,
+.file-fallback-icon.fallback-icon-hidden {
+  display: none;
+}
+
+/* modales compartidos */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.modal-content {
+  background: var(--modal-bg);
+  padding: 2rem;
+  border-radius: 12px;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.35);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid var(--sidebar-border);
+  min-width: 300px;
+  max-width: 500px;
+  box-sizing: border-box;
+}
+
+.modal-content h3 {
+  margin-bottom: 1rem;
+  color: var(--text-color);
+}
+
+.modal-content input {
+  width: 100%;
+  padding: 0.75rem;
+  border: 2px solid var(--input-border);
+  border-radius: 6px;
+  font-size: 1rem;
+  margin-bottom: 1rem;
+}
+
+.modal-content input:focus {
+  outline: none;
+  border-color: var(--input-focus-border);
+}
+
+.modal-buttons {
+  display: flex;
+  gap: 1rem;
+  justify-content: flex-end;
+}
+
+.modal-buttons button {
+  padding: 0.5rem 1rem;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 0.9rem;
+}
+
+.modal-buttons button:first-child {
+  background: var(--button-secondary-bg);
+  color: var(--button-secondary-text);
+}
+
+.modal-buttons button:last-child {
+  background: var(--button-primary-bg);
+  color: var(--button-primary-text);
+}
+
+.modal-buttons button:hover {
+  opacity: 0.9;
+}
+
+/* glassmorphism */
+.glassmorphism {
+  background: rgba(255, 255, 255, 0.6);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid var(--sidebar-border);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.35);
+}
+
+.glassmorphism-strong {
+  background: rgba(255, 255, 255, 0.7);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid var(--sidebar-border);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.35);
+}
+
+.glassmorphism-light {
+  background: rgba(255, 255, 255, 0.5);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid var(--sidebar-border);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.35);
+}
+
+.glassmorphism-modal {
+  background: rgba(255, 255, 255, 0.6);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid var(--sidebar-border);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.35);
+}
+
+.glassmorphism-input {
+  background: rgba(255, 255, 255, 0.6);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid var(--sidebar-border);
+}
+
+.glassmorphism-button {
+  background: rgba(255, 255, 255, 0.6);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid var(--sidebar-border);
+}
+
+.glassmorphism-panel {
+  background: rgba(255, 255, 255, 0.6);
+  backdrop-filter: blur(15px);
+  -webkit-backdrop-filter: blur(15px);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.glassmorphism-preview {
+  background: rgba(255, 255, 255, 0.9);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.25);
+}
+
+.glassmorphism-textarea {
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+}
+
+.glassmorphism-thumbnail {
+  background: rgba(255, 255, 255, 0.8);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+[data-theme="dark"] .glassmorphism {
+  background: rgba(30, 30, 30, 0.9);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+[data-theme="dark"] .glassmorphism-strong {
+  background: rgba(30, 30, 30, 0.95);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+}
+
+[data-theme="dark"] .glassmorphism-light {
+  background: rgba(30, 30, 30, 0.7);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+[data-theme="dark"] .glassmorphism-modal {
+  background: rgba(20, 20, 20, 0.9);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+[data-theme="dark"] .glassmorphism-input {
+  background: rgba(40, 40, 40, 0.95);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+}
+
+[data-theme="dark"] .glassmorphism-button {
+  background: rgba(50, 50, 50, 0.8);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+[data-theme="dark"] .glassmorphism-panel {
+  background: rgba(30, 30, 30, 0.9);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+[data-theme="dark"] .glassmorphism-preview {
+  background: rgba(20, 20, 20, 0.9);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+[data-theme="dark"] .glassmorphism-textarea {
+  background: rgba(40, 40, 40, 0.95);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+}
+
+[data-theme="dark"] .glassmorphism-thumbnail {
+  background: rgba(50, 50, 50, 0.8);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+/* pantalla de carga (antes en App.css) */
+.App {
+  text-align: center;
+}
+
+.app-loading-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 100vh;
+  background: #f8fafc;
+  transition: background 0.3s ease;
+}
+
+[data-theme="dark"] .app-loading-container {
+  background: #0f172a;
+}
+
+.app-loading-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 24px;
+}
+
+.app-loading-logo {
+  width: 72px;
+  height: 72px;
+  filter: drop-shadow(0 4px 12px rgba(0, 0, 0, 0.15));
+  animation: app-logo-float 2s ease-in-out infinite;
+}
+
+[data-theme="dark"] .app-loading-logo {
+  filter: drop-shadow(0 4px 12px rgba(0, 0, 0, 0.4));
+}
+
+@keyframes app-logo-float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-8px); }
+}
+
+.app-loading-spinner {
+  width: 36px;
+  height: 36px;
+  border: 3px solid rgba(37, 99, 235, 0.15);
+  border-top-color: #2563eb;
+  border-radius: 50%;
+  animation: app-spin 0.8s linear infinite;
+}
+
+[data-theme="dark"] .app-loading-spinner {
+  border-color: rgba(56, 189, 248, 0.15);
+  border-top-color: #38bdf8;
+}
+
+@keyframes app-spin {
+  to { transform: rotate(360deg); }
+}

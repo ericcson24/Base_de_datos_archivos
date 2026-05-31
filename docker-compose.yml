@@ -1,7 +1,7 @@
 services:
-  # --- Frontend (React) ---
+  # --- Frontend Next.js (TSX) ---
   frontend:
-    build: 
+    build:
       context: ./front
       network: host
     restart: unless-stopped
